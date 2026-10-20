@@ -88,6 +88,8 @@ export interface DummySpawn {
 export interface MapDef {
   id: string;
   name: string;
+  /** kanji name for the match intro */
+  jp: string;
   description: string;
   kind: 'lobby' | 'arena';
   /** Walkable floor (union of shapes). */
@@ -230,6 +232,7 @@ function buildLobby(): MapDef {
   return {
     id: 'lobby',
     name: 'Proving Grounds',
+    jp: '修練場',
     description: 'Wander, spar and settle scores. The shrine plaza is a safe zone.',
     kind: 'lobby',
     floor: [{ type: 'rect', x: 0, z: 0, hw: LOBBY_HALF, hd: LOBBY_HALF }],
@@ -268,6 +271,7 @@ function buildLobby(): MapDef {
 const sakura: MapDef = {
   id: 'sakura',
   name: 'Sakura Courtyard',
+  jp: '桜庭',
   description: 'A temple courtyard in full bloom. Lanterns break up the sightlines.',
   kind: 'arena',
   floor: [{ type: 'circle', x: 0, z: 0, r: 16 }],
@@ -325,6 +329,7 @@ const bambooProps: Prop[] = (() => {
 const bamboo: MapDef = {
   id: 'bamboo',
   name: 'Moonlit Grove',
+  jp: '月下竹林',
   description: 'Dense bamboo under a full moon. Use the stalks to break line and reset.',
   kind: 'arena',
   floor: [{ type: 'rect', x: 0, z: 0, hw: 17, hd: 17 }],
@@ -363,6 +368,7 @@ const bamboo: MapDef = {
 const summit: MapDef = {
   id: 'summit',
   name: 'Frozen Summit',
+  jp: '氷峰',
   description: 'A wind-scoured peak above the clouds. One wrong step and it is a long way down.',
   kind: 'arena',
   floor: [{ type: 'circle', x: 0, z: 0, r: 15 }],
@@ -403,6 +409,7 @@ const summit: MapDef = {
 const forge: MapDef = {
   id: 'forge',
   name: 'Molten Forge',
+  jp: '鍛冶場',
   description: 'A dwarven foundry. Lava pools burn anyone who strays into the corners.',
   kind: 'arena',
   floor: [{ type: 'rect', x: 0, z: 0, hw: 15, hd: 15 }],
@@ -450,6 +457,7 @@ const forge: MapDef = {
 const bridge: MapDef = {
   id: 'bridge',
   name: 'Sky Bridge',
+  jp: '天橋',
   description: 'A narrow span between two peaks at dusk. Fight on the platform or risk the edge.',
   kind: 'arena',
   floor: [
@@ -493,6 +501,7 @@ const bridge: MapDef = {
 const ruins: MapDef = {
   id: 'ruins',
   name: 'Sunken Ruins',
+  jp: '水没寺',
   description: 'A drowned temple in the rain. Broken pillars and walls make for tight corners.',
   kind: 'arena',
   floor: [{ type: 'circle', x: 0, z: 0, r: 17 }],

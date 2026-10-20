@@ -194,7 +194,7 @@ export function glyphTexture(text: string, color: string, bg: string): THREE.Can
     g.arc(16, 16, 14, 0, Math.PI * 2);
     g.fill();
     g.fillStyle = color;
-    g.font = 'bold 22px serif';
+    g.font = `22px 'Yuji Mai', serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText(text, 16, 17);

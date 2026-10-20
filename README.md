@@ -139,6 +139,17 @@ tests/           vitest: combat rules + server integration
 scripts/         headless-browser screenshot helpers used during development
 ```
 
+### Look and feel
+
+The UI is styled after ink-and-lacquer Japanese design: black lacquer panels with gold trim, vermilion seals, washi-paper scrolls for menus and kanji accents (始め on FIGHT, 勝利 on a win, 死 on death).
+- **Fonts:** all from Google Fonts.
+  - **Yuji Mai** (brush calligraphy) for kanji and big callouts.
+  - **Zen Antique** for headings and names.
+  - **Shippori Mincho B1** for text.
+  - **DotGothic16** (a Japanese pixel font) for small numbers and key hints.
+- **Brushwork:** generated in code by `src/client/ink.ts` and exposed as CSS variables. This covers the enso circles on the touch buttons, the brush strokes behind banners, the paper grain and the seigaiha waves on the title screen.
+- **Where to restyle:** colors and type live at the top of `src/client/styles.css`. Each character and map has a `jp` kanji name in `characters.ts` / `maps.ts`.
+
 ### Designing characters
 
 Gameplay lives entirely in `src/shared/characters.ts`: names, stats, frame data, passives and abilities. Change a number there and both the server and the client pick it up.

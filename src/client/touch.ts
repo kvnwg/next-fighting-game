@@ -53,14 +53,14 @@ export class TouchControls {
           <button class="tc-round" data-act="menu" aria-label="Menu">${ICON_MENU}</button>
           <button class="tc-round" data-act="chat" aria-label="Chat">${ICON_CHAT}</button>
         </div>
-        <button class="tc-btn tc-special hidden" data-bind="special">Special</button>
-        <button class="tc-btn tc-parry" data-bind="block">Parry</button>
-        <button class="tc-btn tc-heavy" data-bind="heavy">Heavy</button>
-        <button class="tc-btn tc-dodge" data-bind="dodge">Dodge<span class="tc-cd"></span></button>
-        <button class="tc-btn tc-light" data-bind="light">Light</button>
-        <button class="tc-btn tc-jump" data-bind="jump">Jump</button>
+        <button class="tc-btn tc-special hidden" data-bind="special"><i class="tc-jp">危</i>Special</button>
+        <button class="tc-btn tc-parry" data-bind="block"><i class="tc-jp">弾</i>Parry</button>
+        <button class="tc-btn tc-heavy" data-bind="heavy"><i class="tc-jp">重</i>Heavy</button>
+        <button class="tc-btn tc-dodge" data-bind="dodge"><i class="tc-jp">避</i>Dodge<span class="tc-cd"></span></button>
+        <button class="tc-btn tc-light" data-bind="light"><i class="tc-jp">斬</i>Light</button>
+        <button class="tc-btn tc-jump" data-bind="jump"><i class="tc-jp">跳</i>Jump</button>
         <button class="tc-btn tc-ability" data-bind="ability"><span class="tc-name"></span><span class="tc-cd"></span></button>
-        <button class="tc-btn tc-lock" data-bind="lock">Lock</button>
+        <button class="tc-btn tc-lock" data-bind="lock"><i class="tc-jp">狙</i>Lock</button>
       </div>`;
     this.root = t.content.firstElementChild as HTMLElement;
     parent.prepend(this.root); // under the rest of the HUD, so menus and popups stay tappable

@@ -24,6 +24,9 @@ import { CardData, Preview, UI } from './ui';
 
 type MatchMsg = Extract<ServerMsg, { t: 'match' }>;
 
+/** kanji numerals for countdowns and round titles */
+const KANJI_NUM = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+
 export function startApp(root: HTMLElement, offline = false): void {
   new App(root, offline);
 }
@@ -109,6 +112,8 @@ class App {
     this.loadMap(LOBBY_MAP);
     this.bindNet();
     requestAnimationFrame((t) => this.frame(t));
+    // dev builds: reach the app from the console / screenshot scripts
+    if (import.meta.env.DEV) (window as unknown as { __app: App }).__app = this;
   }
 
   // ------------------------------------------------------------------ connection
@@ -305,13 +310,13 @@ class App {
         this.lock = this.fighters.get(oppId) ?? null;
         break;
       case 'fight':
-        this.ui.banner('FIGHT!', '', 900, 'fight');
+        this.ui.banner('Fight', '', 900, 'fight', '始め');
         audio.play('fight');
         this.lock = this.fighters.get(oppId) ?? null;
         break;
       case 'roundEnd': {
         const w = m.roundWinner;
-        this.ui.banner(w === -1 ? 'DRAW' : w === m.you ? 'ROUND WON' : 'ROUND LOST', `${m.scores[m.you]} - ${m.scores[m.you === 0 ? 1 : 0]}`, 2500, w === m.you ? 'win' : 'lose');
+        this.ui.banner(w === -1 ? 'Draw' : w === m.you ? 'Round won' : 'Round lost', `${m.scores[m.you]} - ${m.scores[m.you === 0 ? 1 : 0]}`, 2500, w === -1 ? 'draw' : w === m.you ? 'win' : 'lose', w === -1 ? '引分' : w === m.you ? '勝' : '敗');
         break;
       }
       case 'matchEnd':
@@ -455,7 +460,7 @@ class App {
         stop(75);
         if (mine) this.cam.shake(0.12, 0.15);
         if (meD) {
-          this.ui.floatText('DEFLECT', pos.x, pos.y + 0.4, pos.z, 'good big');
+          this.ui.floatText('DEFLECT', pos.x, pos.y + 0.4, pos.z, 'good big', '弾');
           this.local?.onDeflected();
         }
         else if (meA) this.ui.floatText('DEFLECTED', pos.x, pos.y + 0.4, pos.z, 'bad');
@@ -472,7 +477,7 @@ class App {
         this.effects.ring(d?.pos ?? pos, '#ff9a2a', 3);
         play('guardBreak');
         stop(90);
-        this.ui.floatText('GUARD BROKEN', head(d).x, head(d).y, head(d).z, 'warn big');
+        this.ui.floatText('GUARD BROKEN', head(d).x, head(d).y, head(d).z, 'warn big', '破');
         if (mine) this.cam.shake(0.2, 0.25);
         break;
       case 'hit':
@@ -498,7 +503,7 @@ class App {
         d?.model.react('hit');
         stop(150);
         play('deathblow', Math.min(1, vol * 1.3));
-        this.ui.floatText('DEATHBLOW', head(d).x, head(d).y + 0.3, head(d).z, 'bad huge');
+        this.ui.floatText('DEATHBLOW', head(d).x, head(d).y + 0.3, head(d).z, 'bad huge', '止め');
         if (mine) {
           this.cam.shake(0.35, 0.4);
           this.renderer.flash = 0.2;
@@ -509,7 +514,7 @@ class App {
         this.effects.burst(pos, { count: 30, color: ['#ffffff', '#c8e8ff'], speed: 7, life: 0.5 });
         play('mikiri');
         stop(100);
-        this.ui.floatText('MIKIRI COUNTER', head(d).x, head(d).y, head(d).z, 'good big');
+        this.ui.floatText('MIKIRI COUNTER', head(d).x, head(d).y, head(d).z, 'good big', '見切り');
         if (mine) this.cam.shake(0.2, 0.2);
         break;
       case 'evade':
@@ -524,7 +529,7 @@ class App {
         play('hit');
         a?.model.react('hit');
         stop(90);
-        this.ui.floatText('COUNTER!', head(d).x, head(d).y, head(d).z, 'good big');
+        this.ui.floatText('COUNTER!', head(d).x, head(d).y, head(d).z, 'good big', '返し');
         if (e.dmg) this.ui.floatText(`-${e.dmg}`, head(a).x, head(a).y - 0.5, head(a).z, meA ? 'dmg me' : 'dmg');
         break;
       case 'feint':
@@ -539,18 +544,18 @@ class App {
         }
         break;
       case 'fall':
-        this.ui.floatText('RING OUT', pos.x, 1.5, pos.z, 'bad big');
+        this.ui.floatText('RING OUT', pos.x, 1.5, pos.z, 'bad big', '落');
         break;
       default:
         break;
     }
     if (e.tags?.includes('broken') && d) {
-      this.ui.floatText('POSTURE BROKEN', head(d).x, head(d).y + 0.4, head(d).z, 'warn big');
+      this.ui.floatText('POSTURE BROKEN', head(d).x, head(d).y + 0.4, head(d).z, 'warn big', '崩し');
       this.effects.ring(d.pos, '#ffb02a', 3.2);
       if (e.k !== 'guardBreak') play('guardBreak');
     }
     if (e.tags?.includes('abroken') && a) {
-      this.ui.floatText('POSTURE BROKEN', head(a).x, head(a).y + 0.4, head(a).z, 'warn big');
+      this.ui.floatText('POSTURE BROKEN', head(a).x, head(a).y + 0.4, head(a).z, 'warn big', '崩し');
       this.effects.ring(a.pos, '#ffb02a', 3.2);
       play('guardBreak');
     }
@@ -687,7 +692,7 @@ class App {
       const secs = Math.ceil((this.match.endsAt - now) / 1000);
       if (secs !== this.lastCountdown && secs > 0 && secs <= 3) {
         this.lastCountdown = secs;
-        this.ui.banner(String(secs), `Round ${this.match.round}`, 950, 'count');
+        this.ui.banner(String(secs), `第${KANJI_NUM[this.match.round] ?? this.match.round}戦 · Round ${this.match.round}`, 950, 'count', KANJI_NUM[secs]);
         audio.play('countdown');
       }
     }

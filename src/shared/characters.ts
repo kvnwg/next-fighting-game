@@ -124,6 +124,8 @@ export interface Palette {
 export interface CharacterDef {
   id: CharacterId;
   name: string;
+  /** kanji name shown in menus (flavour text; change it along with the design) */
+  jp: string;
   weapon: string;
   weaponKind: WeaponKind;
   role: string;
@@ -148,6 +150,7 @@ export interface CharacterDef {
 const ronin: CharacterDef = {
   id: 'ronin',
   name: 'Ronin',
+  jp: '浪人',
   weapon: 'Katana',
   weaponKind: 'katana',
   role: 'All-rounder',
@@ -176,6 +179,7 @@ const ronin: CharacterDef = {
 const juggernaut: CharacterDef = {
   id: 'juggernaut',
   name: 'Juggernaut',
+  jp: '巨漢',
   weapon: 'Greathammer',
   weaponKind: 'greathammer',
   role: 'Heavy bruiser',
@@ -204,6 +208,7 @@ const juggernaut: CharacterDef = {
 const duelist: CharacterDef = {
   id: 'duelist',
   name: 'Duelist',
+  jp: '剣客',
   weapon: 'Rapier',
   weaponKind: 'rapier',
   role: 'Fencer / mind games',
@@ -236,6 +241,7 @@ const duelist: CharacterDef = {
 const lancer: CharacterDef = {
   id: 'lancer',
   name: 'Lancer',
+  jp: '槍兵',
   weapon: 'Spear',
   weaponKind: 'spear',
   role: 'Zoner',
@@ -265,6 +271,7 @@ const lancer: CharacterDef = {
 const shade: CharacterDef = {
   id: 'shade',
   name: 'Shade',
+  jp: '影',
   weapon: 'Twin Daggers',
   weaponKind: 'daggers',
   role: 'Assassin',
@@ -293,6 +300,7 @@ const shade: CharacterDef = {
 const reaper: CharacterDef = {
   id: 'reaper',
   name: 'Reaper',
+  jp: '死神',
   weapon: 'Scythe',
   weaponKind: 'scythe',
   role: 'Sustain / control',
@@ -320,6 +328,7 @@ const reaper: CharacterDef = {
 const monk: CharacterDef = {
   id: 'monk',
   name: 'Monk',
+  jp: '武僧',
   weapon: 'Gauntlets',
   weaponKind: 'gauntlets',
   role: 'Posture breaker',
@@ -349,6 +358,7 @@ const monk: CharacterDef = {
 const paladin: CharacterDef = {
   id: 'paladin',
   name: 'Paladin',
+  jp: '聖騎士',
   weapon: 'Sword & Shield',
   weaponKind: 'swordShield',
   role: 'Defender',

@@ -15,6 +15,9 @@ const h = (html: string): HTMLElement => {
 export const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+/** A button label with its kanji tag in front. */
+const jpLabel = (kanji: string, text: string) => `<span class="bk">${kanji}</span>${text}`;
+
 export function rankBadge(r: RankInfo, small = false): string {
   const label = r.placed ? r.label : small ? 'Unranked' : r.label;
   return `<span class="rank-badge ${small ? 'small' : ''}" style="--rank:${r.color}"><i></i>${esc(label)}</span>`;
@@ -107,11 +110,16 @@ export class UI {
 
     this.title = h(`
       <div class="title-screen">
+        <div class="title-waves"></div>
         <div class="title-box">
-          <h1 class="logo">${GAME_TITLE}</h1>
-          <div class="subtitle">${GAME_SUBTITLE}</div>
-          <label class="field"><span>Your name</span><input id="name-input" maxlength="16" autocomplete="off" spellcheck="false" /></label>
-          <button class="btn big" id="enter-btn">${offline ? 'Play' : 'Enter the Grounds'}</button>
+          <div class="logo-wrap">
+            <div class="logo-sun"></div>
+            <h1 class="logo">${GAME_TITLE}</h1>
+            <div class="hanko" aria-hidden="true">弾</div>
+          </div>
+          <div class="subtitle"><span class="jp">一騎打ち</span>${GAME_SUBTITLE}</div>
+          <label class="field"><span>Your name <i class="jp">名</i></span><input id="name-input" maxlength="16" autocomplete="off" spellcheck="false" /></label>
+          <button class="btn big" id="enter-btn">${jpLabel('参る', offline ? 'Play' : 'Enter the Grounds')}</button>
           <div class="title-status" id="title-status">${
             offline ? 'Single player: roam the lobby, spar, practice, and climb ranked against AI opponents. Progress saves in this browser.' : ''
           }</div>
@@ -158,24 +166,25 @@ export class UI {
         </div>
         <div class="top-center">
           <div class="match-timer hidden">0:00</div>
-          <div class="zone-indicator hidden">Safe zone · PvP disabled</div>
+          <div class="zone-indicator hidden"><span class="jp">安全地帯</span>Safe zone · PvP disabled</div>
           <div class="net-info"><span id="online"></span><span id="fps"></span></div>
         </div>
         <div class="side-menu">
-          <button class="btn ranked" id="btn-ranked">${offline ? 'Ranked vs AI' : 'Ranked'}<span class="key"> [K]</span></button>
+          <button class="btn ranked" id="btn-ranked">${jpLabel('段位戦', offline ? 'Ranked vs AI' : 'Ranked')}<span class="key"> [K]</span></button>
           <div class="practice-group">
-            <button class="btn" id="btn-practice">Practice<span class="key"> [P]</span></button>
+            <button class="btn" id="btn-practice">${jpLabel('稽古', 'Practice')}<span class="key"> [P]</span></button>
             <select id="practice-diff" aria-label="Bot difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
           </div>
-          <button class="btn small" id="btn-chars">Characters<span class="key"> [C]</span></button>
-          <button class="btn small" id="btn-ladder">Ladder<span class="key"> [L]</span></button>
-          <button class="btn small" id="btn-help">Help<span class="key"> [H]</span></button>
-          <button class="btn small danger hidden" id="btn-forfeit">Forfeit</button>
+          <button class="btn small" id="btn-chars">${jpLabel('武者', 'Characters')}<span class="key"> [C]</span></button>
+          <button class="btn small" id="btn-ladder">${jpLabel('番付', 'Ladder')}<span class="key"> [L]</span></button>
+          <button class="btn small" id="btn-help">${jpLabel('心得', 'Help')}<span class="key"> [H]</span></button>
+          <button class="btn small danger hidden" id="btn-forfeit">${jpLabel('降参', 'Forfeit')}</button>
           <div class="queue-panel hidden">
+            <div class="queue-jp">対戦相手探索中</div>
             <div class="queue-title">${offline ? 'Finding an opponent near your rating…' : 'Searching for a ranked duel…'}</div>
             <div class="queue-time">0:00</div>
             <div class="queue-count"></div>
-            <button class="btn small" id="btn-cancel">Cancel</button>
+            <button class="btn small" id="btn-cancel">${jpLabel('取消', 'Cancel')}</button>
           </div>
           <div class="esc-hint hidden">Esc to free the cursor</div>
         </div>
@@ -187,7 +196,7 @@ export class UI {
         <div class="toasts"></div>
         <div class="prompt hidden"></div>
         <div class="challenge-popup hidden"></div>
-        <div class="death-overlay hidden"><div class="death-title">SLAIN</div><div class="death-sub"></div></div>
+        <div class="death-overlay hidden"><div class="death-kanji">死</div><div class="death-title">Slain</div><div class="death-sub"></div></div>
         <div class="chat">
           <div class="chat-log"></div>
           <input class="chat-input hidden" maxlength="140" placeholder="Say something… (Enter to send, Esc to cancel)" />
@@ -275,14 +284,14 @@ export class UI {
     forfeit.addEventListener('click', () => {
       if (performance.now() < armedUntil) {
         armedUntil = 0;
-        forfeit.textContent = 'Forfeit';
+        forfeit.innerHTML = jpLabel('降参', 'Forfeit');
         this.handlers.onForfeit();
         return;
       }
       armedUntil = performance.now() + 3000;
-      forfeit.textContent = 'Click again to forfeit';
+      forfeit.innerHTML = jpLabel('降参', this.touch ? 'Tap again to forfeit' : 'Click again to forfeit');
       setTimeout(() => {
-        if (performance.now() >= armedUntil) forfeit.textContent = 'Forfeit';
+        if (performance.now() >= armedUntil) forfeit.innerHTML = jpLabel('降参', 'Forfeit');
       }, 3100);
     });
     this.chatInput.addEventListener('keydown', (e) => {
@@ -460,11 +469,12 @@ export class UI {
     if (x !== null) this.els.reticle.style.transform = `translate(${x}px, ${y}px)`;
   }
 
-  banner(text: string, sub = '', ms = 1600, cls = ''): void {
+  /** Big centre-screen callout: brushed kanji over the English text. */
+  banner(text: string, sub = '', ms = 1600, cls = '', kanji = ''): void {
     const b = this.els.banner;
     const s = this.els.subbanner;
-    b.className = `banner ${cls}`;
-    b.textContent = text;
+    b.className = `banner ${cls}${kanji ? '' : ' en-only'}`;
+    b.innerHTML = kanji ? `<span class="b-jp">${kanji}</span><span class="b-en">${esc(text)}</span>` : `<span class="b-en">${esc(text)}</span>`;
     s.textContent = sub;
     s.classList.toggle('hidden', !sub);
     // restart the pop animation
@@ -537,8 +547,8 @@ export class UI {
     this.plates.clear();
   }
 
-  floatText(text: string, x: number, y: number, z: number, cls: string): void {
-    const el = h(`<div class="floater ${cls}">${esc(text)}</div>`);
+  floatText(text: string, x: number, y: number, z: number, cls: string, kanji = ''): void {
+    const el = h(`<div class="floater ${cls}">${kanji ? `<span class="f-jp">${kanji}</span>` : ''}${esc(text)}</div>`);
     this.floatLayer.appendChild(el);
     this.floaters.push({ el, x, y, z, life: 1.0, max: 1.0 });
     if (this.floaters.length > 30) {
@@ -597,8 +607,9 @@ export class UI {
   showChallenge(from: string, name: string, char: CharacterId): void {
     this.challengeFrom = from;
     const el = this.els.challenge;
-    el.innerHTML = `<div><b>${esc(name)}</b> (${CHARACTERS[char].name}) challenges you to a duel!</div>
-      <div class="row"><button class="btn small" data-a="1">Accept [Y]</button><button class="btn small danger" data-a="0">Decline [N]</button></div>`;
+    el.innerHTML = `<div class="ch-seal" aria-hidden="true">挑</div><div class="ch-head">挑戦状 · A challenge</div>
+      <div><b>${esc(name)}</b> (${CHARACTERS[char].name}) challenges you to a duel!</div>
+      <div class="row"><button class="btn small" data-a="1">${jpLabel('受', 'Accept')}<span class="key"> [Y]</span></button><button class="btn small danger" data-a="0">${jpLabel('断', 'Decline')}<span class="key"> [N]</span></button></div>`;
     el.classList.remove('hidden');
     el.querySelectorAll('button').forEach((b) =>
       b.addEventListener('click', () => this.answerChallenge((b as HTMLElement).dataset.a === '1')),
@@ -637,10 +648,10 @@ export class UI {
     this.handlers.onModalChange(false);
   }
 
-  private frame(title: string, body: string, wide = false): void {
+  private frame(title: string, body: string, wide = false, kanji = ''): void {
     this.preview?.dispose();
     this.preview = null;
-    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''}"><div class="modal-head"><h2>${title}</h2><button class="btn small close">✕<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
+    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''}"><div class="modal-head"><h2>${kanji ? `<span class="mk">${kanji}</span>` : ''}${title}</h2><button class="btn small close">✕<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
     this.modal.classList.remove('hidden');
     this.modal.querySelector('.close')!.addEventListener('click', () => this.closeModal());
   }
@@ -650,7 +661,7 @@ export class UI {
     this.handlers.onModalChange(true);
     if (kind === 'chars') this.renderChars(currentChar);
     else if (kind === 'ladder') {
-      this.frame('Ranked Ladder', `<div class="ladder">Loading…</div>`);
+      this.frame('Ranked Ladder', `<div class="ladder">Loading…</div>`, false, '番付');
       this.handlers.onLeaderboard();
     } else this.renderHelp();
   }
@@ -659,9 +670,9 @@ export class UI {
     const cards = CHARACTER_IDS.map((id) => {
       const c = CHARACTERS[id];
       return `<button class="char-card ${id === selected ? 'sel' : ''}" data-id="${id}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}">
-        <div class="cc-swatch"></div><div class="cc-name">${c.name}</div><div class="cc-weapon">${c.weapon}</div></button>`;
+        <div class="cc-swatch"></div><span class="cc-jp" aria-hidden="true">${c.jp}</span><div class="cc-name">${c.name}</div><div class="cc-weapon">${c.weapon}</div></button>`;
     }).join('');
-    this.frame('Choose your fighter', `<div class="char-select"><div class="char-grid">${cards}</div><div class="char-detail"></div></div>`, true);
+    this.frame('Choose your fighter', `<div class="char-select"><div class="char-grid">${cards}</div><div class="char-detail"></div></div>`, true, '武者');
     const detail = this.modal.querySelector<HTMLElement>('.char-detail')!;
     const show = (id: CharacterId) => {
       const c = CHARACTERS[id];
@@ -671,7 +682,7 @@ export class UI {
         <div class="cd-top">
           <div class="cd-preview"></div>
           <div class="cd-info">
-            <h3>${c.name} <span class="muted">· ${c.weapon}</span></h3>
+            <h3><span class="cd-jp">${c.jp}</span>${c.name} <span class="muted">· ${c.weapon}</span></h3>
             <div class="role">${c.role}</div>
             <p>${esc(c.description)}</p>
             <div class="cd-stats">HP ${c.stats.hp} · Posture ${c.stats.posture} · Speed ${c.stats.speed}</div>
@@ -685,7 +696,7 @@ export class UI {
           <div><h4>Ability [R] · ${c.ability.name}</h4><p>${esc(c.ability.description)} <span class="muted">(${c.ability.cooldown / 1000}s)</span></p>
             <h4>Passive · ${c.passive.name}</h4><p>${esc(c.passive.description)}</p></div>
         </div>
-        <div class="cd-actions"><button class="btn big" id="pick-char">Play ${c.name}</button><span class="muted">Switch characters inside the lobby safe zone.</span></div>`;
+        <div class="cd-actions"><button class="btn big" id="pick-char">${jpLabel('選', `Play ${c.name}`)}</button><span class="muted">Switch characters inside the lobby safe zone.</span></div>`;
       detail.querySelector('#pick-char')!.addEventListener('click', () => {
         this.handlers.onSelectChar(id);
         this.closeModal();
@@ -795,6 +806,7 @@ export class UI {
         </div>
       </div>`,
       true,
+      '心得',
     );
     const bind = (id: string, apply: (el: HTMLInputElement) => void) => {
       const el = this.modal.querySelector<HTMLInputElement>(id)!;
@@ -821,14 +833,15 @@ export class UI {
 
   matchIntro(mode: MatchMode, mapId: string, players: [RosterEntry, RosterEntry], you: 0 | 1): void {
     const map = MAPS[mapId];
-    const title = mode === 'ranked' ? 'RANKED DUEL' : mode === 'practice' ? 'PRACTICE DUEL' : 'DUEL';
+    const title = mode === 'ranked' ? 'Ranked duel' : mode === 'practice' ? 'Practice duel' : 'Duel';
+    const titleJp = mode === 'ranked' ? '段位戦' : mode === 'practice' ? '稽古' : '決闘';
     const card = (r: RosterEntry, mine: boolean) => {
       const c = CHARACTERS[r.char];
       const rank = r.mmr !== undefined ? rankBadge(rankOf(r.mmr, r.placements ?? 0), true) : '<span class="muted">AI</span>';
-      return `<div class="vs-card ${mine ? 'mine' : ''}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}"><div class="vs-name">${esc(r.name)}</div><div class="vs-char">${c.name} · ${c.weapon}</div>${rank}</div>`;
+      return `<div class="vs-card ${mine ? 'mine' : ''}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}"><span class="vs-jp" aria-hidden="true">${c.jp}</span><div class="vs-name">${esc(r.name)}</div><div class="vs-char">${c.name} · ${c.weapon}</div>${rank}</div>`;
     };
-    const el = h(`<div class="match-intro"><div class="mi-mode">${title}</div><div class="mi-map">${map?.name ?? ''}</div>
-      <div class="mi-vs">${card(players[you], true)}<div class="vs">VS</div>${card(players[you === 0 ? 1 : 0], false)}</div>
+    const el = h(`<div class="match-intro"><div class="mi-mode"><span class="jp">${titleJp}</span>${title}</div><div class="mi-jp">${map?.jp ?? ''}</div><div class="mi-map">${map?.name ?? ''}</div>
+      <div class="mi-vs">${card(players[you], true)}<div class="vs">対</div>${card(players[you === 0 ? 1 : 0], false)}</div>
       <div class="mi-desc">${esc(map?.description ?? '')}</div></div>`);
     this.hud.appendChild(el);
     setTimeout(() => el.classList.add('out'), 3000);
@@ -853,6 +866,7 @@ export class UI {
     }
     const reason = r.reason === 'forfeit' ? (r.won ? 'Opponent forfeited' : 'You forfeited') : r.reason === 'timeout' ? 'Time' : '';
     const el = h(`<div class="result ${r.won ? 'win' : 'lose'}">
+      <div class="res-jp">${r.won ? '勝利' : '敗北'}</div>
       <div class="res-title">${r.won ? 'VICTORY' : 'DEFEAT'}</div>
       <div class="res-score">${r.scores.join(' - ')}${reason ? ` · ${reason}` : ''}</div>
       ${ratingHtml}
