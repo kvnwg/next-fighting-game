@@ -496,13 +496,16 @@ export class MapView {
     ];
     // leave a valley where a low sun disc sits so the peaks don't hide it
     const sunAz = th.sunDisc ? Math.atan2(th.sunDisc[0], th.sunDisc[2]) : null;
+    const sunDir = new THREE.Vector3(...th.sunDir).normalize();
+    const lit = mixSRGB(new THREE.Color(th.sun), new THREE.Color('#ffffff'), 0.3);
+    // faces toward the sun warm up a touch; moonlight barely registers on far ranges
+    const litAmount = th.night ? 0.05 : 0.13;
+    const shade = new THREE.Color(th.ambient);
     for (const range of ranges) {
       const col = hazeAt(range.haze);
-      // mostly self-lit so the sun doesn't pull distant ranges back out of the haze
-      const mat = new THREE.MeshLambertMaterial({ color: col.clone().multiplyScalar(0.06), emissive: col.clone().multiplyScalar(0.92), fog: false });
-      // snow caps catch the light, so they lean toward the sun's colour rather than plain white
-      const capCol = mixSRGB(col, mixSRGB(new THREE.Color('#ffffff'), new THREE.Color(th.sun), 0.35), 0.4);
-      const capMat = new THREE.MeshLambertMaterial({ color: capCol.clone().multiplyScalar(0.06), emissive: capCol.clone().multiplyScalar(0.92), fog: false });
+      // unlit and pre-shaded: a whisper of sun on the lit faces, and the foot of each range
+      // dissolves into the haze so the layers read like a painted backdrop
+      const mat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
       for (let i = 0; i < range.count; i++) {
         const a = (i / range.count) * Math.PI * 2 + rand() * 0.25;
         const r = range.r + rand() * range.spread;
@@ -513,31 +516,48 @@ export class MapView {
           if (off < 0.6) h *= 0.55;
         }
         const w = h * (0.45 + rand() * 0.35);
-        const m = new THREE.Mesh(new THREE.ConeGeometry(w, h, 5), mat);
-        m.position.set(Math.sin(a) * r, base + h / 2, Math.cos(a) * r);
-        m.rotation.y = rand() * 3;
+        const snowy = h - lift > range.h[0] + (range.h[1] - range.h[0]) * 0.6 && !th.night;
+        const geo = ridgeGeometry(rand, w, h, {
+          color: col,
+          haze,
+          lit,
+          shade,
+          sunDir,
+          litAmount,
+          baseFade: range.haze > 0.5 ? 0.7 : 0.55,
+          snow: snowy ? mixSRGB(col, mixSRGB(new THREE.Color('#ffffff'), new THREE.Color(th.sun), 0.35), 0.4) : null,
+        });
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(Math.sin(a) * r, base, Math.cos(a) * r);
+        m.rotation.y = rand() * Math.PI * 2;
         this.group.add(m);
-        if (h - lift > range.h[0] + (range.h[1] - range.h[0]) * 0.6 && !th.night) {
-          const cap = new THREE.Mesh(new THREE.ConeGeometry(w * 0.3, h * 0.3, 5), capMat);
-          cap.position.set(m.position.x, base + h * 0.85, m.position.z);
-          cap.rotation.y = m.rotation.y;
-          this.group.add(cap);
-        }
       }
     }
     if (this.map.edge === 'void') {
-      // sea of clouds below: pale, mostly self-lit puffs that drift slowly
+      // sea of clouds below: soft rounded puffs, sunlit on top and shaded underneath, that drift
+      // slowly. They don't write depth, so the outline pass leaves them soft.
       const abyss = th.below === 'abyss';
-      const cloud = new THREE.MeshBasicMaterial({ color: mixSRGB(new THREE.Color(abyss ? '#1a1420' : '#ffe2b8'), haze, abyss ? 0.35 : 0.35), fog: false });
+      const body = mixSRGB(new THREE.Color(abyss ? '#1a1420' : '#ffe2b8'), haze, 0.35);
+      const top = abyss ? body.clone() : mixSRGB(body, lit, 0.45);
+      const under = mixSRGB(body, abyss ? new THREE.Color('#05040a') : shade, abyss ? 0.4 : 0.45);
+      const cloud = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, transparent: true, depthWrite: false });
       const clouds = new THREE.Group();
-      for (let i = 0; i < 90; i++) {
+      for (let i = 0; i < 60; i++) {
         const a = rand() * Math.PI * 2;
-        const r = 12 + rand() * 110;
-        const m = new THREE.Mesh(new THREE.IcosahedronGeometry(4 + rand() * 7, 0), cloud);
-        m.scale.set(1.4, 0.3, 1);
-        m.rotation.y = rand() * 3;
-        m.position.set(Math.sin(a) * r, -14 - rand() * 10, Math.cos(a) * r);
-        clouds.add(m);
+        const r = 14 + rand() * 110;
+        const bank = new THREE.Group();
+        bank.position.set(Math.sin(a) * r, -14 - rand() * 10, Math.cos(a) * r);
+        bank.rotation.y = rand() * 3;
+        const puffs = 2 + Math.floor(rand() * 3);
+        const size = 4 + rand() * 6;
+        for (let k = 0; k < puffs; k++) {
+          const pr = size * (0.6 + rand() * 0.5);
+          const m = new THREE.Mesh(cloudPuff(pr, top, body, under), cloud);
+          m.scale.set(1.5, 0.42, 1.1);
+          m.position.set((k - (puffs - 1) / 2) * size * 1.1 + rand() * 2, rand() * 1.2, (rand() - 0.5) * size);
+          bank.add(m);
+        }
+        clouds.add(bank);
       }
       this.group.add(clouds);
       this.animators.push((t) => {
@@ -631,8 +651,20 @@ export class MapView {
       count = 180;
     }
     if (!count) return;
-    const geo = new THREE.BoxGeometry(0.12, 0.22, 0.12);
-    geo.translate(0, 0.11, 0);
+    // shaped by kind so they read as tufts, lumps and fallen petals rather than little cubes
+    let geo: THREE.BufferGeometry;
+    if (this.map.id === 'sakura') {
+      geo = new THREE.CircleGeometry(0.08, 5);
+      geo.scale(1.5, 1, 1);
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(0, 0.015, 0);
+    } else if (ground === 'snow') {
+      geo = new THREE.DodecahedronGeometry(0.12, 0);
+      geo.scale(1.2, 0.45, 1);
+    } else {
+      geo = new THREE.ConeGeometry(0.07, 0.3, 3);
+      geo.translate(0, 0.15, 0);
+    }
     const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), count);
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -699,6 +731,113 @@ export class MapView {
 }
 
 /** Blend two colours the way a painter would (in sRGB, not linear light). */
+interface RidgeShading {
+  color: THREE.Color;
+  haze: THREE.Color;
+  lit: THREE.Color;
+  shade: THREE.Color;
+  sunDir: THREE.Vector3;
+  litAmount: number;
+  /** how much of the foot dissolves into the haze */
+  baseFade: number;
+  /** snow colour for the top third, or null */
+  snow: THREE.Color | null;
+}
+
+/**
+ * A jagged mountain: a main peak with a lower shoulder on each side, rings jittered so the
+ * silhouette is craggy rather than a clean cone. Vertex colours carry the shading (faces toward the
+ * sun warm up, the foot fades into the haze), so it renders unlit.
+ */
+function ridgeGeometry(rand: () => number, w: number, h: number, sh: RidgeShading): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const peak = (cx: number, cz: number, pw: number, ph: number) => {
+    const radial = 9;
+    const rings = 4;
+    const pos: number[] = [];
+    const idx: number[] = [];
+    for (let k = 0; k < rings; k++) {
+      const f = k / rings;
+      const ring = pw * Math.pow(1 - f, 0.9);
+      const y = ph * f * (k === 0 ? 1 : 0.92 + rand() * 0.16);
+      for (let j = 0; j < radial; j++) {
+        const a = (j / radial) * Math.PI * 2;
+        const rr = ring * (0.7 + rand() * 0.55);
+        pos.push(cx + Math.sin(a) * rr, y, cz + Math.cos(a) * rr);
+      }
+    }
+    const tip = pos.length / 3;
+    pos.push(cx + (rand() - 0.5) * pw * 0.2, ph, cz + (rand() - 0.5) * pw * 0.2);
+    for (let k = 0; k < rings - 1; k++) {
+      for (let j = 0; j < radial; j++) {
+        const a = k * radial + j;
+        const b = k * radial + ((j + 1) % radial);
+        const c = a + radial;
+        const d = b + radial;
+        idx.push(a, b, d, a, d, c);
+      }
+    }
+    const last = (rings - 1) * radial;
+    for (let j = 0; j < radial; j++) idx.push(last + j, last + ((j + 1) % radial), tip);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    parts.push(g.toNonIndexed());
+  };
+  peak(0, 0, w, h);
+  peak(w * (0.55 + rand() * 0.3), (rand() - 0.5) * w * 0.4, w * 0.7, h * (0.45 + rand() * 0.2));
+  peak(-w * (0.55 + rand() * 0.3), (rand() - 0.5) * w * 0.4, w * 0.65, h * (0.35 + rand() * 0.2));
+
+  const count = parts.reduce((n, g) => n + g.attributes.position.count, 0);
+  const pos = new Float32Array(count * 3);
+  let o = 0;
+  for (const g of parts) {
+    pos.set(g.attributes.position.array as Float32Array, o);
+    o += g.attributes.position.array.length;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.computeVertexNormals();
+
+  const n = geo.attributes.normal;
+  const colors = new Float32Array(count * 3);
+  const c = new THREE.Color();
+  const v = new THREE.Vector3();
+  for (let i = 0; i < count; i++) {
+    const y = pos[i * 3 + 1] / h;
+    v.set(n.getX(i), n.getY(i), n.getZ(i));
+    const light = Math.max(0, v.dot(sh.sunDir));
+    c.copy(sh.snow && y > 0.68 ? sh.snow : sh.color);
+    c.lerp(sh.lit, light * sh.litAmount);
+    c.lerp(sh.shade, (1 - light) * sh.litAmount * 0.35);
+    c.lerp(sh.haze, Math.pow(1 - Math.min(1, y), 2.2) * sh.baseFade);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  for (const g of parts) g.dispose();
+  return geo;
+}
+
+/** A smooth cloud puff, shaded by vertex colour from a lit top to a shaded underside. */
+function cloudPuff(r: number, top: THREE.Color, body: THREE.Color, under: THREE.Color): THREE.BufferGeometry {
+  const geo = new THREE.IcosahedronGeometry(r, 2);
+  const n = geo.attributes.normal;
+  const colors = new Float32Array(n.count * 3);
+  const c = new THREE.Color();
+  for (let i = 0; i < n.count; i++) {
+    const up = n.getY(i);
+    if (up > 0) c.copy(body).lerp(top, Math.min(1, up * 1.4));
+    else c.copy(body).lerp(under, Math.min(1, -up * 1.2));
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+
 function mixSRGB(a: THREE.Color, b: THREE.Color, t: number): THREE.Color {
   const x = a.getRGB({ r: 0, g: 0, b: 0 }, THREE.SRGBColorSpace);
   const y = b.getRGB({ r: 0, g: 0, b: 0 }, THREE.SRGBColorSpace);

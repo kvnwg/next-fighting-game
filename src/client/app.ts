@@ -64,7 +64,7 @@ class App {
     root: HTMLElement,
     private readonly offline: boolean,
   ) {
-    this.renderer = new PixelRenderer(root, settings.pixelSize);
+    this.renderer = new PixelRenderer(root, settings.pixelSize, settings.artStyle);
     this.scene = this.renderer.scene;
     this.cam = new CameraRig(this.renderer.camera);
     this.effects = new Effects(this.scene);
@@ -85,6 +85,7 @@ class App {
       onForfeit: () => this.net.send({ t: 'forfeit' }),
       onSettingsChanged: () => {
         this.renderer.setPixelSize(settings.pixelSize);
+        this.renderer.setStyle(settings.artStyle);
         audio.setVolume(settings.volume);
         saveSettings();
       },
@@ -781,7 +782,7 @@ function createPreview(container: HTMLElement): Preview {
   const holder = document.createElement('div');
   holder.className = 'preview-holder';
   container.appendChild(holder);
-  const r = new PixelRenderer(holder, 3);
+  const r = new PixelRenderer(holder, 3, settings.artStyle);
   const scene = r.scene;
   scene.background = new THREE.Color('#1c1a24');
   scene.add(new THREE.HemisphereLight('#d8e4ff', '#4a4038', 1.5));

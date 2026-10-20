@@ -16,7 +16,7 @@ import { MapView } from './render/world';
 
 export function startViewer(root: HTMLElement): void {
   const params = new URLSearchParams(location.search);
-  const r = new PixelRenderer(root, Number(params.get('px') ?? 3));
+  const r = new PixelRenderer(root, Number(params.get('px') ?? 3), params.get('style') === 'pixel' ? 'pixel' : 'clean');
   const mapId = params.get('map');
   if (mapId && MAPS[mapId]) {
     showMap(r, mapId, params);

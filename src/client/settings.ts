@@ -5,7 +5,9 @@ export interface Settings {
   name: string;
   token: string;
   char: CharacterId;
-  /** size of one "pixel" in screen pixels */
+  /** 'clean' renders at full resolution with cel shading; 'pixel' is the chunky 3D pixel look */
+  artStyle: 'clean' | 'pixel';
+  /** size of one "pixel" in screen pixels (pixel style only) */
   pixelSize: number;
   sensitivity: number;
   invertY: boolean;
@@ -21,6 +23,7 @@ const DEFAULTS: Settings = {
   name: '',
   token: '',
   char: 'ronin',
+  artStyle: 'clean',
   pixelSize: 3,
   sensitivity: 1,
   invertY: false,
@@ -35,6 +38,7 @@ function load(): Settings {
     if (!raw) return { ...DEFAULTS };
     const s = { ...DEFAULTS, ...JSON.parse(raw) } as Settings;
     if (!isCharacterId(s.char)) s.char = 'ronin';
+    if (s.artStyle !== 'pixel') s.artStyle = 'clean';
     s.pixelSize = Math.max(1, Math.min(6, Math.round(s.pixelSize)));
     return s;
   } catch {

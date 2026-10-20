@@ -1,4 +1,4 @@
-# DEFLECT — a 3D pixel dueling arena
+# DEFLECT — a samurai dueling arena
 
 A browser-based 1v1 sword-fighting game with deflect-and-posture combat. You walk around a shared lobby with other players, spar or brawl outside the safe zone, and click into **ranked** duels (best of 3 rounds) on one of six arenas. Instead of picking weapons, you pick a **character**, and each character's weapon, quirks and moves are part of who they are.
 
@@ -64,6 +64,15 @@ Ranked profiles are stored in `data/profiles.json` (`DATA_DIR` overrides the fol
   - **Special** pops up above Heavy once the special meter is full.
 - **Menu and chat:** use the two buttons at the top left.
 - **Challenge:** tap the on-screen prompt to challenge the player in front of you.
+
+## Art style
+
+The game renders in one of two looks, picked under **Help → Settings → Art style**:
+
+- **Clean** (default): full resolution with smooth texture filtering and cel shading. Fighters get a soft ink outline and a rim light from the sun's side. Distant mountains fade into the haze, there's a wide bloom on lanterns and the sun, and a colour grade with cool shadows and warm highlights. FXAA smooths the edges. On high-density phone screens the render resolution is capped so it stays smooth.
+- **Pixel**: the original chunky 3D pixel look, snapped to a fixed palette, with a pixel-size slider.
+
+Both share `src/client/render/renderer.ts`; the clean path is the `CLEAN` define in its composite shader. In the dev viewer, add `&style=pixel` to compare.
 
 ## Combat
 
@@ -132,7 +141,7 @@ src/server/      Node WebSocket server
   lobby.ts         safe zone, respawns, dummies     arena.ts   best-of-3 match flow
   bot.ts           AI opponents                     store.ts   profile persistence
 src/client/      three.js client
-  render/          pixel renderer, character rig + animation, weapons, maps, effects
+  render/          renderer (clean cel-shaded or 3D pixel), character rig + animation, weapons, maps, effects
   app.ts           main loop + networking glue      local.ts   local player prediction
   ui.ts            HUD, menus, character select, ladder, results
 tests/           vitest: combat rules + server integration

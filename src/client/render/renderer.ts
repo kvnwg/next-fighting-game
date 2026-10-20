@@ -1,6 +1,13 @@
 /**
- * The "3D pixel" look: the scene renders into a small target (screen / pixelSize) with nearest
- * filtering, then a composite pass upscales it. On the way it:
+ * Two looks share one pipeline:
+ *
+ * "clean" (default): the scene renders at full resolution with smooth texture filtering, then a
+ * composite pass inks a soft outline around fighters, traces their sun-facing edge with a rim
+ * light, adds a wide bloom and colour-grades the frame (cool shadows, warm highlights). FXAA
+ * smooths every edge at the end.
+ *
+ * "pixel": the scene renders into a small target (screen / pixelSize) with nearest filtering and
+ * the composite upscales it. On the way it:
  *  - inks a 1px silhouette around fighters (CHAR_LAYER, found with a separate mask pass) and traces
  *    their sun-facing edge with a rim light, so they pop off the background
  *  - darkens depth edges and lifts normal creases on everything else
@@ -10,10 +17,14 @@
  * Particles and other effects live on FX_LAYER and are excluded from the outline passes.
  */
 import * as THREE from 'three';
+import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
+import { applyTextureFilter, ArtStyle, setTextureStyle } from './textures';
 
 export const FX_LAYER = 1;
 /** Fighters (and their weapons): they get the ink outline and rim light. */
 export const CHAR_LAYER = 2;
+
+export type { ArtStyle };
 
 /**
  * ENDESGA 32 by Endesga (lospec.com/palette-list/endesga-32), plus a few hand-picked additions it
@@ -89,6 +100,8 @@ uniform sampler2D tLut;
 uniform vec2 texel;
 uniform float near;
 uniform float far;
+uniform float inkWidth;
+uniform float time;
 uniform float outline;
 uniform float highlight;
 uniform vec3 inkColor;
@@ -103,6 +116,10 @@ uniform vec2 fogRange;
 uniform float flash;
 uniform vec3 flashColor;
 uniform float vignette;
+uniform vec3 shadowTint;
+uniform vec3 highlightTint;
+uniform vec3 grade;
+uniform float saturation;
 varying vec2 vUv;
 
 float linearDepth(vec2 uv) {
@@ -160,23 +177,38 @@ void main() {
   float sky = step(far * 0.8, d); // the sky dome sits just inside the far plane
   float isChar = charAt(vUv, d);
 
+#ifdef CLEAN
+  // eight taps around a ring inkWidth pixels wide, so the outline is round and even
+  const int TAPS = 8;
+  vec2 offs[8];
+  offs[0] = vec2(1.0, 0.0);
+  offs[1] = vec2(-1.0, 0.0);
+  offs[2] = vec2(0.0, 1.0);
+  offs[3] = vec2(0.0, -1.0);
+  offs[4] = vec2(0.7071, 0.7071);
+  offs[5] = vec2(-0.7071, 0.7071);
+  offs[6] = vec2(0.7071, -0.7071);
+  offs[7] = vec2(-0.7071, -0.7071);
+#else
+  const int TAPS = 4;
   vec2 offs[4];
   offs[0] = vec2(1.0, 0.0);
   offs[1] = vec2(-1.0, 0.0);
   offs[2] = vec2(0.0, 1.0);
   offs[3] = vec2(0.0, -1.0);
+#endif
   float edge = 0.0;
   float crease = 0.0;
   float ink = 0.0;
   float rim = 0.0;
   float thresh = 0.06 + d * 0.04;
-  for (int i = 0; i < 4; i++) {
-    vec2 uv = vUv + offs[i] * texel;
+  for (int i = 0; i < TAPS; i++) {
+    vec2 uv = vUv + offs[i] * texel * inkWidth;
     float nd = linearDepth(uv);
     float nChar = charAt(uv, nd);
     // a neighbour noticeably farther away means we are on the near side of an edge
     if (nd - d > thresh) edge = 1.0;
-    vec3 nn = texture2D(tNormal, uv).rgb * 2.0 - 1.0;
+    vec3 nn = texture2D(tNormal, vUv + offs[i] * texel).rgb * 2.0 - 1.0;
     if (abs(nd - d) < thresh && dot(n, nn) < 0.75 && dot(n - nn, vec3(1.0)) > 0.0) crease = 1.0;
     // fighter silhouette: ink the background pixel just outside a nearer fighter
     if (nChar > 0.5 && (isChar < 0.5 || d - nd > thresh) && d - nd > 0.02) ink = 1.0;
@@ -189,6 +221,10 @@ void main() {
   // distant scenery is soft: no ink lines once it is in the haze
   float fogAmt = smoothstep(fogRange.x, fogRange.y, d);
   edge *= (1.0 - sky) * (1.0 - fogAmt);
+#ifdef CLEAN
+  // painted look: linework only on the nearby world, fading out well before the haze
+  edge *= 1.0 - smoothstep(fogRange.x * 0.4, fogRange.x * 0.8, d) * (1.0 - isChar);
+#endif
   crease *= (1.0 - sky) * (1.0 - edge) * (1.0 - fogAmt);
 
   c *= 1.0 - (isChar > 0.5 ? 0.65 : outline) * edge;
@@ -207,6 +243,19 @@ void main() {
   c = mix(c, flashColor, flash);
   c = toSRGB(c);
 
+#ifdef CLEAN
+  // grade: shadows lean cool indigo, highlights warm, a gentle S-curve and a little extra colour
+  float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  c = mix(c, c * shadowTint * 1.6, (1.0 - smoothstep(0.0, 0.55, lum)) * grade.x);
+  c = mix(c, c * highlightTint * 1.1, smoothstep(0.45, 1.0, lum) * grade.y);
+  c = mix(c, c * c * (3.0 - 2.0 * c), grade.z);
+  float g = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  c = mix(vec3(g), c, saturation);
+  // a whisper of grain hides banding in the sky gradient
+  float noise = fract(sin(dot(gl_FragCoord.xy + fract(time) * 61.0, vec2(12.9898, 78.233))) * 43758.5453);
+  c += (noise - 0.5) / 128.0;
+  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+#else
   // palette snap; dither only smooth gradients (the sky and its haze, glow) so flat textures and
   // pre-tinted scenery stay clean
   float glowAmt = clamp(dot(glow, vec3(0.33)) * 3.0, 0.0, 1.0);
@@ -214,6 +263,7 @@ void main() {
   amt *= 1.0 - smoothstep(0.9, 0.97, min(c.r, min(c.g, c.b))); // keep the sun disc a clean white
   c += bayer4(floor(vUv / texel)) * dither * amt;
   gl_FragColor = vec4(palette(c), 1.0);
+#endif
 }`;
 
 function srgbToLinear(c: number): number {
@@ -290,16 +340,22 @@ function lutData(colors: string[]): Uint8Array {
 
 const _sun = new THREE.Vector3();
 
+/** Upper bound on rendered pixels in clean mode, so phones with 3x screens stay smooth. */
+const CLEAN_MAX_PIXELS = 2_000_000;
+
 export class PixelRenderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly camera: THREE.PerspectiveCamera;
   scene: THREE.Scene;
   pixelSize: number;
+  style: ArtStyle;
   private colorTarget: THREE.WebGLRenderTarget;
   private normalTarget: THREE.WebGLRenderTarget;
   private maskTarget: THREE.WebGLRenderTarget;
   private bloomA: THREE.WebGLRenderTarget;
   private bloomB: THREE.WebGLRenderTarget;
+  /** clean mode: the graded frame, before FXAA */
+  private finalTarget: THREE.WebGLRenderTarget;
   private normalMaterial = new THREE.MeshNormalMaterial();
   private maskMaterial = new THREE.ShaderMaterial({ vertexShader: MASK_VERT, fragmentShader: MASK_FRAG });
   private quad: THREE.Mesh;
@@ -308,6 +364,8 @@ export class PixelRenderer {
   private material: THREE.ShaderMaterial;
   private brightMaterial: THREE.ShaderMaterial;
   private blurMaterial: THREE.ShaderMaterial;
+  private fxaaMaterial: THREE.ShaderMaterial;
+  private clock = 0;
   width = 1;
   height = 1;
   flash = 0;
@@ -318,12 +376,15 @@ export class PixelRenderer {
   constructor(
     readonly container: HTMLElement,
     pixelSize = 3,
+    style: ArtStyle = 'clean',
   ) {
     this.pixelSize = pixelSize;
+    this.style = style;
+    setTextureStyle(style);
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(1);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.BasicShadowMap;
+    this.renderer.shadowMap.type = style === 'clean' ? THREE.PCFShadowMap : THREE.BasicShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -334,11 +395,11 @@ export class PixelRenderer {
     this.camera.layers.enable(FX_LAYER);
     this.scene = new THREE.Scene();
 
-    const mkTarget = (depth: boolean, filter: THREE.MagnificationTextureFilter = THREE.NearestFilter) => {
+    const mkTarget = (depth: boolean, filter: THREE.MagnificationTextureFilter = THREE.NearestFilter, type: THREE.TextureDataType = THREE.HalfFloatType) => {
       const t = new THREE.WebGLRenderTarget(1, 1, {
         minFilter: filter,
         magFilter: filter,
-        type: THREE.HalfFloatType,
+        type,
         depthBuffer: depth,
       });
       return t;
@@ -349,6 +410,7 @@ export class PixelRenderer {
     this.maskTarget = mkTarget(true);
     this.bloomA = mkTarget(false, THREE.LinearFilter);
     this.bloomB = mkTarget(false, THREE.LinearFilter);
+    this.finalTarget = mkTarget(false, THREE.LinearFilter, THREE.UnsignedByteType);
 
     this.brightMaterial = new THREE.ShaderMaterial({
       uniforms: {
@@ -372,6 +434,15 @@ export class PixelRenderer {
       depthWrite: false,
       toneMapped: false,
     });
+    this.fxaaMaterial = new THREE.ShaderMaterial({
+      uniforms: THREE.UniformsUtils.clone(FXAAShader.uniforms),
+      vertexShader: FXAAShader.vertexShader,
+      fragmentShader: FXAAShader.fragmentShader,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    this.fxaaMaterial.uniforms.tDiffuse.value = this.finalTarget.texture;
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         tColor: { value: this.colorTarget.texture },
@@ -383,6 +454,8 @@ export class PixelRenderer {
         texel: { value: new THREE.Vector2() },
         near: { value: this.camera.near },
         far: { value: this.camera.far },
+        inkWidth: { value: 1 },
+        time: { value: 0 },
         outline: { value: 0.4 },
         highlight: { value: 0.22 },
         inkColor: { value: new THREE.Color('#181425') },
@@ -397,6 +470,11 @@ export class PixelRenderer {
         flash: { value: 0 },
         flashColor: { value: this.flashColor },
         vignette: { value: 0.55 },
+        shadowTint: { value: new THREE.Color('#5a5490') },
+        highlightTint: { value: new THREE.Color('#fff2dc') },
+        // shadow tint, highlight tint, contrast
+        grade: { value: new THREE.Vector3(0.35, 0.5, 0.25) },
+        saturation: { value: 1.1 },
       },
       vertexShader: QUAD_VERT,
       fragmentShader: COMPOSITE_FRAG,
@@ -407,6 +485,7 @@ export class PixelRenderer {
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
     this.quad.frustumCulled = false;
     this.quadScene.add(this.quad);
+    this.applyStyle();
 
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -415,6 +494,43 @@ export class PixelRenderer {
   setPixelSize(px: number): void {
     this.pixelSize = px;
     this.resize();
+  }
+
+  /** Switch between the clean cel-shaded look and the 3D pixel look. */
+  setStyle(style: ArtStyle): void {
+    if (style === this.style) return;
+    this.style = style;
+    setTextureStyle(style);
+    this.renderer.shadowMap.type = style === 'clean' ? THREE.PCFShadowMap : THREE.BasicShadowMap;
+    // textures already in the scene pick up the new filtering; materials recompile for the new shadow type
+    this.scene.traverse((o) => {
+      const mats = (o as THREE.Mesh).material;
+      if (!mats) return;
+      for (const m of Array.isArray(mats) ? mats : [mats]) {
+        const map = (m as THREE.MeshLambertMaterial).map;
+        if (map && map.userData.styled) applyTextureFilter(map, style);
+        m.needsUpdate = true;
+      }
+    });
+    this.applyStyle();
+    this.resize();
+  }
+
+  private applyStyle(): void {
+    const clean = this.style === 'clean';
+    const u = this.material.uniforms;
+    this.material.defines = clean ? { CLEAN: '' } : {};
+    this.material.needsUpdate = true;
+    for (const t of [this.colorTarget, this.normalTarget, this.maskTarget]) {
+      t.texture.minFilter = THREE.NearestFilter;
+      t.texture.magFilter = THREE.NearestFilter;
+    }
+    // clean mode: lighter linework on the world, softer creases, a wider glow
+    u.outline.value = clean ? 0.22 : 0.4;
+    u.highlight.value = clean ? 0.08 : 0.22;
+    u.bloom.value = clean ? 0.7 : 0.45;
+    u.vignette.value = clean ? 0.45 : 0.55;
+    this.brightMaterial.uniforms.threshold.value = clean ? 0.95 : 1.15;
   }
 
   /** Swap the colour palette every pixel is snapped to. */
@@ -430,20 +546,35 @@ export class PixelRenderer {
     this.material.uniforms.rimStrength.value = strength;
   }
 
+  /** Render pixels per CSS pixel in clean mode: the device ratio, capped by a pixel budget. */
+  private cleanScale(w: number, h: number): number {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    return Math.max(0.75, Math.min(dpr, Math.sqrt(CLEAN_MAX_PIXELS / Math.max(1, w * h))));
+  }
+
   resize(): void {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
     this.width = w;
     this.height = h;
+    const clean = this.style === 'clean';
+    const scale = clean ? this.cleanScale(w, h) : 1;
+    this.renderer.setPixelRatio(scale);
     this.renderer.setSize(w, h);
-    const lw = Math.max(1, Math.floor(w / this.pixelSize));
-    const lh = Math.max(1, Math.floor(h / this.pixelSize));
+    const lw = clean ? Math.max(1, Math.round(w * scale)) : Math.max(1, Math.floor(w / this.pixelSize));
+    const lh = clean ? Math.max(1, Math.round(h * scale)) : Math.max(1, Math.floor(h / this.pixelSize));
     this.colorTarget.setSize(lw, lh);
     this.normalTarget.setSize(lw, lh);
     this.maskTarget.setSize(lw, lh);
-    this.bloomA.setSize(Math.max(1, lw >> 1), Math.max(1, lh >> 1));
-    this.bloomB.setSize(Math.max(1, lw >> 1), Math.max(1, lh >> 1));
+    // clean mode blooms from a quarter-size image so the glow spreads wider
+    const bs = clean ? 2 : 1;
+    this.bloomA.setSize(Math.max(1, lw >> bs), Math.max(1, lh >> bs));
+    this.bloomB.setSize(Math.max(1, lw >> bs), Math.max(1, lh >> bs));
+    this.finalTarget.setSize(clean ? lw : 1, clean ? lh : 1);
+    (this.fxaaMaterial.uniforms.resolution.value as THREE.Vector2).set(1 / lw, 1 / lh);
     (this.material.uniforms.texel.value as THREE.Vector2).set(1 / lw, 1 / lh);
+    // outline width in render pixels: about 2 CSS pixels, scaled up a little on big screens
+    this.material.uniforms.inkWidth.value = clean ? Math.max(1.5, scale * Math.max(1.6, Math.min(2.6, h / 420))) : 1;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -458,6 +589,7 @@ export class PixelRenderer {
     const r = this.renderer;
     const cam = this.camera;
     const u = this.material.uniforms;
+    const clean = this.style === 'clean';
     cam.layers.enable(FX_LAYER);
     r.setRenderTarget(this.colorTarget);
     r.render(this.scene, cam);
@@ -486,15 +618,18 @@ export class PixelRenderer {
     cam.layers.set(0);
     cam.layers.enable(FX_LAYER);
 
-    // bloom: bright pass at half resolution, blurred both ways
+    // bloom: bright pass at reduced resolution, blurred both ways (twice in clean mode, for a wider glow)
     this.pass(this.brightMaterial, this.bloomA);
     const bu = this.blurMaterial.uniforms;
-    bu.tInput.value = this.bloomA.texture;
-    (bu.dir.value as THREE.Vector2).set(1 / this.bloomA.width, 0);
-    this.pass(this.blurMaterial, this.bloomB);
-    bu.tInput.value = this.bloomB.texture;
-    (bu.dir.value as THREE.Vector2).set(0, 1 / this.bloomA.height);
-    this.pass(this.blurMaterial, this.bloomA);
+    for (let i = 0; i < (clean ? 2 : 1); i++) {
+      const spread = i + 1;
+      bu.tInput.value = this.bloomA.texture;
+      (bu.dir.value as THREE.Vector2).set(spread / this.bloomA.width, 0);
+      this.pass(this.blurMaterial, this.bloomB);
+      bu.tInput.value = this.bloomB.texture;
+      (bu.dir.value as THREE.Vector2).set(0, spread / this.bloomA.height);
+      this.pass(this.blurMaterial, this.bloomA);
+    }
 
     // rim light comes from the sun's side of the screen
     cam.updateMatrixWorld();
@@ -508,8 +643,15 @@ export class PixelRenderer {
     (u.fogRange.value as THREE.Vector2).set(f instanceof THREE.Fog ? f.near : 1e4, f instanceof THREE.Fog ? f.far : 1e4);
     u.exposure.value = r.toneMappingExposure;
     u.flash.value = this.flash;
+    this.clock = (this.clock + 1 / 60) % 1000;
+    u.time.value = this.clock;
     r.setClearColor(0x000000, 1);
-    this.pass(this.material, null);
+    if (clean) {
+      this.pass(this.material, this.finalTarget);
+      this.pass(this.fxaaMaterial, null);
+    } else {
+      this.pass(this.material, null);
+    }
   }
 
   /** Project a world point to CSS pixels. Returns null when behind the camera. */

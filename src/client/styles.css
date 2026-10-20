@@ -127,7 +127,7 @@ select { font-family: var(--head); font-size: 13px; background: #1c1516; color: 
 .fc-portrait { width: 140%; height: 140%; transform: rotate(-45deg); image-rendering: pixelated; object-fit: cover; }
 .fcard.broken .fc-diamond { border-color: var(--shu-hi); animation: brokenflash 0.25s steps(2) infinite; }
 .fc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.fc-title { font-family: var(--head); font-size: 14px; color: #ff6a50; letter-spacing: 0.04em; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8); line-height: 1; min-height: 14px; }
+.fc-title { font-family: var(--head); font-size: 14px; color: #e8a27a; opacity: 0.75; letter-spacing: 0.04em; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8); line-height: 1; min-height: 14px; }
 .fc-name { font-family: var(--head); font-size: 16px; line-height: 1.15; color: #f8f0dd; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fc-name b { font-weight: 400; }
 .fc-handle { font-family: var(--body); color: #d8cdb6; font-size: 12px; text-shadow: 0 0 3px #000, 0 1px 2px #000; }

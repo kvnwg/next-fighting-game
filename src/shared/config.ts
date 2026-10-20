@@ -1,7 +1,7 @@
 /** Global tuning shared by the client and the server. Times are milliseconds, distances meters. */
 
 export const GAME_TITLE = 'DEFLECT';
-export const GAME_SUBTITLE = 'a pixel dueling arena';
+export const GAME_SUBTITLE = 'a samurai dueling arena';
 
 // ---- Networking ---------------------------------------------------------------
 export const SERVER_TICK_HZ = 60;

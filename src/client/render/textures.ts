@@ -5,6 +5,26 @@ import { seededRandom } from '../../shared/math';
 
 const cache = new Map<string, THREE.CanvasTexture>();
 
+export type ArtStyle = 'clean' | 'pixel';
+
+let style: ArtStyle = 'clean';
+
+/** Sets how textures created from now on are filtered (the renderer updates existing ones). */
+export function setTextureStyle(s: ArtStyle): void {
+  style = s;
+}
+
+/** Nearest filtering for the pixel look; smooth, mipmapped filtering for the clean one. */
+export function applyTextureFilter(t: THREE.Texture, s: ArtStyle = style): void {
+  const clean = s === 'clean';
+  t.magFilter = clean ? THREE.LinearFilter : THREE.NearestFilter;
+  t.minFilter = clean ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter;
+  t.generateMipmaps = clean;
+  t.anisotropy = clean ? 4 : 1;
+  t.userData.styled = true;
+  t.needsUpdate = true;
+}
+
 function canvasTex(key: string, size: number, draw: (g: CanvasRenderingContext2D, rand: () => number) => void): THREE.CanvasTexture {
   const hit = cache.get(key);
   if (hit) return hit;
@@ -13,11 +33,9 @@ function canvasTex(key: string, size: number, draw: (g: CanvasRenderingContext2D
   const g = c.getContext('2d')!;
   draw(g, seededRandom(key.length * 7919 + size));
   const t = new THREE.CanvasTexture(c);
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestFilter;
+  applyTextureFilter(t);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
-  t.generateMipmaps = false;
   cache.set(key, t);
   return t;
 }
