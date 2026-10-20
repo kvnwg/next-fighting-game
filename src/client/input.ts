@@ -57,6 +57,9 @@ export class Input {
   mouseDX = 0;
   mouseDY = 0;
   locked = false;
+  /** Pointer lock was refused (e.g. inside a sandboxed frame): fall back to free-cursor mouse look. */
+  lockFailed = false;
+  private lastLockAttempt = -Infinity;
   /** when true (chat/menus focused) gameplay keys are ignored */
   suspended = false;
   onBind: ((b: Bind, pressed: boolean, time: number) => void) | null = null;
@@ -80,7 +83,7 @@ export class Input {
     canvas.addEventListener('mousedown', (e) => {
       if (!this.locked) {
         if (!this.suspended) this.requestLock();
-        return;
+        if (!this.lockFailed) return;
       }
       const b = MOUSE[e.button];
       if (b) {
@@ -94,14 +97,18 @@ export class Input {
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      if (!this.locked && !(this.lockFailed && e.target === this.canvas && !this.suspended)) return;
       this.mouseDX += e.movementX;
       this.mouseDY += e.movementY;
     });
     canvas.addEventListener('wheel', (e) => this.onWheel?.(e.deltaY), { passive: true });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
-      if (!this.locked) this.releaseAll();
+      if (this.locked) this.lockFailed = false;
+      else this.releaseAll();
+    });
+    document.addEventListener('pointerlockerror', () => {
+      this.lockFailed = true;
     });
     window.addEventListener('blur', () => this.releaseAll());
   }
@@ -112,12 +119,20 @@ export class Input {
   }
 
   requestLock(): void {
+    // once refused, only retry occasionally (a sandboxed frame refuses every time)
+    if (this.lockFailed && performance.now() - this.lastLockAttempt < 8000) return;
+    this.lastLockAttempt = performance.now();
     const el = this.canvas as HTMLElement & { requestPointerLock?: () => Promise<void> | void };
+    if (!el.requestPointerLock) {
+      this.lockFailed = true;
+      return;
+    }
     try {
-      const r = el.requestPointerLock?.();
-      if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch(() => {});
+      const r = el.requestPointerLock();
+      if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch(() => (this.lockFailed = true));
     } catch {
-      // pointer lock unavailable (e.g. iframe without permission)
+      // pointer lock unavailable (e.g. a sandboxed frame without permission)
+      this.lockFailed = true;
     }
   }
 

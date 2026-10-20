@@ -22,6 +22,16 @@ npm run build        # typecheck + build the client into dist/client
 npm start            # one server on $PORT (default 3000) serving the client and the WebSocket
 ```
 
+### Single player (no server)
+
+The whole game server also runs inside the browser. Open <http://localhost:5173/?offline> in dev, or build a single self-contained page with `npm run build:artifact` (writes `dist/artifact/deflect.html`, which is what the claude.ai artifact is built from). Offline you get:
+
+- the lobby, with roaming AI fighters that pick fights outside the safe zone
+- the training dummies and practice matches
+- **Ranked vs AI**: opponents matched to your rating, with Elo saved in browser storage
+
+Multiplayer and the shared ladder need the server.
+
 Other scripts: `npm test` (combat rules, server integration and bot-vs-bot match simulations), `npm run typecheck`.
 
 `tests/sim.ts` can simulate complete matches between server-side bots on a fake clock. It's handy for balance passes: run every matchup and compare win rates and how often each outcome (deflect, deathblow and so on) happens. The current numbers are a first pass tuned that way.

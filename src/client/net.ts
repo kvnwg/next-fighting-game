@@ -3,8 +3,19 @@ import { ClientMsg, ServerMsg } from '../shared/protocol';
 
 type Handler<T extends ServerMsg['t']> = (m: Extract<ServerMsg, { t: T }>) => void;
 
+/** What Net needs from a socket: a browser WebSocket, or the in-page offline socket. */
+export interface SocketLike {
+  readyState: number;
+  onopen: (() => void) | null;
+  onmessage: ((e: { data: string }) => void) | null;
+  onclose: ((e: { reason: string }) => void) | null;
+  onerror: (() => void) | null;
+  send(data: string): void;
+  close(): void;
+}
+
 export class Net {
-  private ws: WebSocket | null = null;
+  private ws: SocketLike | null = null;
   private handlers = new Map<string, ((m: ServerMsg) => void)[]>();
   private pingTimer: number | null = null;
   /** serverTime ≈ performance.now() + offset */
@@ -15,9 +26,10 @@ export class Net {
   connected = false;
   onClose: ((reason: string) => void) | null = null;
 
-  connect(url: string): Promise<void> {
+  /** Connect to a WebSocket URL, or pass a factory for another transport (offline mode). */
+  connect(target: string | (() => SocketLike)): Promise<void> {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(url);
+      const ws: SocketLike = typeof target === 'string' ? (new WebSocket(target) as unknown as SocketLike) : target();
       this.ws = ws;
       ws.onopen = () => {
         this.connected = true;
@@ -63,7 +75,7 @@ export class Net {
   }
 
   send(m: ClientMsg): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+    if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(m));
   }
 
   private ping(): void {

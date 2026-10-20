@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #14121a;
   --panel: rgba(18, 16, 24, 0.86);
   --edge: #3a3448;
@@ -258,6 +259,12 @@ h3 { font-size: 18px; }
 .settings { display: flex; flex-direction: column; gap: 6px; font-size: 19px; }
 .settings label { display: flex; align-items: center; gap: 10px; }
 .settings input[type='range'] { width: 180px; accent-color: var(--gold); }
+
+@media (max-width: 600px) {
+  .logo { font-size: 40px; letter-spacing: 3px; }
+  .title-box { padding: 24px 20px; margin: 0 16px; }
+  .title-hint { display: none; }
+}
 
 @media (max-width: 900px) {
   .bottom-left { width: 280px; }

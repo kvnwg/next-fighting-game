@@ -1,13 +1,11 @@
 /** Top-level server state: connections, the lobby, running arenas, matchmaking and challenges. */
-import { performance } from 'node:perf_hooks';
-import type { WebSocket } from 'ws';
 import { CharacterId, isCharacterId } from '../shared/characters';
 import { MATCH, SERVER_TICK_HZ } from '../shared/config';
 import { ARENA_MAPS, MapDef } from '../shared/maps';
 import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, ServerMsg } from '../shared/protocol';
 import { eloDelta } from '../shared/ranks';
 import { Arena } from './arena';
-import { Player } from './entities';
+import { Player, SocketLike } from './entities';
 import { Lobby } from './lobby';
 import { Store, profileView } from './store';
 
@@ -24,6 +22,13 @@ function sanitizeChat(raw: unknown): string {
   return raw.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 140);
 }
 
+export interface GameOptions {
+  /** Single-player mode (runs in the browser): ranked queues are matched against rated AI opponents. */
+  offline?: boolean;
+  /** Wandering AI fighters in the lobby. */
+  roamers?: number;
+}
+
 export class Game {
   readonly players = new Map<string, Player>();
   readonly lobby: Lobby;
@@ -31,7 +36,7 @@ export class Game {
   private queue: Player[] = [];
   /** pending challenges keyed by the challenged player's id */
   private challenges = new Map<string, { from: string; expires: number }>();
-  private timer: NodeJS.Timeout | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
   private lastMatchmake = 0;
   private lastQueueBroadcast = 0;
   private lastServerPing = 0;
@@ -42,9 +47,10 @@ export class Game {
   constructor(
     readonly store: Store,
     clock?: () => number,
+    readonly options: GameOptions = {},
   ) {
     this.now = clock ?? (() => performance.now() - this.t0 + 1000);
-    this.lobby = new Lobby(this);
+    this.lobby = new Lobby(this, options.roamers ?? 0);
   }
 
   start(): void {
@@ -91,7 +97,7 @@ export class Game {
 
   // ------------------------------------------------------------------ connections
 
-  handleConnection(ws: WebSocket): void {
+  handleConnection(ws: SocketLike): void {
     let player: Player | null = null;
     ws.on('message', (data) => {
       let msg: ClientMsg;
@@ -130,7 +136,7 @@ export class Game {
     return ++p.msgCount <= MAX_MSGS_PER_SEC;
   }
 
-  private join(ws: WebSocket, msg: Extract<ClientMsg, { t: 'hello' }>): Player | null {
+  private join(ws: SocketLike, msg: Extract<ClientMsg, { t: 'hello' }>): Player | null {
     if (msg.v !== PROTOCOL_VERSION) {
       ws.send(JSON.stringify({ t: 'notice', text: 'Your client is out of date. Refresh the page.', kind: 'warn' }));
       ws.close(4001, 'version');
@@ -264,6 +270,15 @@ export class Game {
 
   /** Pair queued players with the closest rating; the acceptable gap widens the longer you wait. */
   matchmake(now: number): void {
+    if (this.options.offline) {
+      // nobody else is here: after a short "search", face an AI rated close to you
+      for (const p of [...this.queue]) {
+        if (now - p.queue!.since < 2500) continue;
+        const rating = Math.max(600, Math.round(p.profile.mmr + (Math.random() - 0.45) * 120));
+        this.startMatch('ranked', p, null, undefined, this.pickMap(), rating);
+      }
+      return;
+    }
     if (this.queue.length >= 2) {
       const pool = [...this.queue].sort((a, b) => a.profile.mmr - b.profile.mmr);
       const used = new Set<Player>();
@@ -300,14 +315,14 @@ export class Game {
     return ARENA_MAPS[Math.floor(Math.random() * ARENA_MAPS.length)];
   }
 
-  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap()): Arena {
+  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap(), botRating?: number): Arena {
     for (const p of [a, b]) {
       if (!p) continue;
       this.unqueue(p);
       this.challenges.delete(p.id);
       p.instance?.removePlayer(p);
     }
-    const arena = new Arena(this, map, mode, a, b, diff);
+    const arena = new Arena(this, map, mode, a, b, diff, botRating);
     this.arenas.add(arena);
     return arena;
   }
@@ -325,22 +340,32 @@ export class Game {
   }
 
   reportResult(arena: Arena, winner: 0 | 1, reason: 'ko' | 'forfeit' | 'timeout'): void {
-    const [pa, pb] = arena.humans;
-    const ranked = arena.mode === 'ranked' && pa && pb;
-    const before = [pa, pb].map((p) => (p ? { mmr: p.profile.mmr, placements: p.profile.placements } : null));
+    const humans = arena.humans;
+    // ranked between two players, or (offline) against a rated AI opponent
+    const opponentRating = (i: 0 | 1): number | null => {
+      const other = humans[i === 0 ? 1 : 0];
+      if (other) return other.profile.mmr;
+      return arena.botRating ?? null;
+    };
+    const rated = arena.mode === 'ranked';
+    const before = humans.map((p) => (p ? { mmr: p.profile.mmr, placements: p.profile.placements } : null));
     const deltas: [number, number] = [0, 0];
-    if (ranked) {
-      const ra = pa.profile.mmr;
-      const rb = pb.profile.mmr;
-      deltas[0] = eloDelta(ra, rb, winner === 0 ? 1 : 0, pa.profile.placements);
-      deltas[1] = eloDelta(rb, ra, winner === 1 ? 1 : 0, pb.profile.placements);
-      for (const [i, p] of [pa, pb].entries()) {
+    if (rated) {
+      const ratings = [opponentRating(0), opponentRating(1)];
+      for (const i of [0, 1] as const) {
+        const p = humans[i];
+        const opp = ratings[i];
+        if (!p || opp === null) continue;
+        deltas[i] = eloDelta(p.profile.mmr, opp, winner === i ? 1 : 0, p.profile.placements);
+      }
+      for (const i of [0, 1] as const) {
+        const p = humans[i];
+        if (!p || ratings[i] === null) continue;
         const prof = p.profile;
-        const won = winner === i;
         prof.mmr = Math.max(0, prof.mmr + deltas[i]);
         prof.peak = Math.max(prof.peak, prof.mmr);
         prof.placements++;
-        if (won) {
+        if (winner === i) {
           prof.wins++;
           prof.streak = prof.streak >= 0 ? prof.streak + 1 : 1;
         } else {
@@ -350,21 +375,22 @@ export class Game {
       }
       this.store.markDirty();
     }
-    for (const [i, p] of [pa, pb].entries()) {
+    for (const i of [0, 1] as const) {
+      const p = humans[i];
       if (!p) continue;
+      const counted = rated && opponentRating(i) !== null;
       p.send({
         t: 'result',
         mode: arena.mode,
         won: winner === i,
         reason,
         scores: arena.scores,
-        ...(ranked
-          ? { before: before[i]!, after: { mmr: p.profile.mmr, placements: p.profile.placements }, delta: deltas[i] }
-          : {}),
+        ...(counted ? { before: before[i]!, after: { mmr: p.profile.mmr, placements: p.profile.placements }, delta: deltas[i] } : {}),
       });
-      if (ranked) p.send({ t: 'profile', profile: profileView(p.profile) });
+      if (counted) p.send({ t: 'profile', profile: profileView(p.profile) });
     }
-    if (ranked) {
+    const [pa, pb] = humans;
+    if (rated && pa && pb) {
       const w = winner === 0 ? pa : pb;
       const l = winner === 0 ? pb : pa;
       this.broadcastAll({ t: 'chat', name: '', text: `${w.name} defeated ${l.name} in a ranked duel.`, sys: true });

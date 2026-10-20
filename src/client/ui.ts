@@ -79,7 +79,9 @@ export class UI {
   constructor(
     parent: HTMLElement,
     private readonly handlers: UIHandlers,
+    private readonly offline = false,
   ) {
+    const touchOnly = typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
     this.root = h(`<div id="ui"></div>`);
     parent.appendChild(this.root);
 
@@ -89,8 +91,14 @@ export class UI {
           <h1 class="logo">${GAME_TITLE}</h1>
           <div class="subtitle">${GAME_SUBTITLE}</div>
           <label class="field"><span>Your name</span><input id="name-input" maxlength="16" autocomplete="off" spellcheck="false" /></label>
-          <button class="btn big" id="enter-btn">Enter the Grounds</button>
-          <div class="title-status" id="title-status"></div>
+          <button class="btn big" id="enter-btn">${offline ? 'Play' : 'Enter the Grounds'}</button>
+          <div class="title-status" id="title-status">${
+            touchOnly
+              ? 'This game needs a keyboard and mouse. Open it on a computer to play.'
+              : offline
+                ? 'Single player: roam the lobby, spar, practice, and climb ranked against AI opponents. Progress saves in this browser.'
+                : ''
+          }</div>
           <div class="title-hint">WASD move · Mouse aim · LMB attack · RMB heavy · F guard/deflect · Shift dodge · Space jump · E perilous · R ability · Tab lock-on</div>
         </div>
       </div>`);
@@ -125,7 +133,7 @@ export class UI {
         </div>
         <div class="top-right">
           <div class="menu-buttons">
-            <button class="btn ranked" id="btn-ranked">⚔ Ranked [K]</button>
+            <button class="btn ranked" id="btn-ranked">${offline ? '⚔ Ranked vs AI [K]' : '⚔ Ranked [K]'}</button>
             <div class="practice-group">
               <button class="btn" id="btn-practice">Practice vs Bot [P]</button>
               <select id="practice-diff"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
@@ -136,7 +144,7 @@ export class UI {
             <button class="btn small danger hidden" id="btn-forfeit">Forfeit</button>
           </div>
           <div class="queue-panel hidden">
-            <div class="queue-title">Searching for a ranked duel…</div>
+            <div class="queue-title">${offline ? 'Finding an opponent near your rating…' : 'Searching for a ranked duel…'}</div>
             <div class="queue-time">0:00</div>
             <div class="queue-count"></div>
             <button class="btn small" id="btn-cancel">Cancel</button>
@@ -167,7 +175,7 @@ export class UI {
           <div class="skill" id="sk-special"><div class="cd"></div><div class="key">E</div><div class="name"></div></div>
           <div class="skill" id="sk-ability"><div class="cd"></div><div class="key">R</div><div class="name"></div></div>
         </div>
-        <div class="click-hint hidden">Click to capture the mouse</div>
+        <div class="click-hint hidden">Click the game to capture the mouse</div>
         <div class="esc-hint hidden">Esc: free the cursor</div>
       </div>`);
     this.root.appendChild(this.hud);
@@ -229,8 +237,21 @@ export class UI {
     q('#btn-chars').addEventListener('click', () => this.toggleModal('chars'));
     q('#btn-ladder').addEventListener('click', () => this.toggleModal('ladder'));
     q('#btn-help').addEventListener('click', () => this.toggleModal('help'));
-    q('#btn-forfeit').addEventListener('click', () => {
-      if (confirm('Forfeit this match? It counts as a loss.')) this.handlers.onForfeit();
+    // two-step confirm (native confirm() dialogs are blocked in some embeds)
+    const forfeit = q<HTMLButtonElement>('#btn-forfeit');
+    let armedUntil = 0;
+    forfeit.addEventListener('click', () => {
+      if (performance.now() < armedUntil) {
+        armedUntil = 0;
+        forfeit.textContent = 'Forfeit';
+        this.handlers.onForfeit();
+        return;
+      }
+      armedUntil = performance.now() + 3000;
+      forfeit.textContent = 'Click again to forfeit';
+      setTimeout(() => {
+        if (performance.now() >= armedUntil) forfeit.textContent = 'Forfeit';
+      }, 3100);
     });
     this.chatInput.addEventListener('keydown', (e) => {
       e.stopPropagation();
@@ -275,8 +296,8 @@ export class UI {
   }
 
   setNetInfo(online: number, ping: number, fps: number | null): void {
-    this.els.online.textContent = `${online} online`;
-    this.els.ping.textContent = `${Math.round(ping)} ms`;
+    this.els.online.textContent = this.offline ? 'single player' : `${online} online`;
+    this.els.ping.textContent = this.offline ? 'offline' : `${Math.round(ping)} ms`;
     this.els.fps.textContent = fps !== null ? ` · ${fps} fps` : '';
   }
 
@@ -300,8 +321,9 @@ export class UI {
     this.els.zone.classList.toggle('hidden', !inSafe);
   }
 
-  setClickHint(show: boolean, locked: boolean): void {
-    this.els.clickHint.classList.toggle('hidden', !show);
+  setClickHint(show: boolean, locked: boolean, fallback = false): void {
+    // without pointer lock the cursor stays free: mouse movement over the game still looks around
+    this.els.clickHint.classList.toggle('hidden', !show || fallback);
     this.els.escHint.classList.toggle('hidden', !locked);
   }
 
@@ -638,7 +660,11 @@ export class UI {
       <div class="ladder-you">${me && meRank ? `You: ${rankBadge(meRank)} ${meRank.placed ? `${me.mmr} MMR · #${you ?? '?'} of ${total}` : `play ${PLACEMENT_MATCHES - me.placements} more ranked match(es) to place`}` : ''}</div>
       ${entries.length ? `<table><thead><tr><th>#</th><th>Name</th><th>Rank</th><th>MMR</th><th>W-L</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted">Nobody has finished placements yet. Be the first!</p>'}
       <div class="tiers">${tiers}</div>
-      <p class="muted">Ranked is best of 3 rounds on a random map. Ratings use Elo (K=32, 64 during your ${PLACEMENT_MATCHES} placement matches). Leaving a ranked match counts as a loss.</p>`;
+      <p class="muted">${
+        this.offline
+          ? 'Single player: you climb by beating AI opponents matched to your rating, and your record is saved in this browser. Run the game server to play ranked against other people.'
+          : `Ranked is best of 3 rounds on a random map. Ratings use Elo (K=32, 64 during your ${PLACEMENT_MATCHES} placement matches). Leaving a ranked match counts as a loss.`
+      }</p>`;
   }
 
   private renderHelp(): void {

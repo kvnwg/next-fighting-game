@@ -1,7 +1,4 @@
-/** Player profiles + ranked ratings, persisted to a JSON file. */
-import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
+/** Player profiles + ranked ratings. Persistence is pluggable (a JSON file on the server, localStorage offline). */
 import { LeaderboardEntry, ProfileView } from '../shared/protocol';
 import { PLACEMENT_MATCHES, START_MMR } from '../shared/ranks';
 
@@ -25,19 +22,36 @@ export function profileView(p: Profile): ProfileView {
   };
 }
 
+export interface StorePersistence {
+  load(): Profile[];
+  save(profiles: Profile[]): void;
+}
+
+function randomId(): string {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function randomToken(): string {
+  const bytes = new Uint8Array(24);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export class Store {
   private byId = new Map<string, Profile>();
   private byToken = new Map<string, Profile>();
-  private saveTimer: NodeJS.Timeout | null = null;
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** `file` null = in-memory only (tests). */
-  constructor(private readonly file: string | null) {
-    if (file && fs.existsSync(file)) {
+  /** `persist` null = in-memory only (tests). */
+  constructor(private readonly persist: StorePersistence | null) {
+    if (persist) {
       try {
-        const data = JSON.parse(fs.readFileSync(file, 'utf8')) as { profiles: Profile[] };
-        for (const p of data.profiles ?? []) this.index(p);
+        for (const p of persist.load()) this.index(p);
       } catch (err) {
-        console.error(`[store] could not read ${file}:`, err);
+        console.error('[store] could not load profiles:', err);
       }
     }
   }
@@ -63,8 +77,8 @@ export class Store {
   create(name: string): Profile {
     const now = Date.now();
     const p: Profile = {
-      id: crypto.randomUUID(),
-      token: crypto.randomBytes(24).toString('hex'),
+      id: randomId(),
+      token: randomToken(),
       name,
       mmr: START_MMR,
       peak: START_MMR,
@@ -104,7 +118,7 @@ export class Store {
   }
 
   markDirty(): void {
-    if (!this.file || this.saveTimer) return;
+    if (!this.persist || this.saveTimer) return;
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
       this.flush();
@@ -112,16 +126,13 @@ export class Store {
   }
 
   flush(): void {
-    if (!this.file) return;
+    if (!this.persist) return;
     if (this.saveTimer) {
       clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
     try {
-      fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      const tmp = `${this.file}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify({ profiles: [...this.byId.values()] }));
-      fs.renameSync(tmp, this.file);
+      this.persist.save([...this.byId.values()]);
     } catch (err) {
       console.error('[store] save failed:', err);
     }

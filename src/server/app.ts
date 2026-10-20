@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
+import { fileStore } from './fileStore';
 import { Game } from './game';
 import { Store } from './store';
 
@@ -62,7 +63,7 @@ function staticHandler(dir: string | undefined): http.RequestListener {
 }
 
 export function startServer(opts: ServerOptions): Promise<RunningServer> {
-  const store = new Store(opts.dataFile);
+  const store = new Store(opts.dataFile ? fileStore(opts.dataFile) : null);
   const game = new Game(store);
   const server = http.createServer(staticHandler(opts.staticDir));
   const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 });

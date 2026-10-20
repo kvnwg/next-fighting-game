@@ -1,18 +1,29 @@
 /** Server-side wrappers: a connected human (Player) and a simulated fighter (ServerFighter). */
-import type { WebSocket } from 'ws';
 import { CharacterId } from '../shared/characters';
 import { HIT_CONFIRM_SLACK_MS, MAX_LAG_COMP_MS } from '../shared/config';
+import { PLACEMENT_MATCHES } from '../shared/ranks';
 import { Fighter, DefenseEvent } from '../shared/fighter';
 import { BotDifficulty, QueueMode, RosterEntry, ServerMsg } from '../shared/protocol';
 import type { BotBrain } from './bot';
 import type { Instance } from './instance';
 import { Profile } from './store';
 
+/** The subset of a WebSocket the server uses (satisfied by `ws`, and by the in-browser offline socket). */
+export interface SocketLike {
+  readonly readyState: number;
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  on(event: 'message', cb: (data: unknown) => void): unknown;
+  on(event: 'close' | 'error', cb: () => void): unknown;
+}
+
 export class ServerFighter extends Fighter {
   name: string;
   owner: Player | null = null;
   brain: BotBrain | null = null;
   dummy: 'passive' | 'sparring' | undefined;
+  /** Rating of an AI opponent in a rated (offline ranked) match. */
+  rating: number | undefined;
 
   /** Defensive timeline used for lag-compensated hit resolution. */
   log: DefenseEvent[] = [];
@@ -60,6 +71,10 @@ export class ServerFighter extends Fighter {
     } else {
       e.bot = true;
       if (this.dummy) e.dummy = this.dummy;
+      if (this.rating !== undefined) {
+        e.mmr = this.rating;
+        e.placements = PLACEMENT_MATCHES;
+      }
     }
     return e;
   }
@@ -73,7 +88,7 @@ export class ServerFighter extends Fighter {
 
 export class Player {
   readonly id: string;
-  readonly ws: WebSocket;
+  readonly ws: SocketLike;
   profile: Profile;
   charId: CharacterId;
   fighter: ServerFighter | null = null;
@@ -87,7 +102,7 @@ export class Player {
   msgCount = 0;
   closed = false;
 
-  constructor(ws: WebSocket, profile: Profile, charId: CharacterId) {
+  constructor(ws: SocketLike, profile: Profile, charId: CharacterId) {
     this.id = profile.id;
     this.ws = ws;
     this.profile = profile;

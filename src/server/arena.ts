@@ -3,12 +3,15 @@ import { CHARACTER_IDS } from '../shared/characters';
 import { MATCH } from '../shared/config';
 import { MapDef } from '../shared/maps';
 import { BotDifficulty, MatchMode, MatchPhase, RosterEntry } from '../shared/protocol';
-import { BOT_PROFILES, BotBrain } from './bot';
+import { BOT_PROFILES, BotBrain, botProfileForRating } from './bot';
 import { Player, ServerFighter } from './entities';
 import type { Game } from './game';
 import { Instance } from './instance';
 
 let botCounter = 0;
+
+/** Names for rated AI opponents (placeholders, like the rest of the cast). */
+const AI_NAMES = ['Kestrel', 'Marlo', 'Sable', 'Wren', 'Ivo', 'Tamsin', 'Kael', 'Juno', 'Orrin', 'Pell', 'Rook', 'Vesna'];
 
 export class Arena extends Instance {
   readonly kind = 'arena' as const;
@@ -31,6 +34,8 @@ export class Arena extends Instance {
     a: Player,
     b: Player | null,
     diff: BotDifficulty = 'normal',
+    /** When set (offline ranked), the AI opponent has this rating and plays at a matching skill. */
+    readonly botRating?: number,
   ) {
     super(game, map);
     const [s0, s1] = map.spawns;
@@ -39,11 +44,13 @@ export class Arena extends Instance {
       // create the bot first so it is part of the human's initial roster
       const char = CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)];
       const label = diff[0].toUpperCase() + diff.slice(1);
-      fb = new ServerFighter(`bot-${++botCounter}`, `${label} Bot`, char);
+      const name = botRating !== undefined ? `${AI_NAMES[Math.floor(Math.random() * AI_NAMES.length)]} (AI)` : `${label} Bot`;
+      fb = new ServerFighter(`bot-${++botCounter}`, name, char);
       fb.x = s1.x;
       fb.z = s1.z;
       fb.yaw = s1.yaw;
-      fb.brain = new BotBrain(fb, 'duel', BOT_PROFILES[diff]);
+      fb.rating = botRating;
+      fb.brain = new BotBrain(fb, 'duel', botRating !== undefined ? botProfileForRating(botRating) : BOT_PROFILES[diff]);
       this.addFighter(fb);
     }
     const fa = this.addPlayer(a, s0);

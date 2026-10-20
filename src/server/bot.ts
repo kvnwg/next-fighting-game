@@ -4,8 +4,8 @@
  */
 import { AttackDef } from '../shared/characters';
 import { InputAction } from '../shared/fighter';
-import { onFloor } from '../shared/maps';
-import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
+import { inSafeZone, onFloor } from '../shared/maps';
+import { angleDiff, clamp, dist2D, forward, lerp, yawTo } from '../shared/math';
 import { BotDifficulty } from '../shared/protocol';
 import type { ServerFighter } from './entities';
 import type { Instance } from './instance';
@@ -38,7 +38,22 @@ interface Scheduled {
   serial?: number;
 }
 
-export type BotMode = 'duel' | 'sparring' | 'passive';
+/** Interpolate between the difficulty presets by rating (used for rated matches against AI). */
+export function botProfileForRating(mmr: number): BotProfile {
+  const t = clamp((mmr - 800) / 700, 0, 1);
+  const a = t < 0.5 ? BOT_PROFILES.easy : BOT_PROFILES.normal;
+  const b = t < 0.5 ? BOT_PROFILES.normal : BOT_PROFILES.hard;
+  const k = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+  const out = {} as BotProfile;
+  for (const key of Object.keys(a) as (keyof BotProfile)[]) out[key] = lerp(a[key], b[key], k);
+  return out;
+}
+
+/**
+ * duel: fight one opponent (arenas). sparring: stationary dummy that swings at nearby players.
+ * passive: does nothing. roam: wanders the lobby and picks fights outside the safe zone.
+ */
+export type BotMode = 'duel' | 'sparring' | 'passive' | 'roam';
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -52,6 +67,11 @@ export class BotBrain {
   private sparIndex = 0;
   private stanceAttackAt = 0;
   private holdingBlock = false;
+  // roaming
+  private waypoint: { x: number; z: number; until: number } | null = null;
+  private fightTarget: string | null = null;
+  private fightUntil = 0;
+  private calmUntil = 0;
 
   constructor(
     readonly f: ServerFighter,
@@ -96,6 +116,11 @@ export class BotBrain {
       for (const s of due) this.act(inst, s.action, now, s.dx, s.dz);
     }
 
+    if (this.mode === 'roam') {
+      this.roam(inst, now);
+      return;
+    }
+
     const t = this.target(inst);
     if (!t) {
       if (this.holdingBlock) this.releaseBlock(inst, now);
@@ -113,6 +138,73 @@ export class BotBrain {
     this.defend(inst, t, dist, now);
     this.move(inst, t, dist, now);
     this.attack(inst, t, dist, now);
+  }
+
+  // ------------------------------------------------------------------ roaming lobby fighter
+
+  private roam(inst: Instance, now: number): void {
+    const f = this.f;
+    let t = this.fightTarget ? inst.fighters.get(this.fightTarget) ?? null : null;
+    if (t) {
+      const d = dist2D(f.x, f.z, t.x, t.z);
+      if (!t.isAlive() || !inst.canDamage(f, t) || d > 14 || now > this.fightUntil) {
+        t = null;
+        this.fightTarget = null;
+        this.calmUntil = now + 8000;
+        if (this.holdingBlock) this.releaseBlock(inst, now);
+      }
+    }
+    // retaliate against whoever just hit us
+    if (!t && f.lastAttackerId && now - f.lastDamageAt < 2500) {
+      const a = inst.fighters.get(f.lastAttackerId);
+      if (a && a.isAlive() && inst.canDamage(f, a)) t = a;
+    }
+    if (!t && now > this.calmUntil) {
+      let bestD = Infinity;
+      for (const o of inst.fighters.values()) {
+        if (o === f || !o.isAlive() || o.dummy || !inst.canDamage(f, o)) continue;
+        const d = dist2D(f.x, f.z, o.x, o.z);
+        const reach = o.owner ? 9 : 6; // players draw more attention than other wanderers
+        if (d < reach && d < bestD) {
+          bestD = d;
+          t = o;
+        }
+      }
+    }
+    if (t) {
+      if (this.fightTarget !== t.id) {
+        this.fightTarget = t.id;
+        this.fightUntil = now + 30_000;
+      }
+      const dist = dist2D(f.x, f.z, t.x, t.z);
+      f.wantYaw = yawTo(f.x, f.z, t.x, t.z);
+      this.defend(inst, t, dist, now);
+      this.move(inst, t, dist, now);
+      this.attack(inst, t, dist, now);
+      return;
+    }
+
+    // stroll between points outside the plaza
+    const zone = inst.map.safeZone;
+    const reached = this.waypoint && dist2D(f.x, f.z, this.waypoint.x, this.waypoint.z) < 1.5;
+    if (!this.waypoint || reached || now > this.waypoint.until) {
+      for (let i = 0; i < 20; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = 22 + Math.random() * 40;
+        const x = Math.sin(a) * r;
+        const z = Math.cos(a) * r;
+        if (zone && inSafeZone(inst.map, x, z)) continue;
+        if (!onFloor(inst.map, x, z, -3)) continue;
+        this.waypoint = { x, z, until: now + 14_000 };
+        break;
+      }
+    }
+    if (this.waypoint) {
+      const dir = forward(yawTo(f.x, f.z, this.waypoint.x, this.waypoint.z));
+      f.moveX = dir.x * 0.55;
+      f.moveZ = dir.z * 0.55;
+      f.wantYaw = yawTo(f.x, f.z, this.waypoint.x, this.waypoint.z);
+    }
   }
 
   // ------------------------------------------------------------------ sparring dummy

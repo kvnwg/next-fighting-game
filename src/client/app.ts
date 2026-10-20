@@ -22,8 +22,8 @@ import { Preview, UI } from './ui';
 
 type MatchMsg = Extract<ServerMsg, { t: 'match' }>;
 
-export function startApp(root: HTMLElement): void {
-  new App(root);
+export function startApp(root: HTMLElement, offline = false): void {
+  new App(root, offline);
 }
 
 class App {
@@ -55,7 +55,10 @@ class App {
   private tmp = new THREE.Vector3();
   private titleTime = 0;
 
-  constructor(root: HTMLElement) {
+  constructor(
+    root: HTMLElement,
+    private readonly offline: boolean,
+  ) {
     this.renderer = new PixelRenderer(root, settings.pixelSize);
     this.scene = this.renderer.scene;
     this.cam = new CameraRig(this.renderer.camera);
@@ -83,7 +86,7 @@ class App {
         if (open) this.input.exitLock();
       },
       createPreview: (el) => createPreview(el),
-    });
+    }, offline);
     this.loadMap(LOBBY_MAP);
     this.bindNet();
     requestAnimationFrame((t) => this.frame(t));
@@ -100,10 +103,14 @@ class App {
     }
     settings.name = name;
     saveSettings();
-    this.ui.setTitleStatus('Connecting…');
-    const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+    this.ui.setTitleStatus(this.offline ? 'Starting…' : 'Connecting…');
     try {
-      await this.net.connect(url);
+      if (this.offline) {
+        const { connectOffline } = await import('./offline');
+        await this.net.connect(connectOffline);
+      } else {
+        await this.net.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+      }
     } catch (e) {
       this.ui.setTitleStatus(`${(e as Error).message} Is the server running? (npm run dev)`, true);
       return;
@@ -633,7 +640,7 @@ class App {
     this.ui.setSelf(this.profile?.name ?? '', sim.char, sim.hp, sim.posture, sim.state === 'broken');
     this.ui.setSkills(sim.char, now, { dodge: sim.dodgeReady, special: sim.specialReadyAt, ability: sim.abilityReadyAt }, COMBAT.dodgeCooldown);
     this.ui.setZone(this.kind === 'lobby' && inSafeZone(this.map, me.pos.x, me.pos.z));
-    this.ui.setClickHint(!this.input.locked && !this.ui.modalOpen && !this.ui.chatOpen, this.input.locked);
+    this.ui.setClickHint(!this.input.locked && !this.ui.modalOpen && !this.ui.chatOpen, this.input.locked, this.input.lockFailed);
     this.ui.setQueue(!!this.queue, this.queue?.since ?? 0, this.queue?.count ?? 0, now);
     this.ui.setMatch(this.match, now);
 
