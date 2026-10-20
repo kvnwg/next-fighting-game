@@ -59,8 +59,15 @@ export class Game {
 
   tick(): void {
     const now = this.now();
-    this.lobby.tick(now);
-    for (const a of this.arenas) a.tick(now);
+    // one broken instance must never take the whole server down
+    for (const inst of [this.lobby, ...this.arenas]) {
+      try {
+        inst.tick(now);
+      } catch (err) {
+        console.error(`[game] ${inst.kind} tick failed`, err);
+        if (inst instanceof Arena) this.closeArena(inst);
+      }
+    }
     if (now - this.lastMatchmake > 1000) {
       this.lastMatchmake = now;
       this.matchmake(now);

@@ -137,6 +137,10 @@ export class ClientFighter {
       // past the newest sample: hold (tiny extrapolation would add jitter at 20Hz)
       this.pos.set(b.x, b.y, b.z);
       this.yaw = b.r;
+    } else if (Math.hypot(b.x - a.x, b.z - a.z) > 8) {
+      // respawn / blink: jump instead of sliding across the map
+      this.pos.set(b.x, b.y, b.z);
+      this.yaw = b.r;
     } else {
       const k = Math.max(0, Math.min(1, (t - a.t) / Math.max(1, b.t - a.t)));
       this.pos.set(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k);

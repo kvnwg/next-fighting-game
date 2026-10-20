@@ -86,6 +86,31 @@ describe('server', () => {
     b.close();
   });
 
+  it('starts a casual duel when a challenge is accepted', async () => {
+    const a = await connect('Challenger');
+    const b = await connect('Challenged', 'monk');
+    a.send({ t: 'challenge', target: b.id });
+    const ch = await b.waitFor('challenge');
+    expect(ch.from).toBe(a.id);
+    b.send({ t: 'challengeReply', from: a.id, accept: true });
+    await a.waitFor('enter', (m) => m.kind === 'arena');
+    const match = await b.waitFor('match');
+    expect(match.mode).toBe('casual');
+    a.close();
+    b.close();
+  });
+
+  it('ignores malformed messages without crashing', async () => {
+    const c = await connect('Fuzzer');
+    for (const junk of ['nope', '{}', '[]', 'null', '{"t":"act","a":"light","vt":"x"}', '{"t":"move","x":"a"}', '{"t":"char","id":"__proto__"}', '{"t":"queue","mode":"weird"}', '{"t":"challenge","target":{}}']) {
+      c.ws.send(junk);
+    }
+    c.send({ t: 'ping', c: 1 });
+    const pong = await c.waitFor('pong');
+    expect(pong.c).toBe(1);
+    c.close();
+  });
+
   it('runs a practice match against a bot that fights back', async () => {
     const c = await connect('Practicer');
     c.send({ t: 'queue', mode: 'practice', diff: 'hard' });

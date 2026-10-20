@@ -386,7 +386,8 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
 export const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
 
 export function isCharacterId(v: unknown): v is CharacterId {
-  return typeof v === 'string' && v in CHARACTERS;
+  // own-property check: `in` would also accept inherited keys like "__proto__"
+  return typeof v === 'string' && Object.prototype.hasOwnProperty.call(CHARACTERS, v);
 }
 
 export function getAttack(char: CharacterDef, key: AttackKey): AttackDef | null {

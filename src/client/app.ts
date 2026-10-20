@@ -193,7 +193,7 @@ class App {
 
   private enterInstance(m: Extract<ServerMsg, { t: 'enter' }>): void {
     this.clearFighters();
-    const map = MAPS[m.map] ?? LOBBY_MAP;
+    const map = Object.prototype.hasOwnProperty.call(MAPS, m.map) ? MAPS[m.map] : LOBBY_MAP;
     this.loadMap(map);
     this.kind = m.kind;
     this.local = null;
