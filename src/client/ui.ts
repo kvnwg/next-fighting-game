@@ -38,6 +38,8 @@ export interface UIHandlers {
   onForfeit(): void;
   onSettingsChanged(): void;
   onModalChange(open: boolean): void;
+  /** the on-screen prompt was tapped (touch: challenge the player in front of you) */
+  onPrompt(): void;
   createPreview(container: HTMLElement): Preview;
   /** data URL of a character's portrait (rendered in-engine) */
   portrait(id: CharacterId): string;
@@ -48,7 +50,8 @@ export interface CardData {
   title: string;
   char: CharacterDef;
   hp: number;
-  posture: number;
+  /** 0..1 special meter: full = the special attack is ready */
+  special: number;
   broken: boolean;
   /** rounds won (null outside matches) */
   pips: number | null;
@@ -75,7 +78,7 @@ interface Floater {
 export class UI {
   readonly root: HTMLElement;
   private title: HTMLElement;
-  private hud: HTMLElement;
+  readonly hud: HTMLElement;
   private modal: HTMLElement;
   private chatLog: HTMLElement;
   private chatInput: HTMLInputElement;
@@ -97,9 +100,9 @@ export class UI {
     parent: HTMLElement,
     private readonly handlers: UIHandlers,
     private readonly offline = false,
+    readonly touch = false,
   ) {
-    const touchOnly = typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
-    this.root = h(`<div id="ui"></div>`);
+    this.root = h(`<div id="ui" class="${touch ? 'touch' : ''}"></div>`);
     parent.appendChild(this.root);
 
     this.title = h(`
@@ -110,13 +113,13 @@ export class UI {
           <label class="field"><span>Your name</span><input id="name-input" maxlength="16" autocomplete="off" spellcheck="false" /></label>
           <button class="btn big" id="enter-btn">${offline ? 'Play' : 'Enter the Grounds'}</button>
           <div class="title-status" id="title-status">${
-            touchOnly
-              ? 'This game needs a keyboard and mouse. Open it on a computer to play.'
-              : offline
-                ? 'Single player: roam the lobby, spar, practice, and climb ranked against AI opponents. Progress saves in this browser.'
-                : ''
+            offline ? 'Single player: roam the lobby, spar, practice, and climb ranked against AI opponents. Progress saves in this browser.' : ''
           }</div>
-          <div class="title-hint">WASD move · Mouse aim · LMB attack · RMB heavy · F guard/deflect · Shift dodge · Space jump · E perilous · R ability · Tab lock-on</div>
+          <div class="title-hint">${
+            touch
+              ? 'Left thumb moves · drag the right side to look · tap PARRY just before a hit lands to deflect'
+              : 'WASD move · Mouse aim · LMB attack · RMB heavy · F guard/deflect · Shift dodge · Space jump · E perilous · R ability · Tab lock-on'
+          }</div>
         </div>
       </div>`);
     this.root.appendChild(this.title);
@@ -139,7 +142,7 @@ export class UI {
             <div class="fc-title"></div>
             <div class="fc-name"><b class="fc-n"></b> <span class="fc-handle"></span></div>
             <div class="fc-hp"><div class="fc-trail"></div><div class="fc-fill"></div></div>
-            <div class="fc-po"><div class="fc-fill"></div></div>
+            <div class="fc-sp"><div class="fc-fill"></div></div>
             <div class="fc-meta"><span class="fc-pips"></span><span class="fc-ping"></span></div>
           </div>
         </div>
@@ -149,7 +152,7 @@ export class UI {
             <div class="fc-title"></div>
             <div class="fc-name"><b class="fc-n"></b> <span class="fc-handle"></span></div>
             <div class="fc-hp"><div class="fc-trail"></div><div class="fc-fill"></div></div>
-            <div class="fc-po"><div class="fc-fill"></div></div>
+            <div class="fc-sp"><div class="fc-fill"></div></div>
             <div class="fc-meta"><span class="fc-pips"></span><span class="fc-ping"></span></div>
           </div>
         </div>
@@ -159,14 +162,14 @@ export class UI {
           <div class="net-info"><span id="online"></span><span id="fps"></span></div>
         </div>
         <div class="side-menu">
-          <button class="btn ranked" id="btn-ranked">${offline ? 'Ranked vs AI [K]' : 'Ranked [K]'}</button>
+          <button class="btn ranked" id="btn-ranked">${offline ? 'Ranked vs AI' : 'Ranked'}<span class="key"> [K]</span></button>
           <div class="practice-group">
-            <button class="btn" id="btn-practice">Practice [P]</button>
+            <button class="btn" id="btn-practice">Practice<span class="key"> [P]</span></button>
             <select id="practice-diff" aria-label="Bot difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
           </div>
-          <button class="btn small" id="btn-chars">Characters [C]</button>
-          <button class="btn small" id="btn-ladder">Ladder [L]</button>
-          <button class="btn small" id="btn-help">Help [H]</button>
+          <button class="btn small" id="btn-chars">Characters<span class="key"> [C]</span></button>
+          <button class="btn small" id="btn-ladder">Ladder<span class="key"> [L]</span></button>
+          <button class="btn small" id="btn-help">Help<span class="key"> [H]</span></button>
           <button class="btn small danger hidden" id="btn-forfeit">Forfeit</button>
           <div class="queue-panel hidden">
             <div class="queue-title">${offline ? 'Finding an opponent near your rating…' : 'Searching for a ranked duel…'}</div>
@@ -209,6 +212,7 @@ export class UI {
           <div class="hint"><span class="h-label">Lock on</span><kbd>Tab</kbd></div>
         </div>
         <div class="click-hint hidden">Click the game to capture the mouse</div>
+        <div class="rotate-hint">Turn your device sideways to play</div>
       </div>`);
     this.root.appendChild(this.hud);
     this.modal = h(`<div class="modal hidden"></div>`);
@@ -260,6 +264,11 @@ export class UI {
     q('#btn-chars').addEventListener('click', () => this.toggleModal('chars'));
     q('#btn-ladder').addEventListener('click', () => this.toggleModal('ladder'));
     q('#btn-help').addEventListener('click', () => this.toggleModal('help'));
+    q('.prompt').addEventListener('click', () => this.handlers.onPrompt());
+    // touch: the menu is a dropdown under the menu button; picking anything closes it
+    this.els.menuButtons.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('.btn:not(#btn-forfeit)')) this.setTouchMenu(false);
+    });
     // two-step confirm (native confirm() dialogs are blocked in some embeds)
     const forfeit = q<HTMLButtonElement>('#btn-forfeit');
     let armedUntil = 0;
@@ -283,6 +292,10 @@ export class UI {
         if (text) this.handlers.onChat(text);
         this.closeChat();
       } else if (e.key === 'Escape') this.closeChat();
+    });
+    // touch keyboards have no Escape: tapping away closes the chat
+    this.chatInput.addEventListener('blur', () => {
+      if (this.touch && this.chatOpen) this.closeChat();
     });
     // keep the buttons from stealing keyboard focus (space/enter would click them)
     this.hud.querySelectorAll('button, select').forEach((b) => b.addEventListener('mouseup', () => (b as HTMLElement).blur()));
@@ -373,7 +386,9 @@ export class UI {
       fill.style.width = hp;
       q('.fc-trail').style.width = hp; // trails behind on a delay, showing the chunk you lost
     }
-    this.setBar(q('.fc-po .fc-fill'), d.posture / d.char.stats.posture);
+    const sp = q('.fc-sp');
+    (sp.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(1, d.special)) * 100}%`;
+    sp.classList.toggle('ready', d.special >= 1);
     el.classList.toggle('broken', d.broken);
     const pips = d.pips === null ? '' : Array.from({ length: d.pipMax }, (_, i) => `<i class="${i < d.pips! ? 'won' : ''}"></i>`).join('');
     const pipEl = q('.fc-pips');
@@ -429,6 +444,12 @@ export class UI {
     if (text !== null) this.els.deathSub.textContent = text;
   }
 
+  /** Touch: open or close the menu dropdown (toggles when no value is given). */
+  setTouchMenu(open?: boolean): void {
+    const menu = this.els.menuButtons;
+    menu.classList.toggle('open', open ?? !menu.classList.contains('open'));
+  }
+
   setPrompt(text: string | null): void {
     this.els.prompt.classList.toggle('hidden', !text);
     if (text) this.els.prompt.innerHTML = text;
@@ -479,14 +500,15 @@ export class UI {
 
   // ------------------------------------------------------------------ nameplates & floating text
 
-  plate(id: string, show: boolean, x = 0, y = 0, name = '', hpFrac = 1, color = '#fff', sub = ''): void {
+  /** Overhead nameplate: name, health and (once it starts building) posture, Sekiro-style. */
+  plate(id: string, show: boolean, x = 0, y = 0, name = '', hpFrac = 1, color = '#fff', sub = '', postureFrac = 0): void {
     let el = this.plates.get(id);
     if (!show) {
       if (el) el.style.display = 'none';
       return;
     }
     if (!el) {
-      el = h(`<div class="plate"><div class="plate-name"></div><div class="plate-hp"><div></div></div></div>`);
+      el = h(`<div class="plate"><div class="plate-name"></div><div class="plate-hp"><div></div></div><div class="plate-po"><div></div></div></div>`);
       this.plateLayer.appendChild(el);
       this.plates.set(id, el);
     }
@@ -499,7 +521,10 @@ export class UI {
       n.dataset.label = label;
     }
     n.style.color = color;
-    ((el.lastElementChild as HTMLElement).firstElementChild as HTMLElement).style.width = `${Math.max(0, hpFrac) * 100}%`;
+    (el.querySelector('.plate-hp div') as HTMLElement).style.width = `${Math.max(0, hpFrac) * 100}%`;
+    const po = el.querySelector('.plate-po') as HTMLElement;
+    po.classList.toggle('empty', postureFrac < 0.02);
+    this.setBar(po.firstElementChild as HTMLElement, postureFrac);
   }
 
   removePlate(id: string): void {
@@ -615,7 +640,7 @@ export class UI {
   private frame(title: string, body: string, wide = false): void {
     this.preview?.dispose();
     this.preview = null;
-    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''}"><div class="modal-head"><h2>${title}</h2><button class="btn small close">✕ Esc</button></div><div class="modal-body">${body}</div></div>`;
+    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''}"><div class="modal-head"><h2>${title}</h2><button class="btn small close">✕<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
     this.modal.classList.remove('hidden');
     this.modal.querySelector('.close')!.addEventListener('click', () => this.closeModal());
   }
@@ -712,7 +737,25 @@ export class UI {
         <div class="help-cols">
           <div>
             <h4>Controls</h4>
-            <table class="keys">
+            ${
+              this.touch
+                ? `<table class="keys">
+              <tr><td>Left thumb</td><td>Move (anywhere on the left side)</td></tr>
+              <tr><td>Drag right</td><td>Look around</td></tr>
+              <tr><td>Light</td><td>Light attack (chain up to 3-4)</td></tr>
+              <tr><td>Heavy</td><td>Heavy attack (tap Parry during the windup to feint)</td></tr>
+              <tr><td>Parry</td><td>Guard; tap right before a hit to DEFLECT</td></tr>
+              <tr><td>Dodge</td><td>Dodge (hold to sprint)</td></tr>
+              <tr><td>Jump</td><td>Jump (evades perilous sweeps)</td></tr>
+              <tr><td>Special</td><td>Appears when your special bar fills: perilous special (unblockable)</td></tr>
+              <tr><td>Small button</td><td>Character ability</td></tr>
+              <tr><td>Lock</td><td>Lock on</td></tr>
+              <tr><td>Prompt</td><td>Tap it to challenge the player in front of you</td></tr>
+              <tr><td>☰</td><td>Menu: ranked, practice, characters, ladder</td></tr>
+            </table>`
+                : ''
+            }
+            <table class="keys${this.touch ? ' hidden' : ''}">
               <tr><td>WASD</td><td>Move (Shift tap: dodge, hold: sprint)</td></tr>
               <tr><td>Mouse</td><td>Look / aim (click to capture)</td></tr>
               <tr><td>LMB</td><td>Light attack (chain up to 3-4)</td></tr>
@@ -744,10 +787,10 @@ export class UI {
         <h4>Settings</h4>
         <div class="settings">
           <label>Pixel size <input type="range" min="1" max="6" step="1" id="set-px" value="${settings.pixelSize}"><span id="set-px-v">${settings.pixelSize}</span></label>
-          <label>Mouse sensitivity <input type="range" min="0.2" max="3" step="0.1" id="set-sens" value="${settings.sensitivity}"><span id="set-sens-v">${settings.sensitivity}</span></label>
+          <label>${this.touch ? 'Look' : 'Mouse'} sensitivity <input type="range" min="0.2" max="3" step="0.1" id="set-sens" value="${settings.sensitivity}"><span id="set-sens-v">${settings.sensitivity}</span></label>
           <label>Volume <input type="range" min="0" max="1" step="0.05" id="set-vol" value="${settings.volume}"></label>
           <label><input type="checkbox" id="set-cue" ${settings.parryCue ? 'checked' : ''}> Weapon glint before a hit lands</label>
-          <label><input type="checkbox" id="set-inv" ${settings.invertY ? 'checked' : ''}> Invert mouse Y</label>
+          <label><input type="checkbox" id="set-inv" ${settings.invertY ? 'checked' : ''}> Invert ${this.touch ? 'look' : 'mouse'} Y</label>
           <label><input type="checkbox" id="set-fps" ${settings.showFps ? 'checked' : ''}> Show FPS</label>
         </div>
       </div>`,

@@ -105,6 +105,8 @@ export class Arena extends Instance {
     for (const [i, f] of this.slots.entries()) {
       const s = this.map.spawns[i];
       this.revive(f, s.x, s.z, s.yaw, now, 0);
+      // the special meter starts filling when the fight starts, not during the countdown
+      f.specialReadyAt = now + MATCH.countdownTime + f.char.special.cooldown;
     }
     this.roundWinner = undefined;
   }

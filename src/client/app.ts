@@ -19,6 +19,7 @@ import { PixelRenderer } from './render/renderer';
 import { portraitURL } from './render/portrait';
 import { MapView } from './render/world';
 import { saveSettings, settings } from './settings';
+import { TouchControls, isTouchDevice } from './touch';
 import { CardData, Preview, UI } from './ui';
 
 type MatchMsg = Extract<ServerMsg, { t: 'match' }>;
@@ -35,6 +36,7 @@ class App {
   private input: Input;
   private net = new Net();
   private ui: UI;
+  private touch: TouchControls | null = null;
   private mapView: MapView | null = null;
   private map: MapDef = LOBBY_MAP;
   private fighters = new Map<string, ClientFighter>();
@@ -64,6 +66,8 @@ class App {
     this.cam = new CameraRig(this.renderer.camera);
     this.effects = new Effects(this.scene);
     this.input = new Input(this.renderer.renderer.domElement);
+    const touch = isTouchDevice();
+    this.input.touchMode = touch;
     this.input.onBind = (b, p, t) => this.onBind(b, p, t);
     this.input.onWheel = (dy) => this.cam.zoom(dy);
     this.ui = new UI(root, {
@@ -83,11 +87,25 @@ class App {
       },
       onModalChange: (open) => {
         this.input.suspended = open || this.ui.chatOpen;
-        if (open) this.input.exitLock();
+        if (open) {
+          this.input.exitLock();
+          this.touch?.cancel();
+          this.ui.setTouchMenu(false);
+        }
       },
+      onPrompt: () => this.sendChallenge(),
       createPreview: (el) => createPreview(el),
       portrait: (id) => portraitURL(this.renderer.renderer, id),
-    }, offline);
+    }, offline, touch);
+    if (touch) {
+      this.touch = new TouchControls(this.ui.hud, this.input, {
+        onMenu: () => this.ui.setTouchMenu(),
+        onChat: () => {
+          this.touch?.cancel();
+          this.onBind('chat', true, performance.now());
+        },
+      });
+    }
     this.loadMap(LOBBY_MAP);
     this.bindNet();
     requestAnimationFrame((t) => this.frame(t));
@@ -345,15 +363,17 @@ class App {
       return;
     }
     if (b === 'challenge') {
-      if (pressed) {
-        const t = this.challengeTarget();
-        if (t) this.net.send({ t: 'challenge', target: t.id });
-      }
+      if (pressed) this.sendChallenge();
       return;
     }
     if (b === 'dodge' && pressed) this.dodgePressAt = performance.now();
     if (b === 'forward' || b === 'back' || b === 'left' || b === 'right') return;
     this.local!.handleBind(b, pressed, time, { camYaw: this.cam.yaw, lock: this.lock });
+  }
+
+  private sendChallenge(): void {
+    const t = this.challengeTarget();
+    if (t) this.net.send({ t: 'challenge', target: t.id });
   }
 
   private toggleLock(): void {
@@ -646,6 +666,16 @@ class App {
     const sim = local.sim;
     this.ui.setNetInfo(this.online, settings.showFps ? this.fps.value : null);
     this.ui.setHints(sim.char, now, { dodge: sim.dodgeReady, special: sim.specialReadyAt, ability: sim.abilityReadyAt });
+    if (this.touch) {
+      const charges = sim.dodgeReady;
+      this.touch.update({
+        specialReady: now >= sim.specialReadyAt && sim.isAlive() && (!this.match || this.match.phase === 'fight'),
+        abilityName: sim.char.ability.name,
+        abilityLeft: Math.max(0, sim.abilityReadyAt - now),
+        dodgeLeft: charges.some((t) => t <= now) ? 0 : Math.max(0, Math.min(...charges) - now),
+        locked: !!this.lock,
+      });
+    }
     this.ui.setPostureMain(sim.posture / sim.char.stats.posture, sim.state === 'broken');
     this.ui.setZone(this.kind === 'lobby' && inSafeZone(this.map, me.pos.x, me.pos.z));
     this.ui.setClickHint(!this.input.locked && !this.ui.modalOpen && !this.ui.chatOpen, this.input.locked, this.input.lockFailed);
@@ -673,7 +703,7 @@ class App {
       title: prof ? rankOf(prof.mmr, prof.placements).label : '',
       char: sim.char,
       hp: sim.hp,
-      posture: sim.posture,
+      special: me.specialCharge(now),
       broken: sim.state === 'broken',
       pips: myScore,
       pipMax: MATCH.roundsToWin,
@@ -694,7 +724,7 @@ class App {
         title,
         char: target.char,
         hp: target.hp,
-        posture: target.po,
+        special: target.specialCharge(now),
         broken: target.s === 'broken',
         pips: inMatch ? theirScore : null,
         pipMax: MATCH.roundsToWin,
@@ -720,12 +750,13 @@ class App {
       }
       const r = f.roster;
       const color = r.dummy ? '#c9b8a0' : r.bot ? '#a0c8ff' : r.mmr !== undefined ? rankOf(r.mmr, r.placements ?? 0).color : '#ffffff';
-      this.ui.plate(f.id, true, p.x, p.y, r.name, f.hp / f.char.stats.hp, color, f.char.name);
+      this.ui.plate(f.id, true, p.x, p.y, r.name, f.hp / f.char.stats.hp, color, f.char.name, f.po / f.char.stats.posture);
     }
 
     // challenge prompt / death
     const ct = this.challengeTarget();
-    this.ui.setPrompt(ct && sim.isAlive() ? `<b>[G]</b> Challenge <b>${ct.roster.name.replace(/</g, '&lt;')}</b> to a duel` : null);
+    const who = ct ? `<b>${ct.roster.name.replace(/</g, '&lt;')}</b>` : '';
+    this.ui.setPrompt(ct && sim.isAlive() ? (this.touch ? `Tap to challenge ${who} to a duel` : `<b>[G]</b> Challenge ${who} to a duel`) : null);
     if (this.kind === 'lobby' && sim.state === 'dead') this.ui.setDeath('Respawning in the shrine plaza…');
     else this.ui.setDeath(null);
     void forward;

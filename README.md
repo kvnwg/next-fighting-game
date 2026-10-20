@@ -56,11 +56,21 @@ Ranked profiles are stored in `data/profiles.json` (`DATA_DIR` overrides the fol
 | C / L / H | Characters / Ranked ladder / Help and settings |
 | Enter | Chat |
 
+**Phones and tablets** get on-screen controls automatically (or add `?touch` to the URL to force them on, `?touch=0` to force them off). Play in landscape.
+- **Move:** put your left thumb anywhere on the left side; the stick appears under it.
+- **Look:** drag anywhere else.
+- **Buttons** (right side, from `src/client/touch.ts`): **Parry** (tap to deflect, hold to block), **Heavy**, **Dodge** (hold to sprint), **Light** and **Jump**.
+  - Smaller buttons handle the character ability and lock-on.
+  - **Special** pops up above Heavy once the special meter is full.
+- **Menu and chat:** use the two buttons at the top left.
+- **Challenge:** tap the on-screen prompt to challenge the player in front of you.
+
 ## Combat
 
 - **Health and posture.** Blocking a hit costs posture. When posture fills you're **posture broken**: helpless for ~1.8s, and the next hit is a **Deathblow** (40 damage). Posture regenerates when you stop taking posture damage: faster while guarding, slower when your health is low.
 - **Deflect.** Pressing guard within ~200ms before a hit lands deflects it. Deflecting costs you almost nothing and hammers the attacker's posture. It also makes them recoil, and heavier swings recoil longer: deflecting a heavy or perilous attack gives you a free counter, while deflecting a quick poke only gives you the initiative. Mashing guard shrinks your deflect window (only whiffed presses count as spam).
-- **Perilous attacks (危).** Every character's **E** move is unblockable and flashes a red glyph:
+- **Special meter.** The thin bar under each fighter's health fills as their special recharges. It starts empty each round and fills over the special's cooldown (about 7s), and when it's full the special is ready.
+- **Perilous attacks (危).** Every character's special (**E**) is unblockable and flashes a red glyph:
   - **Thrust**: deflect it, or dodge *into* it for a counter that wrecks their posture.
   - **Sweep**: jump over it.
   - **Grab**: dodge or jump away.
@@ -160,4 +170,4 @@ All combat timings live in `COMBAT` and `MATCH` in `src/shared/config.ts` (defle
 - No real accounts: identity is a browser token. Hook up auth before running a public ranked ladder.
 - Movement is client-reported. The server caps speed by state (no walking away while staggered or broken), limits height to real jumps, and measures latency itself. That stops the obvious cheats, but it isn't a fully server-simulated movement model.
 - One server process holds everyone. Scaling out would need sharded lobbies and a shared store such as SQLite or Postgres.
-- Keyboard and mouse only; no gamepad or touch controls yet.
+- No gamepad support yet (keyboard + mouse, or touch).

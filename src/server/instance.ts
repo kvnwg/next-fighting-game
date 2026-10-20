@@ -578,9 +578,10 @@ export abstract class Instance {
     }
   }
 
-  /** Respawn helper: full vitals, idle, protected for a moment. */
+  /** Respawn helper: full vitals, idle, protected for a moment. The special meter starts empty. */
   revive(f: ServerFighter, x: number, z: number, yaw: number, now: number, protect: number = COMBAT.spawnProtection): void {
     f.resetVitals();
+    f.specialReadyAt = now + f.char.special.cooldown;
     f.stateStart = now;
     f.log.length = 0;
     f.guardActive = false;

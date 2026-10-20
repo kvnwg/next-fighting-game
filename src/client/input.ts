@@ -1,4 +1,7 @@
-/** Keyboard + mouse. Combat binds fire callbacks immediately (with exact timestamps) for tight parry timing. */
+/**
+ * Keyboard + mouse, plus the on-screen touch controls (which feed the same binds). Combat binds fire
+ * callbacks immediately (with exact timestamps) for tight parry timing.
+ */
 
 export type Bind =
   | 'forward'
@@ -62,6 +65,10 @@ export class Input {
   private lastLockAttempt = -Infinity;
   /** when true (chat/menus focused) gameplay keys are ignored */
   suspended = false;
+  /** analog thumbstick from the touch controls: (right, forward) in -1..1 */
+  stick = { x: 0, y: 0 };
+  /** playing with touch controls: no pointer lock, and taps never count as mouse clicks */
+  touchMode = false;
   onBind: ((b: Bind, pressed: boolean, time: number) => void) | null = null;
   onWheel: ((dy: number) => void) | null = null;
 
@@ -81,6 +88,7 @@ export class Input {
       if (b) this.release(b, e.timeStamp);
     });
     canvas.addEventListener('mousedown', (e) => {
+      if (this.touchMode) return;
       if (!this.locked) {
         if (!this.suspended) this.requestLock();
         if (!this.lockFailed) return;
@@ -119,6 +127,7 @@ export class Input {
   }
 
   requestLock(): void {
+    if (this.touchMode) return;
     // once refused, only retry occasionally (a sandboxed frame refuses every time)
     if (this.lockFailed && performance.now() - this.lastLockAttempt < 8000) return;
     this.lastLockAttempt = performance.now();
@@ -138,6 +147,12 @@ export class Input {
 
   exitLock(): void {
     if (document.pointerLockElement) document.exitPointerLock();
+  }
+
+  /** An on-screen button went down or up. */
+  virtual(b: Bind, pressed: boolean, time: number): void {
+    if (pressed) this.press(b, time);
+    else this.release(b, time);
   }
 
   private press(b: Bind, time: number): void {
@@ -162,11 +177,12 @@ export class Input {
     return this.down.has(b);
   }
 
-  /** WASD as a (right, forward) vector in -1..1 */
+  /** WASD (or the thumbstick) as a (right, forward) vector in -1..1 */
   moveAxes(): { x: number; y: number } {
     if (this.suspended) return { x: 0, y: 0 };
     const x = (this.isDown('right') ? 1 : 0) - (this.isDown('left') ? 1 : 0);
     const y = (this.isDown('forward') ? 1 : 0) - (this.isDown('back') ? 1 : 0);
+    if (x === 0 && y === 0) return { x: this.stick.x, y: this.stick.y };
     return { x, y };
   }
 

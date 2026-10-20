@@ -38,6 +38,8 @@ export class ClientFighter {
   b = false;
   flags = 0;
   serial = 0;
+  /** server time the special is charged */
+  specialReadyAt = 0;
   private lastStateServerTime = -Infinity;
 
   /** rendered transform */
@@ -137,6 +139,10 @@ export class ClientFighter {
     this.b = f.b === 1;
     this.flags = f.f;
     this.serial = f.n;
+    this.specialReadyAt = f.sr ?? 0;
+    // the server can only push our special further out (respawns, round starts); our own
+    // predicted uses already move it forward locally
+    if (this.sim && f.sr !== undefined && f.sr > this.sim.specialReadyAt + 50) this.sim.specialReadyAt = f.sr;
   }
 
   /** Freeze this fighter's animation briefly (impact feel). */
@@ -266,6 +272,13 @@ export class ClientFighter {
       const pulse = 0.65 + Math.sin(serverNow / 50) * 0.08;
       this.glyph.scale.setScalar(pulse);
     }
+  }
+
+  /** 0..1 special meter (full = the special is ready). */
+  specialCharge(serverNow: number): number {
+    const ready = this.sim ? this.sim.specialReadyAt : this.specialReadyAt;
+    const cd = this.char.special.cooldown;
+    return cd > 0 ? Math.max(0, Math.min(1, 1 - (ready - serverNow) / cd)) : 1;
   }
 
   private dodgeIsVanish(): boolean {

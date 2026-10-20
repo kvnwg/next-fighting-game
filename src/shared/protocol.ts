@@ -56,6 +56,8 @@ export interface FighterSnap {
   f: number;
   /** attack serial; lets clients tell back-to-back identical attacks apart */
   n: number;
+  /** when the special is charged (server ms); drives the special meter */
+  sr?: number;
 }
 
 export interface CombatEvent {
@@ -168,6 +170,7 @@ export function fighterSnap(f: Fighter, flags: number): FighterSnap {
     f: flags,
     n: f.attackSerial,
   };
+  if (f.specialReadyAt > 0) s.sr = Math.round(f.specialReadyAt);
   if (f.state === 'attack' && f.attackKey) {
     s.a = f.attackKey;
     s.aw = f.atkWindup;

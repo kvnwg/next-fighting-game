@@ -259,6 +259,7 @@ export class LocalController {
       sim.drainEvents();
     } else if (reason === 'respawn') {
       sim.resetVitals();
+      sim.specialReadyAt = now + sim.char.special.cooldown; // mirrors the server: the meter refills from empty
       sim.stateStart = now;
       this.lastForcedStart = now;
     }
