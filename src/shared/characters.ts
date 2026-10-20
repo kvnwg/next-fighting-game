@@ -173,7 +173,7 @@ const ronin: CharacterDef = {
     attack: { name: 'Iai Flash', anim: 'draw', windup: 130, active: 90, recovery: 450, damage: 16, posture: 32, blockPosture: 38, range: 3.3, arc: 70, lunge: 2.0 },
   },
   passive: { name: 'Clear Mind', description: 'Deflect window is 40ms longer.', mods: { parryWindowBonus: 40 } },
-  palette: { primary: '#2f3b63', secondary: '#c9b38a', accent: '#d8423b', skin: '#e8b98f', hair: '#1c1a22', metal: '#d9e2ec' },
+  palette: { primary: '#34448a', secondary: '#e6e2d6', accent: '#e43b44', skin: '#e8b796', hair: '#1c1a22', metal: '#d9e2ec' },
 };
 
 const juggernaut: CharacterDef = {
@@ -202,7 +202,7 @@ const juggernaut: CharacterDef = {
     hyperArmor: true,
   },
   passive: { name: 'Unstoppable', description: 'Heavy attacks have hyper armor: getting hit will not interrupt them.', mods: { heavyHyperArmor: true } },
-  palette: { primary: '#5b3a29', secondary: '#8f8f8f', accent: '#e0a030', skin: '#c98d68', hair: '#7a3b1e', metal: '#9aa3ad' },
+  palette: { primary: '#1e6f75', secondary: '#c0cbdc', accent: '#feae34', skin: '#c28569', hair: '#733e39', metal: '#9aa3ad' },
 };
 
 const duelist: CharacterDef = {
@@ -235,7 +235,7 @@ const duelist: CharacterDef = {
     description: 'After a deflect your next attack winds up 40% faster. Light attacks can be feinted.',
     mods: { riposteWindupMult: 0.6, lightFeint: true },
   },
-  palette: { primary: '#7a1f3d', secondary: '#f0e6d2', accent: '#e8c14a', skin: '#f0c8a0', hair: '#d9a441', metal: '#e6eef5' },
+  palette: { primary: '#ecebe6', secondary: '#262b44', accent: '#ff0044', skin: '#e8b796', hair: '#feae34', metal: '#e6eef5' },
 };
 
 const lancer: CharacterDef = {
@@ -265,7 +265,7 @@ const lancer: CharacterDef = {
     iframes: 320,
   },
   passive: { name: 'Reach', description: 'Hits with the outer 30% of a swing deal 25% more damage and posture.', mods: { tipperBonus: 0.25 } },
-  palette: { primary: '#2d5a3d', secondary: '#c7c09a', accent: '#5fb3d9', skin: '#d7a77e', hair: '#3a2a1a', metal: '#cfd8df' },
+  palette: { primary: '#124e89', secondary: '#e0e4ec', accent: '#2ce8f5', skin: '#e4a672', hair: '#3e2731', metal: '#cfd8df' },
 };
 
 const shade: CharacterDef = {
@@ -294,7 +294,7 @@ const shade: CharacterDef = {
     range: 9,
   },
   passive: { name: 'Ghost', description: 'Two dodge charges. Hits from behind deal 40% more damage.', mods: { dodgeCharges: 2, backstabBonus: 0.4 } },
-  palette: { primary: '#3b3450', secondary: '#5a4b78', accent: '#9b6bff', skin: '#d9b39a', hair: '#e8e8f0', metal: '#b8c0d8' },
+  palette: { primary: '#3a4466', secondary: '#262b44', accent: '#b55088', skin: '#e8b796', hair: '#e8e8f0', metal: '#b8c0d8' },
 };
 
 const reaper: CharacterDef = {
@@ -322,7 +322,7 @@ const reaper: CharacterDef = {
     attack: { name: 'Soul Hook', anim: 'hook', windup: 450, active: 120, recovery: 550, damage: 6, posture: 10, blockPosture: 14, range: 11, arc: 12, pull: 2.0 },
   },
   passive: { name: 'Soul Siphon', description: 'Heal for 20% of all damage you deal.', mods: { lifesteal: 0.2 } },
-  palette: { primary: '#2f4740', secondary: '#4f665c', accent: '#7cffb2', skin: '#b9c4bd', hair: '#0f1412', metal: '#a7b5ae' },
+  palette: { primary: '#193c3e', secondary: '#1e6f75', accent: '#63c74d', skin: '#b9c4bd', hair: '#0f1412', metal: '#a7b5ae' },
 };
 
 const monk: CharacterDef = {
@@ -352,7 +352,7 @@ const monk: CharacterDef = {
     attack: { name: 'Counter Strike', anim: 'uppercut', windup: 60, active: 80, recovery: 360, damage: 12, posture: 35, blockPosture: 35, range: 2.5, arc: 90, noHitbox: true },
   },
   passive: { name: 'Inner Focus', description: 'Deal 15% more posture damage. Posture recovers 30% faster.', mods: { postureDamageMult: 1.15 } },
-  palette: { primary: '#d9822b', secondary: '#7a3e12', accent: '#f2d16b', skin: '#c88f62', hair: '#2a1b10', metal: '#8c6f4a' },
+  palette: { primary: '#ecebe6', secondary: '#3a4466', accent: '#f77622', skin: '#c28569', hair: '#2a1b10', metal: '#8c6f4a' },
 };
 
 const paladin: CharacterDef = {
@@ -380,7 +380,7 @@ const paladin: CharacterDef = {
     attack: { name: 'Shield Charge', anim: 'charge', windup: 260, active: 260, recovery: 500, damage: 8, posture: 30, blockPosture: 38, range: 2.0, arc: 60, lunge: 5.0, unparryable: true, knockback: 2.0 },
   },
   passive: { name: 'Bulwark', description: 'Blocking takes 30% less posture damage and covers a wider angle.', mods: { blockPostureMult: 0.7, guardArcBonus: 35 } },
-  palette: { primary: '#d4d8de', secondary: '#2f5fa8', accent: '#f0c94a', skin: '#e3b28d', hair: '#8a5a2b', metal: '#e8edf2' },
+  palette: { primary: '#d4d8de', secondary: '#124e89', accent: '#feae34', skin: '#e8b796', hair: '#733e39', metal: '#e8edf2' },
 };
 
 export const CHARACTERS: Record<CharacterId, CharacterDef> = {

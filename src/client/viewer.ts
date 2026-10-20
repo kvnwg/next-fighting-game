@@ -206,6 +206,8 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
 function showMap(r: PixelRenderer, mapId: string, params: URLSearchParams): void {
   const map = MAPS[mapId];
   const view = new MapView(map, r.scene);
+  r.sunDir.copy(view.sunDir);
+  r.setRim(view.rimColor);
   const fx = new Effects(r.scene);
   fx.setWeather(map.theme.weather);
   const chars = ['ronin', 'reaper'] as const;

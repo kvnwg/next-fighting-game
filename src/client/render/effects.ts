@@ -17,8 +17,13 @@ interface Particle {
   size: number;
   gravity: number;
   drag: number;
+  /** >0: drawn as a streak stretched along its velocity (sparks) */
+  stretch: number;
   color: THREE.Color;
 }
+
+const _up = new THREE.Vector3(0, 1, 0);
+const _vel = new THREE.Vector3();
 
 const MAX_PARTICLES = 900;
 
@@ -59,7 +64,7 @@ export class Effects {
     this.mesh.frustumCulled = false;
     this.mesh.layers.set(FX_LAYER);
     for (let i = 0; i < MAX_PARTICLES; i++) {
-      this.particles.push({ alive: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 1, size: 0.1, gravity: 0, drag: 0, color: new THREE.Color() });
+      this.particles.push({ alive: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 1, size: 0.1, gravity: 0, drag: 0, stretch: 0, color: new THREE.Color() });
       this.mesh.setColorAt(i, new THREE.Color('#ffffff'));
     }
     this.mesh.count = 0;
@@ -79,7 +84,7 @@ export class Effects {
 
   burst(
     pos: THREE.Vector3,
-    opts: { count: number; color: string | string[]; speed: number; up?: number; life?: number; size?: number; gravity?: number; spread?: number; drag?: number },
+    opts: { count: number; color: string | string[]; speed: number; up?: number; life?: number; size?: number; gravity?: number; spread?: number; drag?: number; stretch?: number },
   ): void {
     const colors = Array.isArray(opts.color) ? opts.color : [opts.color];
     for (let i = 0; i < opts.count; i++) {
@@ -99,6 +104,7 @@ export class Effects {
       p.size = (opts.size ?? 0.08) * (0.7 + Math.random() * 0.6);
       p.gravity = opts.gravity ?? 9;
       p.drag = opts.drag ?? 1.5;
+      p.stretch = opts.stretch ?? 0;
       p.color.set(colors[Math.floor(Math.random() * colors.length)]);
     }
   }
@@ -160,7 +166,15 @@ export class Effects {
       }
       const s = p.size * Math.min(1, (p.life / p.max) * 2);
       this.tmpP.set(p.x, p.y, p.z);
-      this.tmpS.set(s, s, s);
+      if (p.stretch > 0) {
+        _vel.set(p.vx, p.vy, p.vz);
+        const speed = _vel.length();
+        if (speed > 1e-4) this.tmpQ.setFromUnitVectors(_up, _vel.multiplyScalar(1 / speed));
+        this.tmpS.set(s * 0.6, s * (1 + speed * p.stretch), s * 0.6);
+      } else {
+        this.tmpQ.identity();
+        this.tmpS.set(s, s, s);
+      }
       this.tmpM.compose(this.tmpP, this.tmpQ, this.tmpS);
       this.mesh.setMatrixAt(n, this.tmpM);
       this.mesh.setColorAt(n, p.color);
@@ -317,13 +331,13 @@ export function makeGlyph(text: string, color: string, bg: string): THREE.Sprite
   return s;
 }
 
-const WEATHER: Record<Weather, { count: number; colors: string[]; size: [number, number, number]; fall: number; sway: number; area: number; height: number }> = {
-  petals: { count: 260, colors: ['#f6b8cc', '#f39dba', '#ffd6e2'], size: [0.1, 0.02, 0.08], fall: 0.9, sway: 1.2, area: 26, height: 12 },
+const WEATHER: Record<Weather, { count: number; colors: string[]; size: [number, number, number]; fall: number; sway: number; area: number; height: number; wind?: [number, number] }> = {
+  petals: { count: 320, colors: ['#f6b8cc', '#f39dba', '#ffd6e2'], size: [0.14, 0.02, 0.11], fall: 0.8, sway: 1.2, area: 26, height: 12, wind: [1.4, 0.4] },
   snow: { count: 500, colors: ['#ffffff', '#e8f0fa'], size: [0.07, 0.07, 0.07], fall: 1.6, sway: 0.8, area: 28, height: 14 },
-  embers: { count: 240, colors: ['#ffb030', '#ff7a1a', '#ffd84a'], size: [0.06, 0.06, 0.06], fall: -1.2, sway: 0.6, area: 22, height: 10 },
+  embers: { count: 240, colors: ['#ffb030', '#ff7a1a', '#ffd84a'], size: [0.06, 0.06, 0.06], fall: -1.2, sway: 0.6, area: 22, height: 10, wind: [0.5, 0.2] },
   rain: { count: 700, colors: ['#9fb8d0', '#c0d4e6'], size: [0.025, 0.5, 0.025], fall: 16, sway: 0.1, area: 26, height: 16 },
   fireflies: { count: 120, colors: ['#e8ff7a', '#c8ff5a'], size: [0.07, 0.07, 0.07], fall: 0, sway: 0.6, area: 24, height: 4 },
-  leaves: { count: 160, colors: ['#e07a2a', '#c8502a', '#e8a83a'], size: [0.12, 0.02, 0.09], fall: 1.1, sway: 1.8, area: 28, height: 12 },
+  leaves: { count: 160, colors: ['#e07a2a', '#c8502a', '#e8a83a'], size: [0.12, 0.02, 0.09], fall: 1.1, sway: 1.8, area: 28, height: 12, wind: [1.0, 0.3] },
   pollen: { count: 140, colors: ['#fff6c0', '#ffffff'], size: [0.04, 0.04, 0.04], fall: 0.15, sway: 0.5, area: 30, height: 6 },
 };
 
@@ -368,13 +382,18 @@ class WeatherSystem {
 
   update(dt: number, cam: THREE.Vector3): void {
     this.t += dt;
-    const { area, height, fall, sway } = this.cfg;
+    const { area, height, fall, sway, wind } = this.cfg;
     const base = this.kind === 'fireflies' || this.kind === 'pollen' ? 0.3 : 0;
     for (let i = 0; i < this.pts.length; i++) {
       const p = this.pts[i];
       p.y -= fall * p.spd * dt;
       p.x += Math.sin(this.t * 0.9 + p.ph) * sway * dt;
       p.z += Math.cos(this.t * 0.7 + p.ph * 1.3) * sway * dt;
+      if (wind) {
+        // a steady breeze carries them across the screen
+        p.x += wind[0] * p.spd * dt;
+        p.z += wind[1] * p.spd * dt;
+      }
       if (this.kind === 'fireflies') p.y = 0.5 + Math.sin(this.t * 0.8 + p.ph) * 1.2 + 1.2;
       if (p.y < 0) p.y += height;
       if (p.y > height) p.y -= height;

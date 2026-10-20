@@ -97,7 +97,9 @@ let game: Game | null = null;
 /** Start (once) the in-page server and open a socket to it. */
 export function connectOffline(): ClientSocketLike {
   if (!game) {
-    game = new Game(new Store(localPersistence), undefined, { offline: true, roamers: 4 });
+    // ?arena=<id> pins every match to one map (handy for testing a specific arena)
+    const arena = new URLSearchParams(location.search).get('arena') ?? undefined;
+    game = new Game(new Store(localPersistence), undefined, { offline: true, roamers: 4, arena });
     game.start();
     addEventListener('pagehide', () => game?.store.flush());
   }

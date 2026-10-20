@@ -15,13 +15,104 @@ void main() {
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
+/**
+ * Gradient sky with a sun (or moon) disc, a glow around it and two layers of drifting cloud
+ * streaks. The disc is brighter than 1.0 so the bloom pass picks it up.
+ */
 const SKY_FRAG = /* glsl */ `
 uniform vec3 top;
+uniform vec3 mid;
 uniform vec3 bottom;
+uniform vec3 glowColor;
+uniform vec3 discColor;
+uniform vec3 cloudColor;
+uniform vec3 sunDir;
+uniform float discSize;
+uniform float glowStrength;
+uniform float clouds;
+uniform float time;
 varying vec3 vDir;
+
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 4; i++) {
+    v += noise(p) * a;
+    p *= 2.03;
+    a *= 0.5;
+  }
+  return v;
+}
+
 void main() {
-  float h = clamp(vDir.y * 1.6 + 0.15, 0.0, 1.0);
-  gl_FragColor = vec4(mix(bottom, top, h), 1.0);
+  vec3 d = normalize(vDir);
+  float h = d.y;
+  float sd = max(dot(d, sunDir), 0.0);
+  // three stops: horizon, a band of colour above it, and the zenith
+  vec3 c = mix(bottom, mid, smoothstep(-0.02, 0.2, h));
+  c = mix(c, top, smoothstep(0.16, 0.65, h));
+  // warm bloom of light around the sun, strongest along the horizon
+  float glow = pow(sd, 6.0) * 0.55 + pow(sd, 40.0) * 0.6;
+  glow *= mix(1.0, 1.6, smoothstep(0.35, 0.0, abs(h - sunDir.y)));
+  c += glowColor * glow * glowStrength;
+
+  // cloud streaks: long thin bands drifting slowly, lit on the side facing the sun
+  float az = atan(d.x, d.z);
+  float band = smoothstep(-0.02, 0.06, h) * smoothstep(0.42, 0.12, h);
+  vec2 p1 = vec2(az * 6.0 + time * 0.006, h * 38.0);
+  vec2 p2 = vec2(az * 10.0 - time * 0.004 + 4.0, h * 60.0 + 3.0);
+  float n1 = smoothstep(0.52, 0.7, fbm(p1 * vec2(1.0, 0.6)));
+  float n2 = smoothstep(0.56, 0.72, fbm(p2 * vec2(1.0, 0.5)));
+  float cloud = max(n1, n2 * 0.8) * band * clouds;
+  vec3 lit = mix(cloudColor, glowColor * 1.15 + 0.15, pow(sd, 3.0));
+  c = mix(c, lit, cloud * 0.85);
+
+  float disc = smoothstep(discSize, discSize + 0.0004, sd);
+  c = mix(c, discColor, disc * (1.0 - cloud * 0.6));
+  gl_FragColor = vec4(c, 1.0);
+}`;
+
+/** Drifting mist sheet: soft noise, faded toward the edges of the sheet. */
+const MIST_VERT = /* glsl */ `
+varying vec3 vWorld;
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  vec4 w = modelMatrix * vec4(position, 1.0);
+  vWorld = w.xyz;
+  gl_Position = projectionMatrix * viewMatrix * w;
+}`;
+
+const MIST_FRAG = /* glsl */ `
+uniform vec3 color;
+uniform float opacity;
+uniform float time;
+uniform float scale;
+uniform vec2 drift;
+varying vec3 vWorld;
+varying vec2 vUv;
+
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+void main() {
+  vec2 p = vWorld.xz * scale + drift * time;
+  float n = noise(p) * 0.6 + noise(p * 2.1 + 7.3) * 0.3 + noise(p * 4.3 - 2.1) * 0.1;
+  float edge = smoothstep(0.5, 0.2, length(vUv - 0.5));
+  float a = smoothstep(0.38, 0.72, n) * edge * opacity;
+  gl_FragColor = vec4(color, a);
 }`;
 
 const ZONE_VERT = /* glsl */ `
@@ -48,6 +139,9 @@ const MAX_POINT_LIGHTS = 8;
 export class MapView {
   readonly group = new THREE.Group();
   readonly sun: THREE.DirectionalLight;
+  /** Direction toward the sun and the colour of the rim light it puts on the fighters. */
+  readonly sunDir: THREE.Vector3;
+  readonly rimColor: THREE.Color;
   private animators: ((t: number, dt: number) => void)[] = [];
   private lightBudget = MAX_POINT_LIGHTS;
   private boardCanvas: HTMLCanvasElement | null = null;
@@ -62,11 +156,28 @@ export class MapView {
     scene.fog = new THREE.Fog(th.fog, th.fogNear, th.fogFar);
     scene.background = new THREE.Color(th.skyBottom);
 
-    // sky dome
+    // sky dome with the sun / moon disc
+    const dir = new THREE.Vector3(...th.sunDir).normalize();
+    this.sunDir = dir.clone();
+    this.rimColor = new THREE.Color(th.sun).lerp(new THREE.Color('#ffffff'), th.night ? 0.3 : 0.45).multiplyScalar(th.night ? 1.1 : 1.6);
+    const discDir = new THREE.Vector3(...(th.sunDisc ?? th.sunDir)).normalize();
+    const skyBottom = new THREE.Color(th.skyBottom);
     const sky = new THREE.Mesh(
-      new THREE.SphereGeometry(350, 24, 12),
+      new THREE.SphereGeometry(350, 32, 16),
       new THREE.ShaderMaterial({
-        uniforms: { top: { value: new THREE.Color(th.skyTop) }, bottom: { value: new THREE.Color(th.skyBottom) } },
+        uniforms: {
+          top: { value: new THREE.Color(th.skyTop) },
+          mid: { value: th.skyMid ? new THREE.Color(th.skyMid) : mixSRGB(skyBottom, new THREE.Color(th.skyTop), 0.45) },
+          bottom: { value: skyBottom },
+          glowColor: { value: new THREE.Color(th.night ? '#8a9ad8' : th.sun) },
+          discColor: { value: new THREE.Color(th.night ? '#f4f1dc' : '#fffaf0').multiplyScalar(th.night ? 1.2 : 3) },
+          cloudColor: { value: skyBottom.clone().lerp(new THREE.Color(th.skyTop), 0.35) },
+          sunDir: { value: discDir },
+          discSize: { value: Math.cos(th.night ? 0.045 : th.sunDisc ? 0.085 : 0.05) },
+          glowStrength: { value: th.night ? 0.35 : th.sunDisc ? 0.55 : 0.4 },
+          clouds: { value: this.map.id === 'forge' ? 0 : 1 },
+          time: { value: 0 },
+        },
         vertexShader: SKY_VERT,
         fragmentShader: SKY_FRAG,
         side: THREE.BackSide,
@@ -76,17 +187,10 @@ export class MapView {
     );
     sky.renderOrder = -10;
     this.group.add(sky);
-
-    // sun / moon disc
-    const dir = new THREE.Vector3(...th.sunDir).normalize();
-    const disc = new THREE.Mesh(
-      new THREE.CircleGeometry(th.night ? 9 : 14, 12),
-      new THREE.MeshBasicMaterial({ color: th.night ? '#f4f1dc' : '#fff7d6', fog: false }),
-    );
-    disc.position.copy(dir).multiplyScalar(300);
-    disc.lookAt(0, 0, 0);
-    disc.layers.set(FX_LAYER);
-    this.group.add(disc);
+    const skyMat = sky.material;
+    this.animators.push((t) => {
+      skyMat.uniforms.time.value = t;
+    });
 
     // lights
     const hemi = new THREE.HemisphereLight(th.ambient, '#3a3530', th.ambientIntensity);
@@ -291,7 +395,7 @@ export class MapView {
   }
 
   private buildProps(): void {
-    const night = !!this.map.theme.night;
+    const night = !!this.map.theme.night || !!this.map.theme.dusk;
     this.map.props.forEach((p, i) => {
       const g = buildProp(p.kind, {
         night,
@@ -376,46 +480,105 @@ export class MapView {
       }
       return;
     }
-    // distant scenery ignores fog and is pre-tinted toward the sky so it reads as a silhouette
+    // Aerial perspective: three mountain ranges, each farther one paler and closer to the haze
+    // (sky horizon) colour, so depth reads at a glance. Distant scenery ignores the scene fog and
+    // is pre-tinted instead.
     const haze = new THREE.Color(th.fog);
-    const mountainMat = new THREE.MeshLambertMaterial({ color: haze.clone().lerp(new THREE.Color(th.night ? '#10142a' : '#4a5462'), 0.42), fog: false });
-    const capMat = new THREE.MeshLambertMaterial({ color: haze.clone().lerp(new THREE.Color('#ffffff'), 0.6), fog: false });
+    const near = new THREE.Color(th.scenery ?? (th.night ? '#10142a' : '#4a5462'));
+    const hazeAt = (k: number) => mixSRGB(near, haze, k);
     const base = this.map.edge === 'void' ? -30 : -1;
     const ringR = this.map.kind === 'lobby' ? 150 : 95;
-    for (let i = 0; i < 22; i++) {
-      const a = (i / 22) * Math.PI * 2 + rand() * 0.2;
-      const r = ringR + rand() * 40;
-      const h = 30 + rand() * 45;
-      const w = 18 + rand() * 18;
-      const m = new THREE.Mesh(new THREE.ConeGeometry(w, h, 5), mountainMat);
-      m.position.set(Math.sin(a) * r, base + h / 2, Math.cos(a) * r);
-      m.rotation.y = rand() * 3;
-      this.group.add(m);
-      if (h > 50) {
-        const cap = new THREE.Mesh(new THREE.ConeGeometry(w * 0.3, h * 0.3, 5), capMat);
-        cap.position.set(m.position.x, base + h * 0.85, m.position.z);
-        cap.rotation.y = m.rotation.y;
-        this.group.add(cap);
+    const lift = this.map.edge === 'void' ? 30 : 0;
+    const ranges = [
+      { r: ringR * 2.2, spread: 30, count: 18, haze: 0.85, h: [45, 80] },
+      { r: ringR * 1.6, spread: 25, count: 16, haze: 0.62, h: [30, 55] },
+      { r: ringR, spread: 20, count: 12, haze: 0.15, h: [16, 34] },
+    ];
+    // leave a valley where a low sun disc sits so the peaks don't hide it
+    const sunAz = th.sunDisc ? Math.atan2(th.sunDisc[0], th.sunDisc[2]) : null;
+    for (const range of ranges) {
+      const col = hazeAt(range.haze);
+      // mostly self-lit so the sun doesn't pull distant ranges back out of the haze
+      const mat = new THREE.MeshLambertMaterial({ color: col.clone().multiplyScalar(0.06), emissive: col.clone().multiplyScalar(0.92), fog: false });
+      // snow caps catch the light, so they lean toward the sun's colour rather than plain white
+      const capCol = mixSRGB(col, mixSRGB(new THREE.Color('#ffffff'), new THREE.Color(th.sun), 0.35), 0.4);
+      const capMat = new THREE.MeshLambertMaterial({ color: capCol.clone().multiplyScalar(0.06), emissive: capCol.clone().multiplyScalar(0.92), fog: false });
+      for (let i = 0; i < range.count; i++) {
+        const a = (i / range.count) * Math.PI * 2 + rand() * 0.25;
+        const r = range.r + rand() * range.spread;
+        let h = range.h[0] + rand() * (range.h[1] - range.h[0]) + lift;
+        if (sunAz !== null) {
+          const off = Math.abs(Math.atan2(Math.sin(a - sunAz), Math.cos(a - sunAz)));
+          if (off < 0.32) continue;
+          if (off < 0.6) h *= 0.55;
+        }
+        const w = h * (0.45 + rand() * 0.35);
+        const m = new THREE.Mesh(new THREE.ConeGeometry(w, h, 5), mat);
+        m.position.set(Math.sin(a) * r, base + h / 2, Math.cos(a) * r);
+        m.rotation.y = rand() * 3;
+        this.group.add(m);
+        if (h - lift > range.h[0] + (range.h[1] - range.h[0]) * 0.6 && !th.night) {
+          const cap = new THREE.Mesh(new THREE.ConeGeometry(w * 0.3, h * 0.3, 5), capMat);
+          cap.position.set(m.position.x, base + h * 0.85, m.position.z);
+          cap.rotation.y = m.rotation.y;
+          this.group.add(cap);
+        }
       }
     }
     if (this.map.edge === 'void') {
-      // sea of clouds below
-      const cloud = new THREE.MeshLambertMaterial({
-        color: new THREE.Color(th.below === 'abyss' ? '#1a1420' : '#ffffff').lerp(new THREE.Color(th.fog), 0.35),
-        fog: false,
-      });
+      // sea of clouds below: pale, mostly self-lit puffs that drift slowly
+      const abyss = th.below === 'abyss';
+      const cloud = new THREE.MeshBasicMaterial({ color: mixSRGB(new THREE.Color(abyss ? '#1a1420' : '#ffe2b8'), haze, abyss ? 0.35 : 0.35), fog: false });
       const clouds = new THREE.Group();
-      for (let i = 0; i < 70; i++) {
+      for (let i = 0; i < 90; i++) {
         const a = rand() * Math.PI * 2;
-        const r = 12 + rand() * 90;
-        const m = new THREE.Mesh(new THREE.IcosahedronGeometry(4 + rand() * 6, 0), cloud);
-        m.scale.y = 0.35;
-        m.position.set(Math.sin(a) * r, -16 - rand() * 8, Math.cos(a) * r);
+        const r = 12 + rand() * 110;
+        const m = new THREE.Mesh(new THREE.IcosahedronGeometry(4 + rand() * 7, 0), cloud);
+        m.scale.set(1.4, 0.3, 1);
+        m.rotation.y = rand() * 3;
+        m.position.set(Math.sin(a) * r, -14 - rand() * 10, Math.cos(a) * r);
         clouds.add(m);
       }
       this.group.add(clouds);
       this.animators.push((t) => {
         clouds.rotation.y = t * 0.01;
+      });
+      this.buildMist(haze);
+    }
+  }
+
+  /** Low mist hanging under and around the floor of void maps, in drifting layers. */
+  private buildMist(haze: THREE.Color): void {
+    const color = mixSRGB(haze, new THREE.Color('#ffffff'), 0.35);
+    const layers = [
+      { y: -0.9, size: 70, opacity: 0.45, scale: 0.09, drift: [0.35, 0.12] },
+      { y: -3.2, size: 120, opacity: 0.6, scale: 0.05, drift: [-0.25, 0.18] },
+      { y: -7.5, size: 180, opacity: 0.7, scale: 0.03, drift: [0.2, -0.1] },
+    ];
+    for (const l of layers) {
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          color: { value: color },
+          opacity: { value: l.opacity },
+          time: { value: 0 },
+          scale: { value: l.scale },
+          drift: { value: new THREE.Vector2(l.drift[0], l.drift[1]) },
+        },
+        vertexShader: MIST_VERT,
+        fragmentShader: MIST_FRAG,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+      });
+      const sheet = new THREE.Mesh(new THREE.PlaneGeometry(l.size, l.size), mat);
+      sheet.rotation.x = -Math.PI / 2;
+      sheet.position.y = l.y;
+      sheet.layers.set(FX_LAYER);
+      sheet.renderOrder = 2;
+      this.group.add(sheet);
+      this.animators.push((t) => {
+        mat.uniforms.time.value = t;
       });
     }
   }
@@ -533,6 +696,13 @@ export class MapView {
       }
     });
   }
+}
+
+/** Blend two colours the way a painter would (in sRGB, not linear light). */
+function mixSRGB(a: THREE.Color, b: THREE.Color, t: number): THREE.Color {
+  const x = a.getRGB({ r: 0, g: 0, b: 0 }, THREE.SRGBColorSpace);
+  const y = b.getRGB({ r: 0, g: 0, b: 0 }, THREE.SRGBColorSpace);
+  return new THREE.Color().setRGB(x.r + (y.r - x.r) * t, x.g + (y.g - x.g) * t, x.b + (y.b - x.b) * t, THREE.SRGBColorSpace);
 }
 
 function inShape(s: Shape, x: number, z: number): boolean {

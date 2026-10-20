@@ -164,7 +164,7 @@ select { font-family: var(--head); font-size: 13px; background: #1c1516; color: 
 @keyframes blink { 50% { opacity: 0.45; } }
 .zone-indicator { display: flex; align-items: center; gap: 8px; padding: 3px 12px; font-family: var(--head); font-size: 13px; letter-spacing: 0.08em; color: #241c16; background: var(--washi), linear-gradient(180deg, #f1e7cd, #e1d1ad); box-shadow: 0 0 0 1px rgba(80, 50, 20, 0.5), 0 3px 8px rgba(0, 0, 0, 0.4); }
 .zone-indicator .jp { color: var(--shu); font-size: 15px; }
-.net-info { font-size: 12px; color: #d8cdb6; text-shadow: 0 0 3px #000, 0 1px 2px #000; }
+.net-info { font-size: 12px; color: #d8cdb6; opacity: 0.6; text-shadow: 0 0 3px #000, 0 1px 2px #000; }
 
 /* lobby menu: a slim column on the right edge */
 .side-menu { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }

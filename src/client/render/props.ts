@@ -2,9 +2,10 @@
 import * as THREE from 'three';
 import { PropKind } from '../../shared/maps';
 import { seededRandom } from '../../shared/math';
-import { bambooTexture, barkTexture, stoneBlockTexture, toon } from './textures';
+import { bambooTexture, barkTexture, stoneBlockTexture, toon, toonRamp } from './textures';
 
 export interface PropContext {
+  /** dark enough (night or dusk) that lanterns cast light */
   night: boolean;
   /** register per-frame animation */
   animate: (fn: (t: number) => void) => void;
@@ -135,14 +136,19 @@ export function buildProp(kind: PropKind, ctx: PropContext): THREE.Group {
       box(stone, 0.6, 0.15, 0.6, 0, 0.08, 0, g);
       cyl(stone, 0.12, 0.15, 0.9, 6, 0, 0.6, 0, g);
       box(stone, 0.55, 0.12, 0.55, 0, 1.1, 0, g);
-      const light = toon('#ffe7a8', { emissive: '#ffb84a' });
-      box(light, 0.36, 0.34, 0.36, 0, 1.33, 0, g);
+      // own material per lantern so each one flickers on its own; bright enough to bloom
+      const light = new THREE.MeshToonMaterial({ color: '#ffb050', emissive: '#ff9a3a', emissiveIntensity: 0.9, gradientMap: toonRamp() });
+      box(light, 0.36, 0.34, 0.36, 0, 1.33, 0, g).castShadow = false;
+      const off = rand() * 10;
+      ctx.animate((t) => {
+        light.emissiveIntensity = 0.85 + Math.sin(t * 6.3 + off) * 0.18 + Math.sin(t * 15.7 + off * 2) * 0.1 + (Math.sin(t * 1.3 + off) > 0.96 ? -0.35 : 0);
+      });
       const roof = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.4, 4), stone);
       roof.position.y = 1.7;
       roof.rotation.y = Math.PI / 4;
       roof.castShadow = true;
       g.add(roof);
-      if (ctx.night) ctx.light(g, '#ffb860', 6, 9, 1.35);
+      if (ctx.night) ctx.light(g, '#ffcf98', 3.2, 8, 1.35);
       break;
     }
     case 'torii': {

@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { CHARACTERS, CharacterDef, CharacterId } from '../../shared/characters';
 import { AnimInput, Animator, Reaction, handTargets } from './anim/animator';
 import { solveTwoBone } from './anim/math';
-import { toonRamp } from './textures';
+import { CHAR_LAYER } from './renderer';
+import { charRamp } from './textures';
 import { WeaponParts, buildWeapon } from './weapons';
 
 export type { AnimInput, Reaction };
@@ -78,11 +79,12 @@ export class CharacterModel {
     this.animator = new Animator(this.char);
     const pal = this.char.palette;
     const mat = (color: string, emissive?: string) => {
-      const m = new THREE.MeshToonMaterial({ color, gradientMap: toonRamp() });
-      if (emissive) {
-        m.emissive = new THREE.Color(emissive);
-        m.userData.baseEmissive = emissive;
-      } else m.userData.baseEmissive = '#000000';
+      const m = new THREE.MeshToonMaterial({ color, gradientMap: charRamp() });
+      // a little self-light in the outfit's own colour keeps the shadow side from taking on the
+      // world's (often warm) light, so fighters keep their identity against the scenery
+      const base = emissive ? new THREE.Color(emissive) : new THREE.Color(color).multiplyScalar(0.22);
+      m.emissive.copy(base);
+      m.userData.baseEmissive = base;
       this.materials.push(m);
       return m;
     };
@@ -164,6 +166,8 @@ export class CharacterModel {
 
     this.scale = this.char.id === 'juggernaut' ? 1.15 : this.char.id === 'shade' ? 0.95 : 1;
     this.root.scale.setScalar(this.scale);
+    // fighters get the ink outline and rim light in the composite pass
+    this.root.traverse((o) => o.layers.enable(CHAR_LAYER));
   }
 
   /** Distinguishing headwear per placeholder character. Replace freely. */
@@ -176,7 +180,7 @@ export class CharacterModel {
     switch (this.char.id) {
       case 'ronin': {
         box(m.hair, 0.38, 0.1, 0.36, 0, 0.38, -0.01, head);
-        const straw = m.mat('#c9a860');
+        const straw = m.mat('#ead4aa');
         box(straw, 0.8, 0.05, 0.8, 0, 0.44, 0, head);
         box(straw, 0.5, 0.06, 0.5, 0, 0.49, 0, head);
         box(straw, 0.22, 0.06, 0.22, 0, 0.54, 0, head);
@@ -351,7 +355,7 @@ export class CharacterModel {
       } else if (glow > 0) {
         m.emissive.setRGB(glow, glow * 0.15, 0);
       } else {
-        m.emissive.set(m.userData.baseEmissive as string);
+        m.emissive.copy(m.userData.baseEmissive as THREE.Color);
       }
     }
   }

@@ -207,6 +207,8 @@ class App {
     this.mapView?.dispose();
     this.map = map;
     this.mapView = new MapView(map, this.scene);
+    this.renderer.sunDir.copy(this.mapView.sunDir);
+    this.renderer.setRim(this.mapView.rimColor);
     const blockers = buildBlockers(map);
     this.cam.constrain = (from, to) => constrainCamera(map, blockers, from, to);
     this.effects.setWeather(map.theme.weather);
@@ -452,7 +454,7 @@ class App {
 
     switch (e.k) {
       case 'deflect':
-        this.effects.burst(pos, { count: 28, color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 7, life: 0.45, size: 0.07, gravity: 6 });
+        this.effects.burst(pos, { count: 28, color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 11, life: 0.3, size: 0.05, gravity: 6, drag: 3, stretch: 0.08 });
         this.effects.flash(pos, '#fff1a0', 1.0, 0.16);
         play('deflect');
         d?.model.react('deflect');
@@ -482,10 +484,13 @@ class App {
         break;
       case 'hit':
       case 'armor':
-        this.effects.burst(pos, { count: 14, color: ['#c81e1e', '#ff4a3a', '#7a0a0a'], speed: 5, life: 0.5, size: 0.07 });
-        d?.model.flash('#ffffff', 0.7);
+        // bright streaking sparks + an impact star, over a few darker chips
+        this.effects.burst(pos, { count: 16, color: ['#ffffff', '#fee761', '#feae34'], speed: 9, life: 0.22, size: 0.05, gravity: 4, drag: 4, stretch: 0.09 });
+        this.effects.burst(pos, { count: 10, color: ['#e43b44', '#a22633', '#3e2731'], speed: 4, life: 0.45, size: 0.07 });
+        this.effects.flash(pos, '#ffffff', 0.75, 0.1);
+        d?.model.flash('#ffffff', 1.2);
         d?.model.react('hit');
-        stop(60);
+        stop(70);
         play('hit');
         if (e.dmg) this.ui.floatText(`-${e.dmg}`, pos.x, pos.y + 0.3, pos.z, meD ? 'dmg me' : 'dmg');
         if (e.k === 'armor') this.ui.floatText('ARMOR', head(d).x, head(d).y, head(d).z, 'warn');
@@ -493,7 +498,7 @@ class App {
           this.cam.shake(0.15, 0.18);
           this.renderer.flash = 0.07;
           this.renderer.flashColor.set('#ff2a2a');
-        }
+        } else if (meA) this.cam.shake(0.07, 0.12);
         break;
       case 'deathblow':
         this.effects.burst(pos, { count: 60, color: ['#ff2a2a', '#ffffff', '#7a0a0a'], speed: 9, life: 0.8, size: 0.1 });
@@ -669,7 +674,7 @@ class App {
     if (!local) return;
     const me = local.cf;
     const sim = local.sim;
-    this.ui.setNetInfo(this.online, settings.showFps ? this.fps.value : null);
+    this.ui.setNetInfo(this.online, this.offline ? null : Math.round(this.net.rtt), settings.showFps ? this.fps.value : null);
     this.ui.setHints(sim.char, now, { dodge: sim.dodgeReady, special: sim.specialReadyAt, ability: sim.abilityReadyAt });
     if (this.touch) {
       const charges = sim.dodgeReady;
@@ -702,7 +707,6 @@ class App {
     const myScore = m ? m.scores[m.you] : null;
     const theirScore = m ? m.scores[m.you === 0 ? 1 : 0] : null;
     const prof = this.profile;
-    const rtt = Math.round(this.net.rtt);
     const self: CardData = {
       name: prof?.name ?? '',
       title: prof ? rankOf(prof.mmr, prof.placements).label : '',
@@ -712,8 +716,7 @@ class App {
       broken: sim.state === 'broken',
       pips: myScore,
       pipMax: MATCH.roundsToWin,
-      meta: this.offline ? (prof && !m ? `${prof.wins}W ${prof.losses}L` : '') : `${rtt}ms`,
-      metaTone: this.offline ? undefined : rtt < 90 ? 'good' : rtt < 170 ? 'ok' : 'bad',
+      meta: prof && !m ? `${prof.wins}W ${prof.losses}L` : '',
     };
     this.ui.setCard('self', self);
 
@@ -737,15 +740,20 @@ class App {
       });
     } else this.ui.setCard('opp', null);
 
-    // lock reticle
+    // lock-on marker: a small diamond above the target's head
     if (this.lock) {
-      const p = this.project(this.lock.pos.x, this.lock.pos.y + 1.2 * this.lock.model.scale, this.lock.pos.z);
+      const p = this.project(this.lock.pos.x, this.lock.pos.y + 2.5 * this.lock.model.scale, this.lock.pos.z);
       this.ui.setReticle(p ? p.x : null, p?.y ?? 0);
     } else this.ui.setReticle(null);
 
-    // nameplates
+    // nameplates for everyone else in the lobby; whoever is on the opponent card (and anyone in an
+    // arena) already has their name and health in the top HUD
     for (const f of this.fighters.values()) {
       if (f.isLocal) continue;
+      if (f === target || this.kind === 'arena') {
+        this.ui.plate(f.id, false);
+        continue;
+      }
       const d = dist2D(me.pos.x, me.pos.z, f.pos.x, f.pos.z);
       const visible = d < 40 && f.s !== 'dead';
       const p = visible ? this.project(f.pos.x, f.pos.y + 2.45 * f.model.scale, f.pos.z) : null;

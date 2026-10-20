@@ -334,8 +334,11 @@ export class UI {
     this.profile = p;
   }
 
-  setNetInfo(online: number, fps: number | null): void {
-    this.setText(this.els.online, this.offline ? 'Single player' : `${online} online`);
+  /** Small, dim connection line: players online, round-trip time, fps. */
+  setNetInfo(online: number, rtt: number | null, fps: number | null): void {
+    const parts = [this.offline ? 'Single player' : `${online} online`];
+    if (rtt !== null) parts.push(`${rtt}ms`);
+    this.setText(this.els.online, parts.join(' · '));
     this.setText(this.els.fps, fps !== null ? ` · ${fps} fps` : '');
   }
 

@@ -59,6 +59,8 @@ export interface Decal {
 
 export interface MapTheme {
   skyTop: string;
+  /** Band of colour just above the horizon (defaults to a blend of top and bottom). */
+  skyMid?: string;
   skyBottom: string;
   fog: string;
   fogNear: number;
@@ -74,6 +76,12 @@ export interface MapTheme {
   weather: Weather | null;
   /** Show a moon instead of a sun disc. */
   night?: boolean;
+  /** Low evening light: lanterns are lit. */
+  dusk?: boolean;
+  /** Where the sun/moon disc sits in the sky, if not along sunDir (e.g. low behind a gate). */
+  sunDisc?: [number, number, number];
+  /** Colour of the nearest mountains before haze; farther ranges fade toward the fog colour. */
+  scenery?: string;
   /** Void maps: what is far below. */
   below?: 'clouds' | 'abyss';
 }
@@ -481,20 +489,25 @@ const bridge: MapDef = {
   decals: [{ shape: { type: 'circle', x: 0, z: 0, r: 3 }, tex: 'stone' }],
   hazards: [],
   theme: {
-    skyTop: '#3b2a5c',
-    skyBottom: '#ff9a62',
-    fog: '#e88f72',
-    fogNear: 30,
-    fogFar: 95,
+    skyTop: '#2e2c58',
+    skyMid: '#c8607a',
+    skyBottom: '#f7a35c',
+    fog: '#eb9e74',
+    fogNear: 45,
+    fogFar: 170,
     ground: 'planks',
     edge: '#5c3b2e',
     sun: '#ffb070',
     sunIntensity: 2.0,
     sunDir: [-0.2, 0.45, 1],
-    ambient: '#9a7ab8',
-    ambientIntensity: 1.0,
-    weather: 'leaves',
+    // low behind the far torii so the gate reads as a silhouette against the glow
+    sunDisc: [0, 0.035, 1],
+    ambient: '#a88ac4',
+    ambientIntensity: 1.5,
+    weather: 'petals',
     below: 'clouds',
+    dusk: true,
+    scenery: '#3a2848',
   },
 };
 
