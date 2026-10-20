@@ -15,6 +15,10 @@ export function portraitURL(renderer: THREE.WebGLRenderer, id: CharacterId): str
   const key = new THREE.DirectionalLight('#fff0dc', 2.6);
   key.position.set(1.6, 2.4, 3);
   scene.add(key);
+  // frontal fill so hooded and masked faces don't vanish into the frame
+  const fill = new THREE.DirectionalLight('#dfe6ff', 1.2);
+  fill.position.set(-0.5, 0.3, 3);
+  scene.add(fill);
   const model = new CharacterModel(id);
   for (let i = 0; i < 12; i++) {
     model.update({ state: 'idle', elapsed: 0, dur: 0, attack: null, windup: 0, speed: 0, moveForward: 1, moveSide: 0, airborne: false, blockHeld: false, buff: false }, 0.05);

@@ -20,6 +20,17 @@ export function rankBadge(r: RankInfo, small = false): string {
   return `<span class="rank-badge ${small ? 'small' : ''}" style="--rank:${r.color}"><i></i>${esc(label)}</span>`;
 }
 
+/** 16x16 line icons for the round menu buttons (drawn crisp so they read as pixel art). */
+const ICON: Record<string, string> = {
+  ranked: '<path d="M3 3 L12 12 M13 3 L4 12 M2 10 L6 14 M14 10 L10 14" />',
+  practice: '<rect x="3" y="3" width="10" height="10" /><rect x="6" y="6" width="4" height="4" />',
+  chars: '<rect x="5" y="2" width="6" height="5" /><path d="M3 15 V11 H13 V15" />',
+  ladder: '<path d="M1 14 H15 M6 14 V5 H10 V14 M2 14 V9 H6 M10 14 V11 H14 V14" />',
+  help: '<path d="M5 5 V3 H11 V8 H8 V10" /><rect x="7" y="13" width="2" height="1" />',
+  forfeit: '<path d="M4 15 V2 M4 3 H13 L11 6 L13 9 H4" />',
+};
+const icon = (name: string) => `<svg viewBox="0 0 16 16" aria-hidden="true" shape-rendering="crispEdges">${ICON[name]}</svg>`;
+
 const PERILOUS_TIP: Record<Perilous, string> = {
   thrust: 'Perilous THRUST — deflect it, or dodge into it for a Mikiri Counter',
   sweep: 'Perilous SWEEP — jump over it',
@@ -54,7 +65,6 @@ export interface CardData {
   pips: number | null;
   pipMax: number;
   meta: string;
-  metaTone?: 'good' | 'ok' | 'bad';
 }
 
 export interface Preview {
@@ -132,22 +142,20 @@ export class UI {
       <div class="hud hidden">
         <div class="plates"></div>
         <div class="floaters"></div>
-        <div class="lock-reticle hidden"></div>
+        <div class="lock-marker hidden"><i></i></div>
         <div class="fcard self">
-          <div class="fc-diamond"><img class="fc-portrait" alt="" /></div>
+          <div class="fc-frame"><img class="fc-portrait" alt="" /><span class="fc-initial"></span></div>
           <div class="fc-body">
-            <div class="fc-title"></div>
-            <div class="fc-name"><b class="fc-n"></b> <span class="fc-handle"></span></div>
+            <div class="fc-name"><b class="fc-n"></b><span class="fc-handle"></span><span class="fc-title"></span></div>
             <div class="fc-hp"><div class="fc-trail"></div><div class="fc-fill"></div></div>
             <div class="fc-po"><div class="fc-fill"></div></div>
             <div class="fc-meta"><span class="fc-pips"></span><span class="fc-ping"></span></div>
           </div>
         </div>
         <div class="fcard opp hidden">
-          <div class="fc-diamond"><img class="fc-portrait" alt="" /></div>
+          <div class="fc-frame"><img class="fc-portrait" alt="" /><span class="fc-initial"></span></div>
           <div class="fc-body">
-            <div class="fc-title"></div>
-            <div class="fc-name"><b class="fc-n"></b> <span class="fc-handle"></span></div>
+            <div class="fc-name"><b class="fc-n"></b><span class="fc-handle"></span><span class="fc-title"></span></div>
             <div class="fc-hp"><div class="fc-trail"></div><div class="fc-fill"></div></div>
             <div class="fc-po"><div class="fc-fill"></div></div>
             <div class="fc-meta"><span class="fc-pips"></span><span class="fc-ping"></span></div>
@@ -156,18 +164,18 @@ export class UI {
         <div class="top-center">
           <div class="match-timer hidden">0:00</div>
           <div class="zone-indicator hidden">Safe zone · PvP disabled</div>
-          <div class="net-info"><span id="online"></span><span id="fps"></span></div>
         </div>
+        <div class="net-info"><span id="online"></span><span id="fps"></span></div>
         <div class="side-menu">
-          <button class="btn ranked" id="btn-ranked">${offline ? 'Ranked vs AI [K]' : 'Ranked [K]'}</button>
+          <button class="rbtn primary" id="btn-ranked" data-label="${offline ? 'Ranked vs AI' : 'Ranked'}" aria-label="${offline ? 'Ranked vs AI' : 'Ranked'}">${icon('ranked')}<kbd>K</kbd></button>
           <div class="practice-group">
-            <button class="btn" id="btn-practice">Practice [P]</button>
             <select id="practice-diff" aria-label="Bot difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
+            <button class="rbtn" id="btn-practice" data-label="Practice" aria-label="Practice">${icon('practice')}<kbd>P</kbd></button>
           </div>
-          <button class="btn small" id="btn-chars">Characters [C]</button>
-          <button class="btn small" id="btn-ladder">Ladder [L]</button>
-          <button class="btn small" id="btn-help">Help [H]</button>
-          <button class="btn small danger hidden" id="btn-forfeit">Forfeit</button>
+          <button class="rbtn" id="btn-chars" data-label="Characters" aria-label="Characters">${icon('chars')}<kbd>C</kbd></button>
+          <button class="rbtn" id="btn-ladder" data-label="Ladder" aria-label="Ladder">${icon('ladder')}<kbd>L</kbd></button>
+          <button class="rbtn" id="btn-help" data-label="Help &amp; settings" aria-label="Help and settings">${icon('help')}<kbd>H</kbd></button>
+          <button class="rbtn danger hidden" id="btn-forfeit" data-label="Forfeit" aria-label="Forfeit">${icon('forfeit')}</button>
           <div class="queue-panel hidden">
             <div class="queue-title">${offline ? 'Finding an opponent near your rating…' : 'Searching for a ranked duel…'}</div>
             <div class="queue-time">0:00</div>
@@ -243,7 +251,7 @@ export class UI {
       challenge: '.challenge-popup',
       death: '.death-overlay',
       deathSub: '.death-sub',
-      reticle: '.lock-reticle',
+      reticle: '.lock-marker',
       clickHint: '.click-hint',
       escHint: '.esc-hint',
       menuButtons: '.side-menu',
@@ -266,14 +274,19 @@ export class UI {
     forfeit.addEventListener('click', () => {
       if (performance.now() < armedUntil) {
         armedUntil = 0;
-        forfeit.textContent = 'Forfeit';
+        forfeit.dataset.label = 'Forfeit';
+        forfeit.classList.remove('armed');
         this.handlers.onForfeit();
         return;
       }
       armedUntil = performance.now() + 3000;
-      forfeit.textContent = 'Click again to forfeit';
+      forfeit.dataset.label = 'Click again to forfeit';
+      forfeit.classList.add('armed');
       setTimeout(() => {
-        if (performance.now() >= armedUntil) forfeit.textContent = 'Forfeit';
+        if (performance.now() >= armedUntil) {
+          forfeit.dataset.label = 'Forfeit';
+          forfeit.classList.remove('armed');
+        }
       }, 3100);
     });
     this.chatInput.addEventListener('keydown', (e) => {
@@ -312,9 +325,13 @@ export class UI {
     this.profile = p;
   }
 
-  setNetInfo(online: number, fps: number | null): void {
-    this.setText(this.els.online, this.offline ? 'Single player' : `${online} online`);
+  /** Small, dim connection line in the corner: players online, round-trip time, fps. */
+  setNetInfo(online: number, rtt: number | null, fps: number | null): void {
+    const parts = [this.offline ? 'Single player' : `${online} online`];
+    if (rtt !== null) parts.push(`${rtt}ms`);
+    this.setText(this.els.online, parts.join(' · '));
     this.setText(this.els.fps, fps !== null ? ` · ${fps} fps` : '');
+    this.els.online.dataset.q = rtt === null ? '' : rtt < 90 ? 'good' : rtt < 170 ? 'ok' : 'bad';
   }
 
   private setText(el: HTMLElement, text: string): void {
@@ -361,12 +378,22 @@ export class UI {
     const q = (sel: string) => el.querySelector<HTMLElement>(sel)!;
     if (el.dataset.char !== d.char.id) {
       el.dataset.char = d.char.id;
-      (q('.fc-portrait') as HTMLImageElement).src = this.handlers.portrait(d.char.id);
+      const img = q('.fc-portrait') as HTMLImageElement;
+      // the initial shows through if the in-engine portrait isn't available
+      this.setText(q('.fc-initial'), d.char.name[0]);
+      let url = '';
+      try {
+        url = this.handlers.portrait(d.char.id);
+      } catch {
+        url = '';
+      }
+      img.classList.toggle('hidden', !url);
+      if (url) img.src = url;
       el.style.setProperty('--accent', d.char.palette.accent);
     }
     this.setText(q('.fc-title'), d.title);
     this.setText(q('.fc-n'), d.name);
-    this.setText(q('.fc-handle'), `@${d.char.name}`);
+    this.setText(q('.fc-handle'), d.char.name);
     const hp = `${Math.max(0, Math.min(1, d.hp / d.char.stats.hp)) * 100}%`;
     const fill = q('.fc-hp .fc-fill');
     if (fill.style.width !== hp) {
@@ -381,9 +408,7 @@ export class UI {
       pipEl.dataset.v = pips;
       pipEl.innerHTML = pips;
     }
-    const ping = q('.fc-ping');
-    this.setText(ping, d.meta);
-    ping.dataset.q = d.metaTone ?? '';
+    this.setText(q('.fc-ping'), d.meta);
   }
 
   private setBar(fill: HTMLElement, frac: number): void {

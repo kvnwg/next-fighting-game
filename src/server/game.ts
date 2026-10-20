@@ -27,6 +27,8 @@ export interface GameOptions {
   offline?: boolean;
   /** Wandering AI fighters in the lobby. */
   roamers?: number;
+  /** Always use this arena (dev/testing). */
+  arena?: string;
 }
 
 export class Game {
@@ -312,6 +314,8 @@ export class Game {
   }
 
   private pickMap(): MapDef {
+    const fixed = ARENA_MAPS.find((m) => m.id === this.options.arena);
+    if (fixed) return fixed;
     return ARENA_MAPS[Math.floor(Math.random() * ARENA_MAPS.length)];
   }
 

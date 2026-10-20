@@ -109,17 +109,17 @@ export function groundTexture(kind: GroundTex): THREE.CanvasTexture {
         for (let i = 0; i < 5; i++) g.fillRect(Math.floor(rand() * S), Math.floor(rand() * S), 1, 1);
         break;
       case 'planks':
-        g.fillStyle = '#8a5a36';
+        // weathered, greyish wood: warm light tints it without pushing it into saturated reds
+        g.fillStyle = '#9a8270';
         g.fillRect(0, 0, S, S);
         for (let row = 0; row < 4; row++) {
-          const base = ['#8a5a36', '#7d5130', '#94633d', '#82552f'][row];
+          const base = ['#9a8270', '#8c7564', '#a68c78', '#927a68'][row];
           g.fillStyle = base;
           g.fillRect(0, row * 8, S, 8);
-          speckle(g, rand, 0, [], 0);
-          g.fillStyle = '#5a3820';
+          g.fillStyle = '#5a4a44';
           g.fillRect(0, row * 8 + 7, S, 1);
           g.fillRect(((row * 13) % S) + 4, row * 8, 1, 7);
-          g.fillStyle = '#a0704a';
+          g.fillStyle = '#b49c88';
           for (let i = 0; i < 6; i++) g.fillRect(Math.floor(rand() * S), row * 8 + 1 + Math.floor(rand() * 5), 2, 1);
         }
         break;
@@ -199,6 +199,19 @@ export function glyphTexture(text: string, color: string, bg: string): THREE.Can
     g.textBaseline = 'middle';
     g.fillText(text, 16, 17);
   });
+}
+
+/** Fighters: a darker shadow band so the lit side and the rim read clearly. */
+let charGradient: THREE.DataTexture | null = null;
+export function charRamp(): THREE.DataTexture {
+  if (charGradient) return charGradient;
+  const data = new Uint8Array([30, 30, 170, 255]);
+  charGradient = new THREE.DataTexture(data, data.length, 1, THREE.RedFormat);
+  charGradient.minFilter = THREE.NearestFilter;
+  charGradient.magFilter = THREE.NearestFilter;
+  charGradient.generateMipmaps = false;
+  charGradient.needsUpdate = true;
+  return charGradient;
 }
 
 /** 4-step gradient for toon shading. */
