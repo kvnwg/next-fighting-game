@@ -1,0 +1,169 @@
+/** A 1v1 match: best of three rounds on one of the arena maps. */
+import { CHARACTER_IDS } from '../shared/characters';
+import { MATCH } from '../shared/config';
+import { MapDef } from '../shared/maps';
+import { BotDifficulty, MatchMode, MatchPhase, RosterEntry } from '../shared/protocol';
+import { BOT_PROFILES, BotBrain } from './bot';
+import { Player, ServerFighter } from './entities';
+import type { Game } from './game';
+import { Instance } from './instance';
+
+let botCounter = 0;
+
+export class Arena extends Instance {
+  readonly kind = 'arena' as const;
+  phase: MatchPhase = 'intro';
+  phaseEndsAt = 0;
+  round = 1;
+  scores: [number, number] = [0, 0];
+  roundWinner: 0 | 1 | -1 | undefined;
+  finished = false;
+  winner: 0 | 1 = 0;
+  readonly slots: [ServerFighter, ServerFighter];
+  /** humans by slot (null for a bot) */
+  readonly humans: [Player | null, Player | null];
+  private readonly rosters: [RosterEntry, RosterEntry];
+
+  constructor(
+    game: Game,
+    map: MapDef,
+    readonly mode: MatchMode,
+    a: Player,
+    b: Player | null,
+    diff: BotDifficulty = 'normal',
+  ) {
+    super(game, map);
+    const [s0, s1] = map.spawns;
+    let fb: ServerFighter | null = null;
+    if (!b) {
+      // create the bot first so it is part of the human's initial roster
+      const char = CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)];
+      const label = diff[0].toUpperCase() + diff.slice(1);
+      fb = new ServerFighter(`bot-${++botCounter}`, `${label} Bot`, char);
+      fb.x = s1.x;
+      fb.z = s1.z;
+      fb.yaw = s1.yaw;
+      fb.brain = new BotBrain(fb, 'duel', BOT_PROFILES[diff]);
+      this.addFighter(fb);
+    }
+    const fa = this.addPlayer(a, s0);
+    if (b) fb = this.addPlayer(b, s1);
+    if (!fb) throw new Error('arena needs two fighters');
+    this.slots = [fa, fb];
+    this.humans = [a, b];
+    this.rosters = [fa.roster(), fb.roster()];
+    this.setPhase('intro', game.now() + MATCH.introTime);
+  }
+
+  isFrozen(): boolean {
+    return this.phase === 'intro' || this.phase === 'countdown';
+  }
+
+  canDamage(a: ServerFighter, d: ServerFighter): boolean {
+    return this.phase === 'fight' && a !== d && a.isAlive() && d.isAlive();
+  }
+
+  protected environmentHurts(): boolean {
+    return this.phase === 'fight';
+  }
+
+  slotOf(f: ServerFighter): 0 | 1 | -1 {
+    return f === this.slots[0] ? 0 : f === this.slots[1] ? 1 : -1;
+  }
+
+  private setPhase(phase: MatchPhase, endsAt: number): void {
+    this.phase = phase;
+    this.phaseEndsAt = endsAt;
+    this.sendMatch();
+  }
+
+  sendMatch(): void {
+    for (const [i, p] of this.humans.entries()) {
+      p?.send({
+        t: 'match',
+        mode: this.mode,
+        phase: this.phase,
+        round: this.round,
+        scores: this.scores,
+        endsAt: this.phaseEndsAt,
+        map: this.map.id,
+        you: i as 0 | 1,
+        players: this.rosters,
+        roundWinner: this.roundWinner,
+      });
+    }
+  }
+
+  private resetRound(now: number): void {
+    for (const [i, f] of this.slots.entries()) {
+      const s = this.map.spawns[i];
+      this.revive(f, s.x, s.z, s.yaw, now, 0);
+    }
+    this.roundWinner = undefined;
+  }
+
+  protected onKill(victim: ServerFighter, _killer: ServerFighter | null, _how: string, now: number): void {
+    if (this.phase !== 'fight') return;
+    const slot = this.slotOf(victim);
+    if (slot < 0) return;
+    this.endRound(slot === 0 ? 1 : 0, now);
+  }
+
+  private endRound(winner: 0 | 1 | -1, now: number): void {
+    if (winner === 0 || winner === 1) this.scores[winner]++;
+    this.roundWinner = winner;
+    if (this.scores[0] >= MATCH.roundsToWin || this.scores[1] >= MATCH.roundsToWin) {
+      this.finish(this.scores[0] > this.scores[1] ? 0 : 1, 'ko', now);
+    } else {
+      this.setPhase('roundEnd', now + MATCH.roundEndTime);
+    }
+  }
+
+  protected rules(now: number): void {
+    if (this.phase === 'fight') {
+      // keep both fighters inside the match even if they somehow left
+      if (now >= this.phaseEndsAt) {
+        const [a, b] = this.slots;
+        const pa = a.hp / a.maxHp;
+        const pb = b.hp / b.maxHp;
+        this.endRound(Math.abs(pa - pb) < 0.001 ? -1 : pa > pb ? 0 : 1, now);
+      }
+      return;
+    }
+    if (now < this.phaseEndsAt) return;
+    switch (this.phase) {
+      case 'intro':
+        this.resetRound(now);
+        this.setPhase('countdown', now + MATCH.countdownTime);
+        break;
+      case 'countdown':
+        this.setPhase('fight', now + MATCH.roundTime);
+        break;
+      case 'roundEnd':
+        this.round++;
+        this.resetRound(now);
+        this.setPhase('countdown', now + MATCH.countdownTime);
+        break;
+      case 'matchEnd':
+        this.game.closeArena(this);
+        break;
+    }
+  }
+
+  /** A player left or gave up. */
+  forfeit(p: Player): void {
+    if (this.finished) return;
+    const slot = this.humans[0] === p ? 0 : this.humans[1] === p ? 1 : -1;
+    if (slot < 0) return;
+    this.finish(slot === 0 ? 1 : 0, 'forfeit', this.game.now());
+  }
+
+  private finish(winner: 0 | 1, reason: 'ko' | 'forfeit' | 'timeout', now: number): void {
+    if (this.finished) return;
+    this.finished = true;
+    this.winner = winner;
+    this.roundWinner = this.roundWinner ?? winner;
+    this.setPhase('matchEnd', now + MATCH.matchEndTime);
+    this.game.reportResult(this, winner, reason);
+  }
+}
