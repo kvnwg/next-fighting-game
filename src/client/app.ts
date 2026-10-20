@@ -47,7 +47,6 @@ class App {
   private queue: { since: number; count: number } | null = null;
   private lock: ClientFighter | null = null;
   private online = 0;
-  private hitstop = 0;
   private last = performance.now();
   private dodgePressAt = 0;
   private lastHitTarget: { id: string; until: number } | null = null;
@@ -419,6 +418,11 @@ class App {
     const vol = this.volumeAt(e.x, e.z);
     const play = (s: Sfx, v = vol) => audio.play(s, v);
     const head = (f: ClientFighter | undefined) => (f ? new THREE.Vector3(f.pos.x, f.pos.y + 2.1 * f.model.scale, f.pos.z) : pos);
+    // impact freeze on both fighters
+    const stop = (ms: number) => {
+      d?.hitstop(ms);
+      a?.hitstop(ms);
+    };
     if (mine && e.a && e.d) this.lastHitTarget = { id: meA ? e.d : e.a, until: performance.now() + 5000 };
 
     switch (e.k) {
@@ -426,10 +430,10 @@ class App {
         this.effects.burst(pos, { count: 28, color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 7, life: 0.45, size: 0.07, gravity: 6 });
         this.effects.flash(pos, '#fff1a0', 1.0, 0.16);
         play('deflect');
-        if (mine) {
-          this.cam.shake(0.12, 0.15);
-          this.hitstop = 0.07;
-        }
+        d?.model.react('deflect');
+        a?.model.react('blocked');
+        stop(75);
+        if (mine) this.cam.shake(0.12, 0.15);
         if (meD) {
           this.ui.floatText('DEFLECT', pos.x, pos.y + 0.4, pos.z, 'good big');
           this.local?.onDeflected();
@@ -439,12 +443,15 @@ class App {
       case 'block':
         this.effects.burst(pos, { count: 12, color: ['#ffb04a', '#ff8a2a', '#ffe0a0'], speed: 5, life: 0.35, size: 0.06 });
         play('block');
+        a?.model.react('blocked');
+        stop(40);
         if (meD) this.cam.shake(0.06, 0.1);
         break;
       case 'guardBreak':
         this.effects.burst(pos, { count: 40, color: ['#ff9a2a', '#ffd24a', '#ff5a2a'], speed: 8, life: 0.6, size: 0.09 });
         this.effects.ring(d?.pos ?? pos, '#ff9a2a', 3);
         play('guardBreak');
+        stop(90);
         this.ui.floatText('GUARD BROKEN', head(d).x, head(d).y, head(d).z, 'warn big');
         if (mine) this.cam.shake(0.2, 0.25);
         break;
@@ -452,6 +459,8 @@ class App {
       case 'armor':
         this.effects.burst(pos, { count: 14, color: ['#c81e1e', '#ff4a3a', '#7a0a0a'], speed: 5, life: 0.5, size: 0.07 });
         d?.model.flash('#ffffff', 0.7);
+        d?.model.react('hit');
+        stop(60);
         play('hit');
         if (e.dmg) this.ui.floatText(`-${e.dmg}`, pos.x, pos.y + 0.3, pos.z, meD ? 'dmg me' : 'dmg');
         if (e.k === 'armor') this.ui.floatText('ARMOR', head(d).x, head(d).y, head(d).z, 'warn');
@@ -459,18 +468,19 @@ class App {
           this.cam.shake(0.15, 0.18);
           this.renderer.flash = 0.07;
           this.renderer.flashColor.set('#ff2a2a');
-        } else if (meA) this.hitstop = 0.04;
+        }
         break;
       case 'deathblow':
         this.effects.burst(pos, { count: 60, color: ['#ff2a2a', '#ffffff', '#7a0a0a'], speed: 9, life: 0.8, size: 0.1 });
         this.effects.ring(d?.pos ?? pos, '#ff2a2a', 4.5, 0.6);
         this.effects.flash(pos, '#ff4a4a', 1.4, 0.22);
         d?.model.flash('#ff2a2a', 1.4);
+        d?.model.react('hit');
+        stop(150);
         play('deathblow', Math.min(1, vol * 1.3));
         this.ui.floatText('DEATHBLOW', head(d).x, head(d).y + 0.3, head(d).z, 'bad huge');
         if (mine) {
           this.cam.shake(0.35, 0.4);
-          this.hitstop = 0.14;
           this.renderer.flash = 0.2;
           this.renderer.flashColor.set('#ff1a1a');
         }
@@ -478,11 +488,9 @@ class App {
       case 'mikiri':
         this.effects.burst(pos, { count: 30, color: ['#ffffff', '#c8e8ff'], speed: 7, life: 0.5 });
         play('mikiri');
+        stop(100);
         this.ui.floatText('MIKIRI COUNTER', head(d).x, head(d).y, head(d).z, 'good big');
-        if (mine) {
-          this.cam.shake(0.2, 0.2);
-          this.hitstop = 0.1;
-        }
+        if (mine) this.cam.shake(0.2, 0.2);
         break;
       case 'evade':
         if (e.tags?.includes('blink')) {
@@ -494,6 +502,8 @@ class App {
         this.effects.burst(pos, { count: 24, color: ['#ffd24a', '#ffffff'], speed: 6, life: 0.45 });
         play('deflect');
         play('hit');
+        a?.model.react('hit');
+        stop(90);
         this.ui.floatText('COUNTER!', head(d).x, head(d).y, head(d).z, 'good big');
         if (e.dmg) this.ui.floatText(`-${e.dmg}`, head(a).x, head(a).y - 0.5, head(a).z, meA ? 'dmg me' : 'dmg');
         break;
@@ -562,6 +572,7 @@ class App {
     const buff = (f.flags & 1) === 1 || (!!f.sim && f.sim.buffActive(now));
     if (buff && !this.buffSeen.get(f.id)) {
       audio.play('buff', this.volumeAt(f.pos.x, f.pos.z));
+      f.model.react('roar');
       this.effects.ring(f.pos, '#ff6a2a', 2.5, 0.5);
     }
     this.buffSeen.set(f.id, buff);
@@ -574,11 +585,6 @@ class App {
     const dt = Math.min(0.05, (t - this.last) / 1000);
     this.last = t;
     const now = this.net.serverNow();
-    let animDt = dt;
-    if (this.hitstop > 0) {
-      this.hitstop -= dt;
-      animDt = dt * 0.08;
-    }
     this.renderer.flash = Math.max(0, this.renderer.flash - dt * 3);
 
     const mouse = this.input.consumeMouse();
@@ -597,7 +603,7 @@ class App {
     for (const f of this.fighters.values()) {
       f.interpolate(now);
       const buff = (f.flags & 1) === 1 || (!!f.sim && f.sim.buffActive(now));
-      f.updateVisual(animDt, now, buff);
+      f.updateVisual(dt, now, buff);
       this.stateCues(f, now);
     }
 
@@ -771,7 +777,7 @@ function createPreview(container: HTMLElement): Preview {
     const total = atk ? atk.windup + atk.active + atk.recovery + 150 : step.ms;
     stateT += dt * 1000;
     model.update(
-      { state: atk ? 'attack' : 'idle', elapsed: stateT, dur: total, attack: atk, windup: atk?.windup ?? 0, speed: 0, moveForward: 1, moveSide: 0, airborne: false, blockHeld: false, buff: false },
+      { state: atk ? 'attack' : 'idle', elapsed: stateT, dur: total, attack: atk, windup: atk?.windup ?? 0, key: step.key ?? undefined, serial: idx, speed: 0, moveForward: 1, moveSide: 0, airborne: false, blockHeld: false, buff: false },
       dt,
     );
     if (stateT > total) {

@@ -1,9 +1,13 @@
 /**
- * Placeholder weapon models built from boxes. In hand-local space the grip is at the origin and the
- * weapon points along +Z. Swap these out for real models once the designs exist.
+ * Placeholder weapon models built from boxes. The grip (where the main hand holds it) is at the
+ * origin and the weapon points along +Z. Swap these out for real models once the designs exist.
+ *
+ * Cutting edges: blades are widest along local Y (that is the edge the animation leads with), the
+ * hammer head and spear blade along X, the scythe blade sticks out along -X.
  */
 import * as THREE from 'three';
 import { CharacterDef, WeaponKind } from '../../shared/characters';
+import { KATANA_SHEATH, KATANA_SHEATH_MOUTH } from './anim/styles';
 
 export interface WeaponParts {
   main: THREE.Group;
@@ -16,6 +20,8 @@ export interface WeaponParts {
   twoHanded: boolean;
   /** hide the fist meshes (gauntlets replace them) */
   hideHands: boolean;
+  /** extra pieces worn on the body (e.g. a scabbard), positioned in torso space */
+  worn: THREE.Object3D | null;
   materials: THREE.MeshToonMaterial[];
 }
 
@@ -52,6 +58,7 @@ export function buildWeapon(char: CharacterDef, mat: Mat): WeaponParts {
     offTip: null,
     twoHanded: false,
     hideHands: false,
+    worn: null,
     materials: [metal, dark, wood, accent, gold],
   };
   const g = parts.main;
@@ -66,6 +73,17 @@ export function buildWeapon(char: CharacterDef, mat: Mat): WeaponParts {
       box(metal, 0.035, 0.05, 0.08, 0, 0.02, 1.17, g); // kissaki
       parts.base = anchor(g, 0.25);
       parts.tip = anchor(g, 1.2);
+      // scabbard through the sash on the left hip (the Iai draw comes out of it)
+      const sheath = new THREE.Group();
+      box(dark, 0.07, 0.1, 0.97, 0, 0, 0.5, sheath);
+      box(gold, 0.08, 0.11, 0.05, 0, 0, 0.03, sheath);
+      box(accent, 0.075, 0.105, 0.04, 0, 0, 0.26, sheath);
+      box(gold, 0.08, 0.11, 0.04, 0, 0, 0.97, sheath);
+      const [mx, my, mz] = KATANA_SHEATH_MOUTH;
+      const [dx, dy, dz] = KATANA_SHEATH;
+      sheath.position.set(mx, my, mz);
+      sheath.lookAt(new THREE.Vector3(mx + dx, my + dy, mz + dz));
+      parts.worn = sheath;
       break;
     }
     case 'greathammer': {
@@ -137,12 +155,13 @@ export function buildWeapon(char: CharacterDef, mat: Mat): WeaponParts {
     }
     case 'gauntlets': {
       parts.hideHands = true;
+      // knuckles face +Z (the punch direction), the cuff trails back toward the elbow
       const fist = (grp: THREE.Group) => {
-        box(metal, 0.2, 0.2, 0.22, 0, -0.02, 0.02, grp);
-        box(accent, 0.21, 0.07, 0.23, 0, 0.06, 0.02, grp);
-        box(gold, 0.05, 0.05, 0.06, -0.06, -0.02, 0.15, grp);
-        box(gold, 0.05, 0.05, 0.06, 0.06, -0.02, 0.15, grp);
-        box(metal, 0.17, 0.17, 0.12, 0, 0.12, -0.02, grp); // cuff
+        box(metal, 0.2, 0.2, 0.22, 0, 0, 0.02, grp);
+        box(accent, 0.21, 0.07, 0.23, 0, 0.08, 0.02, grp);
+        box(gold, 0.05, 0.05, 0.06, -0.06, 0.02, 0.15, grp);
+        box(gold, 0.05, 0.05, 0.06, 0.06, 0.02, 0.15, grp);
+        box(metal, 0.17, 0.17, 0.14, 0, 0, -0.14, grp); // cuff
       };
       fist(g);
       parts.base = anchor(g, 0, 0.1);
@@ -161,16 +180,19 @@ export function buildWeapon(char: CharacterDef, mat: Mat): WeaponParts {
       box(gold, 0.07, 0.07, 0.07, 0, 0, -0.11, g);
       parts.base = anchor(g, 0.16);
       parts.tip = anchor(g, 0.92);
+      // kite shield: the handle is at the origin, the face points along +Z, top edge toward +Y
       const off = new THREE.Group();
-      // kite shield strapped to the forearm, face pointing out of the arm (+Z when the arm is raised)
       const shield = new THREE.Group();
-      shield.position.set(0, 0.12, 0.06);
+      shield.position.set(0, 0.05, 0.08);
       off.add(shield);
       box(mat(p.secondary), 0.62, 0.78, 0.07, 0, 0, 0, shield);
       box(gold, 0.66, 0.06, 0.08, 0, 0.38, 0, shield);
       box(gold, 0.06, 0.82, 0.08, 0, 0, 0, shield);
       box(mat(p.accent), 0.22, 0.22, 0.09, 0, 0.05, 0.01, shield);
+      box(dark, 0.05, 0.16, 0.05, 0, 0, -0.04, shield); // handle
       parts.off = off;
+      parts.offBase = anchor(off, 0.1, -0.3);
+      parts.offTip = anchor(off, 0.1, 0.4);
       break;
     }
   }

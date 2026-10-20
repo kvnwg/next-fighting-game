@@ -23,7 +23,7 @@ export class ClientFighter {
   roster: RosterEntry;
   model: CharacterModel;
   readonly trail: WeaponTrail;
-  readonly offTrail: WeaponTrail | null;
+  offTrail: WeaponTrail | null;
   readonly glyph: THREE.Sprite;
   readonly isLocal: boolean;
 
@@ -58,8 +58,13 @@ export class ClientFighter {
   lastCueSerial = -1;
   lastStateKey = '';
   private tmpBase = new THREE.Vector3();
-  private tmpTip = new THREE.Vector3();
-  private tmpOff = { base: new THREE.Vector3(), tip: new THREE.Vector3() };
+  private tmpPos = new THREE.Vector3();
+  private tmpQuat = new THREE.Quaternion();
+  private tmpScale = new THREE.Vector3();
+  /** hit-stop: the animation holds still for a moment on impact, then catches back up */
+  private freezeMs = 0;
+  private lagMs = 0;
+  private lagKey = '';
 
   constructor(
     roster: RosterEntry,
@@ -70,7 +75,7 @@ export class ClientFighter {
     this.isLocal = isLocal;
     this.model = new CharacterModel(roster.char);
     this.trail = new WeaponTrail('#ffffff');
-    this.offTrail = this.model.weapon.offTip ? new WeaponTrail('#ffffff') : null;
+    this.offTrail = this.model.trailOff ? new WeaponTrail('#ffffff') : null;
     this.glyph = makeGlyph('危', '#ffffff', '#c41a1a');
     this.glyph.visible = false;
     scene.add(this.model.root, this.trail.mesh, this.glyph);
@@ -96,6 +101,16 @@ export class ClientFighter {
     this.model.dispose();
     this.model = new CharacterModel(r.char);
     this.scene.add(this.model.root);
+    if (!!this.offTrail !== !!this.model.trailOff) {
+      if (this.offTrail) {
+        this.scene.remove(this.offTrail.mesh);
+        this.offTrail.dispose();
+        this.offTrail = null;
+      } else {
+        this.offTrail = new WeaponTrail('#ffffff');
+        this.scene.add(this.offTrail.mesh);
+      }
+    }
     if (this.sim) {
       // the server keeps cooldowns across a swap; mirror that
       const ready = { special: this.sim.specialReadyAt, ability: this.sim.abilityReadyAt };
@@ -124,7 +139,14 @@ export class ClientFighter {
     this.serial = f.n;
   }
 
+  /** Freeze this fighter's animation briefly (impact feel). */
+  hitstop(ms: number): void {
+    this.freezeMs = Math.max(this.freezeMs, ms);
+  }
+
   teleportTo(x: number, y: number, z: number, yaw?: number): void {
+    this.trail.reset();
+    this.offTrail?.reset();
     this.pos.set(x, y, z);
     this.prevPos.copy(this.pos);
     if (yaw !== undefined) this.yaw = yaw;
@@ -192,12 +214,24 @@ export class ClientFighter {
     this.prevPos.copy(this.pos);
 
     const v = this.view(serverNow);
+    // hit-stop lag, reset whenever the state changes
+    const lagKey = `${v.state}|${v.serial}`;
+    if (lagKey !== this.lagKey) {
+      this.lagKey = lagKey;
+      this.lagMs = 0;
+    }
+    if (this.freezeMs > 0) {
+      this.freezeMs -= dt * 1000;
+      this.lagMs += dt * 1000;
+    } else this.lagMs = Math.max(0, this.lagMs - dt * 1000 * 0.5);
     const input: AnimInput = {
       state: v.state,
-      elapsed: v.elapsed,
+      elapsed: Math.max(0, v.elapsed - this.lagMs),
       dur: v.dur,
       attack: v.attack,
       windup: v.windup,
+      key: v.key,
+      serial: v.serial,
       speed: v.state === 'dodge' ? 0 : this.speed,
       moveForward: this.moveF,
       moveSide: this.moveS,
@@ -207,21 +241,21 @@ export class ClientFighter {
     };
     this.model.root.position.copy(this.pos);
     this.model.root.rotation.y = this.yaw;
-    this.model.update(input, dt);
+    this.model.update(input, this.freezeMs > 0 ? dt * 0.1 : dt);
     // shadow step / dead fade
     this.model.setVisible(!(v.state === 'dodge' && this.char.ability.kind === 'teleport' && v.elapsed < 250 && !v.attack && this.dodgeIsVanish()));
 
-    // weapon trails during the swing
+    // weapon trails follow the swing
     const atk = v.attack;
-    const swinging = !!atk && v.state === 'attack' && !atk.noHitbox && v.elapsed > v.windup - 40 && v.elapsed < v.windup + atk.active + 60;
+    const live = !!atk && v.state === 'attack' && !atk.noHitbox;
     const color = atk?.perilous ? '#ff4a3a' : v.key === 'h' ? '#ffd27a' : '#ffffff';
+    const m = this.model;
     this.trail.setColor(color);
-    const hasOff = this.model.weaponTips(this.tmpBase, this.tmpTip, this.offTrail ? this.tmpOff : undefined);
-    this.trail.update(dt, swinging, this.tmpBase, this.tmpTip);
-    if (this.offTrail && hasOff) {
+    m.weaponXf('main', this.tmpPos, this.tmpQuat, this.tmpScale);
+    this.trail.update(dt, live && m.swingMain, this.tmpPos, this.tmpQuat, this.tmpScale.x, m.trailMain.base, m.trailMain.tip);
+    if (this.offTrail && m.trailOff && m.weaponXf('off', this.tmpPos, this.tmpQuat, this.tmpScale)) {
       this.offTrail.setColor(color);
-      const offSwing = swinging && (atk?.anim === 'dualSlash' || atk?.anim === 'punchL' || atk?.anim === 'grab');
-      this.offTrail.update(dt, offSwing, this.tmpOff.base, this.tmpOff.tip);
+      this.offTrail.update(dt, live && m.swingOff, this.tmpPos, this.tmpQuat, this.tmpScale.x, m.trailOff.base, m.trailOff.tip);
     }
 
     // perilous glyph during the windup

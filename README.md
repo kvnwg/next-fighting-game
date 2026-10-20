@@ -137,9 +137,19 @@ The look is built in code, so you can replace it piece by piece:
 
 - `src/client/render/character.ts`: the body rig, plus `headgear()` (hats, hoods and helmets per character). Palettes come from `palette` in `characters.ts`.
 - `src/client/render/weapons.ts`: one builder per `weaponKind`. The grip sits at the origin and the weapon points along +Z.
-- Animations are procedural poses (guard, block and keyframes per `AttackAnim`) in `character.ts`, timed by each attack's windup, active and recovery frames. Every move animates in sync with its gameplay timing automatically.
+- Animations are procedural and authored weapon-first in `src/client/render/anim/styles.ts`. Each weapon has a guard, a block and a moveset. A swing is the path the weapon travels (an arc of blade directions around a pivot, or a line for thrusts and punches) plus how the body coils and uncoils. The arms and legs follow with two-handed IK: hands stay on the grip, feet stay planted.
+- `anim/animator.ts` times every move off the attack's windup, active and recovery frames:
+  - the weapon chambers, coils, then accelerates through the hit, and the hit lands at the same moment the server resolves it;
+  - it overshoots, settles and flows back to guard;
+  - each state blends from the current pose, so combos chain from where the last cut ended.
+  - Deflects, blocks, hits and war cries add short reactions on top, and impacts freeze both fighters for a few frames (hit-stop).
+- Weapon trails are interpolated between frames, so fast swings leave a smooth arc.
 
-Dev viewer: open `/?viewer` to watch all characters cycle through their animations. `/?viewer&anim=sp&t=0.4` freezes a pose, and `/?viewer&map=forge` previews a map.
+Dev viewer:
+- `/?viewer` shows all characters cycling through their animations, and `/?viewer&char=ronin` shows just one.
+- `/?viewer&anim=sp&t=0.4` freezes a pose.
+- `/?viewer&char=ronin&anim=l0&strip=8` lays one move out as 8 frozen moments, side by side. `&chain=l0,l1,l2` (or `stance,ia`, or states like `block,stagger`) plays a sequence, and `&walk=6` adds running.
+- `/?viewer&map=forge` previews a map.
 
 ### Tuning
 

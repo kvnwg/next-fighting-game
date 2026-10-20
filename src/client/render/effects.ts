@@ -210,30 +210,34 @@ export class Effects {
 /** A ribbon following a weapon's base->tip segment while it swings. */
 export class WeaponTrail {
   readonly mesh: THREE.Mesh;
-  private readonly n = 12;
-  private bases: THREE.Vector3[] = [];
-  private tips: THREE.Vector3[] = [];
+  /** seconds a point of the ribbon lives */
+  private readonly life = 0.13;
+  private readonly max = 72;
+  private pts: { b: THREE.Vector3; t: THREE.Vector3; age: number }[] = [];
   private positions: Float32Array;
   private alphas: Float32Array;
-  private active = false;
-  private fade = 0;
+  private prevPos = new THREE.Vector3();
+  private prevQuat = new THREE.Quaternion();
+  private hasPrev = false;
+  private readonly p = new THREE.Vector3();
+  private readonly q = new THREE.Quaternion();
 
   constructor(color: string) {
     const geo = new THREE.BufferGeometry();
-    this.positions = new Float32Array(this.n * 2 * 3);
-    this.alphas = new Float32Array(this.n * 2);
+    this.positions = new Float32Array(this.max * 2 * 3);
+    this.alphas = new Float32Array(this.max * 2);
     geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     geo.setAttribute('alpha', new THREE.BufferAttribute(this.alphas, 1));
     const idx: number[] = [];
-    for (let i = 0; i < this.n - 1; i++) {
+    for (let i = 0; i < this.max - 1; i++) {
       const a = i * 2;
       idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
     }
     geo.setIndex(idx);
     const mat = new THREE.ShaderMaterial({
-      uniforms: { color: { value: new THREE.Color(color) }, fade: { value: 1 } },
+      uniforms: { color: { value: new THREE.Color(color) } },
       vertexShader: `attribute float alpha; varying float vA; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 color; uniform float fade; varying float vA; void main(){ gl_FragColor = vec4(color, vA * fade * 0.85); }`,
+      fragmentShader: `uniform vec3 color; varying float vA; void main(){ gl_FragColor = vec4(mix(color, vec3(1.0), vA * 0.35), vA * 0.85); }`,
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -248,41 +252,54 @@ export class WeaponTrail {
     ((this.mesh.material as THREE.ShaderMaterial).uniforms.color.value as THREE.Color).set(c);
   }
 
-  update(dt: number, emitting: boolean, base: THREE.Vector3, tip: THREE.Vector3): void {
-    if (emitting) {
-      if (!this.active) {
-        this.bases = [];
-        this.tips = [];
+  /**
+   * Feed the weapon's world transform each frame plus its trail anchors in weapon space. Between
+   * frames the transform is interpolated (slerped), so fast swings leave a smooth curve, not a fan.
+   */
+  update(dt: number, emitting: boolean, pos: THREE.Vector3, quat: THREE.Quaternion, scale: number, base: THREE.Vector3, tip: THREE.Vector3): void {
+    for (const pt of this.pts) pt.age += dt;
+    while (this.pts.length && this.pts[this.pts.length - 1].age > this.life) this.pts.pop();
+    if (emitting && this.hasPrev) {
+      const angle = this.prevQuat.angleTo(quat);
+      const moved = this.prevPos.distanceTo(pos);
+      const steps = Math.max(1, Math.min(10, Math.ceil(Math.max(angle / 0.05, moved / 0.04))));
+      for (let i = 1; i <= steps; i++) {
+        const k = i / steps;
+        this.p.lerpVectors(this.prevPos, pos, k);
+        this.q.slerpQuaternions(this.prevQuat, quat, k);
+        this.pts.unshift({
+          b: base.clone().multiplyScalar(scale).applyQuaternion(this.q).add(this.p),
+          t: tip.clone().multiplyScalar(scale).applyQuaternion(this.q).add(this.p),
+          age: dt * (1 - k),
+        });
       }
-      this.active = true;
-      this.fade = 1;
-      this.bases.unshift(base.clone());
-      this.tips.unshift(tip.clone());
-      if (this.bases.length > this.n) {
-        this.bases.pop();
-        this.tips.pop();
-      }
-    } else if (this.active) {
-      this.fade -= dt * 6;
-      if (this.fade <= 0) this.active = false;
+      if (this.pts.length > this.max) this.pts.length = this.max;
     }
-    this.mesh.visible = this.active && this.bases.length > 1;
+    this.prevPos.copy(pos);
+    this.prevQuat.copy(quat);
+    this.hasPrev = true;
+
+    const count = this.pts.length;
+    this.mesh.visible = count > 1;
     if (!this.mesh.visible) return;
-    const count = this.bases.length;
-    for (let i = 0; i < this.n; i++) {
-      const j = Math.min(i, count - 1);
-      const b = this.bases[j];
-      const t = this.tips[j];
-      this.positions.set([b.x, b.y, b.z], i * 6);
-      this.positions.set([t.x, t.y, t.z], i * 6 + 3);
-      const a = i < count ? 1 - i / this.n : 0;
-      this.alphas[i * 2] = a * 0.3;
+    for (let i = 0; i < this.max; i++) {
+      const pt = this.pts[Math.min(i, count - 1)];
+      this.positions.set([pt.b.x, pt.b.y, pt.b.z], i * 6);
+      this.positions.set([pt.t.x, pt.t.y, pt.t.z], i * 6 + 3);
+      const a = i < count ? Math.pow(1 - pt.age / this.life, 1.6) : 0;
+      this.alphas[i * 2] = a * 0.15;
       this.alphas[i * 2 + 1] = a;
     }
     const g = this.mesh.geometry;
     g.attributes.position.needsUpdate = true;
     g.attributes.alpha.needsUpdate = true;
-    (this.mesh.material as THREE.ShaderMaterial).uniforms.fade.value = this.fade;
+  }
+
+  /** Drop the trail (e.g. after a teleport). */
+  reset(): void {
+    this.pts = [];
+    this.hasPrev = false;
+    this.mesh.visible = false;
   }
 
   dispose(): void {

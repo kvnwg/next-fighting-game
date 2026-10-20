@@ -40,7 +40,8 @@ export type AttackAnim =
   | 'dualSlash'
   | 'slam'
   | 'charge'
-  | 'hook';
+  | 'hook'
+  | 'draw';
 
 /**
  * Perilous attacks cannot be blocked:
@@ -166,7 +167,7 @@ const ronin: CharacterDef = {
     description: 'Sheathe your blade. Attack within 1.5s to unleash Iai Flash, a near-instant draw cut that wrecks posture.',
     cooldown: 8000,
     duration: 1500,
-    attack: { name: 'Iai Flash', anim: 'slashR', windup: 130, active: 90, recovery: 450, damage: 16, posture: 32, blockPosture: 38, range: 3.3, arc: 70, lunge: 2.0 },
+    attack: { name: 'Iai Flash', anim: 'draw', windup: 130, active: 90, recovery: 450, damage: 16, posture: 32, blockPosture: 38, range: 3.3, arc: 70, lunge: 2.0 },
   },
   passive: { name: 'Clear Mind', description: 'Deflect window is 40ms longer.', mods: { parryWindowBonus: 40 } },
   palette: { primary: '#2f3b63', secondary: '#c9b38a', accent: '#d8423b', skin: '#e8b98f', hair: '#1c1a22', metal: '#d9e2ec' },
