@@ -3,9 +3,9 @@
  * state machines -> hit detection -> lag-compensated hit resolution -> broadcast.
  */
 import { AttackDef, AttackKey } from '../shared/characters';
-import { COMBAT, MAX_LAG_COMP_MS, PLAYER_RADIUS, SNAPSHOT_HZ, FALL_DEATH_Y } from '../shared/config';
+import { COMBAT, MAX_LAG_COMP_MS, PLAYER_RADIUS, SNAPSHOT_HZ, FALL_DEATH_Y, SPRINT_MULT } from '../shared/config';
 import { HitResult, applyHit, decideOutcome, defenseAt, inAttackCone, pruneDefenseLog, pushDefense } from '../shared/combat';
-import { INPUT_ACTIONS, InputAction } from '../shared/fighter';
+import { FORCED_STATES, INPUT_ACTIONS, InputAction, InputOptions } from '../shared/fighter';
 import { MapDef, hazardAt, inSafeZone, onFloor } from '../shared/maps';
 import { clamp, forward, turnToward, yawTo } from '../shared/math';
 import { clampToFloor, getColliders, pushOut, stepBody } from '../shared/physics';
@@ -18,10 +18,23 @@ interface PendingHit {
   defender: ServerFighter;
   atk: AttackDef;
   key: AttackKey;
+  /** attacker's attackSerial when the hit connected */
+  serial: number;
   tHit: number;
   resolveAt: number;
   distance: number;
+  /** positions/facing when the hit connected (outcomes are judged at that moment) */
+  ax: number;
+  az: number;
+  dx: number;
+  dz: number;
+  dYaw: number;
 }
+
+/** Short bursts of ordinary movement allowed above the sustained speed cap (network jitter). */
+const MOVE_BURST = 3;
+/** Highest a jump or vault can legitimately take you. */
+const MAX_AIR_HEIGHT = 1.8;
 
 let instanceCounter = 0;
 
@@ -158,21 +171,34 @@ export abstract class Instance {
     if (![m.x, m.y, m.z, m.r].every(Number.isFinite)) return;
     if (this.isFrozen() || !f.isAlive()) return;
     const now = this.game.now();
-    const dt = clamp((now - f.lastMoveAt) / 1000, 0.016, 1);
+    const dt = clamp((now - f.lastMoveAt) / 1000, 0, 1);
     f.lastMoveAt = now;
+
+    // Sustained speed is capped by what the fighter's state allows (nothing while staggered or
+    // broken); dashes, lunges and shoves the server knows about are granted as explicit allowance.
+    const mobile = f.moveSpeedMult(now) > 0;
+    const cap = (mobile ? f.char.stats.speed * SPRINT_MULT * 1.25 : 0) + 0.6;
+    f.moveBudget = Math.min(MOVE_BURST, f.moveBudget + cap * dt);
     const dist = Math.hypot(m.x - f.x, m.z - f.z);
-    const allowed = 24 * dt + 1.5 + f.moveAllowance;
-    f.moveAllowance = Math.max(0, f.moveAllowance - dist);
-    if (dist > allowed) {
-      // too fast to be legit: snap them back
+    const fromAllowance = Math.min(dist, f.moveAllowance);
+    const spend = dist - fromAllowance;
+    if (spend > f.moveBudget + 0.05) {
       this.teleport(f, f.x, f.z, f.yaw, 'correction');
       return;
     }
+    f.moveAllowance -= fromAllowance;
+    f.moveBudget -= spend;
+
     const pos = { x: m.x, z: m.z };
     if (this.map.edge === 'wall') clampToFloor(this.map, pos, PLAYER_RADIUS * 0.5);
     f.x = pos.x;
     f.z = pos.z;
-    f.y = clamp(m.y, FALL_DEATH_Y - 5, 6);
+    // You can only be off the ground shortly after a jump/vault, and never above jump height;
+    // well inside the floor you can't be below it either.
+    let y = clamp(m.y, FALL_DEATH_Y - 5, MAX_AIR_HEIGHT);
+    if (y > 0 && now - f.lastAirAt > 1100) y = 0;
+    if (y < 0 && onFloor(this.map, f.x, f.z, -0.6)) y = 0;
+    f.y = y;
     f.yaw = m.r;
     f.onGround = m.g === 1;
   }
@@ -182,45 +208,60 @@ export abstract class Instance {
     if (!f || !INPUT_ACTIONS.includes(m.a)) return;
     if (!f.isAlive()) return;
     const now = this.game.now();
+    const tag = Number.isInteger(m.q) ? (m.q as number) : undefined;
     if (this.isFrozen()) {
       if (m.a === 'blockDown') f.blockHeld = true;
       else if (m.a === 'blockUp') f.blockHeld = false;
-      else p.send({ t: 'reject', a: m.a });
+      else p.send({ t: 'reject', a: m.a, q: tag });
       return;
     }
     if (Number.isFinite(m.r)) f.yaw = m.r as number;
 
-    // Lag compensation: honour the client's view time, within limits.
+    // Lag compensation: honour the client's view time, within limits based on the latency the
+    // server itself measured. The fighter state machine additionally refuses press times from
+    // before the current state allowed that input.
     const maxBack = Math.min(MAX_LAG_COMP_MS, p.oneWay() + 60);
     let pressTime = Number.isFinite(m.vt) ? clamp(m.vt, now - maxBack, now) : now;
     const last = f.log[f.log.length - 1];
     if (last && pressTime < last.t) pressTime = Math.min(now, last.t);
 
-    const opts = {
+    const opts: InputOptions = {
       pressTime,
       dx: Number.isFinite(m.dx) ? (m.dx as number) : 0,
       dz: Number.isFinite(m.dz) ? (m.dz as number) : 0,
+      tag,
     };
     this.applyInput(f, m.a, now, opts);
   }
 
   /** Shared by human and bot inputs. */
-  applyInput(f: ServerFighter, a: InputAction, now: number, opts: { pressTime?: number; dx?: number; dz?: number } = {}): boolean {
+  applyInput(f: ServerFighter, a: InputAction, now: number, opts: InputOptions = {}): boolean {
     if (a === 'ability' && f.char.ability.kind === 'teleport') {
       const target = this.teleportTarget(f, now);
-      if (!target || now < f.abilityReadyAt || (f.state !== 'idle' && f.state !== 'block')) {
-        f.owner?.send({ t: 'reject', a });
+      const spot = target ? this.shadowStepSpot(target) : null;
+      if (!target || !spot || now < f.abilityReadyAt || (f.state !== 'idle' && f.state !== 'block')) {
+        f.owner?.send({ t: 'reject', a, q: opts.tag });
         return false;
       }
       const ok = f.input(a, now, opts);
-      if (ok) this.shadowStep(f, target);
+      if (ok) this.shadowStep(f, target, spot);
       this.processEvents(f);
       return ok;
     }
-    if (a === 'jump' && f.owner) f.onGround = true; // the client already validated ground contact
+    // Ground contact is client-reported; the jump cooldown (longer than airtime) stops chaining.
+    if (a === 'jump' && f.owner) f.onGround = true;
+    const before = { serial: f.attackSerial, state: f.state, start: f.stateStart };
     const ok = f.input(a, now, opts);
+    this.grantMovement(f, before);
     this.processEvents(f);
     return ok;
+  }
+
+  /** When a fighter starts a dash or lunge, allow the distance it will legitimately cover. */
+  private grantMovement(f: ServerFighter, before: { serial: number; state: string; start: number }): void {
+    if (!f.owner) return;
+    if (f.attackSerial !== before.serial && f.attack?.lunge) f.moveAllowance += f.attack.lunge + 0.5;
+    if (f.state === 'dodge' && (before.state !== 'dodge' || f.stateStart !== before.start)) f.moveAllowance += f.dodgeDist + 0.5;
   }
 
   protected processEvents(f: ServerFighter): void {
@@ -229,8 +270,11 @@ export abstract class Instance {
         case 'guardOn':
         case 'guardOff':
         case 'dodge':
+          pushDefense(f.log, e);
+          break;
         case 'jump':
           pushDefense(f.log, e);
+          f.lastAirAt = this.game.now();
           break;
         case 'feint':
           this.fx.push({ k: 'feint', d: f.id, x: f.x, y: f.y, z: f.z });
@@ -261,19 +305,22 @@ export abstract class Instance {
     return best;
   }
 
-  private shadowStep(f: ServerFighter, target: ServerFighter): void {
+  /** Where a shadow step behind `target` would land, or null if there's no safe spot. */
+  shadowStepSpot(target: ServerFighter): { x: number; z: number } | null {
     const back = forward(target.yaw);
-    const candidates = [1.5, 1.2, -1.5];
-    for (const dist of candidates) {
+    for (const dist of [1.5, 1.2, -1.5]) {
       const p = { x: target.x - back.x * dist, z: target.z - back.z * dist };
       pushOut(p, PLAYER_RADIUS, getColliders(this.map));
       if (this.map.edge === 'wall') clampToFloor(this.map, p);
       if (this.map.edge === 'void' && !onFloor(this.map, p.x, p.z, -0.5)) continue;
-      if (f.owner) f.moveAllowance += Math.hypot(p.x - f.x, p.z - f.z) + 2;
-      this.teleport(f, p.x, p.z, yawTo(p.x, p.z, target.x, target.z), 'shadowstep');
-      this.fx.push({ k: 'evade', d: f.id, x: f.x, y: f.y, z: f.z, tags: ['blink'] });
-      return;
+      return p;
     }
+    return null;
+  }
+
+  private shadowStep(f: ServerFighter, target: ServerFighter, spot: { x: number; z: number }): void {
+    this.teleport(f, spot.x, spot.z, yawTo(spot.x, spot.z, target.x, target.z), 'shadowstep');
+    this.fx.push({ k: 'evade', d: f.id, x: f.x, y: f.y, z: f.z, tags: ['blink'] });
   }
 
   // ------------------------------------------------------------------ simulation
@@ -284,9 +331,11 @@ export abstract class Instance {
 
     for (const f of others) {
       if (f.brain && !this.isFrozen()) f.brain.think(now, this);
-      f.update(now);
+      const before = { serial: f.attackSerial, state: f.state, start: f.stateStart };
+      f.update(now); // may run a buffered attack or dodge
+      this.grantMovement(f, before);
       if (f.bufferExpired) {
-        f.owner?.send({ t: 'reject', a: f.bufferExpired });
+        f.owner?.send({ t: 'reject', a: f.bufferExpired.action, q: f.bufferExpired.tag });
         f.bufferExpired = null;
       }
       this.processEvents(f);
@@ -352,26 +401,72 @@ export abstract class Instance {
         if (dist === null) continue;
         a.hitRecord.set(d.id, seg + 1);
         const tHit = Math.max(start + seg * segLen, this.lastTick);
-        this.pending.push({ attacker: a, defender: d, atk, key: a.attackKey, tHit, resolveAt: tHit + d.hitGrace(), distance: dist });
+        this.pending.push({
+          attacker: a,
+          defender: d,
+          atk,
+          key: a.attackKey,
+          serial: a.attackSerial,
+          tHit,
+          resolveAt: tHit + d.hitGrace(),
+          distance: dist,
+          ax: a.x,
+          az: a.z,
+          dx: d.x,
+          dz: d.z,
+          dYaw: d.yaw,
+        });
       }
     }
   }
 
+  /**
+   * Finalise pending hits in the order they landed. A hit waits while an earlier hit involving
+   * either fighter is still waiting for its defender's grace period, so trades resolve in order.
+   */
   private resolveHits(now: number): void {
     if (this.pending.length === 0) return;
-    const due = this.pending.filter((h) => h.resolveAt <= now).sort((x, y) => x.tHit - y.tHit);
-    if (due.length === 0) return;
-    this.pending = this.pending.filter((h) => h.resolveAt > now);
-    for (const h of due) {
+    const sorted = [...this.pending].sort((x, y) => x.tHit - y.tHit);
+    const waiting = new Set<string>();
+    const keep: PendingHit[] = [];
+    for (const h of sorted) {
+      if (h.resolveAt > now || waiting.has(h.attacker.id) || waiting.has(h.defender.id)) {
+        keep.push(h);
+        waiting.add(h.attacker.id);
+        waiting.add(h.defender.id);
+        continue;
+      }
+      this.resolveHit(h, now);
+    }
+    this.pending = keep;
+  }
+
+  private resolveHit(h: PendingHit, now: number): void {
+    {
       const { attacker: a, defender: d } = h;
-      if (!this.fighters.has(a.id) || !this.fighters.has(d.id)) continue;
-      if (!d.isAlive() || !this.canDamage(a, d)) continue;
+      if (!this.fighters.has(a.id) || !this.fighters.has(d.id)) return;
+      if (!d.isAlive() || !this.canDamage(a, d)) return;
+      // the attack was interrupted (deflected, staggered...) before this part of it connected
+      if (a.interrupt && a.interrupt.serial === h.serial && h.tHit > a.interrupt.t) return;
       // A posture break can't be cashed in by the very next frames of the attack that caused it.
-      if (d.state === 'broken' && h.tHit - d.stateStart < 120) continue;
+      if (d.state === 'broken' && h.tHit - d.stateStart < 120) return;
       const def = defenseAt(d.log, h.tHit);
+
+      // judge the hit with everyone where they were when it connected
+      const saved = [a.x, a.z, d.x, d.z, d.yaw];
+      a.x = h.ax;
+      a.z = h.az;
+      d.x = h.dx;
+      d.z = h.dz;
+      d.yaw = h.dYaw;
+      const aSerial = a.attackSerial;
+      const dSerial = d.attackSerial;
       const outcome = decideOutcome(a, d, h.atk, h.tHit, def);
-      if (outcome === 'miss') continue;
-      const res = applyHit(a, d, h.atk, h.key, outcome, now, { distance: h.distance });
+      const res = outcome === 'miss' ? null : applyHit(a, d, h.atk, h.key, outcome, now, { distance: h.distance });
+      [a.x, a.z, d.x, d.z, d.yaw] = saved;
+      if (!res) return;
+      if (FORCED_STATES.has(a.state) || res.killed === a) a.interrupt = { serial: aSerial, t: h.tHit };
+      if (FORCED_STATES.has(d.state) || res.killed === d) d.interrupt = { serial: dSerial, t: h.tHit };
       this.processEvents(a);
       this.processEvents(d);
       d.lastAttackerId = a.id;

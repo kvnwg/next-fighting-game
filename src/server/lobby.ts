@@ -90,8 +90,19 @@ export class Lobby extends Instance {
       p.send({ t: 'notice', text: 'You can only change character inside the safe zone.', kind: 'warn' });
       return false;
     }
+    if (id === f.char.id) return false;
+    if (f.state !== 'idle' && f.state !== 'block') {
+      p.send({ t: 'notice', text: 'Finish what you are doing before switching characters.', kind: 'warn' });
+      return false;
+    }
+    // swapping must not double as a free heal or cooldown reset
+    const hpFrac = f.hp / f.maxHp;
+    const ready = { special: f.specialReadyAt, ability: f.abilityReadyAt };
     p.charId = id;
     f.setCharacter(id);
+    f.hp = Math.max(1, Math.round(f.maxHp * hpFrac));
+    f.specialReadyAt = ready.special;
+    f.abilityReadyAt = ready.ability;
     f.stateStart = this.game.now();
     this.broadcast({ t: 'roster', add: [f.roster()] });
     return true;

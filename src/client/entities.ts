@@ -96,7 +96,13 @@ export class ClientFighter {
     this.model.dispose();
     this.model = new CharacterModel(r.char);
     this.scene.add(this.model.root);
-    if (this.sim) this.sim.setCharacter(r.char);
+    if (this.sim) {
+      // the server keeps cooldowns across a swap; mirror that
+      const ready = { special: this.sim.specialReadyAt, ability: this.sim.abilityReadyAt };
+      this.sim.setCharacter(r.char);
+      this.sim.specialReadyAt = ready.special;
+      this.sim.abilityReadyAt = ready.ability;
+    }
   }
 
   applySnap(f: FighterSnap, serverTime: number, positional: boolean): void {

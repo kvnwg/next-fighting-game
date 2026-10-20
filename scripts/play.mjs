@@ -11,6 +11,15 @@ const logs = [];
 page.on('console', (m) => { if (m.type() !== 'debug') logs.push(`[${m.type()}] ${m.text()}`); });
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack}`));
 const shot = (name) => page.screenshot({ path: `${outDir}/${scenario}-${name}.png` });
+const net = { corrections: 0, rejects: 0, fx: {} };
+page.on('websocket', (ws) =>
+  ws.on('framereceived', (f) => {
+    const text = typeof f.payload === 'string' ? f.payload : '';
+    if (text.includes('"reason":"correction"')) net.corrections++;
+    if (text.startsWith('{"t":"reject"')) net.rejects++;
+    if (text.startsWith('{"t":"fx"')) for (const e of JSON.parse(text).e) net.fx[e.k] = (net.fx[e.k] ?? 0) + 1;
+  }),
+);
 await page.goto(base, { waitUntil: 'load' });
 await page.waitForTimeout(1500);
 await shot('title');
@@ -21,7 +30,19 @@ await shot('entered');
 if (scenario === 'lobby') {
   await page.keyboard.down('KeyD');
   await page.waitForTimeout(1500);
+  // sprint, dodge and jump around
+  await page.keyboard.down('ShiftLeft');
+  await page.waitForTimeout(2500);
+  await page.keyboard.up('ShiftLeft');
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press('ShiftLeft');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(950);
+  }
   await page.keyboard.up('KeyD');
+  await page.keyboard.press('KeyR');
+  await page.waitForTimeout(600);
   await shot('walked');
 } else if (scenario === 'practice') {
   await page.keyboard.press('KeyP');
@@ -63,5 +84,6 @@ if (scenario === 'lobby') {
   await page.waitForTimeout(800);
   await shot('ladder');
 }
+console.log(JSON.stringify(net));
 console.log(logs.join('\n'));
 await browser.close();

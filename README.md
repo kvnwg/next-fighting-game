@@ -138,6 +138,6 @@ All combat timings live in `COMBAT` and `MATCH` in `src/shared/config.ts` (defle
 ## Known limitations / next steps
 
 - No real accounts: identity is a browser token. Hook up auth before running a public ranked ladder.
-- Movement is client-reported (with speed sanity checks on the server), which is fine for friends but not cheat-proof.
+- Movement is client-reported. The server caps speed by state (no walking away while staggered or broken), limits height to real jumps, and measures latency itself. That stops the obvious cheats, but it isn't a fully server-simulated movement model.
 - One server process holds everyone. Scaling out would need sharded lobbies and a shared store such as SQLite or Postgres.
 - Keyboard and mouse only; no gamepad or touch controls yet.

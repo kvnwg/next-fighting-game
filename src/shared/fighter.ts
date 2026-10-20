@@ -48,6 +48,8 @@ export type FighterEvent =
   | { type: 'ability'; t: number; kind: AbilityDef['kind'] };
 
 export interface InputOptions {
+  /** Client sequence number, echoed back if the input is rejected. */
+  tag?: number;
   /** When the input actually happened (lag-compensated). Defaults to now. */
   pressTime?: number;
   /** Desired dodge direction in world space. */
@@ -107,7 +109,7 @@ export class Fighter {
 
   buffered: { action: InputAction; until: number; opts: InputOptions } | null = null;
   /** Set when a buffered input timed out without ever taking effect. */
-  bufferExpired: InputAction | null = null;
+  bufferExpired: { action: InputAction; tag?: number } | null = null;
   events: FighterEvent[] = [];
   private lastUpdate = -1;
 
@@ -191,6 +193,7 @@ export class Fighter {
 
   hasHyperArmor(now: number): boolean {
     if (this.state !== 'attack' || !this.attack || this.attack.noHitbox) return false;
+    if (now < this.stateStart) return false; // the attack hadn't started yet at that moment
     if (this.attackPhase(now) === 'recovery') return false;
     if (this.attack.hyperArmor) return true;
     if (this.attackKey === 'h' && this.mods.heavyHyperArmor) return true;
@@ -405,7 +408,34 @@ export class Fighter {
     return !!this.mods.lightFeint && this.isLightKey(this.attackKey);
   }
 
+  /**
+   * Earliest moment the current state allowed a defensive input. Lag-compensated press times are
+   * never allowed to predate it, so you can't backdate a guard or dodge to before a stagger began
+   * or before your own attack recovery let you cancel.
+   */
+  private legalSince(kind: 'guard' | 'evade', now: number): number {
+    switch (this.state) {
+      case 'stagger':
+        return this.stateStart + COMBAT.staggerDefendAfter;
+      case 'deflected':
+        return this.stateStart + this.stateDur * COMBAT.deflectedDefendFrac;
+      case 'attack': {
+        if (!this.attack) return this.stateStart;
+        const recovery = this.stateStart + this.atkWindup + this.attack.active;
+        if (kind === 'guard' && this.attackPhase(now) === 'windup') return this.stateStart; // feint
+        return kind === 'guard' ? recovery + this.attack.recovery * COMBAT.recoveryGuardCancel : recovery;
+      }
+      default:
+        return this.stateStart;
+    }
+  }
+
+  private clampPress(kind: 'guard' | 'evade', now: number, pressTime: number): number {
+    return Math.min(now, Math.max(pressTime, this.legalSince(kind, now)));
+  }
+
   pressBlock(now: number, pressTime = now): boolean {
+    pressTime = this.clampPress('guard', now, pressTime);
     this.blockHeld = true;
     const since = pressTime - this.lastBlockPress;
     this.spamCount = since < COMBAT.parrySpamWindow && !this.lastPressDeflected ? Math.min(this.spamCount + 1, 4) : 0;
@@ -486,6 +516,7 @@ export class Fighter {
 
   pressDodge(now: number, dx: number, dz: number, pressTime = now): boolean {
     if (!this.canEvade(now)) return false;
+    pressTime = this.clampPress('evade', now, pressTime);
     const charge = this.dodgeReady.findIndex((t) => t <= now);
     if (charge < 0) return false;
     this.dodgeReady[charge] = now + COMBAT.dodgeCooldown;
@@ -510,8 +541,9 @@ export class Fighter {
   }
 
   pressJump(now: number, pressTime = now): boolean {
-    if (!this.onGround || now - this.lastJump < 450) return false;
+    if (!this.onGround || now - this.lastJump < COMBAT.jumpCooldown) return false;
     if (this.state !== 'idle' && this.state !== 'block' && this.state !== 'stance') return false;
+    pressTime = this.clampPress('evade', now, pressTime);
     this.lastJump = now;
     this.vy = JUMP_VELOCITY;
     this.onGround = false;
@@ -605,7 +637,7 @@ export class Fighter {
 
     if (this.buffered) {
       if (now > this.buffered.until) {
-        this.bufferExpired = this.buffered.action;
+        this.bufferExpired = { action: this.buffered.action, tag: this.buffered.opts.tag };
         this.buffered = null;
       } else if (this.tryInput(this.buffered.action, now, this.buffered.opts)) this.buffered = null;
     }

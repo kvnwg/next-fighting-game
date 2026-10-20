@@ -34,6 +34,7 @@ export class Game {
   private timer: NodeJS.Timeout | null = null;
   private lastMatchmake = 0;
   private lastQueueBroadcast = 0;
+  private lastServerPing = 0;
   private readonly t0 = performance.now();
   /** Server clock in ms (monotonic). Clients sync to this. Injectable for simulations. */
   readonly now: () => number;
@@ -66,6 +67,14 @@ export class Game {
       } catch (err) {
         console.error(`[game] ${inst.kind} tick failed`, err);
         if (inst instanceof Arena) this.closeArena(inst);
+      }
+    }
+    if (now - this.lastServerPing > 2000) {
+      // latency is measured by the server, so a client can't claim extra lag compensation
+      this.lastServerPing = now;
+      for (const p of this.players.values()) {
+        p.lastPingS = Math.round(now);
+        p.send({ t: 'sping', s: p.lastPingS });
       }
     }
     if (now - this.lastMatchmake > 1000) {
@@ -170,8 +179,12 @@ export class Game {
     const now = this.now();
     switch (msg.t) {
       case 'ping':
-        if (Number.isFinite(msg.rtt)) p.rtt = p.rtt * 0.7 + Math.max(0, Math.min(1000, msg.rtt as number)) * 0.3;
-        p.send({ t: 'pong', c: msg.c, s: now });
+        p.send({ t: 'pong', c: Number.isFinite(msg.c) ? msg.c : 0, s: now });
+        break;
+      case 'spong':
+        if (msg.s !== p.lastPingS || p.lastPingS === 0) return;
+        p.lastPingS = 0;
+        p.rtt = p.rtt * 0.6 + Math.max(0, Math.min(1000, now - msg.s)) * 0.4;
         break;
       case 'move':
         p.instance?.handleMove(p, msg);

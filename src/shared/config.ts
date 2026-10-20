@@ -70,6 +70,8 @@ export const COMBAT = {
   dodgeIframes: 240,
   dodgeDistance: 4.2,
   dodgeCooldown: 850,
+  /** Minimum time between jumps (longer than a jump's airtime, so evasion can't be chained). */
+  jumpCooldown: 900,
   /** Window after a jump press during which sweeps and grabs pass under you. */
   jumpEvadeStart: 50,
   jumpEvadeEnd: 620,
@@ -91,6 +93,8 @@ export const COMBAT = {
 // ---- Matches -------------------------------------------------------------------
 export const MATCH = {
   roundsToWin: 2,
+  /** Drawn rounds don't count; after this many rounds the leader (or healthier fighter) wins. */
+  maxRounds: 5,
   introTime: 3500,
   countdownTime: 3000,
   roundTime: 90_000,

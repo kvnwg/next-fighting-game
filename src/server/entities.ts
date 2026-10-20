@@ -23,8 +23,14 @@ export class ServerFighter extends Fighter {
   /** Position epoch: bumped on every server-side teleport so stale client positions are ignored. */
   epoch = 0;
   lastMoveAt = 0;
-  /** Extra movement distance tolerated after the server shoved the fighter. */
+  /** Extra movement distance tolerated after shoves, dashes and lunges the server knows about. */
   moveAllowance = 0;
+  /** Token bucket for ordinary movement: refills at the state's max speed, caps short bursts. */
+  moveBudget = 3;
+  /** Last time the server accepted a jump or leap (allows reported height above the floor). */
+  lastAirAt = -Infinity;
+  /** Set when a hit interrupted this fighter's attack: later hits from that attack are void. */
+  interrupt: { serial: number; t: number } | null = null;
 
   respawnAt = 0;
   spawnProtectedUntil = 0;
@@ -72,7 +78,9 @@ export class Player {
   charId: CharacterId;
   fighter: ServerFighter | null = null;
   instance: Instance | null = null;
-  rtt = 80;
+  /** Round-trip time measured by the server (never trusted from the client). */
+  rtt = 100;
+  lastPingS = 0;
   queue: { mode: QueueMode; since: number; diff?: BotDifficulty } | null = null;
   lastChatAt = 0;
   msgWindowStart = 0;

@@ -42,6 +42,7 @@ export class Net {
           return;
         }
         if (m.t === 'pong') this.onPong(m);
+        if (m.t === 'sping') this.send({ t: 'spong', s: m.s });
         if (m.t === 'welcome' && !this.synced) {
           this.offset = m.serverTime - performance.now();
         }
@@ -66,7 +67,7 @@ export class Net {
   }
 
   private ping(): void {
-    this.send({ t: 'ping', c: performance.now(), rtt: this.synced ? this.rtt : undefined });
+    this.send({ t: 'ping', c: performance.now() });
   }
 
   private onPong(m: Extract<ServerMsg, { t: 'pong' }>): void {

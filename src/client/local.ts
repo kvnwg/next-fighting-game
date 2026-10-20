@@ -3,7 +3,7 @@
  * the shared physics, streams position to the server and adopts server-imposed states.
  */
 import { CLIENT_SEND_HZ, SPRINT_MULT } from '../shared/config';
-import { FORCED_STATES, Fighter, InputAction } from '../shared/fighter';
+import { FORCED_STATES, Fighter, FighterState, InputAction } from '../shared/fighter';
 import { MapDef } from '../shared/maps';
 import { forward, turnToward, yawTo } from '../shared/math';
 import { stepBody } from '../shared/physics';
@@ -29,8 +29,23 @@ const BIND_ACTION: Partial<Record<Bind, InputAction>> = {
   ability: 'ability',
 };
 
+/** What an accepted local prediction changed, so a server rejection can undo exactly that. */
+interface Prediction {
+  at: number;
+  serial: number;
+  state: FighterState;
+  stateStart: number;
+  specialReadyAt: number;
+  abilityReadyAt: number;
+  dodgeReady: number[];
+}
+
 export class LocalController {
   epoch = 0;
+  private seq = 0;
+  private predictions = new Map<number, Prediction>();
+  /** cooldown snapshot taken when a press was buffered, keyed by its sequence number */
+  private bufferedPrev = new Map<number, Pick<Prediction, 'specialReadyAt' | 'abilityReadyAt' | 'dodgeReady'>>();
   frozen = false;
   private lastSend = 0;
   private push = { x: 0, z: 0, until: 0 };
@@ -83,21 +98,45 @@ export class LocalController {
     const canTurn = sim.state === 'idle' || sim.state === 'block' || sim.state === 'stance' || (sim.state === 'attack' && sim.attackPhase(now) === 'recovery');
     if (aims && canTurn) sim.yaw = this.desiredYaw(ctx);
 
+    const q = ++this.seq;
+    const prev = { specialReadyAt: sim.specialReadyAt, abilityReadyAt: sim.abilityReadyAt, dodgeReady: [...sim.dodgeReady] };
     let ok = false;
     if (action === 'ability' && sim.char.ability.kind === 'teleport') {
-      ok = true; // the server decides and teleports us
+      ok = true; // the server decides and teleports us; nothing to predict
     } else {
-      ok = sim.input(action, now, { pressTime: vt, dx, dz });
+      const serial = sim.attackSerial;
+      const start = sim.stateStart;
+      ok = sim.input(action, now, { pressTime: vt, dx, dz, tag: q });
+      if (ok && (sim.attackSerial !== serial || sim.stateStart !== start)) this.remember(q, prev);
+      else if (!ok && sim.buffered?.opts.tag === q) this.bufferedPrev.set(q, prev);
     }
     sim.drainEvents();
     if (action === 'jump' && !ok) return;
-    this.net.send({ t: 'act', a: action, vt: Math.round(vt), dx: dx || undefined, dz: dz || undefined, r: Math.round(sim.yaw * 1000) / 1000 });
+    this.net.send({ t: 'act', a: action, vt: Math.round(vt), dx: dx || undefined, dz: dz || undefined, r: Math.round(sim.yaw * 1000) / 1000, q });
     this.onAction?.(action, ok);
+  }
+
+  private remember(q: number, prev: Pick<Prediction, 'specialReadyAt' | 'abilityReadyAt' | 'dodgeReady'>): void {
+    const sim = this.sim;
+    this.predictions.set(q, { at: this.net.serverNow(), serial: sim.attackSerial, state: sim.state, stateStart: sim.stateStart, ...prev });
+    if (this.predictions.size > 32) {
+      const cutoff = this.net.serverNow() - 3000;
+      for (const [k, p] of this.predictions) if (p.at < cutoff) this.predictions.delete(k);
+    }
   }
 
   update(dt: number, now: number, ctx: MoveContext): void {
     const sim = this.sim;
+    const bufTag = sim.buffered?.opts.tag;
+    const serial = sim.attackSerial;
+    const start = sim.stateStart;
     sim.update(now);
+    if (bufTag !== undefined && !sim.buffered && (sim.attackSerial !== serial || sim.stateStart !== start)) {
+      // a buffered press just went through locally: remember it in case the server disagrees
+      const prev = this.bufferedPrev.get(bufTag);
+      if (prev) this.remember(bufTag, prev);
+    }
+    if (bufTag !== undefined && !sim.buffered) this.bufferedPrev.delete(bufTag);
     sim.drainEvents();
 
     const f = forward(ctx.camYaw);
@@ -230,15 +269,25 @@ export class LocalController {
     this.push = { x: dx / (dur / 1000), z: dz / (dur / 1000), until: this.net.serverNow() + dur };
   }
 
-  onReject(a: InputAction): void {
+  /** The server never applied press `q`: undo only what that press predicted, if it's still showing. */
+  onReject(_a: InputAction, q: number | undefined): void {
+    if (q === undefined) return;
+    const p = this.predictions.get(q);
+    if (!p) return;
+    this.predictions.delete(q);
     const sim = this.sim;
-    const now = this.net.serverNow();
-    if (a === 'ability') sim.abilityReadyAt = 0;
-    if (a === 'special') sim.specialReadyAt = 0;
-    const voluntary = sim.state === 'attack' || sim.state === 'dodge' || sim.state === 'stance';
-    if (voluntary && now - sim.stateStart < 600) {
-      sim.setState(sim.blockHeld ? 'block' : 'idle', now);
+    sim.specialReadyAt = p.specialReadyAt;
+    sim.abilityReadyAt = p.abilityReadyAt;
+    sim.dodgeReady = p.dodgeReady;
+    if (sim.attackSerial === p.serial && sim.stateStart === p.stateStart && sim.state === p.state && !FORCED_STATES.has(sim.state)) {
+      sim.setState(sim.blockHeld ? 'block' : 'idle', this.net.serverNow());
       sim.drainEvents();
     }
+  }
+
+  /** Mirror of the server's riposte buff (Duelist): after we deflect, our next windup is faster. */
+  onDeflected(): void {
+    const sim = this.sim;
+    if (sim.mods.riposteWindupMult) sim.riposteUntil = this.net.serverNow() + 1200;
   }
 }

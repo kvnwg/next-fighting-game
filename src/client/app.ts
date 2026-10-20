@@ -143,7 +143,7 @@ class App {
     n.on('fx', (m) => m.e.forEach((e) => this.onFx(e)));
     n.on('tp', (m) => this.local?.onTeleport(m.x, m.z, m.yaw, m.epoch, m.reason));
     n.on('push', (m) => this.local?.onPush(m.dx, m.dz));
-    n.on('reject', (m) => this.local?.onReject(m.a));
+    n.on('reject', (m) => this.local?.onReject(m.a, m.q));
     n.on('queue', (m) => {
       this.queue = m.mode ? { since: m.since, count: m.searching } : null;
     });
@@ -421,7 +421,10 @@ class App {
           this.cam.shake(0.12, 0.15);
           this.hitstop = 0.07;
         }
-        if (meD) this.ui.floatText('DEFLECT', pos.x, pos.y + 0.4, pos.z, 'good big');
+        if (meD) {
+          this.ui.floatText('DEFLECT', pos.x, pos.y + 0.4, pos.z, 'good big');
+          this.local?.onDeflected();
+        }
         else if (meA) this.ui.floatText('DEFLECTED', pos.x, pos.y + 0.4, pos.z, 'bad');
         break;
       case 'block':

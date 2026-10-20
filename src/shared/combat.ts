@@ -37,8 +37,8 @@ export function defenseAt(log: readonly DefenseEvent[], t: number): DefenseInfo 
   for (const e of log) {
     if (e.type === 'guardOn' || e.type === 'guardOff') {
       if (e.t <= t) lastGuard = e;
-      else if (e.type === 'guardOn' && e.t <= t + tol) {
-        // pressed a hair late: still counts as a deflect
+      else if (e.type === 'guardOn' && e.t <= t + tol && e.parryUntil > e.t) {
+        // pressed a hair late: still counts as a deflect (only a real press, not an automatic re-guard)
         info.guarding = true;
         info.parrying = true;
       }
@@ -59,13 +59,10 @@ export function defenseAt(log: readonly DefenseEvent[], t: number): DefenseInfo 
 }
 
 export function pruneDefenseLog(log: DefenseEvent[], before: number): void {
-  // keep the most recent guard entry even if old: it defines the current guard state
+  // keep the guard entry that was in effect at the cutoff: it defines the guard state from then on
   let lastGuardIdx = -1;
-  for (let i = log.length - 1; i >= 0; i--) {
-    if (log[i].type === 'guardOn' || log[i].type === 'guardOff') {
-      lastGuardIdx = i;
-      break;
-    }
+  for (let i = 0; i < log.length && log[i].t < before; i++) {
+    if (log[i].type === 'guardOn' || log[i].type === 'guardOff') lastGuardIdx = i;
   }
   let w = 0;
   for (let i = 0; i < log.length; i++) {
@@ -113,6 +110,7 @@ export function decideOutcome(attacker: Fighter, defender: Fighter, atk: AttackD
 
   if (
     defender.state === 'stance' &&
+    defender.stateStart <= t &&
     defender.char.ability.kind === 'counter' &&
     atk.perilous !== 'grab' &&
     atk.perilous !== 'sweep'

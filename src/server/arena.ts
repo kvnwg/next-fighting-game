@@ -114,6 +114,11 @@ export class Arena extends Instance {
     this.roundWinner = winner;
     if (this.scores[0] >= MATCH.roundsToWin || this.scores[1] >= MATCH.roundsToWin) {
       this.finish(this.scores[0] > this.scores[1] ? 0 : 1, 'ko', now);
+    } else if (this.round >= MATCH.maxRounds) {
+      // too many draws: the leader wins, otherwise whoever ended the last round healthier
+      const [a, b] = this.slots;
+      const lead = this.scores[0] !== this.scores[1] ? (this.scores[0] > this.scores[1] ? 0 : 1) : a.hp / a.maxHp >= b.hp / b.maxHp ? 0 : 1;
+      this.finish(lead, 'timeout', now);
     } else {
       this.setPhase('roundEnd', now + MATCH.roundEndTime);
     }

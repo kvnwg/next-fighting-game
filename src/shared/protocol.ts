@@ -4,7 +4,7 @@ import { Outcome } from './combat';
 import { Fighter, FighterState, InputAction } from './fighter';
 import { round2 } from './math';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export type QueueMode = 'ranked' | 'practice';
 export type MatchMode = 'ranked' | 'practice' | 'casual';
@@ -83,14 +83,17 @@ export interface LeaderboardEntry {
 export type ClientMsg =
   | { t: 'hello'; v: number; token?: string; name: string; char: CharacterId }
   | { t: 'move'; x: number; y: number; z: number; r: number; g: 0 | 1; e: number }
-  | { t: 'act'; a: InputAction; vt: number; dx?: number; dz?: number; r?: number }
+  /** q: client sequence number, echoed in a 'reject' if the input never takes effect */
+  | { t: 'act'; a: InputAction; vt: number; dx?: number; dz?: number; r?: number; q?: number }
   | { t: 'char'; id: CharacterId }
   | { t: 'queue'; mode: QueueMode; diff?: BotDifficulty }
   | { t: 'unqueue' }
   | { t: 'challenge'; target: string }
   | { t: 'challengeReply'; from: string; accept: boolean }
   | { t: 'chat'; text: string }
-  | { t: 'ping'; c: number; rtt?: number }
+  | { t: 'ping'; c: number }
+  /** answer to a server 'sping' (the server measures latency itself) */
+  | { t: 'spong'; s: number }
   | { t: 'forfeit' }
   | { t: 'leaderboard' }
   | { t: 'fell' };
@@ -98,6 +101,7 @@ export type ClientMsg =
 export type ServerMsg =
   | { t: 'welcome'; id: string; token: string; profile: ProfileView; online: number; serverTime: number }
   | { t: 'pong'; c: number; s: number }
+  | { t: 'sping'; s: number }
   | {
       t: 'enter';
       kind: 'lobby' | 'arena';
@@ -116,7 +120,7 @@ export type ServerMsg =
   | { t: 'fx'; e: CombatEvent[] }
   | { t: 'tp'; x: number; z: number; yaw?: number; epoch: number; reason?: string }
   | { t: 'push'; dx: number; dz: number }
-  | { t: 'reject'; a: InputAction }
+  | { t: 'reject'; a: InputAction; q?: number }
   | { t: 'queue'; mode: QueueMode | null; since: number; searching: number }
   | {
       t: 'match';
