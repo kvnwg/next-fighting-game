@@ -1,7 +1,7 @@
 /** The client application: wires networking, input, simulation, rendering and UI together. */
 import * as THREE from 'three';
 import { CHARACTERS, CharacterId } from '../shared/characters';
-import { COMBAT } from '../shared/config';
+import { MATCH } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RosterEntry, ServerMsg } from '../shared/protocol';
@@ -16,9 +16,10 @@ import { Net } from './net';
 import { CharacterModel } from './render/character';
 import { Effects } from './render/effects';
 import { PixelRenderer } from './render/renderer';
+import { portraitURL } from './render/portrait';
 import { MapView } from './render/world';
 import { saveSettings, settings } from './settings';
-import { Preview, UI } from './ui';
+import { CardData, Preview, UI } from './ui';
 
 type MatchMsg = Extract<ServerMsg, { t: 'match' }>;
 
@@ -86,6 +87,7 @@ class App {
         if (open) this.input.exitLock();
       },
       createPreview: (el) => createPreview(el),
+      portrait: (id) => portraitURL(this.renderer.renderer, id),
     }, offline);
     this.loadMap(LOBBY_MAP);
     this.bindNet();
@@ -636,9 +638,9 @@ class App {
     if (!local) return;
     const me = local.cf;
     const sim = local.sim;
-    this.ui.setNetInfo(this.online, this.net.rtt, settings.showFps ? this.fps.value : null);
-    this.ui.setSelf(this.profile?.name ?? '', sim.char, sim.hp, sim.posture, sim.state === 'broken');
-    this.ui.setSkills(sim.char, now, { dodge: sim.dodgeReady, special: sim.specialReadyAt, ability: sim.abilityReadyAt }, COMBAT.dodgeCooldown);
+    this.ui.setNetInfo(this.online, settings.showFps ? this.fps.value : null);
+    this.ui.setHints(sim.char, now, { dodge: sim.dodgeReady, special: sim.specialReadyAt, ability: sim.abilityReadyAt });
+    this.ui.setPostureMain(sim.posture / sim.char.stats.posture, sim.state === 'broken');
     this.ui.setZone(this.kind === 'lobby' && inSafeZone(this.map, me.pos.x, me.pos.z));
     this.ui.setClickHint(!this.input.locked && !this.ui.modalOpen && !this.ui.chatOpen, this.input.locked, this.input.lockFailed);
     this.ui.setQueue(!!this.queue, this.queue?.since ?? 0, this.queue?.count ?? 0, now);
@@ -654,21 +656,45 @@ class App {
       }
     }
 
-    // target panel
+    // fighter cards: you (left) and your opponent / lock-on target (right)
+    const m = this.match;
+    const myScore = m ? m.scores[m.you] : null;
+    const theirScore = m ? m.scores[m.you === 0 ? 1 : 0] : null;
+    const prof = this.profile;
+    const rtt = Math.round(this.net.rtt);
+    const self: CardData = {
+      name: prof?.name ?? '',
+      title: prof ? rankOf(prof.mmr, prof.placements).label : '',
+      char: sim.char,
+      hp: sim.hp,
+      posture: sim.posture,
+      broken: sim.state === 'broken',
+      pips: myScore,
+      pipMax: MATCH.roundsToWin,
+      meta: this.offline ? (prof && !m ? `${prof.wins}W ${prof.losses}L` : '') : `${rtt}ms`,
+      metaTone: this.offline ? undefined : rtt < 90 ? 'good' : rtt < 170 ? 'ok' : 'bad',
+    };
+    this.ui.setCard('self', self);
+
     let target: ClientFighter | null = this.lock;
-    if (!target && this.match) target = this.fighters.get(this.match.players[this.match.you === 0 ? 1 : 0].id) ?? null;
+    if (!target && m) target = this.fighters.get(m.players[m.you === 0 ? 1 : 0].id) ?? null;
     if (!target && this.lastHitTarget && performance.now() < this.lastHitTarget.until) target = this.fighters.get(this.lastHitTarget.id) ?? null;
-    this.ui.setTarget(
-      target
-        ? {
-            name: target.roster.name,
-            char: target.char,
-            hp: target.hp,
-            posture: target.po,
-            rank: target.roster.mmr !== undefined ? rankOf(target.roster.mmr, target.roster.placements ?? 0) : undefined,
-          }
-        : null,
-    );
+    if (target) {
+      const r = target.roster;
+      const title = r.dummy ? 'Training' : r.mmr !== undefined ? rankOf(r.mmr, r.placements ?? 0).label : r.bot ? 'AI' : '';
+      const inMatch = !!m && m.players.some((p) => p.id === target!.id);
+      this.ui.setCard('opp', {
+        name: r.name,
+        title,
+        char: target.char,
+        hp: target.hp,
+        posture: target.po,
+        broken: target.s === 'broken',
+        pips: inMatch ? theirScore : null,
+        pipMax: MATCH.roundsToWin,
+        meta: '',
+      });
+    } else this.ui.setCard('opp', null);
 
     // lock reticle
     if (this.lock) {

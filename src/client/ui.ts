@@ -39,6 +39,22 @@ export interface UIHandlers {
   onSettingsChanged(): void;
   onModalChange(open: boolean): void;
   createPreview(container: HTMLElement): Preview;
+  /** data URL of a character's portrait (rendered in-engine) */
+  portrait(id: CharacterId): string;
+}
+
+export interface CardData {
+  name: string;
+  title: string;
+  char: CharacterDef;
+  hp: number;
+  posture: number;
+  broken: boolean;
+  /** rounds won (null outside matches) */
+  pips: number | null;
+  pipMax: number;
+  meta: string;
+  metaTone?: 'good' | 'ok' | 'bad';
 }
 
 export interface Preview {
@@ -73,6 +89,7 @@ export class UI {
   private preview: Preview | null = null;
   private challengeFrom: string | null = null;
   modalOpen: string | null = null;
+  profile: ProfileView | null = null;
   chatOpen = false;
   private els: Record<string, HTMLElement> = {};
 
@@ -116,41 +133,50 @@ export class UI {
         <div class="plates"></div>
         <div class="floaters"></div>
         <div class="lock-reticle hidden"></div>
-        <div class="top-left">
-          <div class="profile-card"></div>
-          <div class="net-info"><span id="online">0 online</span> · <span id="ping">-- ms</span><span id="fps"></span></div>
+        <div class="fcard self">
+          <div class="fc-diamond"><img class="fc-portrait" alt="" /></div>
+          <div class="fc-body">
+            <div class="fc-title"></div>
+            <div class="fc-name"><b class="fc-n"></b> <span class="fc-handle"></span></div>
+            <div class="fc-hp"><div class="fc-trail"></div><div class="fc-fill"></div></div>
+            <div class="fc-po"><div class="fc-fill"></div></div>
+            <div class="fc-meta"><span class="fc-pips"></span><span class="fc-ping"></span></div>
+          </div>
+        </div>
+        <div class="fcard opp hidden">
+          <div class="fc-diamond"><img class="fc-portrait" alt="" /></div>
+          <div class="fc-body">
+            <div class="fc-title"></div>
+            <div class="fc-name"><b class="fc-n"></b> <span class="fc-handle"></span></div>
+            <div class="fc-hp"><div class="fc-trail"></div><div class="fc-fill"></div></div>
+            <div class="fc-po"><div class="fc-fill"></div></div>
+            <div class="fc-meta"><span class="fc-pips"></span><span class="fc-ping"></span></div>
+          </div>
         </div>
         <div class="top-center">
-          <div class="zone-indicator hidden">SAFE ZONE · PvP disabled</div>
-          <div class="match-bar hidden">
-            <div class="pips left"></div><div class="match-timer">0:00</div><div class="pips right"></div>
-          </div>
-          <div class="target-panel hidden">
-            <div class="target-name"></div>
-            <div class="bar hp"><div class="fill"></div></div>
-            <div class="posture"><div class="fill"></div></div>
-          </div>
+          <div class="match-timer hidden">0:00</div>
+          <div class="zone-indicator hidden">Safe zone · PvP disabled</div>
+          <div class="net-info"><span id="online"></span><span id="fps"></span></div>
         </div>
-        <div class="top-right">
-          <div class="menu-buttons">
-            <button class="btn ranked" id="btn-ranked">${offline ? '⚔ Ranked vs AI [K]' : '⚔ Ranked [K]'}</button>
-            <div class="practice-group">
-              <button class="btn" id="btn-practice">Practice vs Bot [P]</button>
-              <select id="practice-diff"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
-            </div>
-            <button class="btn small" id="btn-chars">Characters [C]</button>
-            <button class="btn small" id="btn-ladder">Ladder [L]</button>
-            <button class="btn small" id="btn-help">Help [H]</button>
-            <button class="btn small danger hidden" id="btn-forfeit">Forfeit</button>
+        <div class="side-menu">
+          <button class="btn ranked" id="btn-ranked">${offline ? 'Ranked vs AI [K]' : 'Ranked [K]'}</button>
+          <div class="practice-group">
+            <button class="btn" id="btn-practice">Practice [P]</button>
+            <select id="practice-diff" aria-label="Bot difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
           </div>
+          <button class="btn small" id="btn-chars">Characters [C]</button>
+          <button class="btn small" id="btn-ladder">Ladder [L]</button>
+          <button class="btn small" id="btn-help">Help [H]</button>
+          <button class="btn small danger hidden" id="btn-forfeit">Forfeit</button>
           <div class="queue-panel hidden">
             <div class="queue-title">${offline ? 'Finding an opponent near your rating…' : 'Searching for a ranked duel…'}</div>
             <div class="queue-time">0:00</div>
             <div class="queue-count"></div>
             <button class="btn small" id="btn-cancel">Cancel</button>
           </div>
-          <div class="feed"></div>
+          <div class="esc-hint hidden">Esc to free the cursor</div>
         </div>
+        <div class="feed"></div>
         <div class="center">
           <div class="banner hidden"></div>
           <div class="subbanner hidden"></div>
@@ -159,24 +185,30 @@ export class UI {
         <div class="prompt hidden"></div>
         <div class="challenge-popup hidden"></div>
         <div class="death-overlay hidden"><div class="death-title">SLAIN</div><div class="death-sub"></div></div>
-        <div class="bottom-left">
-          <div class="chat">
-            <div class="chat-log"></div>
-            <input class="chat-input hidden" maxlength="140" placeholder="Say something… (Enter to send, Esc to cancel)" />
-          </div>
+        <div class="chat">
+          <div class="chat-log"></div>
+          <input class="chat-input hidden" maxlength="140" placeholder="Say something… (Enter to send, Esc to cancel)" />
         </div>
-        <div class="bottom-center">
-          <div class="self-name"></div>
-          <div class="posture self"><div class="fill"></div></div>
-          <div class="bar hp self"><div class="fill"></div><span class="val"></span></div>
+        <div class="posture-main">
+          <div class="pm-bar left"><div class="pm-fill"></div></div>
+          <svg class="pm-shield" viewBox="0 0 32 38" aria-hidden="true">
+            <path class="pm-shield-body" d="M16 1 L30 6 V17 C30 27 23 33 16 37 C9 33 2 27 2 17 V6 Z" />
+            <path class="pm-shield-line" d="M16 6 V32" />
+          </svg>
+          <div class="pm-bar right"><div class="pm-fill"></div></div>
         </div>
-        <div class="bottom-right">
-          <div class="skill" id="sk-dodge"><div class="cd"></div><div class="key">Shift</div><div class="name">Dodge</div><div class="charges"></div></div>
-          <div class="skill" id="sk-special"><div class="cd"></div><div class="key">E</div><div class="name"></div></div>
-          <div class="skill" id="sk-ability"><div class="cd"></div><div class="key">R</div><div class="name"></div></div>
+        <div class="hints left">
+          <div class="hint" id="h-dodge"><kbd>Shift</kbd><span class="h-label">Dodge</span><span class="h-cd"></span></div>
+          <div class="hint" id="h-jump"><kbd>Space</kbd><span class="h-label">Jump</span></div>
+          <div class="hint" id="h-special"><kbd>E</kbd><span class="h-label"></span><span class="h-cd"></span></div>
+          <div class="hint" id="h-ability"><kbd>R</kbd><span class="h-label"></span><span class="h-cd"></span></div>
+        </div>
+        <div class="hints right">
+          <div class="hint"><span class="h-label">Parry / (Hold) Block</span><kbd>F</kbd></div>
+          <div class="hint"><span class="h-label">Light / Heavy</span><kbd>M1</kbd><kbd>M2</kbd></div>
+          <div class="hint"><span class="h-label">Lock on</span><kbd>Tab</kbd></div>
         </div>
         <div class="click-hint hidden">Click the game to capture the mouse</div>
-        <div class="esc-hint hidden">Esc: free the cursor</div>
       </div>`);
     this.root.appendChild(this.hud);
     this.modal = h(`<div class="modal hidden"></div>`);
@@ -190,19 +222,18 @@ export class UI {
     this.chatLog = q('.chat-log');
     this.chatInput = q<HTMLInputElement>('.chat-input');
     for (const [k, sel] of Object.entries({
-      profile: '.profile-card',
       online: '#online',
-      ping: '#ping',
       fps: '#fps',
       zone: '.zone-indicator',
-      matchBar: '.match-bar',
-      pipsL: '.pips.left',
-      pipsR: '.pips.right',
       timer: '.match-timer',
-      target: '.target-panel',
-      targetName: '.target-name',
-      targetHp: '.target-panel .hp .fill',
-      targetPo: '.target-panel .posture .fill',
+      selfCard: '.fcard.self',
+      oppCard: '.fcard.opp',
+      postureMain: '.posture-main',
+      pmLeft: '.pm-bar.left .pm-fill',
+      pmRight: '.pm-bar.right .pm-fill',
+      hDodge: '#h-dodge',
+      hSpecial: '#h-special',
+      hAbility: '#h-ability',
       queue: '.queue-panel',
       queueTime: '.queue-time',
       queueCount: '.queue-count',
@@ -212,18 +243,10 @@ export class UI {
       challenge: '.challenge-popup',
       death: '.death-overlay',
       deathSub: '.death-sub',
-      selfName: '.self-name',
-      selfHp: '.bar.hp.self .fill',
-      selfHpVal: '.bar.hp.self .val',
-      selfPo: '.posture.self .fill',
-      selfPoBox: '.posture.self',
-      skDodge: '#sk-dodge',
-      skSpecial: '#sk-special',
-      skAbility: '#sk-ability',
       reticle: '.lock-reticle',
       clickHint: '.click-hint',
       escHint: '.esc-hint',
-      menuButtons: '.menu-buttons',
+      menuButtons: '.side-menu',
       btnRanked: '#btn-ranked',
       btnPractice: '#btn-practice',
       btnForfeit: '#btn-forfeit',
@@ -286,19 +309,16 @@ export class UI {
   // ------------------------------------------------------------------ profile & lobby chrome
 
   setProfile(p: ProfileView): void {
-    const r = rankOf(p.mmr, p.placements);
-    const games = p.wins + p.losses;
-    this.els.profile.innerHTML = `
-      <div class="pc-name">${esc(p.name)}</div>
-      <div>${rankBadge(r)}</div>
-      <div class="pc-stats">${r.placed ? `${p.mmr} MMR · ` : ''}${p.wins}W ${p.losses}L${games ? ` · ${Math.round((p.wins / games) * 100)}%` : ''}${p.streak > 1 ? ` · 🔥${p.streak}` : ''}</div>
-      ${r.placed ? `<div class="pc-progress"><div style="width:${Math.round(r.progress * 100)}%;background:${r.color}"></div></div>` : `<div class="pc-progress"><div style="width:${(p.placements / PLACEMENT_MATCHES) * 100}%;background:#8b93a1"></div></div>`}`;
+    this.profile = p;
   }
 
-  setNetInfo(online: number, ping: number, fps: number | null): void {
-    this.els.online.textContent = this.offline ? 'single player' : `${online} online`;
-    this.els.ping.textContent = this.offline ? 'offline' : `${Math.round(ping)} ms`;
-    this.els.fps.textContent = fps !== null ? ` · ${fps} fps` : '';
+  setNetInfo(online: number, fps: number | null): void {
+    this.setText(this.els.online, this.offline ? 'Single player' : `${online} online`);
+    this.setText(this.els.fps, fps !== null ? ` · ${fps} fps` : '');
+  }
+
+  private setText(el: HTMLElement, text: string): void {
+    if (el.textContent !== text) el.textContent = text;
   }
 
   setLobbyMode(inLobby: boolean): void {
@@ -333,57 +353,74 @@ export class UI {
 
   // ------------------------------------------------------------------ combat HUD
 
-  setSelf(name: string, char: CharacterDef, hp: number, posture: number, broken: boolean): void {
-    this.els.selfName.textContent = `${name} · ${char.name}`;
-    const hpPct = Math.max(0, hp / char.stats.hp) * 100;
-    (this.els.selfHp as HTMLElement).style.width = `${hpPct}%`;
-    this.els.selfHpVal.textContent = `${Math.ceil(hp)} / ${char.stats.hp}`;
-    this.setPosture(this.els.selfPo, posture / char.stats.posture);
-    this.els.selfPoBox.classList.toggle('broken', broken);
+  /** Fighter cards: you on the left, your opponent / lock-on target mirrored on the right. */
+  setCard(which: 'self' | 'opp', d: CardData | null): void {
+    const el = which === 'self' ? this.els.selfCard : this.els.oppCard;
+    el.classList.toggle('hidden', !d);
+    if (!d) return;
+    const q = (sel: string) => el.querySelector<HTMLElement>(sel)!;
+    if (el.dataset.char !== d.char.id) {
+      el.dataset.char = d.char.id;
+      (q('.fc-portrait') as HTMLImageElement).src = this.handlers.portrait(d.char.id);
+      el.style.setProperty('--accent', d.char.palette.accent);
+    }
+    this.setText(q('.fc-title'), d.title);
+    this.setText(q('.fc-n'), d.name);
+    this.setText(q('.fc-handle'), `@${d.char.name}`);
+    const hp = `${Math.max(0, Math.min(1, d.hp / d.char.stats.hp)) * 100}%`;
+    const fill = q('.fc-hp .fc-fill');
+    if (fill.style.width !== hp) {
+      fill.style.width = hp;
+      q('.fc-trail').style.width = hp; // trails behind on a delay, showing the chunk you lost
+    }
+    this.setBar(q('.fc-po .fc-fill'), d.posture / d.char.stats.posture);
+    el.classList.toggle('broken', d.broken);
+    const pips = d.pips === null ? '' : Array.from({ length: d.pipMax }, (_, i) => `<i class="${i < d.pips! ? 'won' : ''}"></i>`).join('');
+    const pipEl = q('.fc-pips');
+    if (pipEl.dataset.v !== pips) {
+      pipEl.dataset.v = pips;
+      pipEl.innerHTML = pips;
+    }
+    const ping = q('.fc-ping');
+    this.setText(ping, d.meta);
+    ping.dataset.q = d.metaTone ?? '';
   }
 
-  private setPosture(fill: HTMLElement, frac: number): void {
+  private setBar(fill: HTMLElement, frac: number): void {
     const f = Math.max(0, Math.min(1, frac));
     fill.style.width = `${f * 100}%`;
-    fill.style.background = f > 0.8 ? '#ff4a2a' : f > 0.5 ? '#ff9a2a' : '#ffd24a';
+    fill.dataset.level = f > 0.8 ? 'high' : f > 0.5 ? 'mid' : 'low';
   }
 
-  setTarget(t: { name: string; char: CharacterDef; hp: number; posture: number; rank?: RankInfo } | null): void {
-    this.els.target.classList.toggle('hidden', !t);
-    if (!t) return;
-    this.els.targetName.innerHTML = `${esc(t.name)} <span class="muted">· ${t.char.name}</span> ${t.rank ? rankBadge(t.rank, true) : ''}`;
-    this.els.targetHp.style.width = `${Math.max(0, t.hp / t.char.stats.hp) * 100}%`;
-    this.setPosture(this.els.targetPo, t.posture / t.char.stats.posture);
+  /** The big posture bar: fills outward from the shield as posture builds. */
+  setPostureMain(frac: number, broken: boolean): void {
+    this.setBar(this.els.pmLeft, frac);
+    this.setBar(this.els.pmRight, frac);
+    this.els.postureMain.classList.toggle('broken', broken);
+    this.els.postureMain.dataset.level = this.els.pmLeft.dataset.level;
   }
 
-  setSkills(char: CharacterDef, now: number, readyAt: { dodge: number[]; special: number; ability: number }, dodgeCd: number): void {
-    const set = (el: HTMLElement, readyTime: number, cd: number, name: string, title: string) => {
+  setHints(char: CharacterDef, now: number, readyAt: { dodge: number[]; special: number; ability: number }): void {
+    const cd = (el: HTMLElement, readyTime: number, label: string, title: string) => {
       const left = Math.max(0, readyTime - now);
-      const cdEl = el.querySelector<HTMLElement>('.cd')!;
-      cdEl.style.height = `${Math.min(1, left / cd) * 100}%`;
-      el.classList.toggle('ready', left <= 0);
-      el.querySelector('.name')!.textContent = left > 0 ? `${(left / 1000).toFixed(1)}s` : name;
+      this.setText(el.querySelector<HTMLElement>('.h-label')!, label);
+      this.setText(el.querySelector<HTMLElement>('.h-cd')!, left > 0 ? `${(left / 1000).toFixed(1)}s` : '');
+      el.classList.toggle('cooling', left > 0);
       el.title = title;
     };
     const charges = readyAt.dodge;
     const ready = charges.filter((t) => t <= now).length;
-    const nextReady = ready > 0 ? 0 : Math.min(...charges);
-    set(this.els.skDodge, nextReady, dodgeCd, 'Dodge', 'Dodge (i-frames). Dodge INTO a perilous thrust for a Mikiri Counter.');
-    this.els.skDodge.querySelector('.charges')!.textContent = charges.length > 1 ? `${ready}/${charges.length}` : '';
-    set(this.els.skSpecial, readyAt.special, char.special.cooldown, char.special.name, `${char.special.name}: ${PERILOUS_TIP[char.special.perilous!]}`);
-    set(this.els.skAbility, readyAt.ability, char.ability.cooldown, char.ability.name, `${char.ability.name}: ${char.ability.description}`);
+    cd(this.els.hDodge, ready > 0 ? 0 : Math.min(...charges), charges.length > 1 ? `Dodge ${ready}/${charges.length}` : 'Dodge', 'Dodge (i-frames). Dodge INTO a perilous thrust for a Mikiri Counter.');
+    cd(this.els.hSpecial, readyAt.special, char.special.name, `${char.special.name}: ${PERILOUS_TIP[char.special.perilous!]}`);
+    cd(this.els.hAbility, readyAt.ability, char.ability.name, `${char.ability.name}: ${char.ability.description}`);
   }
 
   setMatch(m: Extract<ServerMsg, { t: 'match' }> | null, serverNow: number): void {
-    this.els.matchBar.classList.toggle('hidden', !m);
+    this.els.timer.classList.toggle('hidden', !m);
     if (!m) return;
-    const pips = (n: number) => Array.from({ length: 2 }, (_, i) => `<i class="${i < n ? 'won' : ''}"></i>`).join('');
-    const me = m.you;
-    this.els.pipsL.innerHTML = pips(m.scores[me]);
-    this.els.pipsR.innerHTML = pips(m.scores[me === 0 ? 1 : 0]);
     let secs = 0;
     if (m.phase === 'fight') secs = Math.max(0, Math.ceil((m.endsAt - serverNow) / 1000));
-    this.els.timer.textContent = m.phase === 'fight' ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : `R${m.round}`;
+    this.setText(this.els.timer, m.phase === 'fight' ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : `Round ${m.round}`);
     this.els.timer.classList.toggle('urgent', m.phase === 'fight' && secs <= 10);
   }
 
