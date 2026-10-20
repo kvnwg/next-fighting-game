@@ -542,6 +542,11 @@ export class Fighter {
         const f = forward(this.yaw);
         this.beginDodge(now, -f.x, -f.z, ab.distance, ab.duration, ab.iframes, now);
         this.emit({ type: 'jump', t: now });
+        if (this.onGround) {
+          // a real hop (visual for players, physical for bots)
+          this.vy = JUMP_VELOCITY * 0.75;
+          this.onGround = false;
+        }
         break;
       }
       case 'teleport':

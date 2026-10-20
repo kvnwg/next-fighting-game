@@ -145,9 +145,7 @@ class App {
     n.on('push', (m) => this.local?.onPush(m.dx, m.dz));
     n.on('reject', (m) => this.local?.onReject(m.a));
     n.on('queue', (m) => {
-      const was = !!this.queue;
       this.queue = m.mode ? { since: m.since, count: m.searching } : null;
-      if (!was && this.queue) this.ui.toast('Searching for a ranked opponent…');
     });
     n.on('match', (m) => this.onMatch(m));
     n.on('result', (m) => {
