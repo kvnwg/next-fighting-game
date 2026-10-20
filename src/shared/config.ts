@@ -44,9 +44,16 @@ export const COMBAT = {
   /** While staggered you may start guarding (and deflect) after this long. */
   staggerDefendAfter: 140,
   blockstunTime: 200,
-  deflectedTime: 600,
-  /** A deflected attacker can raise their guard again after this long. */
-  deflectedDefendAfter: 450,
+  /**
+   * Recoil after being deflected scales with how heavy the deflected attack was:
+   * base + posture * perPosture, clamped. Pokes give a small opening, heavies a big one.
+   */
+  deflectRecoilBase: 250,
+  deflectRecoilPerPosture: 12,
+  deflectRecoilMin: 320,
+  deflectRecoilMax: 720,
+  /** A deflected attacker can raise their guard again after this fraction of the recoil. */
+  deflectedDefendFrac: 0.75,
   mikiriStunTime: 900,
   brokenTime: 1800,
   knockdownTime: 1100,

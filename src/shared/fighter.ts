@@ -449,7 +449,7 @@ export class Fighter {
         }
         return false;
       case 'deflected':
-        if (e >= COMBAT.deflectedDefendAfter) {
+        if (e >= this.stateDur * COMBAT.deflectedDefendFrac) {
           this.setState('block', now, 0, pressTime);
           return true;
         }
@@ -478,7 +478,7 @@ export class Fighter {
       case 'stagger':
         return e >= COMBAT.staggerDefendAfter;
       case 'deflected':
-        return e >= COMBAT.deflectedDefendAfter;
+        return e >= this.stateDur * COMBAT.deflectedDefendFrac;
       default:
         return false;
     }
@@ -592,7 +592,7 @@ export class Fighter {
       if (
         this.state === 'idle' ||
         (this.state === 'stagger' && e2 >= COMBAT.staggerDefendAfter) ||
-        (this.state === 'deflected' && e2 >= COMBAT.deflectedDefendAfter)
+        (this.state === 'deflected' && e2 >= this.stateDur * COMBAT.deflectedDefendFrac)
       ) {
         this.setState('block', now);
       }

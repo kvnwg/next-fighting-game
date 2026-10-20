@@ -210,9 +210,9 @@ const duelist: CharacterDef = {
   stats: { hp: 90, posture: 90, speed: 6.6, postureRegen: 1.05 },
   ratings: { power: 2, speed: 4, reach: 4, defense: 2, difficulty: 4 },
   lights: [
-    { name: 'Lunge', anim: 'thrust', windup: 240, active: 70, recovery: 280, damage: 6, posture: 8, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.8, feintable: true },
-    { name: 'Prick', anim: 'thrust', windup: 220, active: 70, recovery: 280, damage: 6, posture: 8, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.5, feintable: true },
-    { name: 'Flurry', anim: 'thrust', windup: 220, active: 70, recovery: 300, damage: 6, posture: 8, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.5, feintable: true },
+    { name: 'Lunge', anim: 'thrust', windup: 240, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.8, feintable: true },
+    { name: 'Prick', anim: 'thrust', windup: 220, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.5, feintable: true },
+    { name: 'Flurry', anim: 'thrust', windup: 220, active: 70, recovery: 300, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.5, feintable: true },
     { name: 'Pierce', anim: 'thrust', windup: 300, active: 80, recovery: 420, damage: 10, posture: 12, blockPosture: 14, range: 3.3, arc: 30, lunge: 0.9, feintable: true },
   ],
   heavy: { name: 'Skewer', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.4, arc: 30, lunge: 1.5, feintable: true },
@@ -268,13 +268,13 @@ const shade: CharacterDef = {
   weaponKind: 'daggers',
   role: 'Assassin',
   description: 'Fragile and relentless. Two dodge charges, backstabs and a blink that puts you right behind them.',
-  stats: { hp: 85, posture: 80, speed: 6.9, postureRegen: 1.1 },
+  stats: { hp: 90, posture: 90, speed: 6.9, postureRegen: 1.1 },
   ratings: { power: 2, speed: 5, reach: 1, defense: 1, difficulty: 5 },
   lights: [
-    { name: 'Slit', anim: 'dualSlash', windup: 210, active: 60, recovery: 240, damage: 5, posture: 6, blockPosture: 8, range: 2.1, arc: 70, lunge: 0.7 },
-    { name: 'Slash', anim: 'slashL', windup: 190, active: 60, recovery: 240, damage: 5, posture: 6, blockPosture: 8, range: 2.1, arc: 70, lunge: 0.5 },
-    { name: 'Rend', anim: 'slashR', windup: 190, active: 60, recovery: 260, damage: 5, posture: 6, blockPosture: 8, range: 2.1, arc: 70, lunge: 0.5 },
-    { name: 'Eviscerate', anim: 'dualSlash', windup: 270, active: 100, recovery: 420, damage: 5, posture: 6, blockPosture: 7, range: 2.2, arc: 70, lunge: 0.8, hits: 2 },
+    { name: 'Slit', anim: 'dualSlash', windup: 210, active: 60, recovery: 240, damage: 6, posture: 7, blockPosture: 9, range: 2.35, arc: 70, lunge: 0.7 },
+    { name: 'Slash', anim: 'slashL', windup: 190, active: 60, recovery: 240, damage: 6, posture: 7, blockPosture: 9, range: 2.35, arc: 70, lunge: 0.5 },
+    { name: 'Rend', anim: 'slashR', windup: 190, active: 60, recovery: 260, damage: 6, posture: 7, blockPosture: 9, range: 2.35, arc: 70, lunge: 0.5 },
+    { name: 'Eviscerate', anim: 'dualSlash', windup: 270, active: 100, recovery: 420, damage: 5, posture: 6, blockPosture: 7, range: 2.4, arc: 70, lunge: 0.8, hits: 2 },
   ],
   heavy: { name: 'Viper Fang', anim: 'thrust', windup: 520, active: 100, recovery: 460, damage: 14, posture: 18, blockPosture: 22, range: 2.4, arc: 40, lunge: 2.0, feintable: true },
   special: { name: 'Throat Grab', anim: 'grab', windup: 650, active: 150, recovery: 650, damage: 22, posture: 25, blockPosture: 25, range: 2.4, arc: 40, lunge: 2.0, perilous: 'grab', cooldown: 7500 },
@@ -312,7 +312,7 @@ const reaper: CharacterDef = {
     cooldown: 9000,
     attack: { name: 'Soul Hook', anim: 'hook', windup: 450, active: 120, recovery: 550, damage: 6, posture: 10, blockPosture: 14, range: 11, arc: 12, pull: 2.0 },
   },
-  passive: { name: 'Soul Siphon', description: 'Heal for 25% of all damage you deal.', mods: { lifesteal: 0.25 } },
+  passive: { name: 'Soul Siphon', description: 'Heal for 20% of all damage you deal.', mods: { lifesteal: 0.2 } },
   palette: { primary: '#2f4740', secondary: '#4f665c', accent: '#7cffb2', skin: '#b9c4bd', hair: '#0f1412', metal: '#a7b5ae' },
 };
 
@@ -326,9 +326,9 @@ const monk: CharacterDef = {
   stats: { hp: 100, posture: 110, speed: 6.4, postureRegen: 1.3 },
   ratings: { power: 3, speed: 5, reach: 1, defense: 4, difficulty: 4 },
   lights: [
-    { name: 'Jab', anim: 'punchR', windup: 210, active: 60, recovery: 240, damage: 5, posture: 9, blockPosture: 11, range: 1.9, arc: 60, lunge: 0.6 },
-    { name: 'Cross', anim: 'punchL', windup: 200, active: 60, recovery: 240, damage: 5, posture: 9, blockPosture: 11, range: 1.9, arc: 60, lunge: 0.5 },
-    { name: 'Hook', anim: 'punchR', windup: 220, active: 60, recovery: 260, damage: 6, posture: 10, blockPosture: 12, range: 1.9, arc: 70, lunge: 0.5 },
+    { name: 'Jab', anim: 'punchR', windup: 240, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 1.9, arc: 60, lunge: 0.6 },
+    { name: 'Cross', anim: 'punchL', windup: 220, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 1.9, arc: 60, lunge: 0.5 },
+    { name: 'Hook', anim: 'punchR', windup: 230, active: 60, recovery: 280, damage: 6, posture: 9, blockPosture: 11, range: 1.9, arc: 70, lunge: 0.5 },
     { name: 'Palm Strike', anim: 'uppercut', windup: 300, active: 80, recovery: 420, damage: 8, posture: 14, blockPosture: 18, range: 2.0, arc: 60, lunge: 0.8 },
   ],
   heavy: { name: 'Mountain Breaker', anim: 'punchR', windup: 560, active: 100, recovery: 480, damage: 14, posture: 28, blockPosture: 34, range: 2.1, arc: 50, lunge: 1.5, feintable: true, knockback: 1.0 },
@@ -336,12 +336,12 @@ const monk: CharacterDef = {
   ability: {
     kind: 'counter',
     name: 'Still Water',
-    description: 'Hold a counter stance for 0.9s. If struck by a normal or thrust attack, negate it and strike back.',
-    cooldown: 8000,
-    duration: 900,
+    description: 'Hold a counter stance for 0.75s. If struck by a normal or thrust attack, negate it and strike back.',
+    cooldown: 9000,
+    duration: 750,
     attack: { name: 'Counter Strike', anim: 'uppercut', windup: 60, active: 80, recovery: 360, damage: 12, posture: 35, blockPosture: 35, range: 2.5, arc: 90, noHitbox: true },
   },
-  passive: { name: 'Inner Focus', description: 'Deal 25% more posture damage. Posture recovers 30% faster.', mods: { postureDamageMult: 1.25 } },
+  passive: { name: 'Inner Focus', description: 'Deal 15% more posture damage. Posture recovers 30% faster.', mods: { postureDamageMult: 1.15 } },
   palette: { primary: '#d9822b', secondary: '#7a3e12', accent: '#f2d16b', skin: '#c88f62', hair: '#2a1b10', metal: '#8c6f4a' },
 };
 
@@ -368,7 +368,7 @@ const paladin: CharacterDef = {
     cooldown: 8000,
     attack: { name: 'Shield Charge', anim: 'charge', windup: 260, active: 260, recovery: 500, damage: 8, posture: 30, blockPosture: 38, range: 2.0, arc: 60, lunge: 5.0, unparryable: true, knockback: 2.0 },
   },
-  passive: { name: 'Bulwark', description: 'Blocking takes 40% less posture damage and covers a wider angle.', mods: { blockPostureMult: 0.6, guardArcBonus: 35 } },
+  passive: { name: 'Bulwark', description: 'Blocking takes 30% less posture damage and covers a wider angle.', mods: { blockPostureMult: 0.7, guardArcBonus: 35 } },
   palette: { primary: '#d4d8de', secondary: '#2f5fa8', accent: '#f0c94a', skin: '#e3b28d', hair: '#8a5a2b', metal: '#e8edf2' },
 };
 

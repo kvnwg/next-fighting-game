@@ -22,7 +22,9 @@ npm run build        # typecheck + build the client into dist/client
 npm start            # one server on $PORT (default 3000) serving the client and the WebSocket
 ```
 
-Other scripts: `npm test` (combat rules plus server integration tests), `npm run typecheck`.
+Other scripts: `npm test` (combat rules, server integration and bot-vs-bot match simulations), `npm run typecheck`.
+
+`tests/sim.ts` can simulate complete matches between server-side bots on a fake clock. It's handy for balance passes: run every matchup and compare win rates and how often each outcome (deflect, deathblow and so on) happens. The current numbers are a first pass tuned that way.
 
 Ranked profiles are stored in `data/profiles.json` (`DATA_DIR` overrides the folder). Identity is a random token kept in the browser's localStorage. There are no accounts or passwords yet.
 
@@ -47,7 +49,7 @@ Ranked profiles are stored in `data/profiles.json` (`DATA_DIR` overrides the fol
 ## Combat
 
 - **Health and posture.** Blocking a hit costs posture. When posture fills you're **posture broken**: helpless for ~1.8s, and the next hit is a **Deathblow** (40 damage). Posture regenerates when you stop taking posture damage: faster while guarding, slower when your health is low.
-- **Deflect.** Pressing guard within ~200ms before a hit lands deflects it. Deflecting costs you almost nothing and hammers the attacker's posture, recoiling them long enough for a guaranteed counter. Mashing guard shrinks your deflect window (only whiffed presses count as spam).
+- **Deflect.** Pressing guard within ~200ms before a hit lands deflects it. Deflecting costs you almost nothing and hammers the attacker's posture. It also makes them recoil, and heavier swings recoil longer: deflecting a heavy or perilous attack gives you a free counter, while deflecting a quick poke only gives you the initiative. Mashing guard shrinks your deflect window (only whiffed presses count as spam).
 - **Perilous attacks (危).** Every character's **E** move is unblockable and flashes a red glyph:
   - **Thrust**: deflect it, or dodge *into* it for a counter that wrecks their posture.
   - **Sweep**: jump over it.
@@ -70,9 +72,9 @@ The server is authoritative for combat. Each client predicts its own actions wit
 | **Duelist** | Rapier | Fencer / mind games | Faster attack after a deflect; lights can feint | Coup de Grace (thrust) | **Fleche**: 6m running thrust |
 | **Lancer** | Spear | Zoner | Tip hits deal +25% | Whirlwind (sweep) | **Pole Vault**: invulnerable 6m backflip |
 | **Shade** | Twin Daggers | Assassin | 2 dodge charges, +40% backstab damage | Throat Grab (grab) | **Shadow Step**: blink behind a target |
-| **Reaper** | Scythe | Sustain / control | Heals 25% of damage dealt | Reaping Arc (sweep) | **Soul Hook**: drag a target from 11m |
-| **Monk** | Gauntlets | Posture breaker | +25% posture damage, faster posture regen | Iron Grapple (grab) | **Still Water**: counter stance |
-| **Paladin** | Sword & Shield | Defender | Blocking costs 40% less posture, wider guard | Holy Lance (thrust) | **Shield Charge**: undeflectable 5m charge |
+| **Reaper** | Scythe | Sustain / control | Heals 20% of damage dealt | Reaping Arc (sweep) | **Soul Hook**: drag a target from 11m |
+| **Monk** | Gauntlets | Posture breaker | +15% posture damage, faster posture regen | Iron Grapple (grab) | **Still Water**: counter stance |
+| **Paladin** | Sword & Shield | Defender | Blocking costs 30% less posture, wider guard | Holy Lance (thrust) | **Shield Charge**: undeflectable 5m charge |
 
 You can switch characters in the lobby safe zone (press **C**).
 

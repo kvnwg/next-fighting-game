@@ -35,14 +35,15 @@ export class Game {
   private lastMatchmake = 0;
   private lastQueueBroadcast = 0;
   private readonly t0 = performance.now();
+  /** Server clock in ms (monotonic). Clients sync to this. Injectable for simulations. */
+  readonly now: () => number;
 
-  constructor(readonly store: Store) {
+  constructor(
+    readonly store: Store,
+    clock?: () => number,
+  ) {
+    this.now = clock ?? (() => performance.now() - this.t0 + 1000);
     this.lobby = new Lobby(this);
-  }
-
-  /** Server clock in ms (monotonic). Clients sync to this. */
-  now(): number {
-    return performance.now() - this.t0 + 1000;
   }
 
   start(): void {

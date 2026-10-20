@@ -234,7 +234,11 @@ export function applyHit(
       const mult = atk.perilous ? COMBAT.perilousDeflectMult : 1;
       const broke = attacker.addPosture(atk.posture * COMBAT.deflectAttackerPosture * mult * postureMult(defender), now);
       r.attackerBroken = broke;
-      attacker.force(broke ? 'broken' : 'deflected', now, broke ? COMBAT.brokenTime : COMBAT.deflectedTime);
+      const recoil = Math.min(
+        COMBAT.deflectRecoilMax,
+        Math.max(COMBAT.deflectRecoilMin, COMBAT.deflectRecoilBase + atk.posture * mult * COMBAT.deflectRecoilPerPosture),
+      );
+      attacker.force(broke ? 'broken' : 'deflected', now, broke ? COMBAT.brokenTime : Math.round(recoil));
       // deflecting costs a sliver of your own posture, but can never break you
       const self = atk.blockPosture * COMBAT.deflectSelfPosture * (defender.mods.blockPostureMult ?? 1);
       defender.posture = Math.min(defender.maxPosture - 1, defender.posture + self);
