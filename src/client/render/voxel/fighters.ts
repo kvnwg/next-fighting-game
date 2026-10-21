@@ -169,7 +169,7 @@ export interface RigDims {
   ankle: number;
   hasLegs: boolean;
   hasFeet: boolean;
-  /** Standing height without hats and weapons. */
+  /** Standing height, headwear included, carried weapons not. */
   height: number;
 }
 
@@ -198,8 +198,13 @@ export function rigDims(model: VoxelModel): RigDims {
     ankle = foot.y;
     hipR = hip.clone().sub(pelvis);
   }
+  // the top of the head and whatever it wears (hat, hood, helm crest), not weapons slung on the back
+  const onHead = (name: string): boolean => {
+    for (let b = bones.get(name); b; b = b.parent ? bones.get(b.parent) : undefined) if (b.name === 'head') return true;
+    return false;
+  };
   let top = 0;
-  for (const v of model.voxels) if (/^(head|torso|pelvis)$/.test(v.bone)) top = Math.max(top, v.y + 1);
+  for (const v of model.voxels) if (onHead(v.bone) || v.bone === 'torso') top = Math.max(top, v.y + 1);
   const shoulderR = shoulder.clone().sub(torso);
   return {
     hipsY: pelvis.y,

@@ -1,7 +1,9 @@
 /**
  * Assassin, twin daggers. Low, fast and never still: an X cut with both blades, a full turn with the
- * arms flung wide, a three-stab flurry, a front flip that lands blades-first, a snake's rising
- * double stab, a throat grab with a reverse-grip finish, and a shadow step that reappears in smoke.
+ * arms flung wide, a three-stab flurry, a snake's rising double stab, crossed wrists torn apart, a
+ * leaping two-turn lotus, a front flip out of the dodge that lands blades-first, a weaving lunge, a
+ * backhand out of smoke, a rising cross while springing away, a barrel roll in the air, a plunge
+ * from the air, a throat grab with a reverse-grip finish, and a shadow step that reappears in smoke.
  */
 import { B, K, P, Style, X, arc, fx, hitAt, line, mv, seq } from '../author';
 import type { V3 } from '../author';
@@ -28,6 +30,40 @@ const evL = seq([
   [-1.5, 0.35, line([0.16, 0.42, 0.24], [0.14, 0.44, 0.22], [-0.2, 0.6, 1], [-0.2, 0.6, 1], DOWN)],
   [0.35, 1.2, arc(L_SH, 0.46, [[0.3, 0.9, 0.3], [0.1, 0.3, 1], [-0.15, -0.4, 0.9], [-0.3, -0.7, 0.5]])],
 ]);
+
+// Twin Fang: wrists crossed at the chest, both blades pointing out past the other arm, then torn
+// apart outward through them
+const fangR = arc(R_SH, 0.46, [[0.85, 0.05, 0.45], [0.45, 0.18, 0.9], [-0.1, 0.24, 1], [-0.6, 0.2, 0.8], [-0.95, 0.12, 0.3]]);
+const fangL = arc(L_SH, 0.46, [[-0.85, 0.05, 0.45], [-0.45, 0.18, 0.9], [0.1, 0.24, 1], [0.6, 0.2, 0.8], [0.95, 0.12, 0.3]]);
+const fangHit = hitAt(fangR, 2);
+
+// Smoke Cut: a backhand from over the left shoulder, out to the right
+const smokeCut = arc(R_SH, 0.46, [[0.75, 0.35, 0.5], [0.3, 0.3, 0.95], [-0.15, 0.22, 1], [-0.65, 0.12, 0.75], [-0.95, 0.05, 0.25]]);
+const smokeHit = hitAt(smokeCut, 2);
+
+// Hidden Thorn: both blades held point-down behind the hips, then up from low outside, crossing high
+const thornR = arc(R_SH, 0.46, [[-0.3, -0.65, -0.7], [-0.45, -0.55, 0.65], [-0.2, -0.1, 1], [0.12, 0.25, 1], [0.4, 0.7, 0.6]]);
+const thornL = arc(L_SH, 0.46, [[0.3, -0.65, -0.7], [0.45, -0.55, 0.65], [0.2, -0.1, 1], [-0.12, 0.25, 1], [-0.4, 0.7, 0.6]]);
+const thornHit = hitAt(thornR, 3);
+
+// Kite: arms out wide like a kite's spars through the roll, then scissored in together
+const kiteR = seq([
+  [-0.9, 0.0, line([-0.7, 0.5, 0.15], [-0.74, 0.52, 0.11], [-1, 0.1, 0.4], [-1, 0.1, 0.25], [0, 0, 1])],
+  [0.0, 1.07, arc(R_SH, 0.46, [[-1, 0.1, 0.25], [-0.6, 0.05, 0.85], [-0.05, 0.0, 1], [0.4, -0.05, 0.9]])],
+]);
+const kiteL = seq([
+  [-0.9, 0.0, line([0.7, 0.5, 0.15], [0.74, 0.52, 0.11], [1, 0.1, 0.4], [1, 0.1, 0.25], [0, 0, 1])],
+  [0.0, 1.07, arc(L_SH, 0.46, [[1, 0.1, 0.25], [0.6, 0.05, 0.85], [0.05, 0.0, 1], [-0.4, -0.05, 0.9]])],
+]);
+const kiteHit = hitAt(kiteR, 2, 1);
+
+// Nightfall: both blades raised point-down over the head, then driven down into the ground in front
+const fall = (x: number) =>
+  seq([
+    [-0.4, 0.0, line([x * 0.15, 0.95, 0.08], [x * 0.13, 1.04, 0.0], [x * -0.05, -0.75, 0.65], [0, -0.92, 0.38], [0, 0, 1], NaN, NaN, { body: true })],
+    [0.0, 0.45, line([x * 0.13, 1.04, 0.0], [x * 0.1, -0.1, 0.5], [0, -0.92, 0.38], [x * -0.05, -1, 0.18], [0, 0, 1], NaN, NaN, { body: true })],
+    [0.45, 1.07, line([x * 0.1, -0.1, 0.5], [x * 0.1, -0.12, 0.52], [x * -0.05, -1, 0.18], [x * -0.05, -1, 0.18], [0, 0, 1], NaN, NaN, { body: true })],
+  ]);
 
 export const daggers: Style = {
   axis: 'y',
@@ -103,8 +139,79 @@ export const daggers: Style = {
       fx: [fx(0.3, 'sparkle', 'tip', 0.45), fx(0.6, 'sparkle', 'offTip', 0.45), fx(0.9, 'sparkle', 'tip', 0.55)],
       trail: { life: 0.1 },
     }),
-    // Eviscerate: a front flip over the gap, landing with both blades coming down
-    l3: mv({
+    // Viper Fang: coiled flat to the ground like a snake, then up and in with both blades
+    h: mv({
+      keys: [
+        K(-0.2, B({ ...body, crouch: -0.42, lean: 0.46, twist: 0.0, step: 0.3, back: 0.4, width: 0.2 })),
+        K(0.3, B({ ...body, crouch: -0.34, lean: 0.42, step: 0.5, back: 0.44 })),
+        K(0.85, B({ ...body, crouch: -0.26, lean: 0.36, step: 0.72, back: 0.5 })),
+        K(1.05, B({ ...body, crouch: -0.26, lean: 0.36, step: 0.72, back: 0.5 })),
+      ],
+      main: stab([-0.24, 0.1, 0.02], [-0.08, 0.44, 0.66], [0.1, 0.25, 1], [0.0, 0.1, 1]),
+      off: stab([0.2, 0.12, 0.02], [0.06, 0.46, 0.62], [-0.1, 0.25, 1], [0.0, 0.1, 1]),
+      impacts: [0.85],
+      start: -0.2,
+      chamber: -0.06,
+      end: 1.0,
+      ghosts: [0.0, 0.95],
+      fx: [fx(0.0, 'smoke', 'feet', 0.7), fx(0.05, 'dust', 'feet', 0.9), fx(0.85, 'sparkle', 'tip', 0.9), fx(0.85, 'sparkle', 'offTip', 0.9)],
+      trail: { life: 0.2, glow: 0.6 },
+    }),
+    // Twin Fang: out of the lunge the wrists cross at the chest, then both blades tear outward
+    h1: mv({
+      keys: [
+        K(-0.1, B({ ...body, crouch: -0.34, lean: 0.3, twist: 0, step: 0.5, back: 0.42, headPitch: 0.15 })),
+        K(fangHit + 0.1, B({ ...body, crouch: -0.22, lean: 0.42, twist: 0, step: 0.58, back: 0.44, width: 0.18 })),
+        K(1.05, B({ ...body, crouch: -0.2, lean: 0.34, twist: 0, step: 0.58, back: 0.44, width: 0.2, headPitch: -0.1 })),
+      ],
+      main: fangR,
+      off: fangL,
+      impacts: [fangHit],
+      chamber: -0.1,
+      fx: [fx(fangHit, 'sparkle', 'tip', 0.8), fx(fangHit, 'sparkle', 'offTip', 0.8)],
+      trail: { life: 0.18, glow: 0.5 },
+    }),
+    // Death Lotus: sprung up from a crouch into two turns to the right, one blade high and one low
+    // like opening petals; the left blade passes them, then the right, and they land in a crouch
+    h2: mv({
+      keys: [
+        K(-1.4, B({ ...body, crouch: -0.42, lean: 0.34, twist: 0.45, step: 0.3, back: 0.36, width: 0.2 }), { spin: 0, hop: 0 }),
+        K(-0.9, B({ ...body, crouch: -0.3, lean: 0.2, twist: 0.2 }), { spin: -0.15, hop: 0.08 }),
+        K(-0.2, B({ ...body, crouch: -0.12, lean: 0.1, twist: 0, side: 0.15, step: 0.12, back: 0.14, width: 0.1 }), { spin: -0.85, hop: 0.35 }),
+        K(0.45, B({ ...body, crouch: -0.12, lean: 0.12, twist: 0, side: 0.15, step: 0.12, back: 0.14, width: 0.1 }), { spin: -1.25, hop: 0.45 }),
+        K(0.8, B({ ...body, crouch: -0.14, lean: 0.14, twist: 0, side: 0.1, step: 0.14, back: 0.16, width: 0.12 }), { spin: -1.75, hop: 0.4 }),
+        K(1.2, B({ ...body, crouch: -0.42, lean: 0.38, twist: 0, step: 0.36, back: 0.38, width: 0.22 }), { spin: -2, hop: 0 }),
+        K(1.5, B({ ...body, crouch: -0.32, lean: 0.3 }), { spin: -2, hop: 0 }),
+      ],
+      main: seq([
+        [-1.4, -0.7, line([0.05, 0.3, 0.25], [-0.68, 0.18, 0.08], [0.5, -0.3, 0.8], [-1, -0.4, 0.15], [0, 0, -1])],
+        [-0.7, 1.2, line([-0.68, 0.18, 0.08], [-0.7, 0.2, 0.1], [-1, -0.4, 0.15], [-1, -0.35, 0.2], [0, 0, -1])],
+      ]),
+      off: seq([
+        [-1.4, -0.7, line([-0.05, 0.35, 0.25], [0.66, 0.7, 0.06], [-0.5, 0.3, 0.8], [1, 0.55, 0.1], [0, 0, 1])],
+        [-0.7, 1.2, line([0.66, 0.7, 0.06], [0.68, 0.68, 0.08], [1, 0.55, 0.1], [1, 0.5, 0.15], [0, 0, 1])],
+      ]),
+      impacts: [0.45, 0.8],
+      start: -1.4,
+      chamber: -0.7,
+      flow: 1.4,
+      blendIn: 0.3,
+      lead: 0,
+      end: 1.2,
+      rest: 1.5,
+      settle: 0.6,
+      ghosts: [-0.6, 1.0],
+      fx: [
+        fx(-1.3, 'dust', 'feet', 0.8),
+        fx(-0.4, 'whirl', 'root', 0.9, '#b55088'),
+        fx(0.45, 'sparkle', 'offTip', 0.8),
+        fx(0.8, 'sparkle', 'tip', 0.9),
+        fx(1.15, 'stomp', 'feet', 0.8),
+      ],
+      trail: { life: 0.24, glow: 0.6 },
+    }),
+    // Eviscerate: out of the dodge into a front flip over the gap, landing with both blades coming down
+    dl: mv({
       keys: [
         K(-1.5, B({ ...body, crouch: -0.32, lean: 0.36 }), { flip: 0, hop: 0 }),
         K(-1.15, B({ ...body, crouch: -0.05, lean: 0.2 }), { flip: 0.1, hop: 0.3 }),
@@ -126,22 +233,97 @@ export const daggers: Style = {
       fx: [fx(-1.2, 'dust', 'feet', 0.8), fx(0.3, 'stomp', 'feet', 0.6), fx(0.35, 'sparkle', 'tip', 0.6), fx(0.75, 'sparkle', 'offTip', 0.7)],
       trail: { life: 0.18, glow: 0.4 },
     }),
-    // Viper Fang: coiled flat to the ground like a snake, then up and in with both blades
-    h: mv({
+    // Viper Rush: sideways on and stretched flat out, the right blade weaving in like a striking
+    // snake while the left lies back along the forearm
+    dh: mv({
       keys: [
-        K(-0.2, B({ ...body, crouch: -0.42, lean: 0.46, twist: 0.0, step: 0.3, back: 0.4, width: 0.2 })),
-        K(0.3, B({ ...body, crouch: -0.34, lean: 0.42, step: 0.5, back: 0.44 })),
-        K(0.85, B({ ...body, crouch: -0.26, lean: 0.36, step: 0.72, back: 0.5 })),
-        K(1.05, B({ ...body, crouch: -0.26, lean: 0.36, step: 0.72, back: 0.5 })),
+        K(-0.3, B({ ...body, crouch: -0.36, lean: 0.42, twist: -0.2, step: 0.3, back: 0.38, width: 0.18 })),
+        K(0.1, B({ ...body, crouch: -0.4, lean: 0.48, twist: 0.3, step: 0.55, back: 0.5 })),
+        K(0.55, B({ ...body, crouch: -0.42, lean: 0.55, twist: 0.75, step: 0.85, back: 0.6, width: 0.15, headPitch: 0.1 })),
+        K(1.1, B({ ...body, crouch: -0.4, lean: 0.5, twist: 0.7, step: 0.85, back: 0.6, width: 0.15 })),
       ],
-      main: stab([-0.24, 0.1, 0.02], [-0.08, 0.44, 0.66], [0.1, 0.25, 1], [0.0, 0.1, 1]),
-      off: stab([0.2, 0.12, 0.02], [0.06, 0.46, 0.62], [-0.1, 0.25, 1], [0.0, 0.1, 1]),
-      impacts: [0.85],
-      start: -0.2,
+      main: seq(
+        [
+          [-0.3, 0.0, stab([-0.26, 0.18, -0.08], [-0.2, 0.22, 0.05], [0.1, 0.2, 1], [0.35, 0.2, 1])],
+          [0.0, 0.22, stab([-0.2, 0.22, 0.05], [-0.12, 0.32, 0.4], [0.35, 0.2, 1], [-0.35, 0.15, 1])],
+          [0.22, 0.45, stab([-0.12, 0.32, 0.4], [-0.05, 0.38, 0.9], [-0.35, 0.15, 1], [0.0, 0.06, 1])],
+          [0.45, 1.07, stab([-0.05, 0.38, 0.9], [-0.05, 0.38, 0.94], [0.0, 0.06, 1], [0.0, 0.06, 1])],
+        ],
+        0.05,
+      ),
+      off: line([0.26, 0.24, -0.02], [0.28, 0.22, -0.06], [0.1, -0.35, -1], [0.1, -0.35, -1], [0, 1, 0]),
+      impacts: [0.45],
+      start: -0.3,
+      chamber: 0.05,
+      travel: 0.4,
+      ghosts: [-0.1, 0.7],
+      fx: [fx(-0.25, 'smoke', 'feet', 0.8), fx(0.1, 'dust', 'feet', 0.9), fx(0.3, 'spiral', 'tip', 0.6), fx(0.45, 'flashline', 'tip', 1), fx(0.45, 'sparkle', 'tip', 0.9)],
+      trail: { life: 0.2, glow: 0.6 },
+    }),
+    // Smoke Cut: a hop back out of a puff of smoke, the right blade whipped backhand across the gap
+    bl: mv({
+      keys: [
+        K(-0.1, B({ ...body, crouch: -0.24, lean: 0.12, twist: 0.45, step: 0.24, back: 0.36 })),
+        K(smokeHit + 0.1, B({ ...body, crouch: -0.3, lean: -0.12, twist: -0.25, step: 0.12, back: 0.6, headPitch: 0.1 })),
+        K(1.05, B({ ...body, crouch: -0.32, lean: -0.16, twist: -0.45, step: 0.1, back: 0.62 })),
+      ],
+      main: smokeCut,
+      off: line([0.3, 0.24, 0.18], [0.26, 0.4, 0.22], [-0.1, 0.2, 1], [-0.3, 0.6, 0.7], DOWN),
+      impacts: [smokeHit],
+      fx: [fx(0.0, 'smoke', 'feet', 1.0), fx(smokeHit, 'sparkle', 'tip', 0.5)],
+      trail: { life: 0.1 },
+    }),
+    // Hidden Thorn: hunched with both blades hidden behind the hips, then a spring backward that
+    // brings them up from the ground, crossing under the chin
+    bh: mv({
+      keys: [
+        K(-0.1, B({ ...body, crouch: -0.42, lean: 0.32, twist: 0, step: 0.3, back: 0.34, width: 0.18 }), { hop: 0, flip: 0 }),
+        K(thornHit + 0.1, B({ ...body, crouch: -0.2, lean: -0.22, twist: 0, step: 0.14, back: 0.62, headPitch: -0.1 }), { hop: 0.18, flip: -0.04 }),
+        K(1.05, B({ ...body, crouch: -0.36, lean: 0.05, twist: 0, step: 0.16, back: 0.6 }), { hop: 0, flip: 0 }),
+      ],
+      main: thornR,
+      off: thornL,
+      impacts: [thornHit],
       chamber: -0.06,
-      end: 1.0,
-      ghosts: [0.0, 0.95],
-      fx: [fx(0.0, 'smoke', 'feet', 0.7), fx(0.05, 'dust', 'feet', 0.9), fx(0.85, 'sparkle', 'tip', 0.9), fx(0.85, 'sparkle', 'offTip', 0.9)],
+      fx: [fx(0.2, 'dust', 'feet', 0.8), fx(thornHit, 'sparkle', 'tip', 0.8), fx(thornHit, 'sparkle', 'offTip', 0.8), fx(1.0, 'dust', 'feet', 0.6)],
+      trail: { life: 0.18, glow: 0.5 },
+    }),
+    // Kite: a barrel roll in the air with the arms out wide, scissoring both blades in as it comes round
+    jl: mv({
+      keys: [
+        K(-0.9, B({ ...body, crouch: -0.2, lean: 0.2, width: 0.1 }), { roll: 0, hop: 0 }),
+        K(-0.5, B({ ...body, crouch: -0.16, lean: 0.16, width: 0.1 }), { roll: 0.25, hop: 0.25 }),
+        K(0.0, B({ ...body, crouch: -0.16, lean: 0.2, width: 0.1 }), { roll: 0.75, hop: 0.35 }),
+        K(kiteHit, B({ ...body, crouch: -0.18, lean: 0.3, width: 0.12 }), { roll: 1, hop: 0.3 }),
+        K(1.1, B({ ...body, crouch: -0.2, lean: 0.26 }), { roll: 1, hop: 0.1 }),
+      ],
+      main: kiteR,
+      off: kiteL,
+      impacts: [kiteHit],
+      start: -0.9,
+      chamber: -0.3,
+      flow: 1.3,
+      blendIn: 0.3,
+      lead: 0,
+      fx: [fx(-0.4, 'whirl', 'root', 0.5, '#efe0ff'), fx(kiteHit, 'sparkle', 'tip', 0.6), fx(kiteHit, 'sparkle', 'offTip', 0.6)],
+      trail: { life: 0.16, glow: 0.3 },
+    }),
+    // Nightfall: arched back with both blades raised point-down, then dropped onto them, both
+    // blades driven into the ground
+    jh: mv({
+      keys: [
+        K(-0.4, B({ ...body, crouch: -0.06, lean: -0.22, headPitch: 0.15, width: 0.14 }), { hop: 0.15, flip: 0 }),
+        K(0.0, B({ ...body, crouch: -0.02, lean: -0.32, headPitch: 0.2, width: 0.14 }), { hop: 0.25, flip: -0.03 }),
+        K(0.5, B({ ...body, crouch: -0.5, lean: 0.55, step: 0.42, back: 0.42, width: 0.24, headPitch: 0.1 }), { hop: 0, flip: 0 }),
+        K(1.1, B({ ...body, crouch: -0.48, lean: 0.5, step: 0.42, back: 0.42, width: 0.24 })),
+      ],
+      main: fall(-1),
+      off: fall(1),
+      impacts: [0.45],
+      start: -0.4,
+      chamber: 0.0,
+      blendIn: 0.6,
+      fx: [fx(0.45, 'stomp', 'feet', 0.9), fx(0.45, 'shockwave', 'tip', 0.8), fx(0.5, 'smoke', 'feet', 0.8), fx(0.45, 'sparkle', 'offTip', 0.7)],
       trail: { life: 0.2, glow: 0.6 },
     }),
     // Throat Grab: in low, the left hand at the throat, the right blade raised point-down... and down

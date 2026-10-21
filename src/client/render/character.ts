@@ -25,7 +25,7 @@ const POSE_ARM = 0.56;
 const POSE_LEG = 0.85;
 const POSE_ANKLE = 0.05;
 const POSE_HIPS = 0.92;
-const POSE_HEIGHT = 1.9;
+const POSE_HEIGHT = 1.95;
 // elbows bend out, down and back
 const ELBOW_POLE_R = new THREE.Vector3(-0.7, -0.55, -0.45).normalize();
 const ELBOW_POLE_L = new THREE.Vector3(0.7, -0.55, -0.45).normalize();

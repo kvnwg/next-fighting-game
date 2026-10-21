@@ -201,7 +201,11 @@ function kit(light: AttackDef, heavy: AttackDef, n: Record<ExtraKey, Named>): Re
     jh: { ...scaled(heavy, { w: 0.6, rc: 1.05, d: 0.95, p: 1.1 }), lunge: 0.8, knockback: 0.6 },
   };
   const out = {} as Record<ExtraKey, AttackDef>;
-  for (const k of EXTRA_KEYS) out[k] = { ...base[k], ...n[k] };
+  for (const k of EXTRA_KEYS) {
+    const m = { ...base[k], ...n[k] };
+    if (m.lunge !== undefined) m.lunge = Math.round(m.lunge * 100) / 100;
+    out[k] = m;
+  }
   return out;
 }
 

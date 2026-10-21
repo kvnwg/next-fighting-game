@@ -1,9 +1,12 @@
 /**
  * Lancer, spear. Reach and rhythm: thrusts slide the shaft through the front hand, the third light
- * spins the spear over the head before it cuts, the heavy corkscrews in on a gust of wind, the
- * special sweeps the ground in two full turns, and the Pole Vault flips them backwards out of reach.
+ * spins the spear over the head before it cuts, the heavy corkscrews in on a gust of wind, whips
+ * its tail round at the shins and leaps into a turn that comes down like thunder, the dash attacks
+ * lunge and charge like a lance, the backstep attacks fend and wheel while giving ground, the air
+ * attacks stoop and slam, the special sweeps the ground in two full turns, and the Pole Vault flips
+ * them backwards out of reach. Lightning crackles along the spear through every heavy.
  */
-import { B, K, P, Style, X, arc, circle, fx, line, mv, seq, track } from '../author';
+import { B, K, P, Style, X, arc, circle, fx, hitAt, line, mv, seq, track } from '../author';
 import type { V3 } from '../author';
 
 const ST = -0.7; // left side forward, the spear along the body line
@@ -32,6 +35,78 @@ const wheel = seq(
   ],
   0.1,
 );
+
+const BOLT = '#ffe27a'; // the golden lightning that crackles along the spear through the heavies
+
+// Dragon Tail: the spear drawn back out of the lunge and coiled high over the right shoulder, then
+// whipped down and round at shin height, right to left
+const tail = seq(
+  [
+    [-1.0, -0.35, arc([-0.1, 0.3, 0.2], -0.25, [[0.02, 0.1, 1], [-0.7, 0.45, 0.5], [-0.85, 0.32, -0.42]], 0.5, { body: true })],
+    [-0.35, 1.1, arc([-0.06, 0.16, 0.22], -0.25, [[-0.85, 0.32, -0.42], [-0.92, -0.26, 0.22], [-0.55, -0.36, 0.72], [0.0, -0.3, 1], [0.66, -0.28, 0.66], [0.9, -0.2, 0.05]], 0.5, { body: true })],
+  ],
+  0.1,
+);
+const tailHit = hitAt(tail, 3, 1);
+
+// Thunder Spiral: the spear held level while the body leaps through a full turn, rising over the
+// head and back on the way round, then brought straight down through them
+const spiral = seq(
+  [
+    [-1.4, -0.25, arc([0.0, 0.32, 0.22], -0.3, [[0.85, -0.22, 0.3], [0.5, 0.0, 0.85], [0.25, 0.45, 0.85], [0.05, 0.95, 0.2], [0.0, 0.55, -0.83]], 0.6, { body: true, pivot1: [-0.04, 0.6, 0.12] })],
+    [-0.25, 1.1, arc([-0.04, 0.6, 0.12], -0.3, [[0.0, 0.55, -0.83], [0.0, 1, 0.02], [0.0, 0.5, 0.87], [0.0, -0.02, 1], [0.0, -0.4, 0.92]], 0.6, { body: true, pivot1: [-0.04, 0.28, 0.36] })],
+  ],
+  0.08,
+);
+const spiralHit = hitAt(spiral, 3, 1);
+
+// Lightning Lunge: driven out two-handed, then the front hand lets go and the rear arm shoots the
+// spear out to its full length
+const lightning = seq(
+  [
+    [-0.4, 0.5, thrust([-0.26, 0.12, -0.12], [-0.16, 0.24, 0.36], [0.04, 0.1, 1], [0.02, 0.06, 1], 0.6, 0.1)],
+    [0.5, 1.0, line([-0.16, 0.24, 0.36], [-0.12, 0.32, 0.72], [0.02, 0.06, 1], [0.01, 0.05, 1], FLAT, NaN, NaN, { body: true })],
+  ],
+  0.1,
+);
+
+// Storm Charge: the spear couched under the right arm like a lance and carried level through the
+// run, then the whole body drives it home
+const charge = seq(
+  [
+    [-1.0, 0.3, thrust([-0.26, 0.14, -0.04], [-0.24, 0.16, 0.06], [0.03, 0.04, 1], [0.03, 0.03, 1], 0.5, 0.5)],
+    [0.3, 1.0, thrust([-0.24, 0.16, 0.06], [-0.14, 0.26, 0.5], [0.03, 0.03, 1], [0.01, 0.05, 1], 0.5, 0.18)],
+  ],
+  0.08,
+);
+
+// Fending Jab: the hands up at the shoulder, the point jabbed out at their face and snapped back
+const fend = seq(
+  [
+    [-0.2, 0.85, thrust([-0.22, 0.4, -0.16], [-0.14, 0.48, 0.36], [0.03, -0.04, 1], [0.02, 0.0, 1], 0.6, 0.16)],
+    [0.85, 1.07, thrust([-0.14, 0.48, 0.36], [-0.18, 0.44, 0.12], [0.02, 0.0, 1], [0.03, -0.02, 1], 0.16, 0.36)],
+  ],
+  0.05,
+);
+
+// Bolt Wheel: the spear wheeled round at the right side, hands near the middle of the shaft, over
+// the top and back, under, and up again through them from low on the right
+const boltWheel = seq([[-1.4, 1.1, arc([-0.3, 0.56, 0.05], -0.3, circle([0, 0, 1], [0.7, 0.71, 0], 1.25, 0, 10), 0.6, { body: true })]]);
+const boltHit = hitAt(boltWheel, 8);
+
+// Falcon Strike: the spear raised overhand above the head, point angled down, and stooped into them
+const falcon = thrust([-0.16, 0.86, -0.2], [-0.1, 0.6, 0.4], [0.02, -0.26, 1], [0.0, -0.36, 1], 0.62, 0.16);
+
+// Thunderfall: both hands high, the spear swung up and back over the head, then slammed down
+// blade-first in front
+const thunderfall = seq(
+  [
+    [-1.0, -0.15, arc([-0.06, 0.7, 0.1], -0.3, [[0.02, 0.15, 1], [0.0, 0.9, 0.45], [0.0, 0.62, -0.78]], 0.62, { body: true })],
+    [-0.15, 1.1, arc([-0.06, 0.7, 0.1], -0.3, [[0.0, 0.62, -0.78], [0.0, 1, 0.0], [0.0, 0.3, 0.95], [0.0, -0.38, 0.92], [0.0, -0.5, 0.87]], 0.62, { body: true, pivot1: [-0.06, 0.26, 0.4] })],
+  ],
+  0.08,
+);
+const fallHit = hitAt(thunderfall, 3, 1);
 
 export const spear: Style = {
   axis: 'x',
@@ -135,6 +210,174 @@ export const spear: Style = {
         fx(1.0, 'quake', 'tip', 0.8),
       ],
       trail: { life: 0.26, glow: 0.7 },
+    }),
+    // Dragon Tail: out of the lunge the spear is drawn back and coiled over the right shoulder, then the
+    // hips unwind and it whips down and round at the shins
+    h1: mv({
+      keys: [
+        K(-1.0, B({ ...body, twist: ST + 0.15, lean: 0.36, crouch: -0.3, step: 0.7, back: 0.52 })),
+        K(-0.4, B({ ...body, twist: ST - 0.55, hipTwist: -0.3, lean: 0.12, crouch: -0.24, step: 0.42, back: 0.4 })),
+        K(tailHit, B({ ...body, twist: ST + 0.5, hipTwist: 0.25, lean: 0.4, crouch: -0.44, step: 0.5, back: 0.48, width: 0.2 })),
+        K(1.1, B({ ...body, twist: ST + 0.9, hipTwist: 0.35, lean: 0.34, crouch: -0.42, step: 0.5, back: 0.48, width: 0.2 })),
+      ],
+      main: tail,
+      impacts: [tailHit],
+      start: -1.0,
+      chamber: -0.9,
+      flow: 1.25,
+      blendIn: 0.3,
+      end: 1.1,
+      fx: [fx(0.2, 'quake', 'tip', 0.8), fx(tailHit, 'quake', 'tip', 1.2), fx(tailHit, 'sparkle', 'tip', 0.9, BOLT), fx(0.75, 'quake', 'tip', 0.8)],
+      trail: { life: 0.22, glow: 0.6 },
+    }),
+    // Thunder Spiral: a leap into a full turn with the spear held level, rising over the head on the way
+    // round, and on landing brought straight down through them with a thunderclap
+    h2: mv({
+      keys: [
+        K(-1.4, B({ ...body, twist: 0.2, crouch: -0.38, lean: 0.3, step: 0.4, back: 0.4, width: 0.18 }), { spin: 0, hop: 0 }),
+        K(-1.1, B({ ...body, twist: 0.0, crouch: -0.42, lean: 0.22, step: 0.32, back: 0.34 }), { spin: 0.12, hop: 0 }),
+        K(-0.75, B({ ...body, twist: -0.3, crouch: -0.04, lean: -0.04, step: 0.18, back: 0.18, width: 0.1 }), { spin: 0.55, hop: 0.42 }),
+        K(-0.38, B({ ...body, twist: ST, crouch: -0.24, lean: -0.06, step: 0.3, back: 0.3 }), { spin: 1, hop: 0.04 }),
+        K(-0.2, B({ ...body, twist: ST + 0.1, crouch: -0.3, lean: -0.14, step: 0.36, back: 0.36 }), { hop: 0 }),
+        K(spiralHit, B({ ...body, twist: ST + 0.25, crouch: -0.42, lean: 0.4, step: 0.56, back: 0.46, width: 0.18 })),
+        K(1.1, B({ ...body, twist: ST + 0.25, crouch: -0.42, lean: 0.44, step: 0.56, back: 0.46, width: 0.18 })),
+      ],
+      main: spiral,
+      impacts: [spiralHit],
+      start: -1.4,
+      chamber: -1.3,
+      flow: 1.3,
+      blendIn: 0.3,
+      end: 1.1,
+      settle: 0.45,
+      ghosts: [-1.1, -0.3],
+      fx: [
+        fx(-1.0, 'whirl', 'root', 1.0, BOLT),
+        fx(-0.3, 'stomp', 'feet', 0.8),
+        fx(spiralHit, 'flashline', 'tip', 1.2, BOLT),
+        fx(spiralHit, 'shockwave', 'tip', 1.0, BOLT),
+        fx(spiralHit, 'sparkle', 'tip', 1.2, BOLT),
+      ],
+      trail: { life: 0.26, glow: 0.8 },
+    }),
+    // Lightning Lunge: low out of the dash, driven out two-handed, then the front hand lets go and the
+    // rear arm shoots the spear out its full length for the last of the reach
+    dl: mv({
+      keys: [
+        K(-0.4, B({ ...body, twist: ST - 0.05, crouch: -0.3, lean: 0.34, step: 0.4, back: 0.4 })),
+        K(0.5, B({ ...body, twist: ST + 0.15, crouch: -0.32, lean: 0.42, step: 0.6, back: 0.52 })),
+        K(0.85, B({ ...body, twist: ST + 0.4, crouch: -0.34, lean: 0.5, step: 0.78, back: 0.62, side: -0.06 })),
+        K(1.05, B({ ...body, twist: ST + 0.4, crouch: -0.34, lean: 0.5, step: 0.78, back: 0.62, side: -0.06 })),
+      ],
+      main: lightning,
+      free: track([[0.5, [0.1, 0.22, 0.48]], [0.85, [0.5, 0.3, -0.3]]]),
+      impacts: [0.85],
+      start: -0.4,
+      chamber: -0.3,
+      blendIn: 0.4,
+      end: 1.0,
+      fx: [fx(-0.3, 'dust', 'feet', 0.8), fx(0.85, 'flashline', 'tip', 1.1, BOLT), fx(0.85, 'sparkle', 'tip', 0.8)],
+      trail: { life: 0.2, glow: 0.5 },
+    }),
+    // Storm Charge: the spear couched under the arm like a lance, a running charge out of the dash, and
+    // the whole body driven in behind the point
+    dh: mv({
+      keys: [
+        K(-1.0, B({ ...body, twist: ST + 0.1, crouch: -0.22, lean: 0.3, step: 0.35, back: 0.35 }), { hop: 0 }),
+        K(-0.6, B({ ...body, front: 'R', twist: ST + 0.1, crouch: -0.18, lean: 0.4, step: 0.34, back: 0.34 }), { hop: 0.08 }),
+        K(-0.2, B({ ...body, twist: ST + 0.1, crouch: -0.24, lean: 0.42, step: 0.4, back: 0.38 }), { hop: 0 }),
+        K(0.25, B({ ...body, front: 'R', twist: ST + 0.1, crouch: -0.18, lean: 0.46, step: 0.38, back: 0.4 }), { hop: 0.08 }),
+        K(0.85, B({ ...body, twist: ST + 0.25, crouch: -0.34, lean: 0.52, step: 0.85, back: 0.6 }), { hop: 0 }),
+        K(1.1, B({ ...body, twist: ST + 0.25, crouch: -0.34, lean: 0.5, step: 0.85, back: 0.6 })),
+      ],
+      main: charge,
+      impacts: [0.85],
+      start: -1.0,
+      chamber: -0.9,
+      flow: 1.1,
+      blendIn: 0.3,
+      end: 1.05,
+      ghosts: [-0.3, 0.95],
+      fx: [
+        fx(-0.6, 'dust', 'feet', 0.7),
+        fx(-0.2, 'dust', 'feet', 0.7),
+        fx(0.25, 'dust', 'feet', 0.8),
+        fx(0.85, 'stomp', 'feet', 0.9),
+        fx(0.85, 'flashline', 'tip', 1.4, BOLT),
+        fx(0.85, 'sparkle', 'tip', 1.1, BOLT),
+      ],
+      trail: { life: 0.24, glow: 0.7 },
+    }),
+    // Fending Jab: giving ground, the weight back and the rear foot stepping away, a high jab at their
+    // face to keep them off, snapped straight back
+    bl: mv({
+      keys: [
+        K(-0.2, B({ ...body, twist: ST - 0.05, lean: 0.04, step: 0.32 })),
+        K(0.3, B({ ...body, twist: ST - 0.1, lean: -0.04, crouch: -0.18, step: 0.3, back: 0.5 })),
+        K(0.85, B({ ...body, twist: ST + 0.1, lean: -0.2, crouch: -0.26, step: 0.2, back: 0.52, headPitch: 0.06 })),
+        K(1.07, B({ ...body, twist: ST + 0.05, lean: -0.22, crouch: -0.28, step: 0.16, back: 0.48, headPitch: 0.06 })),
+      ],
+      main: fend,
+      impacts: [0.85],
+      start: -0.2,
+      end: 1.07,
+      fx: [fx(0.3, 'dust', 'feet', 0.5), fx(0.85, 'sparkle', 'tip', 0.6)],
+    }),
+    // Bolt Wheel: stepping back, the spear wheeled once round at the right side, over the top and
+    // under, and on the way up again it rises through them from low on the right
+    bh: mv({
+      keys: [
+        K(-1.4, B({ ...body, twist: ST - 0.15, crouch: -0.16, step: 0.32 })),
+        K(-0.6, B({ ...body, twist: ST - 0.3, crouch: -0.18, lean: -0.04, step: 0.3, back: 0.44 })),
+        K(boltHit, B({ ...body, twist: ST + 0.25, crouch: -0.3, lean: -0.1, step: 0.24, back: 0.56 })),
+        K(1.1, B({ ...body, twist: ST + 0.4, crouch: -0.3, lean: -0.14, step: 0.22, back: 0.52, headPitch: -0.06 })),
+      ],
+      main: boltWheel,
+      impacts: [boltHit],
+      start: -1.4,
+      chamber: -1.3,
+      flow: 1.25,
+      blendIn: 0.3,
+      end: 1.1,
+      fx: [fx(-0.7, 'whirl', 'main', 0.7, BOLT), fx(-0.2, 'dust', 'feet', 0.7), fx(boltHit, 'flashline', 'tip', 1.0, BOLT), fx(boltHit, 'sparkle', 'tip', 1.0, BOLT)],
+      trail: { life: 0.24, glow: 0.7 },
+    }),
+    // Falcon Strike: in the air, the spear raised overhand above the head, and the body stoops after the
+    // point as it drives down into them
+    jl: mv({
+      keys: [
+        K(-0.5, B({ ...body, twist: ST - 0.1, crouch: -0.05, lean: -0.08, headPitch: 0.1 }), { hop: 0.08, flip: 0 }),
+        K(0.85, B({ ...body, twist: ST + 0.15, crouch: -0.12, lean: 0.32, headPitch: 0.25, step: 0.4 }), { hop: 0, flip: 0.025 }),
+        K(1.05, B({ ...body, twist: ST + 0.15, crouch: -0.12, lean: 0.32, headPitch: 0.25, step: 0.4 })),
+      ],
+      main: falcon,
+      impacts: [0.85],
+      start: -0.5,
+      chamber: -0.4,
+      blendIn: 0.4,
+      travel: 0.3,
+      end: 1.0,
+      fx: [fx(0.85, 'sparkle', 'tip', 0.7), fx(0.85, 'flashline', 'tip', 0.8)],
+      trail: { life: 0.18, glow: 0.3 },
+    }),
+    // Thunderfall: in the air the spear goes up and back over the head in both hands, the back arched,
+    // and the whole body comes down with it, the blade slamming into the ground in front
+    jh: mv({
+      keys: [
+        K(-1.0, B({ ...body }), { hop: 0 }),
+        K(-0.4, B({ ...body, twist: ST + 0.3, crouch: 0.0, lean: -0.22, step: 0.26, back: 0.26, headPitch: -0.1 }), { hop: 0.28 }),
+        K(fallHit, B({ ...body, twist: ST + 0.35, crouch: -0.5, lean: 0.45, step: 0.55, back: 0.5, width: 0.2 }), { hop: 0 }),
+        K(1.1, B({ ...body, twist: ST + 0.35, crouch: -0.5, lean: 0.45, step: 0.55, back: 0.5, width: 0.2 })),
+      ],
+      main: thunderfall,
+      impacts: [fallHit],
+      start: -1.0,
+      chamber: -0.3,
+      travel: 0.3,
+      blendIn: 0.35,
+      end: 1.1,
+      fx: [fx(fallHit, 'shockwave', 'tip', 1.1, BOLT), fx(fallHit, 'stomp', 'feet', 1.0), fx(fallHit, 'sparkle', 'tip', 1.0, BOLT)],
+      trail: { life: 0.24, glow: 0.7 },
     }),
   },
   // Pole Vault: the butt planted, a backflip over the spear, and a landing well out of reach

@@ -1,9 +1,11 @@
 /**
  * Duelist, rapier. Fencing: side-on, right foot and right shoulder toward the opponent, the back
  * hand raised for balance. Each light attacks on a different line (a straight lunge, a disengage
- * that circles under the guard and comes in high, a whipping cut, a balestra with a flourish), the
- * heavy whirls through a pirouette into its thrust, the special salutes before it kills, and the
- * flèche runs them through.
+ * that circles under the guard and comes in high, a whipping cut), the heavy whirls through a
+ * pirouette into its thrust, takes their blade in a bind and finishes with a grand saluting cut,
+ * the dash attacks are a balestra and a ducking passata, the backstep attacks cut while giving
+ * ground, the air attacks corkscrew or plunge, the special salutes before it kills, and the flèche
+ * runs them through.
  */
 import { B, K, P, Style, X, arc, circle, cone, fx, hitAt, line, mv, seq, track } from '../author';
 import type { V3 } from '../author';
@@ -76,6 +78,73 @@ const fleche = seq(
   0.06,
 );
 
+// Prise de Fer: the point takes their blade round in a wide envelopment, then drives in on the low
+// line, the hand turned over high (seconde) and the point angled down into the flank
+const prise = seq(
+  [
+    [-1.0, -0.2, arc([-0.13, 0.36, 0.46], 0, cone([0.03, 0.18, 1], 26, 90, 450, 10), NaN, { body: true, pivot1: [-0.14, 0.4, 0.36] })],
+    [-0.2, 1.0, thrust([-0.14, 0.42, 0.34], [-0.12, 0.44, 0.84], [0.03, 0.2, 1], [0.06, -0.26, 1])],
+  ],
+  0.1,
+);
+
+// Grand Salut: the blade raised high in salute, swept down behind on the right, then a full-arm
+// rising cut through them, low right to high left
+const salut = seq(
+  [
+    [-1.2, -0.6, line([-0.14, 0.5, 0.4], [-0.18, 0.9, 0.2], [0.03, 0.3, 1], [0.0, 1, -0.08], [0, 0, 1], NaN, NaN, { body: true })],
+    [
+      -0.6,
+      1.1,
+      arc([-0.3, 0.52, 0.04], 0.44, [[-0.25, 1, -0.15], [-0.8, 0.2, -0.55], [-0.62, -0.55, 0.45], [-0.08, 0.05, 1], [0.55, 0.55, 0.6], [0.45, 0.88, -0.1]], NaN, {
+        body: true,
+        pivot1: [-0.08, 0.56, 0.12],
+      }),
+    ],
+  ],
+  0.1,
+);
+const salutHit = hitAt(salut, 3, 1);
+
+// Passata: ducking under their line, the point driven up into them from below
+const passata = seq(
+  [
+    [-0.6, 0.0, thrust([-0.12, 0.3, 0.38], [-0.14, 0.18, 0.28], [0.03, 0.16, 1], [0.03, 0.1, 1])],
+    [0.0, 1.0, thrust([-0.14, 0.18, 0.28], [-0.08, 0.3, 0.78], [0.03, 0.12, 1], [0.04, 0.42, 1])],
+  ],
+  0.08,
+);
+
+// Retreating Cut: a backhand flick of the point across their wrist, the hand drawn back with the body
+const retreatCut = arc([-0.12, 0.42, 0.44], 0.05, [[0.6, 0.38, 0.7], [0.3, 0.26, 0.95], [-0.12, 0.14, 1], [-0.55, 0.04, 0.82], [-0.78, -0.06, 0.5]], NaN, {
+  body: true,
+  pivot1: [-0.2, 0.4, 0.3],
+});
+const retreatHit = hitAt(retreatCut, 2);
+
+// Volte: the arm held out at full length while the body turns away and all the way round, the blade
+// sweeping a full circle at chest height and cutting through as they face front again
+const volte = seq(
+  [
+    [-1.3, -0.3, line([-0.14, 0.34, 0.42], [-0.5, 0.42, 0.18], [0.03, 0.16, 1], [-0.75, 0.1, 0.6], [0, -1, 0], NaN, NaN, { body: true })],
+    [-0.3, 1.1, arc([-0.3, 0.44, 0.0], 0.48, [[-0.85, 0.1, 0.45], [-0.45, 0.08, 0.9], [0.05, 0.06, 1], [0.55, 0.02, 0.8], [0.8, -0.04, 0.3]], NaN, { body: true })],
+  ],
+  0.1,
+);
+const volteHit = hitAt(volte, 2, 1);
+
+// Petal Lunge: a corkscrew in the air about the line of the thrust, the point never leaving it
+const petal = thrust([-0.08, 0.28, 0.3], [-0.05, 0.32, 0.82], [0.03, 0.12, 1], [0.03, 0.04, 1]);
+
+// Sky Piercer: the hand thrown up over the head, the point turned down, then plunged into them
+const sky = seq(
+  [
+    [-1.0, -0.2, line([-0.12, 0.36, 0.42], [-0.14, 0.95, 0.14], [0.03, 0.16, 1], [0.0, -0.8, 0.6], [1, 0, 0], NaN, NaN, { body: true })],
+    [-0.2, 1.0, line([-0.14, 0.95, 0.14], [-0.1, 0.3, 0.56], [0.0, -0.8, 0.6], [0.0, -0.42, 0.9], [1, 0, 0], NaN, NaN, { body: true })],
+  ],
+  0.08,
+);
+
 export const rapier: Style = {
   axis: 'y',
   offAxis: 'y',
@@ -130,10 +199,10 @@ export const rapier: Style = {
       fx: [fx(whipHit, 'sparkle', 'tip', 0.7)],
       trail: { life: 0.18, glow: 0.4 },
     }),
-    // Balestra: hop, lunge deep, and wheel the blade at the side while recovering
-    l3: mv({
+    // Balestra: out of the dash, a hop, a deep lunge, and the blade wheeled at the side while recovering
+    dl: mv({
       keys: [
-        K(-0.7, B({ ...body, crouch: -0.14 }), { hop: 0 }),
+        K(-0.7, B({ ...body, crouch: -0.22, lean: 0.16, step: 0.34 }), { hop: 0 }),
         K(-0.5, B({ ...body, crouch: -0.04, step: 0.38, back: 0.28 }), { hop: 0.2 }),
         K(-0.25, B({ ...body, crouch: -0.2, step: 0.38, back: 0.32 }), { hop: 0 }),
         K(0.35, B({ ...body, crouch: -0.24, lean: 0.14, step: 0.6, back: 0.42, twist: FT + 0.05 })),
@@ -177,6 +246,145 @@ export const rapier: Style = {
       ghosts: [-1.25, -0.2],
       fx: [fx(-1.2, 'whirl', 'root', 0.7, '#ffd0d8'), fx(0.85, 'flashline', 'tip', 1.2), fx(0.85, 'sparkle', 'tip', 1)],
       trail: { life: 0.2, glow: 0.5 },
+    }),
+    // Prise de Fer: out of the lunge, the back foot brought up, their blade taken round in a wide
+    // envelopment, and the second lunge driven in low under the bind
+    h1: mv({
+      keys: [
+        K(-1.0, B({ ...body, crouch: -0.36, lean: 0.26, step: 0.85, back: 0.5, twist: FT + 0.12 })),
+        K(-0.55, B({ ...body, crouch: -0.2, lean: 0.08, step: 0.46, back: 0.24, twist: FT - 0.05 })),
+        K(-0.1, B({ ...body, crouch: -0.24, lean: 0.12, step: 0.5, back: 0.34, twist: FT })),
+        K(0.4, B({ ...body, crouch: -0.32, lean: 0.24, step: 0.72, back: 0.46, twist: FT + 0.1 })),
+        K(0.85, B({ ...body, crouch: -0.48, lean: 0.4, step: 1.02, back: 0.6, twist: FT + 0.26, side: -0.08 })),
+        K(1.05, B({ ...body, crouch: -0.48, lean: 0.4, step: 1.02, back: 0.6, twist: FT + 0.26, side: -0.08 })),
+      ],
+      main: prise,
+      free: track([[-1.0, LOW_HAND], [-0.4, UP_HAND], [0.4, MID_HAND], [0.85, LOW_HAND]]),
+      impacts: [0.85],
+      start: -1.0,
+      chamber: -0.9,
+      flow: 1.25,
+      blendIn: 0.3,
+      end: 1.0,
+      fx: [fx(-0.6, 'sparkle', 'tip', 0.5), fx(-0.3, 'sparkle', 'tip', 0.5), fx(0.6, 'dust', 'feet', 0.7), fx(0.85, 'flashline', 'tip', 1.1), fx(0.85, 'sparkle', 'tip', 0.9)],
+      trail: { life: 0.22, glow: 0.5 },
+    }),
+    // Grand Salut: the blade raised high in salute, swept down behind, and a passing step into a
+    // full-arm rising cut that throws them back
+    h2: mv({
+      keys: [
+        K(-1.2, B({ ...body, crouch: -0.3, lean: 0.2, step: 0.7, back: 0.46, twist: FT + 0.1 })),
+        K(-0.75, B({ ...body, crouch: -0.06, lean: -0.1, step: 0.24, back: 0.2, twist: FT + 0.05, headPitch: -0.12 })),
+        K(-0.25, B({ ...body, crouch: -0.2, lean: 0.0, step: 0.3, back: 0.36, twist: FT + 0.4, hipTwist: 0.5 })),
+        K(salutHit, B({ ...body, front: 'L', crouch: -0.32, lean: 0.22, step: 0.55, back: 0.5, twist: -0.05, hipTwist: -0.15, width: 0.1 })),
+        K(1.1, B({ ...body, front: 'L', crouch: -0.3, lean: 0.12, step: 0.55, back: 0.5, twist: -0.3, hipTwist: -0.2, width: 0.1, headPitch: -0.08 })),
+      ],
+      main: salut,
+      free: track([[-1.2, LOW_HAND], [-0.8, [0.2, 0.05, -0.28]], [-0.3, [0.2, 0.05, -0.28]], [salutHit, [0.6, 0.4, -0.2]], [1.1, [0.55, 0.62, -0.25]]]),
+      impacts: [salutHit],
+      start: -1.2,
+      chamber: -0.6,
+      travel: 0.45,
+      blendIn: 0.3,
+      end: 1.1,
+      settle: 0.5,
+      fx: [fx(-0.7, 'sparkle', 'tip', 0.9, '#ffffff'), fx(salutHit - 0.05, 'stomp', 'feet', 0.9), fx(salutHit, 'flashline', 'tip', 1.3), fx(salutHit, 'sparkle', 'tip', 1.1)],
+      trail: { life: 0.26, glow: 0.7 },
+    }),
+    // Passata: out of the dash the body drops beneath their line, the back leg flung out long and the
+    // back hand down to the floor, the point driven up into them
+    dh: mv({
+      keys: [
+        K(-0.6, B({ ...body, crouch: -0.28, lean: 0.3, step: 0.44, back: 0.4 })),
+        K(0.0, B({ ...body, crouch: -0.36, lean: 0.4, step: 0.62, back: 0.5, twist: FT + 0.05 })),
+        K(0.85, B({ ...body, crouch: -0.5, lean: 0.7, step: 0.72, back: 0.95, twist: FT + 0.1, headPitch: -0.4, width: 0.1 })),
+        K(1.05, B({ ...body, crouch: -0.5, lean: 0.68, step: 0.72, back: 0.95, twist: FT + 0.1, headPitch: -0.38, width: 0.1 })),
+      ],
+      main: passata,
+      free: track([[-0.6, UP_HAND], [0.2, MID_HAND], [0.85, [0.0, -0.1, 0.5]]]),
+      impacts: [0.85],
+      start: -0.6,
+      chamber: -0.1,
+      travel: 0.3,
+      blendIn: 0.4,
+      end: 1.0,
+      ghosts: [-0.3, 0.95],
+      fx: [fx(-0.2, 'dust', 'feet', 1.0), fx(0.82, 'dust', 'feet', 0.9), fx(0.85, 'flashline', 'tip', 1.3), fx(0.85, 'sparkle', 'tip', 1)],
+      trail: { life: 0.22, glow: 0.6 },
+    }),
+    // Retreating Cut: the rear foot steps back and the weight with it, the point flicked backhand
+    // across their wrist to cover the retreat
+    bl: mv({
+      keys: [
+        K(-0.1, B({ ...body, crouch: -0.14, lean: 0.06, twist: FT - 0.1, step: 0.4 })),
+        K(retreatHit, B({ ...body, crouch: -0.26, lean: -0.1, twist: FT + 0.12, step: 0.36, back: 0.5 })),
+        K(1.07, B({ ...body, crouch: -0.28, lean: -0.14, twist: FT + 0.2, step: 0.28, back: 0.46 })),
+      ],
+      main: retreatCut,
+      free: track([[0, UP_HAND], [0.6, [0.42, 0.86, -0.2]]]),
+      impacts: [retreatHit],
+      fx: [fx(0.1, 'dust', 'feet', 0.5), fx(retreatHit, 'sparkle', 'tip', 0.7)],
+      trail: { life: 0.16, glow: 0.3 },
+    }),
+    // Volte: the rear foot swings back and the body turns away and all the way round, the blade out
+    // at arm's length sweeping a full circle and cutting through as they face front again
+    bh: mv({
+      keys: [
+        K(-1.3, B({ ...body, crouch: -0.16 }), { spin: 0 }),
+        K(-0.9, B({ ...body, crouch: -0.2, lean: -0.04, step: 0.3, back: 0.4, twist: FT + 0.15 }), { spin: 0.1 }),
+        K(-0.2, B({ ...body, crouch: -0.24, lean: -0.08, step: 0.3, back: 0.5, width: 0.1 }), { spin: 0.7 }),
+        K(volteHit, B({ ...body, crouch: -0.3, lean: -0.1, step: 0.34, back: 0.52, twist: FT - 0.1 }), { spin: 1.0 }),
+        K(1.1, B({ ...body, crouch: -0.3, lean: -0.08, step: 0.34, back: 0.5, twist: FT - 0.3 }), { spin: 1.04 }),
+      ],
+      main: volte,
+      free: track([[-1.3, UP_HAND], [-0.6, [0.55, 0.55, -0.1]], [volteHit, UP_HAND]]),
+      impacts: [volteHit],
+      start: -1.3,
+      chamber: -0.7,
+      flow: 1.3,
+      blendIn: 0.35,
+      end: 1.1,
+      ghosts: [-0.8, volteHit],
+      fx: [fx(-0.7, 'whirl', 'root', 0.8, '#ffd0d8'), fx(-0.2, 'dust', 'feet', 0.7), fx(volteHit, 'sparkle', 'tip', 1)],
+      trail: { life: 0.24, glow: 0.6 },
+    }),
+    // Petal Lunge: in the air, a full corkscrew about the line of the thrust, the point on them throughout
+    jl: mv({
+      keys: [
+        K(-0.5, B({ ...body, crouch: -0.08, lean: 0.12, step: 0.3, back: 0.28 }), { roll: 0, hop: 0.06 }),
+        K(0.85, B({ ...body, crouch: -0.14, lean: 0.3, step: 0.42, back: 0.34, twist: FT + 0.1 }), { roll: -1, hop: 0 }),
+        K(1.05, B({ ...body, crouch: -0.14, lean: 0.3, step: 0.42, back: 0.34, twist: FT + 0.1 })),
+      ],
+      main: petal,
+      free: track([[-0.5, UP_HAND], [0.85, MID_HAND]]),
+      impacts: [0.85],
+      start: -0.5,
+      chamber: -0.5,
+      flow: 1.2,
+      blendIn: 0.35,
+      end: 1.0,
+      fx: [fx(0.5, 'spiral', 'tip', 0.6, '#ffd0d8'), fx(0.85, 'petals', 'tip', 0.8, '#ffb8cc'), fx(0.85, 'sparkle', 'tip', 0.7)],
+      trail: { life: 0.2, glow: 0.4 },
+    }),
+    // Sky Piercer: drawn up in the air, the hand over the head and the point turned down, then the
+    // whole body drops with the thrust and lands hard in a deep crouch
+    jh: mv({
+      keys: [
+        K(-1.0, B({ ...body, crouch: -0.12 }), { hop: 0 }),
+        K(-0.3, B({ ...body, crouch: 0.0, lean: -0.12, step: 0.28, back: 0.24, twist: FT - 0.2, headPitch: 0.25 }), { hop: 0.26 }),
+        K(0.85, B({ ...body, crouch: -0.5, lean: 0.42, step: 0.56, back: 0.46, width: 0.16, twist: FT + 0.05, headPitch: 0.15 }), { hop: 0 }),
+        K(1.1, B({ ...body, crouch: -0.5, lean: 0.4, step: 0.56, back: 0.46, width: 0.16, twist: FT + 0.05 })),
+      ],
+      main: sky,
+      free: track([[-1.0, UP_HAND], [-0.3, [0.45, 0.62, 0.1]], [0.85, [0.55, 0.2, -0.2]]]),
+      impacts: [0.85],
+      start: -1.0,
+      chamber: -0.25,
+      travel: 0.25,
+      blendIn: 0.35,
+      end: 1.05,
+      fx: [fx(-0.3, 'sparkle', 'tip', 0.6), fx(0.85, 'shockwave', 'tip', 0.9, '#ffd0d8'), fx(0.86, 'stomp', 'feet', 1.0), fx(0.85, 'flashline', 'tip', 1.0)],
+      trail: { life: 0.22, glow: 0.6 },
     }),
     // Coup de Grâce: a salute and a glint off the blade, then a lunge too fast to see
     sp: mv({

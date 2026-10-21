@@ -3,10 +3,12 @@
  * Quaternius' Universal Animation Library 2 (CC0): a crouching rising cut, a lunging cut down from
  * high, a backhand swat with the shield, a spinning leap that comes down as Judgement, and a
  * shoulder-first shield charge. The Holy Lance is authored by hand: a perilous thrust has to read
- * as a thrust.
+ * as a thrust, and so is the extended set: a flat cut and a stepping smite to chain off Judgement, a
+ * fencer's lunge and a shield-first charge out of a dodge, a cut under the raised shield and a
+ * falling shield wall while giving ground, and a whirling cut and a plunge from the air.
  */
-import { B, HOLD, K, P, Style, X, arc, baked, bakedKeys, bakedPose, fx, line, mv, seq } from '../author';
-import type { BodyPose, V3 } from '../author';
+import { B, HOLD, K, P, Style, X, arc, baked, bakedKeys, bakedPose, fx, hitAt, line, mv, seq, track } from '../author';
+import type { BodyPose, Motion, V3 } from '../author';
 import * as S from './baked/sword';
 
 const SHIELD_UP: V3 = [0, 1, 0];
@@ -20,6 +22,40 @@ const stiffen = (b: BodyPose) => {
   b.lean = b.lean > 0.4 ? 0.4 + (b.lean - 0.4) * 0.35 : b.lean;
   b.crouch = b.crouch < -0.2 ? -0.2 + (b.crouch + 0.2) * 0.6 : b.crouch;
 };
+
+/** The shield on the left arm along a straight line, its face turning from d0 to d1, top edge up. */
+const shieldLine = (from: V3, to: V3, d0: V3, d1: V3, body = false) => line(from, to, d0, d1, SHIELD_UP, NaN, NaN, { body });
+const SHIELD_GUARD: V3 = [0.185, 0.44, 0.47];
+// the right foot's stance spot (root frame)
+const REAR_R: V3 = [-0.18, 0.05, -0.2];
+
+/** A stepping foot's path keyed along the move's s, for a step that runs from s=a to s=b. */
+function kickPath(a: number, b: number, keys: [number, V3][]): Motion {
+  return track(keys.map(([s, p]) => [(s - a) / (b - a), p] as [number, V3]));
+}
+
+// Oathkeeper: from low behind on the right, flat across the chest and wrapped round to the left
+const oath = arc([-0.24, 0.42, 0.06], 0.42, [[-0.55, -0.55, -0.6], [-0.95, 0.0, 0.25], [-0.15, 0.3, 1], [0.7, 0.4, 0.6], [0.85, 0.4, -0.15]]);
+const oathHit = hitAt(oath, 2);
+
+// Bronze Verdict: lifted off the left shoulder to cocked behind the head, then over and down the line
+const VERDICT_PIVOT: V3 = [-0.2, 0.55, 0.02];
+const verdict = seq(
+  [
+    [-1.0, -0.1, arc(VERDICT_PIVOT, 0.4, [[0.8, 0.3, -0.3], [0.3, 0.8, -0.5], [0.0, 0.72, -0.7]])],
+    [-0.1, 1.07, arc(VERDICT_PIVOT, 0.4, [[0.0, 0.72, -0.7], [-0.05, 1, 0.05], [-0.03, 0.4, 0.92], [0, -0.15, 1], [0.02, -0.5, 0.86]])],
+  ],
+  0.08,
+);
+const verdictHit = hitAt(verdict, 3, 1);
+
+// Guarded Cut: a backhand from behind the shield out to the right, kept low under it
+const guarded = arc([-0.18, 0.3, 0.12], 0.4, [[0.7, 0.05, -0.45], [0.55, 0.0, 0.8], [-0.1, -0.05, 1], [-0.85, -0.15, 0.5], [-0.85, -0.3, -0.2]]);
+const guardedHit = hitAt(guarded, 2);
+
+// Leaping Strike: the blade held out flat and carried round by a whole turn of the body
+const whirl = arc([-0.2, 0.38, 0.05], 0.42, [[0.75, 0.15, 0.55], [0.0, 0.08, 1], [-0.95, 0.02, 0.2], [-0.75, -0.05, -0.6]]);
+const whirlHit = hitAt(whirl, 2);
 
 export const swordShield: Style = {
   axis: 'y',
@@ -138,6 +174,186 @@ export const swordShield: Style = {
       ghosts: [0.0, 0.95],
       fx: [fx(-0.9, 'holy', 'tip', 0.7), fx(-0.85, 'sparkle', 'tip', 1.0, '#ffffff'), fx(0.0, 'dust', 'feet', 1.1), fx(0.85, 'flashline', 'tip', 1.5, '#ffd86a'), fx(0.86, 'holy', 'tip', 0.8)],
       trail: { life: 0.24, glow: 0.9 },
+    }),
+    // Oathkeeper: out of the smite's crouch, the blade drawn back low on the right and swept flat
+    // across their chest as the hips unwind, the shield swung clear to the left
+    h1: mv({
+      keys: [
+        K(-0.1, B({ ...body, twist: -0.85, hipTwist: -0.3, side: 0.05, crouch: -0.2, lean: 0.22, step: 0.3, back: 0.3 })),
+        K(oathHit, B({ ...body, twist: -0.05, hipTwist: 0.0, side: 0.0, crouch: -0.16, lean: 0.28, step: 0.48, back: 0.32 })),
+        K(1.05, B({ ...body, twist: 0.55, hipTwist: 0.2, side: -0.05, crouch: -0.14, lean: 0.24, step: 0.5, back: 0.32 })),
+      ],
+      main: oath,
+      off: seq([
+        [-0.2, oathHit, shieldLine(SHIELD_GUARD, [0.26, 0.5, 0.4], [-0.1, 0.1, 1], [0.1, 0.1, 1])],
+        [oathHit, 1.1, shieldLine([0.26, 0.5, 0.4], [0.46, 0.28, 0.2], [0.1, 0.1, 1], [0.7, 0, 0.7])],
+      ]),
+      impacts: [oathHit],
+      fx: [fx(oathHit, 'sparkle', 'tip', 0.8), fx(oathHit, 'dust', 'feet', 0.7)],
+      trail: { life: 0.2, glow: 0.5 },
+    }),
+    // Bronze Verdict: up tall with the blade cocked behind the head and the shield raised with it,
+    // then the rear foot steps through as the sword comes over and down, and the ground answers
+    h2: mv({
+      keys: [
+        K(-1.0, B({ ...body, twist: 0.1, hipTwist: 0.0, crouch: -0.04, lean: -0.05, step: 0.24, back: 0.2 })),
+        K(-0.4, B({ ...body, twist: 0.0, hipTwist: 0.0, side: 0.0, crouch: 0.02, lean: -0.2, step: 0.24, back: 0.2, headPitch: -0.15 })),
+        K(-0.05, B({ ...body, twist: -0.1, hipTwist: 0.0, side: 0.0, crouch: 0.0, lean: -0.24, step: 0.24, back: 0.2, headPitch: -0.1 })),
+        K(verdictHit, B({ ...body, twist: -0.25, hipTwist: -0.1, side: 0.0, crouch: -0.28, lean: 0.38, step: 0.3, back: 0.2, width: 0.2 })),
+        K(1.15, B({ ...body, twist: -0.3, hipTwist: -0.1, side: 0.0, crouch: -0.32, lean: 0.44, step: 0.3, back: 0.2, width: 0.2, headPitch: 0.1 })),
+      ],
+      main: verdict,
+      off: seq([
+        [-1.0, -0.1, shieldLine(SHIELD_GUARD, [0.22, 0.86, 0.3], [-0.1, 0.05, 1], [0.0, 0.6, 0.8])],
+        [-0.1, 1.07, shieldLine([0.22, 0.86, 0.3], [0.32, 0.26, 0.32], [0.0, 0.6, 0.8], [0.3, -0.1, 1])],
+      ]),
+      kick: {
+        foot: 'R',
+        from: -0.05,
+        to: 1.15,
+        path: kickPath(-0.05, 1.15, [
+          [-0.05, REAR_R],
+          [0.2, [-0.15, 0.32, 0.18]],
+          [verdictHit, [-0.2, 0.05, 0.62]],
+          [1.15, [-0.2, 0.05, 0.62]],
+        ]),
+      },
+      impacts: [verdictHit],
+      start: -1.0,
+      chamber: -0.1,
+      travel: 0.2,
+      blendIn: 0.3,
+      rest: 1.15,
+      settle: 0.5,
+      fx: [
+        fx(-0.3, 'sparkle', 'tip', 1.0, '#ffe8a0'),
+        fx(verdictHit, 'stomp', 'feet', 1.0),
+        fx(verdictHit, 'holy', 'tip', 1.2),
+        fx(verdictHit + 0.15, 'shockwave', 'tip', 1.2, '#ffd86a'),
+        fx(verdictHit + 0.15, 'shake', 'root', 1.0),
+      ],
+      trail: { life: 0.24, glow: 0.8 },
+    }),
+    // Lunging Edge: out of the dodge low and side-on like a fencer, the point driven straight in off
+    // a long front step, the shield arm flung back for balance
+    dl: mv({
+      keys: [
+        K(-0.1, B({ ...body, twist: -0.2, hipTwist: -0.1, side: 0.0, crouch: -0.24, lean: 0.4, step: 0.36, back: 0.34, headPitch: 0.05 })),
+        K(0.5, B({ ...body, twist: 0.25, hipTwist: 0.05, side: 0.0, crouch: -0.24, lean: 0.38, step: 0.6, back: 0.46 })),
+        K(0.85, B({ ...body, twist: 0.55, hipTwist: 0.2, side: -0.05, crouch: -0.26, lean: 0.4, step: 0.82, back: 0.56 })),
+        K(1.05, B({ ...body, twist: 0.55, hipTwist: 0.2, side: -0.05, crouch: -0.26, lean: 0.4, step: 0.82, back: 0.56 })),
+      ],
+      main: line([-0.34, 0.18, 0.0], [-0.12, 0.38, 0.82], [0.15, 0.15, 1], [0.03, 0.05, 1], [0, 1, 0], NaN, NaN, { body: true, roll: 0.25 }),
+      off: shieldLine(SHIELD_GUARD, [0.36, 0.36, 0.02], [-0.1, 0.05, 1], [0.5, 0.05, 0.6]),
+      impacts: [0.85],
+      end: 1.0,
+      fx: [fx(-0.1, 'dust', 'feet', 1.0), fx(0.85, 'flashline', 'tip', 1.1, '#ffe8a0'), fx(0.86, 'sparkle', 'tip', 0.8)],
+      trail: { life: 0.18, glow: 0.5 },
+    }),
+    // Rampart Charge: square behind the shield with the sword laid over its rim, a driving run, and
+    // the shield heaved forward and up into them
+    dh: mv({
+      keys: [
+        K(-0.3, B({ ...body, twist: 0.0, hipTwist: 0.0, side: 0.0, crouch: -0.22, lean: 0.4, step: 0.3, back: 0.36, headPitch: 0.15 })),
+        K(0.4, B({ ...body, twist: 0.0, hipTwist: 0.0, side: 0.0, crouch: -0.24, lean: 0.45, step: 0.42, back: 0.42, headPitch: 0.15 })),
+        K(0.85, B({ ...body, twist: -0.1, hipTwist: 0.0, side: 0.0, crouch: -0.2, lean: 0.3, step: 0.7, back: 0.5, headPitch: 0.0 })),
+        K(1.1, B({ ...body, twist: -0.1, hipTwist: 0.0, side: 0.0, crouch: -0.2, lean: 0.28, step: 0.7, back: 0.5 })),
+      ],
+      main: line([-0.4, 0.6, 0.18], [-0.4, 0.64, 0.36], [0.02, 0.05, 1], [0.0, 0.0, 1], [0, 1, 0], NaN, NaN, { body: true }),
+      off: seq([
+        [-0.3, 0.4, shieldLine([0.12, 0.44, 0.32], [0.12, 0.46, 0.34], [0, 0.05, 1], [0, 0.05, 1], true)],
+        [0.4, 1.0, shieldLine([0.12, 0.46, 0.34], [0.1, 0.62, 0.8], [0, 0.05, 1], [0, 0.3, 1], true)],
+      ]),
+      impacts: [0.85],
+      start: -0.3,
+      chamber: -0.1,
+      travel: 0.4,
+      end: 1.0,
+      ghosts: [-0.3, 0.9],
+      fx: [fx(-0.3, 'dust', 'feet', 1.2), fx(0.3, 'dust', 'feet', 0.9), fx(0.85, 'stomp', 'feet', 1.0), fx(0.86, 'shake', 'root', 0.9), fx(0.86, 'sparkle', 'offTip', 1.0, '#ffe8a0')],
+    }),
+    // Guarded Cut: giving ground with the shield raised over the head, a backhand cut low beneath it
+    // from behind the shield out to the right
+    bl: mv({
+      keys: [
+        K(-0.1, B({ ...body, twist: 0.45, hipTwist: 0.1, side: 0.0, crouch: -0.12, lean: 0.1, step: 0.24, back: 0.26 })),
+        K(guardedHit, B({ ...body, twist: -0.1, hipTwist: -0.05, side: 0.05, crouch: -0.17, lean: -0.04, step: 0.2, back: 0.4 })),
+        K(1.05, B({ ...body, twist: -0.55, hipTwist: -0.15, side: 0.08, crouch: -0.18, lean: -0.1, step: 0.16, back: 0.44 })),
+      ],
+      main: guarded,
+      off: track([
+        [-0.2, SHIELD_GUARD],
+        [0.1, [0.14, 0.74, 0.36]],
+        [1.0, [0.16, 0.7, 0.38]],
+      ]),
+      impacts: [guardedHit],
+      fx: [fx(-0.05, 'dust', 'feet', 0.6), fx(guardedHit, 'sparkle', 'tip', 0.6)],
+    }),
+    // Shield Wall: a step back as the shield goes up, then brought down in front of them like a wall
+    // falling, the sword cocked over the rim
+    bh: mv({
+      keys: [
+        K(-0.4, B({ ...body, twist: -0.3, crouch: -0.1, lean: 0.05, step: 0.24, back: 0.26 })),
+        K(-0.1, B({ ...body, twist: -0.2, side: 0.0, crouch: -0.16, lean: -0.12, step: 0.2, back: 0.44, headPitch: -0.1 })),
+        K(0.85, B({ ...body, twist: 0.05, hipTwist: 0.0, side: 0.0, crouch: -0.28, lean: 0.3, step: 0.14, back: 0.52 })),
+        K(1.1, B({ ...body, twist: 0.05, hipTwist: 0.0, side: 0.0, crouch: -0.28, lean: 0.26, step: 0.14, back: 0.52 })),
+      ],
+      main: line([-0.38, 0.74, 0.0], [-0.36, 0.76, -0.02], [0.05, 0.3, 1], [0.05, 0.35, 1], [0, 1, 0]),
+      off: seq([
+        [-0.4, -0.1, shieldLine(SHIELD_GUARD, [0.12, 0.88, 0.3], [-0.1, 0.05, 1], [0, 0.7, 0.7])],
+        [-0.1, 1.0, shieldLine([0.12, 0.88, 0.3], [0.05, 0.3, 0.66], [0, 0.7, 0.7], [0, -0.3, 1])],
+      ]),
+      impacts: [0.85],
+      start: -0.4,
+      chamber: -0.1,
+      travel: 0.35,
+      end: 1.0,
+      fx: [fx(-0.1, 'dust', 'feet', 0.8), fx(0.85, 'stomp', 'feet', 1.1), fx(0.86, 'shake', 'root', 0.8), fx(0.86, 'sparkle', 'offTip', 1.0, '#ffe8a0')],
+      trail: { life: 0.18, glow: 0.4 },
+    }),
+    // Leaping Strike: in the air the knight turns a whole circle to the right with the blade held out
+    // flat, the shield tucked to the chest
+    jl: mv({
+      keys: [
+        K(-0.3, B({ ...body, twist: 0.3, hipTwist: 0.0, crouch: -0.08, lean: 0.12, step: 0.14, back: 0.12 }), { spin: 0 }),
+        K(0.1, B({ ...body, twist: 0.0, hipTwist: 0.0, side: -0.1, crouch: -0.06, lean: 0.1, step: 0.12, back: 0.12 }), { spin: -0.35 }),
+        K(whirlHit, B({ ...body, twist: -0.15, hipTwist: 0.0, side: -0.15, crouch: -0.08, lean: 0.12, step: 0.14, back: 0.14 }), { spin: -0.75 }),
+        K(1.1, B({ ...body, twist: -0.3, crouch: -0.18, lean: 0.25, step: 0.24, back: 0.22 }), { spin: -1 }),
+      ],
+      main: whirl,
+      off: shieldLine([0.24, 0.42, 0.3], [0.24, 0.44, 0.28], [0.3, 0.05, 1], [0.3, 0.05, 1]),
+      impacts: [whirlHit],
+      start: -0.3,
+      chamber: -0.1,
+      flow: 1.3,
+      blendIn: 0.3,
+      fx: [fx(-0.1, 'whirl', 'root', 0.8, '#ffe8a0'), fx(whirlHit, 'sparkle', 'tip', 0.7)],
+      trail: { life: 0.2, glow: 0.5 },
+    }),
+    // Crashing Oath: falling with the sword held high, point forward, under the raised shield, then
+    // driven point-first into the ground ahead as the knight lands on one knee
+    jh: mv({
+      keys: [
+        K(-0.6, B({ ...body, twist: 0.0, hipTwist: 0.0, side: 0.0, crouch: 0.0, lean: -0.15, step: 0.2, back: 0.2, headPitch: -0.1 })),
+        K(0.0, B({ ...body, twist: -0.05, hipTwist: 0.0, side: 0.0, crouch: -0.04, lean: -0.1, step: 0.22, back: 0.2 })),
+        K(0.85, B({ ...body, twist: -0.1, hipTwist: 0.0, side: 0.0, crouch: -0.36, lean: 0.4, step: 0.42, back: 0.4 })),
+        K(1.1, B({ ...body, twist: -0.1, hipTwist: 0.0, side: 0.0, crouch: -0.38, lean: 0.42, step: 0.42, back: 0.4, headPitch: 0.1 })),
+      ],
+      main: seq([
+        [-0.6, 0.0, line([-0.3, 0.3, 0.2], [-0.14, 1.0, 0.24], [0.1, 0.4, 1], [0.0, -0.3, 1], [0, 1, 0], NaN, NaN, { body: true })],
+        [0.0, 1.0, line([-0.14, 1.0, 0.24], [-0.06, 0.22, 0.62], [0.0, -0.3, 1], [0.0, -0.66, 0.75], [0, 1, 0], NaN, NaN, { body: true })],
+      ]),
+      off: shieldLine([0.26, 0.82, 0.24], [0.3, 0.4, 0.34], [0.0, 0.6, 0.8], [0.2, 0.05, 1]),
+      impacts: [0.85],
+      start: -0.6,
+      chamber: -0.05,
+      travel: 0.25,
+      blendIn: 0.3,
+      end: 1.0,
+      rest: 1.05,
+      settle: 0.5,
+      fx: [fx(0.85, 'holy', 'tip', 1.0), fx(0.88, 'shockwave', 'tip', 1.1, '#ffd86a'), fx(0.88, 'stomp', 'feet', 0.9)],
+      trail: { life: 0.22, glow: 0.7 },
     }),
     // Shield Charge: shoulder down behind the shield, a burst forward, and a heavy recovery
     ab: mv({

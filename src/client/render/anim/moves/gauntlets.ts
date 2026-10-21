@@ -1,7 +1,9 @@
 /**
  * Monk, gauntlets. A boxer's hands and a kung-fu body: the jab and cross snap out and back, the third
- * light is a spinning hook kick, the fourth a rising palm off the ground, and the heavy gathers chi
- * at the hip and releases it with both palms. The grapple seizes and hauls them in; the counter
+ * light is a spinning hook kick, and the heavy gathers chi at the hip and releases it with both
+ * palms, then chains into a pouncing tiger palm and a stamping uppercut to the sky. Out of a dodge
+ * comes a rising palm off the ground or a head-down charge; giving ground, a crane step or a turning
+ * back-fist; in the air, a crescent kick or a heel dropped like thunder. The grapple seizes and hauls them in; the counter
  * answers with a flurry.
  */
 import { B, HOLD, K, P, Style, X, fx, line, mv, seq, track } from '../author';
@@ -18,8 +20,9 @@ function kickPath(a: number, b: number, keys: [number, V3][]): Motion {
   return track(keys.map(([s, p]) => [(s - a) / (b - a), p] as [number, V3]));
 }
 
-// the rear foot's stance spot (root frame)
+// the feet's stance spots (root frame)
 const REAR_R: V3 = [-0.17, 0.05, -0.24];
+const LEAD_L: V3 = [0.17, 0.05, 0.22];
 
 export const gauntlets: Style = {
   axis: 'y',
@@ -95,8 +98,8 @@ export const gauntlets: Style = {
       fx: [fx(-0.2, 'whirl', 'root', 0.7, '#ffd08a'), fx(0.45, 'chi', 'kick', 0.9)],
       trail: { life: 0.16, glow: 0.4 },
     }),
-    // Rising Dragon: down low, then up off the ground behind a rising palm
-    l3: mv({
+    // Rising Dragon: out of the dodge down low, then up off the ground behind a rising palm
+    dl: mv({
       keys: [
         K(-0.2, B({ ...body, crouch: -0.36, lean: 0.36, twist: -0.45, step: 0.28 }), { hop: 0, spin: 0 }),
         K(0.3, B({ ...body, crouch: -0.18, lean: 0.12, twist: -0.1, step: 0.34 }), { hop: 0.05 }),
@@ -139,6 +142,238 @@ export const gauntlets: Style = {
         fx(0.86, 'shake', 'root', 1.0),
       ],
       trail: { life: 0.2, glow: 0.7 },
+    }),
+    // Tiger Palm: out of the two palms, a pounce; the left hand claws their guard down as the right
+    // drives the heel of the palm into the chest, landing in a deep stance
+    h1: mv({
+      keys: [
+        K(-0.1, B({ ...body, twist: -0.8, hipTwist: -0.3, crouch: -0.2, lean: 0.06, step: 0.3, back: 0.3, width: 0.2 }), { hop: 0 }),
+        K(0.45, B({ ...body, twist: -0.2, hipTwist: -0.05, crouch: -0.14, lean: 0.22, step: 0.42, back: 0.32, width: 0.2 }), { hop: 0.1 }),
+        K(0.85, B({ ...body, twist: 0.5, hipTwist: 0.3, crouch: -0.26, lean: 0.3, step: 0.52, back: 0.36, width: 0.22 }), { hop: 0 }),
+        K(1.1, B({ ...body, twist: 0.5, hipTwist: 0.3, crouch: -0.28, lean: 0.3, step: 0.52, back: 0.36, width: 0.22 })),
+      ],
+      // the heel of the palm, fingers up
+      main: strike([-0.22, 0.3, -0.04], [-0.03, 0.62, 0.78], [0.1, 0.4, 1], [0.0, 1, 0.2], [0, 0, -1]),
+      // the claw reaches out and drags down, back to the hip
+      off: seq([
+        [-0.2, 0.5, strike([0.14, 0.65, 0.36], [0.06, 0.72, 0.66], [-0.1, 0.4, 1], [0, 0.2, 1])],
+        [0.5, 1.1, strike([0.06, 0.72, 0.66], [0.22, 0.3, 0.1], [0, 0.2, 1], [0.2, -0.5, 1])],
+      ]),
+      impacts: [0.85],
+      end: 1.0,
+      fx: [fx(0.85, 'stomp', 'feet', 0.8), fx(0.85, 'chi', 'main', 1.3), fx(0.86, 'shake', 'root', 0.5)],
+      trail: { life: 0.18, glow: 0.6 },
+    }),
+    // Heaven Shaker: the lead foot stamps the ground into a horse stance, then the left fist comes up
+    // from the knee to the sky as the body rises behind it, the right hand pulled down to the hip
+    h2: mv({
+      keys: [
+        K(-0.7, B({ ...body, twist: 0.3, crouch: -0.14, lean: 0.1, step: 0.24, back: 0.3 })),
+        K(-0.45, B({ ...body, twist: 0.1, crouch: -0.06, lean: -0.02, step: 0.2, back: 0.3, width: 0.12, side: -0.08 })),
+        K(-0.2, B({ ...body, twist: -0.35, hipTwist: -0.1, crouch: -0.3, lean: 0.22, step: 0.26, back: 0.24, width: 0.32 })),
+        K(0.3, B({ ...body, twist: -0.5, hipTwist: -0.15, crouch: -0.32, lean: 0.3, step: 0.26, back: 0.24, width: 0.32 })),
+        K(0.85, B({ ...body, twist: 0.25, hipTwist: 0.15, crouch: -0.08, lean: -0.14, step: 0.26, back: 0.26, width: 0.28, headPitch: -0.25 })),
+        K(1.15, B({ ...body, twist: 0.3, hipTwist: 0.15, crouch: -0.12, lean: -0.1, step: 0.26, back: 0.26, width: 0.28, headPitch: -0.2 })),
+      ],
+      main: seq([
+        [-0.7, 0.3, strike([-0.04, 0.6, 0.7], [-0.2, 0.45, 0.25], [0, 0.6, 1], [0.1, 0.3, 1])],
+        [0.3, 1.1, strike([-0.2, 0.45, 0.25], [-0.26, 0.12, 0.0], [0.1, 0.3, 1], [0.2, -0.3, 1])],
+      ]),
+      off: seq([
+        [-0.7, 0.0, strike([0.14, 0.65, 0.36], [0.24, -0.08, 0.32], [-0.1, 0.3, 1], [0.0, -0.4, 1], [0, 0, 1])],
+        [0.0, 1.0, strike([0.24, -0.08, 0.32], [0.06, 0.98, 0.42], [0.0, -0.4, 1], [-0.05, 1, 0.2], [0, 0, 1])],
+      ]),
+      kick: {
+        foot: 'L',
+        from: -0.6,
+        to: -0.2,
+        path: kickPath(-0.6, -0.2, [
+          [-0.6, LEAD_L],
+          [-0.42, [0.14, 0.52, 0.18]],
+          [-0.28, [0.22, 0.3, 0.3]],
+          [-0.2, [0.32, 0.05, 0.26]],
+        ]),
+      },
+      impacts: [0.85],
+      start: -0.7,
+      chamber: -0.15,
+      travel: 0.25,
+      blendIn: 0.3,
+      end: 1.0,
+      rest: 1.15,
+      settle: 0.5,
+      fx: [
+        fx(-0.2, 'shockwave', 'feet', 0.8, '#ffb347'),
+        fx(0.2, 'wisps', 'off', 0.8, '#ff9a2a'),
+        fx(0.85, 'chi', 'off', 1.9),
+        fx(0.86, 'roar', 'root', 0.7, '#ff9a2a'),
+        fx(0.86, 'shake', 'root', 1.0),
+      ],
+      trail: { life: 0.22, glow: 0.8 },
+    }),
+    // Charging Ox: head down behind both fists like horns, the whole charge driven into one left
+    // straight at the end of it
+    dh: mv({
+      keys: [
+        K(-0.3, B({ ...body, twist: -0.2, crouch: -0.22, lean: 0.5, step: 0.3, back: 0.34, headPitch: 0.2 })),
+        K(0.4, B({ ...body, twist: -0.35, crouch: -0.24, lean: 0.54, step: 0.42, back: 0.4, headPitch: 0.15 })),
+        K(0.85, B({ ...body, twist: -0.75, hipTwist: -0.2, crouch: -0.22, lean: 0.46, step: 0.66, back: 0.5, headPitch: -0.05 })),
+        K(1.1, B({ ...body, twist: -0.75, hipTwist: -0.2, crouch: -0.22, lean: 0.4, step: 0.66, back: 0.5 })),
+      ],
+      main: strike([-0.18, 0.78, 0.3], [-0.16, 0.74, 0.32], [0.3, 0.6, 1], [0.4, 0.6, 1]),
+      off: strike([0.18, 0.78, 0.3], [0.03, 0.64, 0.84], [-0.3, 0.6, 1], [0, 0.03, 1]),
+      impacts: [0.85],
+      start: -0.3,
+      chamber: -0.1,
+      travel: 0.4,
+      end: 1.0,
+      ghosts: [-0.3, 0.9],
+      fx: [fx(-0.3, 'dust', 'feet', 1.1), fx(0.3, 'dust', 'feet', 0.8), fx(0.85, 'chi', 'off', 1.5), fx(0.85, 'stomp', 'feet', 0.8), fx(0.86, 'shake', 'root', 0.8)],
+      trail: { life: 0.2, glow: 0.6 },
+    }),
+    // Crane Step: the lead knee lifts into the crane as they give ground, the left arm spread like a
+    // wing, and the right hand pecks down at the face before the foot sets down
+    bl: mv({
+      keys: [
+        K(-0.1, B({ ...body, twist: -0.2, crouch: -0.1, lean: 0.0, step: 0.2, back: 0.32 })),
+        K(0.45, B({ ...body, twist: 0.1, crouch: -0.18, lean: -0.12, step: 0.1, back: 0.36, side: 0.08, headPitch: 0.05 })),
+        K(0.85, B({ ...body, twist: 0.25, hipTwist: 0.1, crouch: -0.2, lean: -0.08, step: 0.08, back: 0.38, side: 0.1 })),
+        K(1.1, B({ ...body, twist: 0.2, crouch: -0.2, lean: -0.02, step: 0.14, back: 0.36 })),
+      ],
+      // the crane's beak: fingertips bunched, striking down
+      main: strike([-0.16, 0.82, 0.2], [-0.04, 0.7, 0.74], [0.05, 0.6, 1], [0.0, -0.35, 1], [0, 1, 0.3]),
+      off: seq([
+        [-0.2, 0.6, strike([0.14, 0.65, 0.36], [0.62, 0.72, -0.06], [-0.1, 0.3, 1], [1, 0.25, -0.2])],
+        [0.6, 1.1, strike([0.62, 0.72, -0.06], [0.48, 0.62, 0.08], [1, 0.25, -0.2], [0.6, 0.3, 0.5])],
+      ]),
+      kick: {
+        foot: 'L',
+        from: -0.1,
+        to: 0.95,
+        path: kickPath(-0.1, 0.95, [
+          [-0.1, LEAD_L],
+          [0.3, [0.12, 0.42, 0.14]],
+          [0.75, [0.12, 0.5, 0.1]],
+          [0.95, [0.16, 0.05, 0.1]],
+        ]),
+      },
+      impacts: [0.85],
+      end: 1.0,
+      fx: [fx(-0.05, 'dust', 'feet', 0.6), fx(0.85, 'chi', 'main', 0.6), fx(1.0, 'dust', 'feet', 0.5)],
+      trail: { life: 0.12 },
+    }),
+    // Turning Mountain: giving ground with a whole turn to the left, the back shown to them, and the
+    // left back-fist swung round at head height as they come about
+    bh: mv({
+      keys: [
+        K(-0.6, B({ ...body, twist: -0.1, crouch: -0.14 }), { spin: 0 }),
+        K(-0.3, B({ ...body, twist: -0.3, crouch: -0.22, lean: 0.0, step: 0.16, back: 0.36, width: 0.14 }), { spin: 0.18 }),
+        K(0.1, B({ ...body, twist: -0.2, crouch: -0.28, lean: -0.1, side: -0.2, step: 0.12, back: 0.44, width: 0.16 }), { spin: 0.55 }),
+        K(0.45, B({ ...body, twist: 0.0, crouch: -0.3, lean: -0.14, side: -0.3, step: 0.12, back: 0.48, width: 0.18 }), { spin: 0.74 }),
+        K(0.8, B({ ...body, twist: -0.1, crouch: -0.3, lean: -0.04, side: -0.1, step: 0.18, back: 0.46, width: 0.18 }), { spin: 0.92 }),
+        K(1.1, B({ ...body, twist: -0.25, crouch: -0.24, lean: 0.06, step: 0.2, back: 0.4 }), { spin: 1 }),
+      ],
+      main: track([
+        [-0.6, [-0.12, 0.62, 0.26]],
+        [0.2, [-0.1, 0.66, 0.24]],
+        [1.0, [-0.12, 0.62, 0.26]],
+      ]),
+      // the back of the fist leads round
+      off: seq([
+        [-0.6, -0.1, line([0.14, 0.65, 0.36], [-0.05, 0.62, 0.24], [-0.1, 0.3, 1], [-1, 0.2, 0.2], [0, 1, 0])],
+        [-0.1, 0.5, line([-0.05, 0.62, 0.24], [0.86, 0.68, 0.06], [-1, 0.2, 0.2], [1, 0.05, 0.05], [0, 0, -1])],
+        [0.5, 1.1, line([0.86, 0.68, 0.06], [0.3, 0.6, 0.3], [1, 0.05, 0.05], [0.3, 0.3, 1], [0, 1, 0])],
+      ]),
+      impacts: [0.45],
+      start: -0.6,
+      chamber: -0.2,
+      flow: 1.4,
+      blendIn: 0.35,
+      fx: [fx(-0.3, 'dust', 'feet', 0.8), fx(-0.1, 'whirl', 'root', 0.9, '#ffb347'), fx(0.45, 'chi', 'off', 1.4), fx(0.46, 'shake', 'root', 0.7), fx(0.9, 'stomp', 'feet', 0.6)],
+      trail: { life: 0.2, glow: 0.6 },
+    }),
+    // Falling Leaf Kick: in the air the body tips over like a leaf and turns to the left, the lead leg
+    // sweeping a crescent round at head height
+    jl: mv({
+      keys: [
+        K(-0.5, B({ ...body, twist: -0.2, crouch: -0.1 }), { spin: 0, roll: 0, hop: 0 }),
+        K(-0.1, B({ ...body, twist: 0.0, lean: 0.0, side: -0.25, crouch: -0.05, step: 0.05, width: 0.08 }), { spin: 0.4, roll: -0.04, hop: 0.06 }),
+        K(0.45, B({ ...body, twist: 0.1, lean: -0.15, side: -0.4, crouch: -0.02, step: 0.04, width: 0.08, headPitch: 0.1 }), { spin: 0.76, roll: -0.08, hop: 0.1 }),
+        K(0.85, B({ ...body, twist: -0.1, lean: 0.05, side: -0.1, crouch: -0.12, step: 0.14, width: 0.12 }), { spin: 0.94, roll: -0.02, hop: 0.04 }),
+        K(1.1, B({ ...body, twist: -0.25, lean: 0.12, crouch: -0.16, step: 0.2 }), { spin: 1, roll: 0, hop: 0 }),
+      ],
+      main: track([
+        [-0.5, [-0.12, 0.62, 0.26]],
+        [0.2, [-0.4, 0.66, 0.06]],
+        [0.9, [-0.12, 0.62, 0.26]],
+      ]),
+      off: track([
+        [-0.5, [0.14, 0.65, 0.36]],
+        [0.2, [0.1, 0.78, 0.2]],
+        [0.9, [0.14, 0.65, 0.36]],
+      ]),
+      kick: {
+        foot: 'L',
+        from: -0.35,
+        to: 0.95,
+        path: kickPath(-0.35, 0.95, [
+          [-0.35, [0.15, 0.3, 0.16]],
+          [-0.05, [0.45, 0.78, 0.18]],
+          [0.3, [0.9, 1.4, 0.12]],
+          [0.55, [0.92, 1.42, -0.06]],
+          [0.8, [0.4, 0.6, 0.0]],
+          [0.95, [0.15, 0.3, 0.16]],
+        ]),
+      },
+      impacts: [0.45],
+      start: -0.5,
+      chamber: -0.15,
+      flow: 1.3,
+      blendIn: 0.3,
+      fx: [fx(0.45, 'chi', 'kick', 0.9), fx(0.45, 'petals', 'kick', 0.5, '#ffd08a')],
+      trail: { life: 0.16, glow: 0.4 },
+    }),
+    // Thunder Heel: the right leg swung up overhead as they come down, the heel chopped straight down
+    // through them and planted with the landing
+    jh: mv({
+      keys: [
+        K(-0.5, B({ ...body, front: 'R', twist: -0.2, crouch: -0.08, lean: 0.0, step: 0.1, back: 0.12 }), { hop: 0 }),
+        K(-0.1, B({ ...body, front: 'R', twist: 0.1, crouch: 0.0, lean: -0.28, step: 0.1, back: 0.14, headPitch: 0.2 }), { hop: 0.1 }),
+        K(0.45, B({ ...body, front: 'R', twist: 0.05, crouch: -0.12, lean: 0.12, step: 0.3, back: 0.2 }), { hop: 0.05 }),
+        K(0.65, B({ ...body, front: 'R', twist: 0.0, crouch: -0.38, lean: 0.36, step: 0.5, back: 0.32, width: 0.2 }), { hop: 0 }),
+        K(1.1, B({ ...body, front: 'R', twist: 0.0, crouch: -0.36, lean: 0.3, step: 0.5, back: 0.32, width: 0.2 })),
+      ],
+      main: seq([
+        [-0.5, 0.2, strike([-0.12, 0.62, 0.26], [-0.34, 0.66, 0.1], [0.1, 0.3, 1], [-0.4, 0.4, 1])],
+        [0.2, 1.1, strike([-0.34, 0.66, 0.1], [-0.4, 0.2, 0.2], [-0.4, 0.4, 1], [-0.4, -0.3, 1])],
+      ]),
+      off: seq([
+        [-0.5, 0.2, strike([0.14, 0.65, 0.36], [0.34, 0.66, 0.1], [-0.1, 0.3, 1], [0.4, 0.4, 1])],
+        [0.2, 1.1, strike([0.34, 0.66, 0.1], [0.4, 0.2, 0.2], [0.4, 0.4, 1], [0.4, -0.3, 1])],
+      ]),
+      kick: {
+        foot: 'R',
+        from: -0.45,
+        to: 1.1,
+        path: kickPath(-0.45, 1.1, [
+          [-0.45, [-0.15, 0.3, -0.05]],
+          [-0.25, [-0.5, 1.3, 0.35]],
+          [-0.05, [-0.12, 1.9, 0.55]],
+          [0.45, [-0.1, 1.15, 0.95]],
+          [0.65, [-0.17, 0.05, 0.5]],
+          [1.1, [-0.17, 0.05, 0.5]],
+        ]),
+      },
+      impacts: [0.45],
+      start: -0.5,
+      chamber: -0.05,
+      travel: 0.3,
+      blendIn: 0.3,
+      end: 1.07,
+      rest: 1.1,
+      settle: 0.5,
+      fx: [fx(0.45, 'chi', 'kick', 1.2), fx(0.65, 'shockwave', 'kick', 1.0, '#ffb347'), fx(0.66, 'shake', 'root', 1.0)],
+      trail: { life: 0.2, glow: 0.6 },
     }),
     // Iron Grapple: arms flung wide, a lunging two-handed seize, and a haul back to the chest
     sp: mv({
