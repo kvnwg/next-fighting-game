@@ -332,7 +332,7 @@ export class Effects {
     }
   }
 
-  /** Shadow smoke (vanishes, the Shade's dashes). */
+  /** Shadow smoke (vanishes, the Assassin's dashes). */
   smoke(pos: THREE.Vector3, scale = 1, color = '#3a2a5a'): void {
     const cols = [color, '#1d1730', '#6a4a9a'];
     for (let i = 0; i < 18 * scale; i++) {

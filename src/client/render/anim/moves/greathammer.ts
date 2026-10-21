@@ -1,5 +1,5 @@
 /**
- * Juggernaut, greathammer. Everything is weight: the hammer is thrown more than swung, the body
+ * Warden, warhammer. Everything is weight: the hammer is thrown more than swung, the body
  * chases it, and whatever it meets (the ground included) gets hit hard. The lights chain from a
  * diagonal smash into a full-turn cyclone, the heavy leaps and cracks the earth, and the special
  * tears a trench through the ground at ankle height.

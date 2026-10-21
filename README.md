@@ -106,8 +106,8 @@ Everything in the world is voxels, lit the way a Minecraft shader pack lights th
   - **Grab**: dodge or jump away.
 - **Feints.** Heavies (and all of the Duelist's attacks) can be cancelled into guard during the windup.
 - **Hit stun.** After being hit you can guard again after 140ms, so a deflect can always interrupt a combo.
-- **Dodge.** Short dash with invulnerability frames and a cooldown. The Shade has two charges.
-- **Hyper armor.** Some attacks (Juggernaut heavies, War Cry) take damage without being interrupted.
+- **Dodge.** Short dash with invulnerability frames and a cooldown. The Assassin has two charges.
+- **Hyper armor.** Some attacks (Warden heavies, War Cry) take damage without being interrupted.
 
 ### Netcode
 
@@ -118,13 +118,13 @@ The server is authoritative for combat. Each client predicts its own actions wit
 | | Weapon | Role | Passive | Perilous (E) | Ability (R) |
 |---|---|---|---|---|---|
 | **Ronin** | Katana | All-rounder | +40ms deflect window | Piercing Thrust (thrust) | **Iai Stance**: next attack is a near-instant draw cut |
-| **Juggernaut** | Greathammer | Heavy bruiser | Heavies have hyper armor | Earthshaker (sweep) | **War Cry**: 5s of hyper armor and +20% damage |
+| **Warden** | Warhammer | Heavy bruiser | Heavies have hyper armor | Earthshaker (sweep) | **War Cry**: 5s of hyper armor and +20% damage |
 | **Duelist** | Rapier | Fencer / mind games | Faster attack after a deflect; lights can feint | Coup de Grace (thrust) | **Fleche**: 6m running thrust |
-| **Lancer** | Spear | Zoner | Tip hits deal +25% | Whirlwind (sweep) | **Pole Vault**: invulnerable 6m backflip |
-| **Shade** | Twin Daggers | Assassin | 2 dodge charges, +40% backstab damage | Throat Grab (grab) | **Shadow Step**: blink behind a target |
-| **Reaper** | Scythe | Sustain / control | Heals 20% of damage dealt | Reaping Arc (sweep) | **Soul Hook**: drag a target from 11m |
-| **Monk** | Gauntlets | Posture breaker | +15% posture damage, faster posture regen | Iron Grapple (grab) | **Still Water**: counter stance |
-| **Paladin** | Sword & Shield | Defender | Blocking costs 30% less posture, wider guard | Holy Lance (thrust) | **Shield Charge**: undeflectable 5m charge |
+| **Lancer** | Golden Spear | Zoner | Tip hits deal +25% | Whirlwind (sweep) | **Pole Vault**: invulnerable 6m backflip |
+| **Assassin** | Twin Daggers | Assassin | 2 dodge charges, +40% backstab damage | Throat Grab (grab) | **Shadow Step**: blink behind a target |
+| **Wraith** | Scythe | Sustain / control | Heals 20% of damage dealt | Reaping Arc (sweep) | **Soul Hook**: drag a target from 11m |
+| **Monk** | Fists | Posture breaker | +15% posture damage, faster posture regen | Iron Grapple (grab) | **Still Water**: counter stance |
+| **Knight** | Greatsword & Shield | Defender | Blocking costs 30% less posture, wider guard | Holy Lance (thrust) | **Shield Charge**: undeflectable 5m charge |
 
 You can switch characters in the lobby safe zone (press **C**).
 
@@ -202,7 +202,7 @@ The look is built in code, so you can replace it piece by piece:
   - Deflects, blocks, hits and war cries add short reactions on top.
 - Hit feel: impacts freeze both fighters for a few frames (longer for heavies), sparks spray the way the weapon was travelling, fast swings leave smear frames, and knockback is a slide that eases to a stop.
 - Weapon trails are interpolated between frames, so fast swings leave a smooth arc.
-- Some of the Paladin's moves are baked from Quaternius' [Universal Animation Library 2](https://quaternius.com) (CC0) with `scripts/bake-anim.ts`, which retargets a glTF clip's body and fists onto this rig.
+- Some of the Knight's moves are baked from Quaternius' [Universal Animation Library 2](https://quaternius.com) (CC0) with `scripts/bake-anim.ts`, which retargets a glTF clip's body and fists onto this rig.
 
 Dev viewer:
 - `/?viewer` shows all characters cycling through their animations, and `/?viewer&char=ronin` shows just one.

@@ -1,31 +1,34 @@
 /**
- * Blocky placeholder fighters with fully procedural animation. The Animator decides where the
- * weapon is and how the body moves each frame (from the combat state, so animations always line up
- * with the gameplay timings the server uses); this file builds the rig and fits the limbs to that
- * with IK: hands reach for the grips, feet stay planted where they're put.
+ * Voxel fighters with fully procedural animation. The Animator decides where the weapon is and how
+ * the body moves each frame (from the combat state, so animations always line up with the gameplay
+ * timings the server uses); this file builds the rig to the voxel model's own proportions, carries
+ * the animator's targets over to them, and fits the limbs with IK: hands reach for the grips, feet
+ * stay planted where they're put.
  */
 import * as THREE from 'three';
 import { CHARACTERS, CharacterDef, CharacterId } from '../../shared/characters';
-import { AnimFrame, AnimInput, Animator, Reaction, handTargets } from './anim/animator';
+import { AnimFrame, AnimInput, Animator, Reaction } from './anim/animator';
 import { smooth, solveTwoBone } from './anim/math';
 import { CHAR_LAYER, FX_LAYER } from './renderer';
 import { patchMaterial } from './gfx/materials';
 import { WeaponParts, buildWeapon } from './weapons';
+import type { VoxelBone } from '../../../characters/voxel-model';
+import { BONE_SLOTS, PropSpec, RigDims, RigSlot, SLOT_BONE, VOXEL_FIGHTERS, propFrame, propRotation, restDirection, rigDims, voxelModel } from './voxel/fighters';
+import { VOXEL } from './voxel/mesh';
 
 export type { AnimFrame, AnimInput, Reaction };
 
-const UPPER_ARM = 0.29;
-const FOREARM = 0.27;
-const THIGH = 0.43;
-const SHIN = 0.42;
-const HIPS_Y = 0.92;
-const SHOULDER_R = new THREE.Vector3(-0.33, 0.5, 0);
-const SHOULDER_L = new THREE.Vector3(0.33, 0.5, 0);
+// The animator's poses are authored for a reference body; each fighter's own proportions are
+// mapped from these (arm reach about the shoulders, leg length for the stance and the hips).
+const POSE_SHOULDER = new THREE.Vector3(0, 0.5, 0);
+const POSE_ARM = 0.56;
+const POSE_LEG = 0.85;
+const POSE_ANKLE = 0.05;
+const POSE_HIPS = 0.92;
+const POSE_HEIGHT = 1.9;
 // elbows bend out, down and back
 const ELBOW_POLE_R = new THREE.Vector3(-0.7, -0.55, -0.45).normalize();
 const ELBOW_POLE_L = new THREE.Vector3(0.7, -0.55, -0.45).normalize();
-const HIP_R = new THREE.Vector3(-0.12, -0.02, 0);
-const HIP_L = new THREE.Vector3(0.12, -0.02, 0);
 // knees forward and a little out
 const KNEE_POLE_R = new THREE.Vector3(-0.18, 0, 1).normalize();
 const KNEE_POLE_L = new THREE.Vector3(0.18, 0, 1).normalize();
@@ -52,6 +55,10 @@ const _ss0 = new THREE.Vector3();
 const _ss1 = new THREE.Vector3();
 const _sq0 = new THREE.Quaternion();
 const _sq1 = new THREE.Quaternion();
+const _mp = new THREE.Vector3();
+const _kick = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _grip = new THREE.Vector3();
 const _sm = new THREE.Matrix4();
 const _sinv = new THREE.Matrix4();
 const _srel = new THREE.Matrix4();
@@ -96,6 +103,12 @@ export class CharacterModel {
   private readonly armL: Limb;
   private readonly legR: Limb;
   private readonly legL: Limb;
+  private readonly d: RigDims;
+  private readonly armK: number;
+  private readonly legK: number;
+  private readonly shoulderMid: THREE.Vector3;
+  /** prop parts lit only during heavy swings and specials (the spear's lightning) */
+  private readonly charged: THREE.Mesh[] = [];
   private readonly mainPivot = new THREE.Group();
   private readonly offPivot = new THREE.Group();
   private readonly materials: THREE.MeshLambertMaterial[] = [];
@@ -127,12 +140,12 @@ export class CharacterModel {
       this.materials.push(m);
       return m;
     };
-    const skin = mat(pal.skin);
-    const prim = mat(pal.primary);
-    const sec = mat(pal.secondary);
-    const acc = mat(pal.accent);
-    const hair = mat(pal.hair);
-    const dark = mat('#1d1b22');
+    const spec = VOXEL_FIGHTERS[charId];
+    const body = voxelModel(spec.build);
+    const d = (this.d = rigDims(body.model));
+    this.armK = (d.upperArm + d.forearm) / POSE_ARM;
+    this.legK = d.hasLegs ? (d.thigh + d.shin) / POSE_LEG : d.hipsY / POSE_HIPS;
+    this.shoulderMid = d.shoulderR.clone().add(d.shoulderL).multiplyScalar(0.5);
 
     const g = (parent: THREE.Object3D, x = 0, y = 0, z = 0): THREE.Group => {
       const o = new THREE.Group();
@@ -140,20 +153,13 @@ export class CharacterModel {
       parent.add(o);
       return o;
     };
-    const box = (m: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number, parent: THREE.Object3D) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-      mesh.position.set(x, y, z);
-      mesh.castShadow = true;
-      parent.add(mesh);
-      return mesh;
-    };
 
     this.root.add(this.body);
-    const hips = (this.hips = g(this.body, 0, HIPS_Y, 0));
+    const hips = (this.hips = g(this.body, 0, d.hipsY, 0));
     hips.rotation.order = 'YXZ';
-    const torso = (this.torso = g(hips, 0, 0.06, 0));
+    const torso = (this.torso = g(hips, d.torso.x, d.torso.y, d.torso.z));
     torso.rotation.order = 'YXZ';
-    const head = (this.head = g(torso, 0, 0.6, 0));
+    const head = (this.head = g(torso, d.head.x, d.head.y, d.head.z));
     head.rotation.order = 'YXZ';
     const limb = (parent: THREE.Object3D, at: THREE.Vector3, l1: number, l2: number): Limb => {
       const upper = g(parent, at.x, at.y, at.z);
@@ -161,33 +167,62 @@ export class CharacterModel {
       const end = g(lower, 0, -l2, 0);
       return { upper, lower, end };
     };
-    this.armR = limb(torso, SHOULDER_R, UPPER_ARM, FOREARM);
-    this.armL = limb(torso, SHOULDER_L, UPPER_ARM, FOREARM);
-    this.legR = limb(hips, HIP_R, THIGH, SHIN);
-    this.legL = limb(hips, HIP_L, THIGH, SHIN);
+    this.armR = limb(torso, d.shoulderR, d.upperArm, d.forearm);
+    this.armL = limb(torso, d.shoulderL, d.upperArm, d.forearm);
+    this.legR = limb(hips, d.hipR, d.thigh, d.shin);
+    this.legL = limb(hips, d.hipL, d.thigh, d.shin);
 
-    // body
-    box(sec, 0.42, 0.18, 0.27, 0, 0, 0, hips);
-    box(prim, 0.5, 0.5, 0.3, 0, 0.3, 0, torso);
-    box(acc, 0.52, 0.08, 0.32, 0, 0.08, 0, torso); // belt / sash
-    box(skin, 0.36, 0.36, 0.34, 0, 0.2, 0, head);
-    box(dark, 0.06, 0.06, 0.02, -0.08, 0.22, 0.175, head);
-    box(dark, 0.06, 0.06, 0.02, 0.08, 0.22, 0.175, head);
-    const fists: THREE.Mesh[] = [];
-    for (const arm of [this.armR, this.armL]) {
-      box(prim, 0.16, 0.3, 0.16, 0, -0.13, 0, arm.upper);
-      box(skin, 0.14, 0.27, 0.14, 0, -0.13, 0, arm.lower);
-      fists.push(box(skin, 0.13, 0.13, 0.13, 0, 0, 0, arm.end));
+    // ---- the voxel body: each bone on its rig group, limbs turned to hang along -Y like the rig ----
+    const slots: Record<RigSlot, THREE.Group> = {
+      hips, torso, head,
+      'armR.upper': this.armR.upper, 'armR.lower': this.armR.lower, 'armR.end': this.armR.end,
+      'armL.upper': this.armL.upper, 'armL.lower': this.armL.lower, 'armL.end': this.armL.end,
+      'legR.upper': this.legR.upper, 'legR.lower': this.legR.lower, 'legR.end': this.legR.end,
+      'legL.upper': this.legL.upper, 'legL.lower': this.legL.lower, 'legL.end': this.legL.end,
+    };
+    const voxMat = this.voxelMaterials(pal.primary);
+    const bones = body.bones;
+    const hidden = new Set(spec.hide ?? []);
+    const slotOf = (b: VoxelBone): RigSlot => {
+      let cur: VoxelBone | undefined = b;
+      while (cur && !BONE_SLOTS[cur.name]) cur = cur.parent ? bones.get(cur.parent) : undefined;
+      return cur ? BONE_SLOTS[cur.name] : 'hips';
+    };
+    const restQ = new Map<RigSlot, THREE.Quaternion>();
+    const DOWN = new THREE.Vector3(0, -1, 0);
+    for (const slot of Object.keys(slots) as RigSlot[]) {
+      const dir = slot.endsWith('.end') && slot.startsWith('leg') ? null : restDirection(body.model, SLOT_BONE[slot]);
+      restQ.set(slot, dir ? new THREE.Quaternion().setFromUnitVectors(dir, DOWN) : new THREE.Quaternion());
     }
-    for (const leg of [this.legR, this.legL]) {
-      box(sec, 0.18, 0.43, 0.2, 0, -0.21, 0, leg.upper);
-      box(sec, 0.17, 0.42, 0.19, 0, -0.2, 0, leg.lower);
-      box(dark, 0.19, 0.08, 0.28, 0, 0, 0.04, leg.end); // foot, kept flat on the ground
+    for (const bone of body.model.bones) {
+      const geo = body.geoms.get(bone.name);
+      if (!geo || hidden.has(bone.name)) continue;
+      const slot = slotOf(bone);
+      const anchor = bones.get(SLOT_BONE[slot]);
+      if (!anchor) continue;
+      const q = restQ.get(slot)!;
+      const mesh = new THREE.Mesh(geo, voxMat(bone));
+      mesh.quaternion.copy(q);
+      mesh.position.set(bone.pivot[0] - anchor.pivot[0], bone.pivot[1] - anchor.pivot[1], bone.pivot[2] - anchor.pivot[2]).multiplyScalar(VOXEL).applyQuaternion(q);
+      // the hand group sits where the fist closes, a little past the wrist pivot
+      if (slot.startsWith('arm') && slot.endsWith('.end')) mesh.position.y += 3 * VOXEL;
+      mesh.castShadow = true;
+      if ((bone.opacity ?? 1) < 1) mesh.renderOrder = 1;
+      slots[slot].add(mesh);
     }
-    this.headgear(head, torso, { prim, sec, acc, hair, dark, skin, mat }, box);
 
-    // weapons are carried by the torso and the hands reach for them
+    // weapons are carried by the torso and the hands reach for them: the voxel props, with the
+    // placeholder set kept only for what it wears on the body (the katana's scabbard)
     this.weapon = buildWeapon(this.char, mat);
+    this.weapon.main = this.prop(spec.main, voxMat);
+    this.weapon.base = this.anchor(this.weapon.main, spec.main, spec.main.base);
+    this.weapon.tip = this.anchor(this.weapon.main, spec.main, spec.main.tip);
+    if (spec.off) {
+      this.weapon.off = this.prop(spec.off, voxMat);
+      this.weapon.offBase = this.anchor(this.weapon.off, spec.off, spec.off.base);
+      this.weapon.offTip = this.anchor(this.weapon.off, spec.off, spec.off.tip);
+    }
+    if (this.weapon.worn) this.mapTorso(this.weapon.worn.position, this.weapon.worn.position);
     const local = (grp: THREE.Group, base: THREE.Object3D, tip: THREE.Object3D) => {
       grp.updateMatrixWorld(true);
       return { base: base.getWorldPosition(new THREE.Vector3()), tip: tip.getWorldPosition(new THREE.Vector3()) };
@@ -201,99 +236,71 @@ export class CharacterModel {
       this.offPivot.add(this.weapon.off);
     }
     if (this.weapon.worn) torso.add(this.weapon.worn);
-    if (this.weapon.hideHands) for (const f of fists) f.visible = false;
 
-    this.scale = this.char.id === 'juggernaut' ? 1.15 : this.char.id === 'shade' ? 0.95 : 1;
-    this.root.scale.setScalar(this.scale);
+    // models are built at their real size; `scale` tells the HUD and camera how tall this one is
+    this.scale = d.height / POSE_HEIGHT;
     // fighters get the ink outline and rim light in the composite pass
     this.root.traverse((o) => o.layers.enable(CHAR_LAYER));
   }
 
-  /** Distinguishing headwear per placeholder character. Replace freely. */
-  private headgear(
-    head: THREE.Group,
-    torso: THREE.Group,
-    m: { prim: THREE.Material; sec: THREE.Material; acc: THREE.Material; hair: THREE.Material; dark: THREE.Material; skin: THREE.Material; mat: (c: string, e?: string) => THREE.MeshLambertMaterial },
-    box: (m: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number, p: THREE.Object3D) => THREE.Mesh,
-  ): void {
-    switch (this.char.id) {
-      case 'ronin': {
-        box(m.hair, 0.38, 0.1, 0.36, 0, 0.38, -0.01, head);
-        const straw = m.mat('#ead4aa');
-        box(straw, 0.8, 0.05, 0.8, 0, 0.44, 0, head);
-        box(straw, 0.5, 0.06, 0.5, 0, 0.49, 0, head);
-        box(straw, 0.22, 0.06, 0.22, 0, 0.54, 0, head);
-        box(m.acc, 0.4, 0.1, 0.36, 0, 0.0, 0, head); // scarf
-        box(m.acc, 0.1, 0.35, 0.06, 0.12, -0.15, -0.18, torso);
-        break;
+  /** Materials for voxel bones: lit with vertex colours, see-through where the bone says so, unlit where it glows. */
+  private voxelMaterials(tint: string): (bone: VoxelBone) => THREE.Material {
+    const base = new THREE.Color(tint).multiplyScalar(0.08);
+    const lit = (opacity: number) => {
+      const m = patchMaterial(new THREE.MeshLambertMaterial({ vertexColors: true, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 }), { rim: true });
+      m.emissive.copy(base);
+      m.userData.baseEmissive = base;
+      this.materials.push(m);
+      return m;
+    };
+    const solid = lit(1);
+    const glow = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    return (bone) => {
+      const opacity = bone.opacity ?? 1;
+      if (bone.emissive) return opacity < 1 ? new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, transparent: true, opacity }) : glow;
+      return opacity < 1 ? lit(opacity) : solid;
+    };
+  }
+
+  /** A held voxel prop in the weapon frame (grip at the origin, along +Z). */
+  private prop(p: PropSpec, voxMat: (bone: VoxelBone) => THREE.Material): THREE.Group {
+    const src = voxelModel(p.build);
+    const frame = propFrame(p);
+    const q = propRotation(p);
+    const group = new THREE.Group();
+    for (const [name, geo] of src.geoms) {
+      if (p.bones && !p.bones.includes(name)) continue;
+      const bone = src.bones.get(name)!;
+      const mesh = new THREE.Mesh(geo, voxMat(bone));
+      mesh.position.copy(frame(bone.pivot));
+      mesh.quaternion.copy(q);
+      mesh.scale.setScalar(p.scale);
+      mesh.castShadow = true;
+      if (p.charged?.includes(name)) {
+        mesh.visible = false;
+        this.charged.push(mesh);
       }
-      case 'juggernaut': {
-        const iron = m.mat('#7c848c');
-        box(iron, 0.42, 0.24, 0.4, 0, 0.3, 0, head);
-        box(m.dark, 0.3, 0.05, 0.02, 0, 0.22, 0.2, head);
-        box(m.mat('#e8e0c8'), 0.08, 0.22, 0.08, -0.25, 0.42, 0, head);
-        box(m.mat('#e8e0c8'), 0.08, 0.22, 0.08, 0.25, 0.42, 0, head);
-        box(iron, 0.26, 0.16, 0.3, -0.36, 0.55, 0, torso);
-        box(iron, 0.26, 0.16, 0.3, 0.36, 0.55, 0, torso);
-        box(m.hair, 0.3, 0.12, 0.05, 0, 0.06, 0.18, head); // beard
-        break;
-      }
-      case 'duelist': {
-        box(m.hair, 0.38, 0.12, 0.38, 0, 0.36, -0.02, head);
-        box(m.hair, 0.38, 0.22, 0.08, 0, 0.18, -0.18, head);
-        const hat = m.mat('#2a1a26');
-        box(hat, 0.56, 0.05, 0.46, 0, 0.42, 0, head);
-        box(hat, 0.34, 0.14, 0.32, 0, 0.5, 0, head);
-        box(m.mat('#f4f0e6'), 0.04, 0.32, 0.04, 0.15, 0.62, -0.06, head);
-        const cape = box(m.prim, 0.5, 0.65, 0.04, 0, 0.2, -0.18, torso);
-        cape.rotation.x = 0.1;
-        break;
-      }
-      case 'lancer': {
-        const helm = m.mat('#b9c2c8');
-        box(helm, 0.4, 0.2, 0.4, 0, 0.32, 0, head);
-        box(helm, 0.06, 0.18, 0.06, 0, 0.12, 0.19, head);
-        box(m.acc, 0.06, 0.14, 0.42, 0, 0.48, -0.02, head);
-        box(m.acc, 0.06, 0.08, 0.2, 0, 0.42, -0.26, head);
-        break;
-      }
-      case 'shade': {
-        box(m.prim, 0.42, 0.44, 0.4, 0, 0.24, -0.02, head); // hood
-        box(m.dark, 0.32, 0.12, 0.04, 0, 0.1, 0.2, head); // mask
-        box(m.mat('#e9e6ff', '#7a5cff'), 0.07, 0.04, 0.02, -0.08, 0.22, 0.19, head);
-        box(m.mat('#e9e6ff', '#7a5cff'), 0.07, 0.04, 0.02, 0.08, 0.22, 0.19, head);
-        box(m.acc, 0.1, 0.3, 0.05, -0.1, -0.05, -0.2, head);
-        break;
-      }
-      case 'reaper': {
-        box(m.prim, 0.44, 0.46, 0.42, 0, 0.24, -0.02, head);
-        box(m.dark, 0.3, 0.28, 0.04, 0, 0.2, 0.2, head);
-        const glow = m.mat('#7cffb2', '#3cff8a');
-        box(glow, 0.06, 0.05, 0.02, -0.07, 0.22, 0.22, head);
-        box(glow, 0.06, 0.05, 0.02, 0.07, 0.22, 0.22, head);
-        const robe = box(m.prim, 0.54, 0.5, 0.34, 0, -0.22, 0, torso);
-        robe.castShadow = true;
-        break;
-      }
-      case 'monk': {
-        box(m.acc, 0.38, 0.06, 0.36, 0, 0.34, 0, head); // headband
-        const beads = m.mat('#5a2a16');
-        for (let i = 0; i < 6; i++) box(beads, 0.07, 0.07, 0.07, -0.18 + i * 0.07, 0.48 - Math.abs(i - 2.5) * 0.06, 0.17, torso);
-        box(m.skin, 0.2, 0.2, 0.32, -0.27, 0.45, 0, torso); // bare shoulder
-        break;
-      }
-      case 'paladin': {
-        const steel = m.mat('#d4d9df');
-        box(steel, 0.42, 0.42, 0.4, 0, 0.21, 0, head);
-        box(m.dark, 0.3, 0.05, 0.02, 0, 0.22, 0.21, head);
-        box(m.dark, 0.05, 0.16, 0.02, 0, 0.12, 0.21, head);
-        box(m.acc, 0.06, 0.18, 0.36, 0, 0.5, -0.02, head);
-        box(steel, 0.24, 0.12, 0.3, -0.34, 0.55, 0, torso);
-        box(steel, 0.24, 0.12, 0.3, 0.34, 0.55, 0, torso);
-        box(m.sec, 0.4, 0.4, 0.04, 0, 0.3, 0.16, torso); // tabard
-        break;
-      }
+      group.add(mesh);
     }
+    return group;
+  }
+
+  private anchor(parent: THREE.Group, p: PropSpec, at: [number, number, number]): THREE.Object3D {
+    const o = new THREE.Object3D();
+    o.position.copy(propFrame(p)(at));
+    parent.add(o);
+    return o;
+  }
+
+  /** A torso-space point from the animator's reference body onto this fighter's. */
+  private mapTorso(from: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+    return out.copy(from).sub(POSE_SHOULDER).multiplyScalar(this.armK).add(this.shoulderMid);
+  }
+
+  /** A root-frame foot target from the reference stance onto this fighter's legs. */
+  private mapFoot(from: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+    const k = this.legK;
+    return out.set(from.x * k, (from.y - POSE_ANKLE) * k + this.d.ankle, from.z * k);
   }
 
   get rightHand(): THREE.Group {
@@ -321,10 +328,15 @@ export class CharacterModel {
     const b = p.body;
     this.swingMain = f.swingMain;
     this.swingOff = f.swingOff;
+    // lightning crackles along the spear through heavy swings and the special
+    const charged = a.state === 'attack' && (a.key === 'h' || a.key === 'sp');
+    this.charged.forEach((m, i) => (m.visible = charged && Math.sin(performance.now() / 21 + i * 2.1) > -0.35));
 
     // body
     const lying = f.lying;
-    this.hips.position.y = HIPS_Y + b.crouch * (1 - lying) + b.lift - 0.78 * lying;
+    // crouches and hops scale with the legs; lying, the hips come down to the floor
+    const d = this.d;
+    this.hips.position.y = d.hipsY * (1 - lying) + (b.crouch * (1 - lying) + b.lift + 0.14 * lying) * this.legK;
     this.hips.rotation.set(-1.45 * lying, b.hipTwist * (1 - lying) + f.spin, 0);
     // flips and cartwheels turn the whole body about the hips; the legs tuck while inverted
     _euler.set(f.flip, 0, f.roll);
@@ -336,33 +348,40 @@ export class CharacterModel {
     this.torso.rotation.set(b.lean * (1 - lying * 0.8), b.twist - b.hipTwist, b.side);
     this.head.rotation.set(b.headPitch - b.lean * 0.5, -b.twist * 0.75, -b.side * 0.6);
 
-    // weapons (torso space)
-    this.mainPivot.position.copy(p.main.pos);
+    // weapons (torso space, carried over to this fighter's reach)
+    const mainPos = this.mapTorso(p.main.pos, _mp);
+    this.mainPivot.position.copy(mainPos);
     this.mainPivot.quaternion.copy(p.main.quat);
     if (this.weapon.off) {
       if (p.off) {
-        this.offPivot.position.copy(p.off.pos);
+        this.mapTorso(p.off.pos, this.offPivot.position);
         this.offPivot.quaternion.copy(p.off.quat);
       } else {
-        this.offPivot.position.copy(p.free);
+        this.mapTorso(p.free, this.offPivot.position);
         this.offPivot.quaternion.identity();
       }
     }
 
     // weapons stop at the ground instead of sinking into it (not mid-flip, where "down" moves)
-    if (lying < 0.5 && tuck < 0.2) this.keepAboveGround(p.main.pos, p.main.quat);
+    if (lying < 0.5 && tuck < 0.2) this.keepAboveGround(mainPos, p.main.quat);
     this.mainPivot.quaternion.copy(p.main.quat);
 
-    // arms: right hand to the grip; if it can't quite reach, the weapon comes to the hand
-    handTargets(p, _rh, _lh);
-    this.reach(this.armR, SHOULDER_R, _rh, ELBOW_POLE_R, _v);
+    // arms: right hand to the grip, left to the off item, the free spot or its grip on the shaft;
+    // if a hand can't quite reach, the weapon comes to the hand
+    _rh.copy(mainPos);
+    this.mapTorso(p.off ? p.off.pos : p.free, _lh);
+    if (p.main.hold2 > 0.001) {
+      _dir.set(0, 0, 1).applyQuaternion(p.main.quat);
+      _lh.lerp(_grip.copy(mainPos).addScaledVector(_dir, p.main.grip2), p.main.hold2);
+    }
+    this.reach(this.armR, d.shoulderR, _rh, ELBOW_POLE_R, _v);
     _w.subVectors(_v, _rh);
     if (_w.lengthSq() > 1e-8) {
       this.mainPivot.position.add(_w);
       _lh.addScaledVector(_w, p.main.hold2);
     }
     this.handAlign(this.armR, this.mainPivot.quaternion, 1);
-    this.reach(this.armL, SHOULDER_L, _lh, ELBOW_POLE_L, _v);
+    this.reach(this.armL, d.shoulderL, _lh, ELBOW_POLE_L, _v);
     if (p.off && this.weapon.off && p.main.hold2 < 0.5) {
       _w.subVectors(_v, _lh);
       this.offPivot.position.add(_w);
@@ -374,19 +393,21 @@ export class CharacterModel {
     this.body.updateMatrix();
     _m.copy(this.hips.matrix).invert();
     _bodyInv.copy(this.body.matrix).invert();
-    for (const [leg, hip, pole, foot, side] of [
-      [this.legR, HIP_R, KNEE_POLE_R, f.feet.R, -1],
-      [this.legL, HIP_L, KNEE_POLE_L, f.feet.L, 1],
-    ] as const) {
-      _v.copy(foot);
+    const legs = [
+      [this.legR, d.hipR, KNEE_POLE_R, f.feet.R, -1],
+      [this.legL, d.hipL, KNEE_POLE_L, f.feet.L, 1],
+    ] as const;
+    // the wraith floats: no legs to place
+    for (const [leg, hip, pole, foot, side] of d.hasLegs ? legs : []) {
+      this.mapFoot(foot, _v);
       // a kicking foot follows the kick's path
       const kickW = f.kick && f.kick.foot === (side === 1 ? 'L' : 'R') ? f.kick.w : 0;
-      if (kickW > 0) _v.lerp(f.kick!.pos, kickW);
+      if (kickW > 0) _v.lerp(this.mapFoot(f.kick!.pos, _kick), kickW);
       // spins carry the stance around with them; flips carry it into the body's frame
       _v.applyAxisAngle(UP, f.spin).applyMatrix4(_bodyInv);
-      if (tuck > 0 && kickW < 0.5) _v.lerp(side === 1 ? TUCK_L : TUCK_R, tuck);
+      if (tuck > 0 && kickW < 0.5) _v.lerp(_kick.copy(side === 1 ? TUCK_L : TUCK_R).multiplyScalar(this.legK), tuck);
       _v.applyMatrix4(_m);
-      solveTwoBone(hip, _v, pole, THIGH, SHIN, leg.upper.quaternion, leg.lower.quaternion);
+      solveTwoBone(hip, _v, pole, d.thigh, d.shin, leg.upper.quaternion, leg.lower.quaternion);
       // feet flat, rear foot turned out a little
       const rear = (side === 1) === (b.front === 'R');
       _yaw.setFromAxisAngle(UP, f.spin + side * (rear ? 0.45 : 0.12));
@@ -592,10 +613,11 @@ export class CharacterModel {
 
   /** IK an arm to a torso-space target; writes where the hand actually got to. */
   private reach(arm: Limb, shoulder: THREE.Vector3, target: THREE.Vector3, pole: THREE.Vector3, out: THREE.Vector3): void {
-    solveTwoBone(shoulder, target, pole, UPPER_ARM, FOREARM, arm.upper.quaternion, arm.lower.quaternion);
+    const d = this.d;
+    solveTwoBone(shoulder, target, pole, d.upperArm, d.forearm, arm.upper.quaternion, arm.lower.quaternion);
     _qa.copy(arm.upper.quaternion).multiply(arm.lower.quaternion);
-    out.copy(_down.set(0, -FOREARM, 0).applyQuaternion(_qa));
-    out.add(_down.set(0, -UPPER_ARM, 0).applyQuaternion(arm.upper.quaternion)).add(shoulder);
+    out.copy(_down.set(0, -d.forearm, 0).applyQuaternion(_qa));
+    out.add(_down.set(0, -d.upperArm, 0).applyQuaternion(arm.upper.quaternion)).add(shoulder);
   }
 
   /** Turn the fist to match what it holds (k blends from following the forearm). */

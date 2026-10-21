@@ -1,5 +1,5 @@
 /**
- * Reaper, scythe. Every cut is a reap: the shaft turns about a point between the hands and the
+ * Wraith, scythe. Every cut is a reap: the shaft turns about a point between the hands and the
  * hips do the sweeping, so the blade hooks round and draws back toward the reaper. A twirl before
  * the reverse cut, a long spin that brings the blade round after three quarters of a turn, an
  * executioner's cut from overhead, green fire along the ground, and a chain of souls flung out to

@@ -1,5 +1,5 @@
 /**
- * Paladin, sword and shield. The lights, the heavy, the shield work and the guard are baked from
+ * Knight, sword and shield. The lights, the heavy, the shield work and the guard are baked from
  * Quaternius' Universal Animation Library 2 (CC0): a crouching rising cut, a lunging cut down from
  * high, a backhand swat with the shield, a spinning leap that comes down as Judgement, and a
  * shoulder-first shield charge. The Holy Lance is authored by hand: a perilous thrust has to read

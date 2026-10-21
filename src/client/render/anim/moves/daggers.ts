@@ -1,5 +1,5 @@
 /**
- * Shade, twin daggers. Low, fast and never still: an X cut with both blades, a full turn with the
+ * Assassin, twin daggers. Low, fast and never still: an X cut with both blades, a full turn with the
  * arms flung wide, a three-stab flurry, a front flip that lands blades-first, a snake's rising
  * double stab, a throat grab with a reverse-grip finish, and a shadow step that reappears in smoke.
  */

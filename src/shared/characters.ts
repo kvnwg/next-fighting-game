@@ -1,7 +1,8 @@
 /**
  * The roster. Every character is a weapon archetype with its own move list, stats, passive quirk,
- * perilous special (E) and unique ability (R). Names and palettes are placeholders: swap them out
- * when the real character designs are ready — gameplay only depends on the numbers below.
+ * perilous special (E) and unique ability (R). Each wears a voxel model from characters/<name>/
+ * (mapped in client/render/voxel/fighters.ts); the ids are the original archetype names, kept so
+ * saved picks and the ladder carry over, and gameplay only depends on the numbers below.
  */
 
 export type CharacterId =
@@ -154,7 +155,7 @@ const ronin: CharacterDef = {
   weapon: 'Katana',
   weaponKind: 'katana',
   role: 'All-rounder',
-  description: 'A wandering swordsman. Honest timings, a generous deflect window and a lightning-fast draw cut.',
+  description: 'A wandering swordsman in a straw kasa. Honest timings, a generous deflect window and a lightning-fast draw cut.',
   stats: { hp: 100, posture: 100, speed: 6.2, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 3, defense: 4, difficulty: 2 },
   lights: [
@@ -174,17 +175,17 @@ const ronin: CharacterDef = {
     attack: { name: 'Iai Flash', anim: 'draw', windup: 130, active: 90, recovery: 450, damage: 16, posture: 32, blockPosture: 38, range: 3.3, arc: 70, lunge: 2.0 },
   },
   passive: { name: 'Clear Mind', description: 'Deflect window is 40ms longer.', mods: { parryWindowBonus: 40 } },
-  palette: { primary: '#34448a', secondary: '#e6e2d6', accent: '#e43b44', skin: '#e8b796', hair: '#1c1a22', metal: '#d9e2ec' },
+  palette: { primary: '#2a2b34', secondary: '#e6dcc4', accent: '#c8323c', skin: '#e8d9c4', hair: '#141418', metal: '#d9e2ec' },
 };
 
 const juggernaut: CharacterDef = {
   id: 'juggernaut',
-  name: 'Juggernaut',
-  jp: '巨漢',
-  weapon: 'Greathammer',
+  name: 'Warden',
+  jp: '石衛',
+  weapon: 'Warhammer',
   weaponKind: 'greathammer',
   role: 'Heavy bruiser',
-  description: 'Slow, huge and unstoppable. Every swing crushes guards, and heavies shrug off interruptions.',
+  description: 'A living fortress of stone and gold. Slow, huge and unstoppable: every swing crushes guards, and heavies shrug off interruptions.',
   stats: { hp: 130, posture: 130, speed: 5.2, postureRegen: 0.9 },
   ratings: { power: 5, speed: 1, reach: 3, defense: 3, difficulty: 2 },
   lights: [
@@ -204,17 +205,17 @@ const juggernaut: CharacterDef = {
     hyperArmor: true,
   },
   passive: { name: 'Unstoppable', description: 'Heavy attacks have hyper armor: getting hit will not interrupt them.', mods: { heavyHyperArmor: true } },
-  palette: { primary: '#1e6f75', secondary: '#c0cbdc', accent: '#feae34', skin: '#c28569', hair: '#733e39', metal: '#9aa3ad' },
+  palette: { primary: '#6e6c66', secondary: '#3a3834', accent: '#d8b25a', skin: '#8a857a', hair: '#3a3834', metal: '#9aa3ad' },
 };
 
 const duelist: CharacterDef = {
   id: 'duelist',
   name: 'Duelist',
-  jp: '剣客',
+  jp: '細剣士',
   weapon: 'Rapier',
   weaponKind: 'rapier',
   role: 'Fencer / mind games',
-  description: 'Quick thrusts with long reach. Feints everything and punishes deflects with blistering ripostes.',
+  description: 'A dashing fencer in a green cape. Quick thrusts with long reach; feints everything and punishes deflects with blistering ripostes.',
   stats: { hp: 90, posture: 90, speed: 6.6, postureRegen: 1.05 },
   ratings: { power: 2, speed: 4, reach: 4, defense: 2, difficulty: 4 },
   lights: [
@@ -238,17 +239,17 @@ const duelist: CharacterDef = {
     description: 'After a deflect your next attack winds up 40% faster. Light attacks can be feinted.',
     mods: { riposteWindupMult: 0.6, lightFeint: true },
   },
-  palette: { primary: '#ecebe6', secondary: '#262b44', accent: '#ff0044', skin: '#e8b796', hair: '#feae34', metal: '#e6eef5' },
+  palette: { primary: '#4f7a3a', secondary: '#ecebe6', accent: '#8fd46a', skin: '#e8b796', hair: '#e0c060', metal: '#e6eef5' },
 };
 
 const lancer: CharacterDef = {
   id: 'lancer',
   name: 'Lancer',
-  jp: '槍兵',
-  weapon: 'Spear',
+  jp: '槍騎士',
+  weapon: 'Golden Spear',
   weaponKind: 'spear',
   role: 'Zoner',
-  description: 'Controls space with the longest reach in the game. Tip hits hurt more; vaults out when crowded.',
+  description: 'A horned knight with a lightning spear. Controls space with the longest reach in the game; tip hits hurt more, and he vaults out when crowded.',
   stats: { hp: 100, posture: 100, speed: 6.0, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 5, defense: 2, difficulty: 3 },
   lights: [
@@ -269,17 +270,17 @@ const lancer: CharacterDef = {
     iframes: 320,
   },
   passive: { name: 'Reach', description: 'Hits with the outer 30% of a swing deal 25% more damage and posture.', mods: { tipperBonus: 0.25 } },
-  palette: { primary: '#124e89', secondary: '#e0e4ec', accent: '#2ce8f5', skin: '#e4a672', hair: '#3e2731', metal: '#cfd8df' },
+  palette: { primary: '#26242a', secondary: '#d9d4c8', accent: '#f2c14e', skin: '#e4a672', hair: '#3e2731', metal: '#f2d27a' },
 };
 
 const shade: CharacterDef = {
   id: 'shade',
-  name: 'Shade',
-  jp: '影',
+  name: 'Assassin',
+  jp: '影刃',
   weapon: 'Twin Daggers',
   weaponKind: 'daggers',
   role: 'Assassin',
-  description: 'Fragile and relentless. Two dodge charges, backstabs and a blink that puts you right behind them.',
+  description: 'A hooded killer with two knives. Fragile and relentless: two dodge charges, backstabs and a blink that puts you right behind them.',
   stats: { hp: 90, posture: 90, speed: 6.9, postureRegen: 1.1 },
   ratings: { power: 2, speed: 5, reach: 1, defense: 1, difficulty: 5 },
   lights: [
@@ -301,17 +302,17 @@ const shade: CharacterDef = {
     range: 9,
   },
   passive: { name: 'Ghost', description: 'Two dodge charges. Hits from behind deal 40% more damage.', mods: { dodgeCharges: 2, backstabBonus: 0.4 } },
-  palette: { primary: '#3a4466', secondary: '#262b44', accent: '#b55088', skin: '#e8b796', hair: '#e8e8f0', metal: '#b8c0d8' },
+  palette: { primary: '#173a3a', secondary: '#262b30', accent: '#38bea8', skin: '#e8b796', hair: '#1a2a2a', metal: '#b8c0d8' },
 };
 
 const reaper: CharacterDef = {
   id: 'reaper',
-  name: 'Reaper',
-  jp: '死神',
+  name: 'Wraith',
+  jp: '鎌鬼',
   weapon: 'Scythe',
   weaponKind: 'scythe',
   role: 'Sustain / control',
-  description: 'Wide sweeping arcs that are hard to step around. Heals from every hit and hooks fleeing prey back in.',
+  description: 'A faceless spirit that drifts on mist. Wide sweeping arcs that are hard to step around; heals from every hit and hooks fleeing prey back in.',
   stats: { hp: 105, posture: 100, speed: 5.8, postureRegen: 0.95 },
   ratings: { power: 3, speed: 2, reach: 4, defense: 3, difficulty: 3 },
   lights: [
@@ -329,17 +330,17 @@ const reaper: CharacterDef = {
     attack: { name: 'Soul Hook', anim: 'hook', windup: 450, active: 120, recovery: 550, damage: 6, posture: 10, blockPosture: 14, range: 11, arc: 12, pull: 2.0 },
   },
   passive: { name: 'Soul Siphon', description: 'Heal for 20% of all damage you deal.', mods: { lifesteal: 0.2 } },
-  palette: { primary: '#193c3e', secondary: '#1e6f75', accent: '#63c74d', skin: '#b9c4bd', hair: '#0f1412', metal: '#a7b5ae' },
+  palette: { primary: '#d8d6d0', secondary: '#2a2a30', accent: '#c4161c', skin: '#e6e4de', hair: '#101012', metal: '#a7b5ae' },
 };
 
 const monk: CharacterDef = {
   id: 'monk',
   name: 'Monk',
-  jp: '武僧',
-  weapon: 'Gauntlets',
+  jp: '老師',
+  weapon: 'Fists',
   weaponKind: 'gauntlets',
   role: 'Posture breaker',
-  description: 'Short range, rapid strikes that shred posture, plus a counter stance that turns their offense against them.',
+  description: 'An old master who has outlived braver men. Short range, rapid strikes that shred posture, plus a counter stance that turns their offense against them.',
   stats: { hp: 100, posture: 110, speed: 6.4, postureRegen: 1.3 },
   ratings: { power: 3, speed: 5, reach: 1, defense: 4, difficulty: 4 },
   lights: [
@@ -360,17 +361,17 @@ const monk: CharacterDef = {
     attack: { name: 'Counter Strike', anim: 'uppercut', windup: 60, active: 80, recovery: 360, damage: 12, posture: 35, blockPosture: 35, range: 2.5, arc: 90, noHitbox: true },
   },
   passive: { name: 'Inner Focus', description: 'Deal 15% more posture damage. Posture recovers 30% faster.', mods: { postureDamageMult: 1.15 } },
-  palette: { primary: '#ecebe6', secondary: '#3a4466', accent: '#f77622', skin: '#c28569', hair: '#2a1b10', metal: '#8c6f4a' },
+  palette: { primary: '#b0432a', secondary: '#e8e0d0', accent: '#f2c14e', skin: '#c28569', hair: '#e8e4dc', metal: '#8c6f4a' },
 };
 
 const paladin: CharacterDef = {
   id: 'paladin',
-  name: 'Paladin',
-  jp: '聖騎士',
-  weapon: 'Sword & Shield',
+  name: 'Knight',
+  jp: '騎士',
+  weapon: 'Greatsword & Shield',
   weaponKind: 'swordShield',
   role: 'Defender',
-  description: 'A walking wall. Blocking barely dents your posture, and a shield charge punishes anyone who turtles.',
+  description: 'A bronze-armoured knight behind a swirl shield. A walking wall: blocking barely dents your posture, and a shield charge punishes anyone who turtles.',
   stats: { hp: 110, posture: 120, speed: 5.6, postureRegen: 1 },
   ratings: { power: 3, speed: 2, reach: 2, defense: 5, difficulty: 1 },
   lights: [
@@ -388,7 +389,7 @@ const paladin: CharacterDef = {
     attack: { name: 'Shield Charge', anim: 'charge', windup: 260, active: 260, recovery: 500, damage: 8, posture: 30, blockPosture: 38, range: 2.0, arc: 60, lunge: 5.0, unparryable: true, knockback: 2.0 },
   },
   passive: { name: 'Bulwark', description: 'Blocking takes 30% less posture damage and covers a wider angle.', mods: { blockPostureMult: 0.7, guardArcBonus: 35 } },
-  palette: { primary: '#d4d8de', secondary: '#124e89', accent: '#feae34', skin: '#e8b796', hair: '#733e39', metal: '#e8edf2' },
+  palette: { primary: '#5a4a2e', secondary: '#1e2a4a', accent: '#c98f45', skin: '#e8b796', hair: '#733e39', metal: '#d9b47a' },
 };
 
 export const CHARACTERS: Record<CharacterId, CharacterDef> = {
