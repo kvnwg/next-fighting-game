@@ -6,13 +6,13 @@
  */
 import * as THREE from 'three';
 import { CHARACTERS, CharacterDef, CharacterId } from '../../shared/characters';
-import { AnimInput, Animator, Reaction, handTargets } from './anim/animator';
-import { solveTwoBone } from './anim/math';
-import { CHAR_LAYER } from './renderer';
+import { AnimFrame, AnimInput, Animator, Reaction, handTargets } from './anim/animator';
+import { smooth, solveTwoBone } from './anim/math';
+import { CHAR_LAYER, FX_LAYER } from './renderer';
 import { charRamp } from './textures';
 import { WeaponParts, buildWeapon } from './weapons';
 
-export type { AnimInput, Reaction };
+export type { AnimFrame, AnimInput, Reaction };
 
 const UPPER_ARM = 0.29;
 const FOREARM = 0.27;
@@ -41,6 +41,20 @@ const _m = new THREE.Matrix4();
 const _yaw = new THREE.Quaternion();
 const _ident = new THREE.Quaternion();
 const _down = new THREE.Vector3();
+const _acro = new THREE.Quaternion();
+const _pivot = new THREE.Vector3();
+const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const _bodyInv = new THREE.Matrix4();
+// legs tucked to the chest while upside down (body frame)
+const TUCK_L = new THREE.Vector3(0.15, 0.55, 0.16);
+const TUCK_R = new THREE.Vector3(-0.15, 0.48, 0.02);
+const GHOST_LIFE = 0.28;
+
+interface Ghost {
+  group: THREE.Group;
+  mat: THREE.MeshBasicMaterial;
+  life: number;
+}
 
 interface Limb {
   upper: THREE.Group;
@@ -73,6 +87,12 @@ export class CharacterModel {
   private readonly materials: THREE.MeshToonMaterial[] = [];
   private flashT = 0;
   private flashColor = new THREE.Color('#ffffff');
+  private ghosts: Ghost[] = [];
+  private ghostT = 0;
+  /** the last animation frame, for effects that need it (kick trails, cue anchors) */
+  frame: AnimFrame | null = null;
+  /** afterimages on dashes and flips (the dev strip viewer turns them off) */
+  ghostsEnabled = true;
 
   constructor(charId: CharacterId) {
     this.char = CHARACTERS[charId];
@@ -277,6 +297,7 @@ export class CharacterModel {
 
   update(a: AnimInput, dt: number): void {
     const f = this.animator.update(a, dt);
+    this.frame = f;
     const p = f.pose;
     const b = p.body;
     this.swingMain = f.swingMain;
@@ -286,6 +307,13 @@ export class CharacterModel {
     const lying = f.lying;
     this.hips.position.y = HIPS_Y + b.crouch * (1 - lying) + b.lift - 0.78 * lying;
     this.hips.rotation.set(-1.45 * lying, b.hipTwist * (1 - lying) + f.spin, 0);
+    // flips and cartwheels turn the whole body about the hips; the legs tuck while inverted
+    _euler.set(f.flip, 0, f.roll);
+    _acro.setFromEuler(_euler);
+    _pivot.set(0, this.hips.position.y, 0);
+    this.body.quaternion.copy(_acro);
+    this.body.position.copy(_pivot).sub(_pivot.clone().applyQuaternion(_acro));
+    const tuck = smooth(Math.min(1, (Math.abs(Math.sin(f.flip / 2)) + Math.abs(Math.sin(f.roll / 2))) * 1.7));
     this.torso.rotation.set(b.lean * (1 - lying * 0.8), b.twist - b.hipTwist, b.side);
     this.head.rotation.set(b.headPitch - b.lean * 0.5, -b.twist * 0.75, -b.side * 0.6);
 
@@ -302,8 +330,8 @@ export class CharacterModel {
       }
     }
 
-    // weapons stop at the ground instead of sinking into it
-    if (lying < 0.5) this.keepAboveGround(p.main.pos, p.main.quat);
+    // weapons stop at the ground instead of sinking into it (not mid-flip, where "down" moves)
+    if (lying < 0.5 && tuck < 0.2) this.keepAboveGround(p.main.pos, p.main.quat);
     this.mainPivot.quaternion.copy(p.main.quat);
 
     // arms: right hand to the grip; if it can't quite reach, the weapon comes to the hand
@@ -324,13 +352,21 @@ export class CharacterModel {
 
     // legs: ankles to the foot targets (given in the root frame)
     this.hips.updateMatrix();
+    this.body.updateMatrix();
     _m.copy(this.hips.matrix).invert();
+    _bodyInv.copy(this.body.matrix).invert();
     for (const [leg, hip, pole, foot, side] of [
       [this.legR, HIP_R, KNEE_POLE_R, f.feet.R, -1],
       [this.legL, HIP_L, KNEE_POLE_L, f.feet.L, 1],
     ] as const) {
-      // spins carry the stance around with them
-      _v.copy(foot).applyAxisAngle(UP, f.spin).applyMatrix4(_m);
+      _v.copy(foot);
+      // a kicking foot follows the kick's path
+      const kickW = f.kick && f.kick.foot === (side === 1 ? 'L' : 'R') ? f.kick.w : 0;
+      if (kickW > 0) _v.lerp(f.kick!.pos, kickW);
+      // spins carry the stance around with them; flips carry it into the body's frame
+      _v.applyAxisAngle(UP, f.spin).applyMatrix4(_bodyInv);
+      if (tuck > 0 && kickW < 0.5) _v.lerp(side === 1 ? TUCK_L : TUCK_R, tuck);
+      _v.applyMatrix4(_m);
       solveTwoBone(hip, _v, pole, THIGH, SHIN, leg.upper.quaternion, leg.lower.quaternion);
       // feet flat, rear foot turned out a little
       const rear = (side === 1) === (b.front === 'R');
@@ -346,6 +382,8 @@ export class CharacterModel {
       }
     }
 
+    this.updateGhosts(f.ghost, dt);
+
     // hit flash / buff glow
     this.flashT = Math.max(0, this.flashT - dt * 8);
     const glow = a.buff ? 0.35 + Math.sin(performance.now() / 90) * 0.15 : 0;
@@ -358,6 +396,66 @@ export class CharacterModel {
         m.emissive.copy(m.userData.baseEmissive as THREE.Color);
       }
     }
+  }
+
+  /** Leave fading afterimages behind while a move asks for them (dashes, flips, blinks). */
+  private updateGhosts(emit: boolean, dt: number): void {
+    this.ghostT -= dt;
+    if (emit && this.ghostsEnabled && this.ghostT <= 0 && this.root.parent && this.body.visible) {
+      this.ghostT = 0.045;
+      this.spawnGhost();
+    }
+    for (let i = this.ghosts.length - 1; i >= 0; i--) {
+      const g = this.ghosts[i];
+      g.life -= dt;
+      g.mat.opacity = Math.max(0, (g.life / GHOST_LIFE) * 0.45);
+      if (g.life <= 0) {
+        g.group.parent?.remove(g.group);
+        g.mat.dispose();
+        this.ghosts.splice(i, 1);
+      }
+    }
+  }
+
+  /** A frozen, translucent copy of the fighter as it is right now. */
+  private spawnGhost(): void {
+    if (this.ghosts.length >= 8) {
+      const old = this.ghosts.shift()!;
+      old.group.parent?.remove(old.group);
+      old.mat.dispose();
+    }
+    this.root.updateMatrixWorld(true);
+    const mat = new THREE.MeshBasicMaterial({
+      color: this.ghostColor,
+      transparent: true,
+      opacity: 0.45,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    });
+    const group = new THREE.Group();
+    this.root.traverse((o) => {
+      if (!(o instanceof THREE.Mesh) || !o.visible) return;
+      const m = new THREE.Mesh(o.geometry, mat);
+      m.matrixAutoUpdate = false;
+      m.matrix.copy(o.matrixWorld);
+      m.layers.set(FX_LAYER);
+      group.add(m);
+    });
+    this.root.parent!.add(group);
+    this.ghosts.push({ group, mat, life: GHOST_LIFE });
+  }
+
+  /** Colour of this fighter's afterimages. */
+  get ghostColor(): string {
+    return this.animator.style.trail.heavy;
+  }
+
+  /** World transform of a foot (for kick trails). */
+  footXf(which: 'L' | 'R', pos: THREE.Vector3, quat: THREE.Quaternion, scale: THREE.Vector3): void {
+    const g = (which === 'L' ? this.legL : this.legR).end;
+    g.updateWorldMatrix(true, false);
+    g.matrixWorld.decompose(pos, quat, scale);
   }
 
   /**
@@ -431,6 +529,11 @@ export class CharacterModel {
   }
 
   dispose(): void {
+    for (const g of this.ghosts) {
+      g.group.parent?.remove(g.group);
+      g.mat.dispose();
+    }
+    this.ghosts = [];
     this.root.traverse((o) => {
       if (o instanceof THREE.Mesh) o.geometry.dispose();
     });

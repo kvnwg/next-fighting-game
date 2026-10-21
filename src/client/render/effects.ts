@@ -19,11 +19,37 @@ interface Particle {
   drag: number;
   /** >0: drawn as a streak stretched along its velocity (sparks) */
   stretch: number;
+  /** size multiplier reached at the end of its life (smoke billows out) */
+  grow: number;
   color: THREE.Color;
 }
 
+/** Which effect a move's cue asks for (see FxKind in anim/author.ts). */
+export type CueKind =
+  | 'dust'
+  | 'stomp'
+  | 'shockwave'
+  | 'quake'
+  | 'sparkle'
+  | 'flashline'
+  | 'petals'
+  | 'spiral'
+  | 'whirl'
+  | 'smoke'
+  | 'wisps'
+  | 'soulfire'
+  | 'chi'
+  | 'holy'
+  | 'roar'
+  | 'shake';
+
 const _up = new THREE.Vector3(0, 1, 0);
 const _vel = new THREE.Vector3();
+const _a = new THREE.Vector3();
+const _b = new THREE.Vector3();
+const _c = new THREE.Vector3();
+const DUST = ['#c8b49a', '#a8957c', '#ddd0bc'];
+const DEBRIS = ['#6b5a48', '#4a3d31', '#8a7660'];
 
 const MAX_PARTICLES = 900;
 
@@ -51,6 +77,7 @@ export class Effects {
   private mesh: THREE.InstancedMesh;
   private flashes: { mesh: THREE.Mesh; life: number; max: number; sx: number; sy: number }[] = [];
   private rings: { mesh: THREE.Mesh; life: number; max: number; grow: number }[] = [];
+  private beams: { mesh: THREE.Mesh; life: number; max: number; width: number }[] = [];
   private tmpM = new THREE.Matrix4();
   private tmpQ = new THREE.Quaternion();
   private tmpS = new THREE.Vector3();
@@ -64,7 +91,7 @@ export class Effects {
     this.mesh.frustumCulled = false;
     this.mesh.layers.set(FX_LAYER);
     for (let i = 0; i < MAX_PARTICLES; i++) {
-      this.particles.push({ alive: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 1, size: 0.1, gravity: 0, drag: 0, stretch: 0, color: new THREE.Color() });
+      this.particles.push({ alive: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 1, size: 0.1, gravity: 0, drag: 0, stretch: 0, grow: 1, color: new THREE.Color() });
       this.mesh.setColorAt(i, new THREE.Color('#ffffff'));
     }
     this.mesh.count = 0;
@@ -84,7 +111,7 @@ export class Effects {
 
   burst(
     pos: THREE.Vector3,
-    opts: { count: number; color: string | string[]; speed: number; up?: number; life?: number; size?: number; gravity?: number; spread?: number; drag?: number; stretch?: number },
+    opts: { count: number; color: string | string[]; speed: number; up?: number; life?: number; size?: number; gravity?: number; spread?: number; drag?: number; stretch?: number; grow?: number },
   ): void {
     const colors = Array.isArray(opts.color) ? opts.color : [opts.color];
     for (let i = 0; i < opts.count; i++) {
@@ -105,8 +132,29 @@ export class Effects {
       p.gravity = opts.gravity ?? 9;
       p.drag = opts.drag ?? 1.5;
       p.stretch = opts.stretch ?? 0;
+      p.grow = opts.grow ?? 1;
       p.color.set(colors[Math.floor(Math.random() * colors.length)]);
     }
+  }
+
+  /** One particle with an explicit velocity (spirals, wisps, sweeps). */
+  emit(x: number, y: number, z: number, vx: number, vy: number, vz: number, color: string, o: { life?: number; size?: number; gravity?: number; drag?: number; stretch?: number; grow?: number } = {}): void {
+    const p = this.spawn();
+    if (!p) return;
+    p.alive = true;
+    p.x = x;
+    p.y = y;
+    p.z = z;
+    p.vx = vx;
+    p.vy = vy;
+    p.vz = vz;
+    p.max = p.life = (o.life ?? 0.5) * (0.8 + Math.random() * 0.4);
+    p.size = (o.size ?? 0.08) * (0.8 + Math.random() * 0.4);
+    p.gravity = o.gravity ?? 0;
+    p.drag = o.drag ?? 1.5;
+    p.stretch = o.stretch ?? 0;
+    p.grow = o.grow ?? 1;
+    p.color.set(color);
   }
 
   /** Billboard flash (parry spark star, impact). */
@@ -128,18 +176,183 @@ export class Effects {
     this.flashes.push({ mesh: m2, life, max: life, sx: size * 1.5, sy: size * 0.45 });
   }
 
-  /** Expanding ground ring (posture break, deathblow, landing). */
-  ring(pos: THREE.Vector3, color: string, radius: number, life = 0.45): void {
+  /** Expanding ring (posture break, deathblow, landing). Flat on the ground unless given a normal. */
+  ring(pos: THREE.Vector3, color: string, radius: number, life = 0.45, normal?: THREE.Vector3, additive = false): void {
     const mesh = new THREE.Mesh(
-      new THREE.RingGeometry(0.8, 1, 24),
-      new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+      new THREE.RingGeometry(0.8, 1, 32),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+        blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      }),
     );
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(pos.x, pos.y + 0.06, pos.z);
+    if (normal) mesh.quaternion.setFromUnitVectors(Z_AXIS, normal.clone().normalize());
+    else mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(pos.x, pos.y + (normal ? 0 : 0.06), pos.z);
     mesh.scale.setScalar(0.2);
     mesh.layers.set(FX_LAYER);
     this.group.add(mesh);
     this.rings.push({ mesh, life, max: life, grow: radius });
+  }
+
+  /** A bright streak between two points that thins out as it fades (draw cuts, light shafts, chains). */
+  beam(a: THREE.Vector3, b: THREE.Vector3, color: string, width = 0.05, life = 0.22): void {
+    const len = a.distanceTo(b);
+    if (len < 1e-3) return;
+    const mesh = new THREE.Mesh(
+      beamGeometry(),
+      new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }),
+    );
+    mesh.position.copy(a).add(b).multiplyScalar(0.5);
+    mesh.quaternion.setFromUnitVectors(_up, _c.subVectors(b, a).normalize());
+    mesh.scale.set(width, len, width);
+    mesh.layers.set(FX_LAYER);
+    this.group.add(mesh);
+    this.beams.push({ mesh, life, max: life, width });
+  }
+
+  // ---------------------------------------------------------------- move effects
+
+  /** A soft puff of dust at the feet. */
+  dust(pos: THREE.Vector3, scale = 1): void {
+    this.burst(pos, { count: Math.round(10 * scale), color: DUST, speed: 2.2 * scale, up: 0.6, life: 0.55, size: 0.11 * scale, gravity: 1, drag: 4, spread: 0.4, grow: 2.2 });
+  }
+
+  /** Thrown stones and clods. */
+  debris(pos: THREE.Vector3, scale = 1): void {
+    this.burst(pos, { count: Math.round(14 * scale), color: DEBRIS, speed: 5 * scale, up: 4 * scale, life: 0.9, size: 0.09, gravity: 18, drag: 0.6, spread: 0.6 });
+  }
+
+  /** A ground impact: dust ring, debris, a ring of light. */
+  shockwave(pos: THREE.Vector3, scale = 1, color = '#ffd27a'): void {
+    this.ring(pos, color, 3.2 * scale, 0.5, undefined, true);
+    this.ring(pos, '#c8b49a', 2.2 * scale, 0.7);
+    this.debris(pos, 1.3 * scale);
+    for (let i = 0; i < 14 * scale; i++) {
+      const a = (i / (14 * scale)) * Math.PI * 2;
+      this.emit(pos.x, pos.y + 0.1, pos.z, Math.cos(a) * 6 * scale, 0.6, Math.sin(a) * 6 * scale, DUST[i % 3], { life: 0.6, size: 0.16 * scale, drag: 5, gravity: 0.5, grow: 2.5 });
+    }
+    this.flash(_a.copy(pos).setY(pos.y + 0.3), color, 1.2 * scale, 0.15);
+  }
+
+  /** Earth thrown up where a sweep skims the ground. */
+  quake(pos: THREE.Vector3, dir: THREE.Vector3, scale = 1): void {
+    for (let i = 0; i < 10 * scale; i++) {
+      const s = 1 + Math.random() * 2;
+      this.emit(pos.x, 0.08, pos.z, dir.x * s + (Math.random() - 0.5) * 2, 3 + Math.random() * 4, dir.z * s + (Math.random() - 0.5) * 2, DEBRIS[i % 3], { life: 0.8, size: 0.1, gravity: 16, drag: 0.5 });
+    }
+    this.dust(_a.copy(pos).setY(0.05), 0.8 * scale);
+  }
+
+  sparkle(pos: THREE.Vector3, color = '#ffffff', scale = 1): void {
+    this.flash(pos, color, 0.55 * scale, 0.14);
+    this.burst(pos, { count: Math.round(6 * scale), color: [color, '#ffffff'], speed: 4, life: 0.25, size: 0.04, gravity: 2, drag: 4, stretch: 0.06 });
+  }
+
+  /** Cherry petals scattered from a cut. */
+  petals(pos: THREE.Vector3, scale = 1): void {
+    const cols = ['#f6b8cc', '#f39dba', '#ffd6e2', '#ffffff'];
+    for (let i = 0; i < 22 * scale; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 1.5 + Math.random() * 3;
+      this.emit(pos.x, pos.y, pos.z, Math.cos(a) * sp, 0.5 + Math.random() * 2, Math.sin(a) * sp, cols[i % 4], { life: 1.2, size: 0.07, gravity: 1.2, drag: 2.5 });
+    }
+  }
+
+  /** Wind spiralling along a thrust. */
+  spiral(pos: THREE.Vector3, dir: THREE.Vector3, color: string, length = 2.2, scale = 1): void {
+    const d = _a.copy(dir).normalize();
+    const u = _b.crossVectors(d, _up);
+    if (u.lengthSq() < 1e-4) u.set(1, 0, 0);
+    u.normalize();
+    const w = _c.crossVectors(d, u).normalize();
+    const turns = 3;
+    const n = Math.round(36 * scale);
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      const ang = t * turns * Math.PI * 2;
+      const r = 0.25 + t * 0.15;
+      const ox = (u.x * Math.cos(ang) + w.x * Math.sin(ang)) * r;
+      const oy = (u.y * Math.cos(ang) + w.y * Math.sin(ang)) * r;
+      const oz = (u.z * Math.cos(ang) + w.z * Math.sin(ang)) * r;
+      const x = pos.x + d.x * length * t + ox;
+      const y = pos.y + d.y * length * t + oy;
+      const z = pos.z + d.z * length * t + oz;
+      this.emit(x, y, z, d.x * 4 + ox * 4, d.y * 4 + oy * 4, d.z * 4 + oz * 4, i % 3 ? color : '#ffffff', { life: 0.35, size: 0.06, drag: 3, stretch: 0.05 });
+    }
+  }
+
+  /** A ring of wind around the fighter (spins). */
+  whirl(pos: THREE.Vector3, scale = 1, color = '#e8f6ff'): void {
+    this.ring(_a.copy(pos).setY(Math.max(0.05, pos.y - 0.9)), color, 3 * scale, 0.4, undefined, true);
+    const n = Math.round(28 * scale);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const r = 1.1 * scale;
+      this.emit(pos.x + Math.cos(a) * r, pos.y - 0.4 + Math.random() * 0.6, pos.z + Math.sin(a) * r, -Math.sin(a) * 6, 0.4, Math.cos(a) * 6, i % 2 ? color : '#ffffff', { life: 0.35, size: 0.06, drag: 2, stretch: 0.05 });
+    }
+  }
+
+  /** Shadow smoke (vanishes, the Shade's dashes). */
+  smoke(pos: THREE.Vector3, scale = 1, color = '#3a2a5a'): void {
+    const cols = [color, '#1d1730', '#6a4a9a'];
+    for (let i = 0; i < 18 * scale; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 0.6 + Math.random() * 1.6;
+      this.emit(pos.x, pos.y + Math.random() * 1.2, pos.z, Math.cos(a) * sp, 0.4 + Math.random() * 0.8, Math.sin(a) * sp, cols[i % 3], { life: 0.7, size: 0.16 * scale, gravity: -0.4, drag: 2.5, grow: 2.6 });
+    }
+  }
+
+  /** Soul wisps rising and curling away. */
+  wisps(pos: THREE.Vector3, color = '#7cffb2', scale = 1): void {
+    for (let i = 0; i < 12 * scale; i++) {
+      const a = Math.random() * Math.PI * 2;
+      this.emit(pos.x, pos.y, pos.z, Math.cos(a) * 1.2, 1.2 + Math.random() * 1.5, Math.sin(a) * 1.2, i % 3 ? color : '#e8fff0', { life: 0.9, size: 0.07, gravity: -1.2, drag: 1.5, grow: 1.6 });
+    }
+  }
+
+  /** Green fire licking along the ground under a sweep. */
+  soulfire(pos: THREE.Vector3, scale = 1): void {
+    const cols = ['#63c74d', '#3cff8a', '#b8ffd0', '#1e6f45'];
+    for (let i = 0; i < 16 * scale; i++) {
+      this.emit(pos.x + (Math.random() - 0.5) * 0.6, 0.08, pos.z + (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, 1.5 + Math.random() * 2.2, (Math.random() - 0.5) * 0.6, cols[i % 4], { life: 0.7, size: 0.1, gravity: -0.6, drag: 2, grow: 0.4 });
+    }
+  }
+
+  /** A burst of chi: a ring facing the strike and sparks thrown forward. */
+  chi(pos: THREE.Vector3, dir: THREE.Vector3, color = '#ff9a2a', scale = 1): void {
+    this.ring(pos, color, 1.8 * scale, 0.3, dir, true);
+    this.ring(pos, '#fff0c8', 1.1 * scale, 0.22, dir, true);
+    this.flash(pos, color, 0.8 * scale, 0.12);
+    for (let i = 0; i < 14 * scale; i++) {
+      this.emit(pos.x, pos.y, pos.z, dir.x * (5 + Math.random() * 5) + (Math.random() - 0.5) * 3, (Math.random() - 0.3) * 3, dir.z * (5 + Math.random() * 5) + (Math.random() - 0.5) * 3, i % 2 ? color : '#ffe0a0', { life: 0.3, size: 0.05, drag: 3, stretch: 0.07 });
+    }
+  }
+
+  /** A golden flare with shafts of light. */
+  holy(pos: THREE.Vector3, scale = 1): void {
+    const gold = '#ffd86a';
+    this.ring(_a.copy(pos).setY(0.05), gold, 3 * scale, 0.6, undefined, true);
+    this.flash(_b.copy(pos).setY(pos.y + 0.4), '#fff4c0', 1.4 * scale, 0.22);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const r = 0.5 + Math.random() * 0.9;
+      const x = pos.x + Math.cos(a) * r;
+      const z = pos.z + Math.sin(a) * r;
+      this.beam(_a.set(x, 0, z), _b.set(x, 2.6 + Math.random() * 1.6, z), gold, 0.07 * scale, 0.45);
+    }
+    this.burst(pos, { count: Math.round(18 * scale), color: [gold, '#ffffff'], speed: 3, up: 2, life: 0.8, size: 0.05, gravity: -1, drag: 2 });
+  }
+
+  /** A war cry: a red pulse and a ring of force. */
+  roar(pos: THREE.Vector3, scale = 1): void {
+    this.ring(_a.copy(pos).setY(0.05), '#ff4a2a', 3.4 * scale, 0.5, undefined, true);
+    this.ring(_a.copy(pos).setY(0.05), '#ffb02a', 2.4 * scale, 0.7, undefined, true);
+    this.dust(_a.copy(pos).setY(0.05), 1.4 * scale);
+    this.burst(_a.copy(pos).setY(pos.y + 1), { count: 24, color: ['#ff6a2a', '#ffb030', '#ff2a1a'], speed: 5, up: 1, life: 0.5, size: 0.07, gravity: -2, drag: 2 });
   }
 
   update(dt: number, camera: THREE.Camera): void {
@@ -164,7 +377,8 @@ export class Effects {
         p.vx *= 0.5;
         p.vz *= 0.5;
       }
-      const s = p.size * Math.min(1, (p.life / p.max) * 2);
+      const age = 1 - p.life / p.max;
+      const s = p.size * (1 + (p.grow - 1) * age) * Math.min(1, (p.life / p.max) * 2);
       this.tmpP.set(p.x, p.y, p.z);
       if (p.stretch > 0) {
         _vel.set(p.vx, p.vy, p.vz);
@@ -199,6 +413,20 @@ export class Effects {
         this.flashes.splice(i, 1);
       }
     }
+    for (let i = this.beams.length - 1; i >= 0; i--) {
+      const bm = this.beams[i];
+      bm.life -= dt;
+      const t = 1 - bm.life / bm.max;
+      const w = bm.width * (1 - t * 0.8);
+      bm.mesh.scale.x = w;
+      bm.mesh.scale.z = w;
+      (bm.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - t * t);
+      if (bm.life <= 0) {
+        this.group.remove(bm.mesh);
+        (bm.mesh.material as THREE.Material).dispose();
+        this.beams.splice(i, 1);
+      }
+    }
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i];
       r.life -= dt;
@@ -221,11 +449,19 @@ export class Effects {
   }
 }
 
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+let beamGeo: THREE.BufferGeometry | null = null;
+/** A unit cylinder along +Y, shared by every beam. */
+function beamGeometry(): THREE.BufferGeometry {
+  if (!beamGeo) beamGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true);
+  return beamGeo;
+}
+
 /** A ribbon following a weapon's base->tip segment while it swings. */
 export class WeaponTrail {
   readonly mesh: THREE.Mesh;
   /** seconds a point of the ribbon lives */
-  private readonly life = 0.13;
+  private life = 0.13;
   private readonly max = 72;
   private pts: { b: THREE.Vector3; t: THREE.Vector3; age: number }[] = [];
   private positions: Float32Array;
@@ -249,9 +485,10 @@ export class WeaponTrail {
     }
     geo.setIndex(idx);
     const mat = new THREE.ShaderMaterial({
-      uniforms: { color: { value: new THREE.Color(color) } },
+      uniforms: { color: { value: new THREE.Color(color) }, glow: { value: 0 } },
       vertexShader: `attribute float alpha; varying float vA; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 color; varying float vA; void main(){ gl_FragColor = vec4(mix(color, vec3(1.0), vA * 0.35), vA * 0.85); }`,
+      // the leading edge burns toward white; glow brightens heavy and special swings
+      fragmentShader: `uniform vec3 color; uniform float glow; varying float vA; void main(){ vec3 c = mix(color, vec3(1.0), vA * (0.35 + glow * 0.4)); gl_FragColor = vec4(c * (1.0 + glow * 0.6), min(1.0, vA * (0.85 + glow * 0.3))); }`,
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -264,6 +501,12 @@ export class WeaponTrail {
 
   setColor(c: string): void {
     ((this.mesh.material as THREE.ShaderMaterial).uniforms.color.value as THREE.Color).set(c);
+  }
+
+  /** Per-move look: how long the ribbon lingers and how bright it burns. */
+  setStyle(life: number, glow: number): void {
+    this.life = life;
+    (this.mesh.material as THREE.ShaderMaterial).uniforms.glow.value = glow;
   }
 
   /**

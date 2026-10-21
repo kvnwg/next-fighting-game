@@ -58,6 +58,8 @@ class App {
   private buffSeen = new Map<string, boolean>();
   private fps = { frames: 0, t: 0, value: 0 };
   private tmp = new THREE.Vector3();
+  private tmp2 = new THREE.Vector3();
+  private tmp3 = new THREE.Vector3();
   private titleTime = 0;
 
   constructor(
@@ -571,6 +573,90 @@ class App {
     if (e.tags?.includes('kill')) play('death', vol);
   }
 
+  /** Effects a move's choreography asks for: dust on a stomp, a shockwave under a slam, petals off an iai cut. */
+  private moveFx(f: ClientFighter): void {
+    if (!f.fxQueue.length) return;
+    const me = this.local?.cf;
+    const far = !!me && dist2D(me.pos.x, me.pos.z, f.pos.x, f.pos.z) > 32;
+    for (const { cue, pos, dir } of f.fxQueue) {
+      if (far) continue;
+      const sc = cue.scale;
+      const color = cue.color ?? f.model.animator.style.trail.heavy;
+      const fx = this.effects;
+      switch (cue.kind) {
+        case 'dust':
+          fx.dust(pos, sc);
+          break;
+        case 'stomp':
+          fx.dust(pos, sc * 1.4);
+          fx.ring(pos, '#c8b49a', 1.6 * sc, 0.4);
+          this.shakeNear(f, 0.05 * sc, 0.1);
+          break;
+        case 'shockwave':
+          fx.shockwave(pos, sc, color);
+          this.shakeNear(f, 0.24 * sc, 0.32);
+          break;
+        case 'quake':
+          fx.quake(pos, dir, sc);
+          this.shakeNear(f, 0.06 * sc, 0.12);
+          break;
+        case 'sparkle':
+          fx.sparkle(pos, color, sc);
+          break;
+        case 'flashline': {
+          // a glint running down the blade and past its point
+          const grip = f.anchor('main', this.tmp2);
+          const end = this.tmp3.subVectors(pos, grip).multiplyScalar(0.7 * sc).add(pos);
+          fx.beam(grip, end, color, 0.035 * sc, 0.2);
+          fx.sparkle(pos, '#ffffff', 0.8 * sc);
+          break;
+        }
+        case 'petals':
+          fx.petals(pos, sc);
+          break;
+        case 'spiral':
+          fx.spiral(pos, dir, color, 2.4 * sc, sc);
+          break;
+        case 'whirl':
+          fx.whirl(pos, sc, color);
+          break;
+        case 'smoke':
+          fx.smoke(pos, sc);
+          break;
+        case 'wisps':
+          fx.wisps(pos, color, sc);
+          break;
+        case 'soulfire':
+          fx.soulfire(pos, sc);
+          break;
+        case 'chi':
+          fx.chi(pos, dir, color, sc);
+          break;
+        case 'holy':
+          fx.holy(pos, sc);
+          this.shakeNear(f, 0.1 * sc, 0.2);
+          break;
+        case 'roar':
+          fx.roar(pos, sc);
+          this.shakeNear(f, 0.14 * sc, 0.3);
+          break;
+        case 'shake':
+          this.shakeNear(f, 0.1 * sc, 0.15);
+          break;
+      }
+    }
+    f.fxQueue.length = 0;
+  }
+
+  /** Shake the camera for an impact, fading with distance from the local player. */
+  private shakeNear(f: ClientFighter, amount: number, time: number): void {
+    const me = this.local?.cf;
+    if (!me) return;
+    const d = dist2D(me.pos.x, me.pos.z, f.pos.x, f.pos.z);
+    const k = f === me ? 1 : Math.max(0, 1 - d / 12);
+    if (k > 0.05) this.cam.shake(amount * k, time);
+  }
+
   /** Sounds and cues driven by state changes (works the same for you, players and bots). */
   private stateCues(f: ClientFighter, now: number): void {
     const v = f.view(now);
@@ -636,6 +722,7 @@ class App {
       const buff = (f.flags & 1) === 1 || (!!f.sim && f.sim.buffActive(now));
       f.updateVisual(dt, now, buff);
       this.stateCues(f, now);
+      this.moveFx(f);
     }
 
     // camera

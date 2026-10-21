@@ -8,8 +8,27 @@ import { INTERP_DELAY_MS } from '../shared/config';
 import { Fighter, FighterState } from '../shared/fighter';
 import { angleDiff, forward } from '../shared/math';
 import { FighterSnap, RosterEntry } from '../shared/protocol';
+import type { DodgeKind } from './render/anim/animator';
+import type { FxAnchor, FxCue } from './render/anim/author';
 import { AnimInput, CharacterModel } from './render/character';
 import { WeaponTrail, makeGlyph } from './render/effects';
+
+/** An effect cue from a move, resolved to a world position (and the fighter's facing). */
+export interface FxEvent {
+  cue: FxCue;
+  pos: THREE.Vector3;
+  dir: THREE.Vector3;
+  fighter: ClientFighter;
+}
+
+/** Kick trail anchors in the ankle's frame: heel to toe. */
+const KICK_BASE = new THREE.Vector3(0, 0.03, -0.06);
+const KICK_TIP = new THREE.Vector3(0, -0.02, 0.2);
+
+function forward3(yaw: number): THREE.Vector3 {
+  const f = forward(yaw);
+  return new THREE.Vector3(f.x, 0, f.z);
+}
 
 interface Sample {
   t: number;
@@ -24,6 +43,10 @@ export class ClientFighter {
   model: CharacterModel;
   readonly trail: WeaponTrail;
   offTrail: WeaponTrail | null;
+  /** follows the kicking foot (martial-arts kicks) */
+  readonly kickTrail: WeaponTrail;
+  /** effect cues fired by the current move, waiting for the game loop */
+  fxQueue: FxEvent[] = [];
   readonly glyph: THREE.Sprite;
   readonly isLocal: boolean;
 
@@ -78,9 +101,10 @@ export class ClientFighter {
     this.model = new CharacterModel(roster.char);
     this.trail = new WeaponTrail('#ffffff');
     this.offTrail = this.model.trailOff ? new WeaponTrail('#ffffff') : null;
+    this.kickTrail = new WeaponTrail('#ffffff');
     this.glyph = makeGlyph('危', '#ffffff', '#c41a1a');
     this.glyph.visible = false;
-    scene.add(this.model.root, this.trail.mesh, this.glyph);
+    scene.add(this.model.root, this.trail.mesh, this.kickTrail.mesh, this.glyph);
     if (this.offTrail) scene.add(this.offTrail.mesh);
     this.hp = CHARACTERS[roster.char].stats.hp;
     if (isLocal) this.sim = new Fighter(roster.id, roster.char);
@@ -184,23 +208,40 @@ export class ClientFighter {
   }
 
   /** The combat state to animate (local prediction for you, server state otherwise). */
-  view(serverNow: number): { state: FighterState; elapsed: number; dur: number; attack: AttackDef | null; windup: number; serial: number; key: string | undefined } {
+  view(serverNow: number): {
+    state: FighterState;
+    elapsed: number;
+    dur: number;
+    attack: AttackDef | null;
+    windup: number;
+    serial: number;
+    key: string | undefined;
+    dodgeKind: DodgeKind | undefined;
+  } {
+    const ab = this.char.ability;
     if (this.sim) {
       const s = this.sim;
+      const dur = s.state === 'dodge' ? s.dodgeDur : s.stateDur;
+      let dodgeKind: DodgeKind | undefined;
+      if (s.state === 'dodge') dodgeKind = s.dodgeDist === 0 ? 'vanish' : ab.kind === 'leap' && s.dodgeDur === ab.duration ? 'leap' : 'roll';
       return {
         state: s.state,
         elapsed: serverNow - s.stateStart,
-        dur: s.state === 'dodge' ? s.dodgeDur : s.stateDur,
+        dur,
         attack: s.attack,
         windup: s.atkWindup,
         serial: s.attackSerial,
         key: s.attackKey ?? undefined,
+        dodgeKind,
       };
     }
     const atk = this.s === 'attack' && this.a ? getAttack(this.char, this.a as never) : null;
     let dur = this.sd;
     if (this.s === 'dodge' && !dur) dur = 380;
-    return { state: this.s, elapsed: serverNow - this.ss, dur, attack: atk, windup: this.aw || atk?.windup || 0, serial: this.serial, key: this.a };
+    // abilities reuse the dodge state; their durations tell them apart
+    let dodgeKind: DodgeKind | undefined;
+    if (this.s === 'dodge') dodgeKind = ab.kind === 'leap' && dur === ab.duration ? 'leap' : ab.kind === 'teleport' && this.dodgeIsVanish() ? 'vanish' : 'roll';
+    return { state: this.s, elapsed: serverNow - this.ss, dur, attack: atk, windup: this.aw || atk?.windup || 0, serial: this.serial, key: this.a, dodgeKind };
   }
 
   updateVisual(dt: number, serverNow: number, buffActive: boolean): void {
@@ -244,6 +285,7 @@ export class ClientFighter {
       airborne: this.airborne,
       blockHeld: this.b,
       buff: buffActive,
+      dodgeKind: v.dodgeKind,
     };
     this.model.root.position.copy(this.pos);
     this.model.root.rotation.y = this.yaw;
@@ -251,18 +293,31 @@ export class ClientFighter {
     // shadow step / dead fade
     this.model.setVisible(!(v.state === 'dodge' && this.char.ability.kind === 'teleport' && v.elapsed < 250 && !v.attack && this.dodgeIsVanish()));
 
-    // weapon trails follow the swing
+    // weapon trails follow the swing, coloured by the character and how big the move is
     const atk = v.attack;
-    const live = !!atk && v.state === 'attack' && !atk.noHitbox;
-    const color = atk?.perilous ? '#ff4a3a' : v.key === 'h' ? '#ffd27a' : '#ffffff';
     const m = this.model;
-    this.trail.setColor(color);
+    const frame = m.frame;
+    const live = (!!atk && v.state === 'attack' && !atk.noHitbox) || (v.state === 'dodge' && !!frame?.trail);
+    const tc = m.animator.style.trail;
+    const big = v.key === 'h' || v.key === 'ab' || v.key === 'ia' || v.key === 'ct';
+    const color = frame?.trail?.color ?? (atk?.perilous ? tc.special : big ? tc.heavy : tc.light);
+    const life = frame?.trail?.life ?? (atk?.perilous ? 0.2 : big ? 0.17 : 0.13);
+    const glow = frame?.trail?.glow ?? (atk?.perilous ? 0.8 : big ? 0.45 : 0.1);
+    for (const t of [this.trail, this.offTrail, this.kickTrail]) {
+      t?.setColor(color);
+      t?.setStyle(life, glow);
+    }
     m.weaponXf('main', this.tmpPos, this.tmpQuat, this.tmpScale);
     this.trail.update(dt, live && m.swingMain, this.tmpPos, this.tmpQuat, this.tmpScale.x, m.trailMain.base, m.trailMain.tip);
     if (this.offTrail && m.trailOff && m.weaponXf('off', this.tmpPos, this.tmpQuat, this.tmpScale)) {
-      this.offTrail.setColor(color);
       this.offTrail.update(dt, live && m.swingOff, this.tmpPos, this.tmpQuat, this.tmpScale.x, m.trailOff.base, m.trailOff.tip);
     }
+    const kick = frame?.kick;
+    m.footXf(kick?.foot ?? 'R', this.tmpPos, this.tmpQuat, this.tmpScale);
+    this.kickTrail.update(dt, live && !!frame?.swingKick, this.tmpPos, this.tmpQuat, this.tmpScale.x, KICK_BASE, KICK_TIP);
+
+    // effect cues from the move, resolved to where they happen
+    if (frame) for (const cue of frame.fx) this.fxQueue.push({ cue, pos: this.anchor(cue.at, new THREE.Vector3()), dir: forward3(this.yaw), fighter: this });
 
     // perilous glyph during the windup
     const perilous = v.state === 'attack' && !!atk?.perilous && v.elapsed < v.windup + atk.active;
@@ -271,6 +326,37 @@ export class ClientFighter {
       this.glyph.position.set(this.pos.x, this.pos.y + 2.5 * this.model.scale, this.pos.z);
       const pulse = 0.65 + Math.sin(serverNow / 50) * 0.08;
       this.glyph.scale.setScalar(pulse);
+    }
+  }
+
+  /** World position of an effect anchor on this fighter. */
+  anchor(at: FxAnchor, out: THREE.Vector3): THREE.Vector3 {
+    const m = this.model;
+    switch (at) {
+      case 'tip':
+        return this.weaponTip(out);
+      case 'main':
+        m.weaponXf('main', out, this.tmpQuat, this.tmpScale);
+        return out;
+      case 'off':
+        if (!m.weaponXf('off', out, this.tmpQuat, this.tmpScale)) out.set(this.pos.x, this.pos.y + 1.2, this.pos.z);
+        return out;
+      case 'offTip': {
+        const off = { base: new THREE.Vector3(), tip: new THREE.Vector3() };
+        if (m.weaponTips(this.tmpBase, out, off)) return out.copy(off.tip);
+        return this.weaponTip(out);
+      }
+      case 'kick':
+        m.footXf(m.frame?.kick?.foot ?? 'R', out, this.tmpQuat, this.tmpScale);
+        return out;
+      case 'feet':
+        return out.set(this.pos.x, Math.max(0, this.pos.y) + 0.05, this.pos.z);
+      case 'root':
+        return out.set(this.pos.x, this.pos.y + 1.0 * m.scale, this.pos.z);
+      case 'front': {
+        const f = forward(this.yaw);
+        return out.set(this.pos.x + f.x * 1.4, this.pos.y + 0.05, this.pos.z + f.z * 1.4);
+      }
     }
   }
 
@@ -292,7 +378,8 @@ export class ClientFighter {
   }
 
   dispose(): void {
-    this.scene.remove(this.model.root, this.trail.mesh, this.glyph);
+    this.scene.remove(this.model.root, this.trail.mesh, this.kickTrail.mesh, this.glyph);
+    this.kickTrail.dispose();
     if (this.offTrail) {
       this.scene.remove(this.offTrail.mesh);
       this.offTrail.dispose();

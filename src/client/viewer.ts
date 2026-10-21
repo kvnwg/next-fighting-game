@@ -175,6 +175,7 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
     const target = from + ((to - from) * i) / (n - 1);
     times.push(target);
     const m = new CharacterModel(id);
+    m.ghostsEnabled = params.has('ghosts');
     m.root.position.set((i - (n - 1) / 2) * gap, 0, 0);
     // every frame seen from the same angle despite the perspective
     m.root.rotation.y = yaw + Math.atan2(-m.root.position.x, dist);

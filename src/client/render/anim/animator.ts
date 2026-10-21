@@ -2,16 +2,21 @@
  * Turns combat state into a pose every frame.
  *
  * Attacks run on the gameplay clock so they always line up with the server's hit timing:
- *   windup:   blend from wherever we were into the chamber, then coil a little further back
- *   swing:    accelerate along the weapon path, crossing the middle of the arc as the hit lands
- *   recovery: overshoot, settle, then flow back to guard
- * Every new state blends from the current pose (combos chain from where the last cut ended).
+ *   windup:   blend from wherever we were into the move's opening pose, then travel (or coil) to
+ *             the chamber, the last moment before the strike
+ *   swing:    accelerate along the weapon path so it crosses each hit's mark exactly when that hit
+ *             resolves, then follow through
+ *   recovery: settle (or play the move's flourish), then flow back to guard
+ * Every new state blends from the current pose, so combos chain from where the last cut ended.
  */
 import * as THREE from 'three';
 import { AttackDef, CharacterDef } from '../../../shared/characters';
 import { FighterState } from '../../../shared/fighter';
+import { BodyKey, BodyPose, FxCue, Motion, MoveDef, Pose, Rot, Style, TrailStyle, WeaponXf, bodyToTorso } from './author';
 import { clamp01, easeIn, easeInOut, easeOut, kick, orientWeapon, smooth } from './math';
-import { BodyPose, Motion, MoveDef, Pose, STYLES, Style, WeaponXf, bodyToTorso, moveFor } from './styles';
+import { STYLES, moveFor } from './styles';
+
+export type DodgeKind = 'roll' | 'leap' | 'vanish';
 
 export interface AnimInput {
   state: FighterState;
@@ -32,6 +37,8 @@ export interface AnimInput {
   airborne: boolean;
   blockHeld: boolean;
   buff: boolean;
+  /** what kind of dodge this is (abilities reuse the dodge state) */
+  dodgeKind?: DodgeKind;
 }
 
 /** A pose with every optional part filled in, ready to blend and to drive the rig. */
@@ -43,24 +50,41 @@ export interface ResolvedPose {
   free: THREE.Vector3;
 }
 
+export interface KickTarget {
+  foot: 'L' | 'R';
+  /** foot position in the root frame */
+  pos: THREE.Vector3;
+  /** 0..1 how much the foot follows the kick instead of its stance */
+  w: number;
+}
+
 export interface AnimFrame {
   pose: ResolvedPose;
-  /** extra whole-body yaw (spin attacks) */
+  /** whole-body yaw (spins), pitch (flips) and roll (cartwheels), radians */
   spin: number;
+  flip: number;
+  roll: number;
   /** 0..1 blend into lying on the ground */
   lying: number;
   /** ankle targets in the fighter's root frame */
   feet: { L: THREE.Vector3; R: THREE.Vector3 };
+  kick: KickTarget | null;
   swingMain: boolean;
   swingOff: boolean;
+  /** the kicking foot is mid-strike (drives a trail) */
+  swingKick: boolean;
+  /** effect cues that fired this frame */
+  fx: FxCue[];
+  /** leave an afterimage this frame */
+  ghost: boolean;
+  /** trail look for the current move */
+  trail: TrailStyle | null;
 }
 
 export type Reaction = 'deflect' | 'blocked' | 'hit' | 'roar';
 
-const S_ANTI = -0.08; // how far past the start the weapon coils before the swing
-const S_IMPACT = 0.45; // where along the path the weapon is when the hit lands
-const S_END = 1.07; // overshoot before settling
 const REST_LEFT = new THREE.Vector3(0.3, 0.12, 0.08);
+const ZERO_ROT: Rot = { spin: 0, flip: 0, roll: 0, hop: 0 };
 
 // ------------------------------------------------------------------------------------ pose ops
 
@@ -131,6 +155,7 @@ export function handTargets(p: ResolvedPose, rh: THREE.Vector3, lh: THREE.Vector
 
 const _q = new THREE.Quaternion();
 const X_AXIS = new THREE.Vector3(1, 0, 0);
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 /** Tilt a held weapon about the torso's left-right axis (negative tips the point up and back). */
 function tilt(x: WeaponXf, angle: number): void {
@@ -145,6 +170,40 @@ function shiftHands(p: ResolvedPose, d: THREE.Vector3, k = 1): void {
   if (p.off) p.off.pos.addScaledVector(d, k);
 }
 
+// ------------------------------------------------------------------------------------ keys
+
+const BODY_CHANNELS = ['crouch', 'lean', 'twist', 'side', 'hipTwist', 'headPitch', 'step', 'back', 'width', 'lift'] as const;
+const ROT_CHANNELS = ['spin', 'flip', 'roll', 'hop'] as const;
+
+/** Cubic Hermite through the keys: smooth, and easing in and out at the first and last key. */
+function hermite(keys: BodyKey[], i: number, t: number, get: (k: BodyKey) => number): number {
+  const k1 = keys[i];
+  const k2 = keys[i + 1];
+  const d = k2.s - k1.s;
+  const p1 = get(k1);
+  const p2 = get(k2);
+  const m1 = i > 0 ? ((p2 - get(keys[i - 1])) / (k2.s - keys[i - 1].s)) * d : 0;
+  const m2 = i + 2 < keys.length ? ((get(keys[i + 2]) - p1) / (keys[i + 2].s - k1.s)) * d : 0;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * p1 + (t3 - 2 * t2 + t) * m1 + (-2 * t3 + 3 * t2) * p2 + (t3 - t2) * m2;
+}
+
+function evalKeys(keys: BodyKey[], s: number): { body: BodyPose; rot: Rot } {
+  if (keys.length === 1 || s <= keys[0].s) return { body: { ...keys[0].b }, rot: { ...keys[0].r } };
+  const last = keys[keys.length - 1];
+  if (s >= last.s) return { body: { ...last.b }, rot: { ...last.r } };
+  let i = 0;
+  while (i < keys.length - 2 && s >= keys[i + 1].s) i++;
+  const t = (s - keys[i].s) / Math.max(1e-6, keys[i + 1].s - keys[i].s);
+  const body = { ...keys[i].b };
+  for (const c of BODY_CHANNELS) body[c] = hermite(keys, i, t, (k) => k.b[c]);
+  body.front = t < 0.5 ? keys[i].b.front : keys[i + 1].b.front;
+  const rot = { ...ZERO_ROT };
+  for (const c of ROT_CHANNELS) rot[c] = hermite(keys, i, t, (k) => k.r[c]);
+  return { body, rot };
+}
+
 // ------------------------------------------------------------------------------------ motions
 
 const _p = new THREE.Vector3();
@@ -153,38 +212,74 @@ const _t = new THREE.Vector3();
 const _e = new THREE.Vector3();
 
 function evalMotion(m: Motion, s: number, axis: Style['axis'], body: BodyPose, hold: WeaponXf | null): WeaponXf | null {
-  if (m.kind === 'hold') return hold ? cloneXf(hold) : null;
-  let grip2: number;
-  if (m.kind === 'arc') {
-    m.arc.at(s, _d, _t);
-    _p.copy(m.pivot);
-    if (m.pivot1) _p.lerp(m.pivot1, clamp01(s));
-    _p.addScaledVector(_d, m.r);
-    if (m.edgeSign === 0) _e.set(0, 1, 0);
-    else _e.copy(_t).multiplyScalar(m.edgeSign);
-    grip2 = m.grip2;
-  } else {
-    _p.copy(m.from).lerp(m.to, s);
-    _d.copy(m.d0).lerp(m.d1, clamp01(s)).normalize();
-    _e.copy(m.edge);
-    grip2 = m.grip2a + (m.grip2b - m.grip2a) * clamp01(s);
+  switch (m.kind) {
+    case 'hold':
+      return hold ? cloneXf(hold) : null;
+    case 'seq': {
+      const parts = m.parts;
+      let i = 0;
+      while (i < parts.length - 1 && s >= parts[i].to) i++;
+      const local = (p: (typeof parts)[number]) => (s - p.from) / Math.max(1e-6, p.to - p.from);
+      const cur = evalMotion(parts[i].m, local(parts[i]), axis, body, hold);
+      // crossfade with the neighbouring part near a boundary so the weapon never jumps
+      const b = m.blend;
+      if (b > 0 && cur) {
+        if (i > 0 && s < parts[i].from + b) {
+          const prev = evalMotion(parts[i - 1].m, local(parts[i - 1]), axis, body, hold);
+          if (prev) return lerpXf(prev, cur, smooth((s - (parts[i].from - b)) / (2 * b)));
+        }
+        if (i < parts.length - 1 && s > parts[i].to - b) {
+          const next = evalMotion(parts[i + 1].m, local(parts[i + 1]), axis, body, hold);
+          if (next) return lerpXf(cur, next, smooth((s - (parts[i].to - b)) / (2 * b)));
+        }
+      }
+      return cur;
+    }
+    case 'arc':
+    case 'line': {
+      let grip2: number;
+      if (m.kind === 'arc') {
+        m.arc.at(s, _d, _t);
+        _p.copy(m.pivot);
+        if (m.pivot1) _p.lerp(m.pivot1, clamp01(s));
+        _p.addScaledVector(_d, m.r);
+        if (m.edgeSign === 0) _e.set(0, 1, 0);
+        else _e.copy(_t).multiplyScalar(m.edgeSign);
+        grip2 = m.grip2;
+      } else {
+        _p.copy(m.from).lerp(m.to, s);
+        _d.copy(m.d0).lerp(m.d1, clamp01(s)).normalize();
+        _e.copy(m.edge);
+        grip2 = m.grip2a + (m.grip2b - m.grip2a) * clamp01(s);
+      }
+      if (m.body) {
+        // authored relative to the hips: undo the torso's turn and lean
+        bodyToTorso(_p, body.twist, body.lean);
+        bodyToTorso(_d, body.twist, body.lean);
+        bodyToTorso(_e, body.twist, body.lean);
+      }
+      const two = Number.isFinite(grip2);
+      const quat = orientWeapon(_d, _e, axis, new THREE.Quaternion());
+      if (m.roll) quat.multiply(_q.setFromAxisAngle(Z_AXIS, m.roll * Math.PI * 2 * clamp01(s)));
+      return { pos: _p.clone(), quat, grip2: two ? grip2 : 0, hold2: two ? 1 : 0 };
+    }
   }
-  if (m.body) {
-    // authored relative to the hips: undo the torso's turn and lean
-    bodyToTorso(_p, body.twist, body.lean);
-    bodyToTorso(_d, body.twist, body.lean);
-    bodyToTorso(_e, body.twist, body.lean);
-  }
-  const two = Number.isFinite(grip2);
-  return { pos: _p.clone(), quat: orientWeapon(_d, _e, axis, new THREE.Quaternion()), grip2: two ? grip2 : 0, hold2: two ? 1 : 0 };
 }
 
 // ------------------------------------------------------------------------------------ animator
+
+interface MoveFrame {
+  pose: ResolvedPose;
+  rot: Rot;
+  kick: KickTarget | null;
+}
 
 export class Animator {
   readonly style: Style;
   private current: ResolvedPose;
   private snapshot: ResolvedPose;
+  private snapRot: Rot = { ...ZERO_ROT };
+  private curRot: Rot = { ...ZERO_ROT };
   private stateKey = '';
   private lastElapsed = 0;
   private walkPhase = 0;
@@ -192,6 +287,8 @@ export class Animator {
   private breath = Math.random() * 10;
   private reactions: { kind: Reaction; t: number }[] = [];
   private feet = { L: new THREE.Vector3(0.13, 0.05, 0.2), R: new THREE.Vector3(-0.13, 0.05, -0.18) };
+  /** effect cues: the furthest s this move has reached, so each cue fires once */
+  private fxMaxS = -Infinity;
 
   constructor(readonly char: CharacterDef) {
     this.style = STYLES[char.weaponKind];
@@ -205,98 +302,173 @@ export class Animator {
   }
 
   update(a: AnimInput, dt: number): AnimFrame {
-    const key = `${a.state}|${a.serial ?? 0}|${a.key ?? ''}`;
+    const key = `${a.state}|${a.serial ?? 0}|${a.key ?? ''}|${a.dodgeKind ?? ''}`;
     if (key !== this.stateKey || a.elapsed < this.lastElapsed - 30) {
       this.stateKey = key;
       this.snapshot = cloneResolved(this.current);
+      this.snapRot = { ...this.curRot };
+      this.fxMaxS = -Infinity;
     }
     this.lastElapsed = a.elapsed;
 
-    let pose: ResolvedPose;
-    let spin = 0;
-    let swingMain = false;
-    let swingOff = false;
-    let lying = 0;
+    const out: AnimFrame = {
+      pose: this.current,
+      spin: 0,
+      flip: 0,
+      roll: 0,
+      lying: 0,
+      feet: this.feet,
+      kick: null,
+      swingMain: false,
+      swingOff: false,
+      swingKick: false,
+      fx: [],
+      ghost: false,
+      trail: null,
+    };
+    let rot: Rot = { ...ZERO_ROT };
 
     if (a.state === 'attack' && a.attack) {
-      const r = this.attackPose(a, a.attack);
-      pose = r.pose;
-      spin = r.spin;
-      swingMain = r.swingMain;
-      swingOff = r.swingOff;
+      const r = this.attackPose(a, a.attack, out);
+      out.pose = r.pose;
+      rot = r.rot;
+      out.kick = r.kick;
+    } else if (a.state === 'dodge' && a.dodgeKind && a.dodgeKind !== 'roll' && (a.dodgeKind === 'leap' ? this.style.leap : this.style.vanish)) {
+      const def = (a.dodgeKind === 'leap' ? this.style.leap : this.style.vanish)!;
+      const r = this.abilityPose(a, def, out);
+      out.pose = r.pose;
+      rot = r.rot;
     } else {
       const { target, tau } = this.statePose(a);
-      pose = lerpResolved(this.snapshot, target, easeOut(a.elapsed / tau, 3));
+      const k = easeOut(a.elapsed / tau, 3);
+      out.pose = lerpResolved(this.snapshot, target, k);
+      // whatever spin or flip the last move ended on unwinds to the nearest whole turn
+      for (const c of ROT_CHANNELS) rot[c] = this.snapRot[c] + (settleTurn(this.snapRot[c], c) - this.snapRot[c]) * k;
       if (a.state === 'dead' || a.state === 'knockdown') {
         // a falling drop, and for knockdowns a push back up at the end
-        lying = easeIn(a.elapsed / 380, 2);
-        if (a.state === 'knockdown' && a.dur - a.elapsed < 380) lying = Math.min(lying, smooth((a.dur - a.elapsed) / 380));
+        out.lying = easeIn(a.elapsed / 380, 2);
+        if (a.state === 'knockdown' && a.dur - a.elapsed < 380) out.lying = Math.min(out.lying, smooth((a.dur - a.elapsed) / 380));
       }
     }
 
-    this.current = cloneResolved(pose);
-    this.locomotion(a, pose, dt);
-    this.applyReactions(pose, dt);
-    const feet = this.footTargets(a, pose.body, dt, lying);
-    return { pose, spin, lying, feet, swingMain, swingOff };
+    this.current = cloneResolved(out.pose);
+    this.curRot = { ...rot };
+    out.pose.body.lift += rot.hop;
+    out.spin = rot.spin * Math.PI * 2;
+    out.flip = rot.flip * Math.PI * 2;
+    out.roll = rot.roll * Math.PI * 2;
+    this.locomotion(a, out.pose, dt);
+    this.applyReactions(out.pose, dt);
+    out.feet = this.footTargets(a, out.pose.body, dt, out.lying);
+    return out;
   }
 
-  // ---------------------------------------------------------------- attacks
+  // ---------------------------------------------------------------- moves
 
-  private movePose(def: MoveDef, s: number, bodyT: number): { pose: ResolvedPose; spin: number } {
+  private movePose(def: MoveDef, s: number): MoveFrame {
     const st = this.style;
-    const body = lerpBody(def.body0, def.body1, easeInOut(bodyT));
-    if (def.hop) body.lift += def.hop * Math.sin(Math.PI * clamp01(s));
+    const { body, rot } = evalKeys(def.keys, s + def.bodyLead);
     const main = evalMotion(def.main, s, st.axis, body, st.guard.main)!;
     const off = def.off ? evalMotion(def.off, s, st.offAxis, body, st.guard.off) : st.guard.off ? cloneXf(st.guard.off) : null;
-    const free = def.free ? def.free[0].clone().lerp(def.free[1], easeInOut(bodyT)) : (st.guard.free ?? REST_LEFT).clone();
-    const spin = (def.spin ?? 0) * Math.PI * 2 * clamp01(s);
-    return { pose: { body, main, off, free }, spin };
+    const free = def.free ? evalMotion(def.free, s, st.axis, body, null)!.pos : (st.guard.free ?? REST_LEFT).clone();
+    let kickT: KickTarget | null = null;
+    if (def.kick) {
+      const k = def.kick;
+      const w = smooth((s - (k.from - 0.18)) / 0.18) * (1 - smooth((s - k.to) / 0.25));
+      if (w > 0) {
+        const local = (s - k.from) / Math.max(1e-6, k.to - k.from);
+        const xf = evalMotion(k.path, Math.min(1.05, Math.max(-0.05, local)), st.axis, body, null);
+        if (xf) kickT = { foot: k.foot, pos: xf.pos.clone(), w };
+      }
+    }
+    return { pose: { body, main, off, free }, rot, kick: kickT };
   }
 
-  private attackPose(a: AnimInput, atk: AttackDef): { pose: ResolvedPose; spin: number; swingMain: boolean; swingOff: boolean } {
-    const st = this.style;
-    const def = moveFor(st, atk.anim, a.key ?? '');
+  /** Fire the cues between the furthest s reached so far and s. */
+  private cues(def: MoveDef, s: number, out: AnimFrame): void {
+    if (this.fxMaxS === -Infinity) this.fxMaxS = Math.min(def.sStart, def.sChamber) - 1e-3;
+    if (s <= this.fxMaxS) return;
+    for (const c of def.fx) if (c.s > this.fxMaxS && c.s <= s) out.fx.push(c);
+    this.fxMaxS = s;
+  }
+
+  private attackPose(a: AnimInput, atk: AttackDef, out: AnimFrame): MoveFrame {
+    const def = moveFor(this.style, atk.anim, a.key ?? '');
+    out.trail = def.trail;
     const w = Math.max(1, a.windup);
     const total = w + atk.active + atk.recovery;
-    // the swing starts a little before the hit window and follows through after it
+    const n = def.impacts.length;
+    // one visual strike per hit, spread over the active frames the way the server spreads hits
+    const hitT = def.impacts.map((_, i) => w + (i * atk.active) / n);
+    // the swing starts a little before the first hit and follows through after the last
     const lead = Math.min(130, Math.max(45, w * 0.42));
     const t0 = w - lead;
-    const t1 = Math.min(total * 0.94, w + atk.active + Math.min(150, Math.max(70, atk.active * 0.5 + 50)));
+    const tail = Math.min(150, Math.max(70, (atk.active / n) * 0.5 + 50));
+    const t1 = Math.min(total * 0.94, w + atk.active + tail);
     const e = a.elapsed;
     const swingsMain = def.main.kind !== 'hold';
     const swingsOff = !!def.off && def.off.kind !== 'hold';
-    const impact = def.impact ?? S_IMPACT;
-    // the body leads the weapon a little (hips and shoulders open before the arms whip through)
-    const bodyAt = (s: number) => clamp01((s + 0.1) * 1.06);
 
     if (e < t0) {
-      // windup: get to the chamber by 75% of the windup, then coil a little further
+      // windup: blend in to the opening pose, then travel (or coil) to the chamber
       const k = e / Math.max(1, t0);
-      const coil = S_ANTI * smooth((k - 0.55) / 0.45);
-      const chamber = this.movePose(def, coil, 0);
-      return { pose: lerpResolved(this.snapshot, chamber.pose, easeOut(k / 0.75, 3)), spin: 0, swingMain: false, swingOff: false };
+      const s = def.sStart + (def.sChamber - def.sStart) * smooth((k - def.travel) / (1 - def.travel));
+      this.cues(def, s, out);
+      const f = this.movePose(def, s);
+      const bw = easeOut(k / def.blendIn, 3);
+      return { pose: lerpResolved(this.snapshot, f.pose, bw), rot: lerpRot(this.snapRot, f.rot, bw), kick: f.kick };
     }
     if (e < t1) {
-      const u = (e - t0) / Math.max(1, t1 - t0);
-      const ui = Math.min(0.7, Math.max(0.2, lead / Math.max(1, t1 - t0)));
       let s: number;
-      if (u < ui) {
-        const q = u / ui;
-        s = S_ANTI + (impact - S_ANTI) * q * q; // accelerating into the hit
+      if (e < hitT[0]) {
+        const q = (e - t0) / Math.max(1, hitT[0] - t0);
+        s = def.sChamber + (def.impacts[0] - def.sChamber) * q * q; // accelerating into the hit
+      } else if (e < hitT[n - 1]) {
+        let i = 0;
+        while (i < n - 2 && e >= hitT[i + 1]) i++;
+        const q = (e - hitT[i]) / Math.max(1, hitT[i + 1] - hitT[i]);
+        s = def.impacts[i] + (def.impacts[i + 1] - def.impacts[i]) * q;
       } else {
-        const q = (u - ui) / (1 - ui);
-        s = impact + (S_END - impact) * (1 - Math.pow(1 - q, 2.4)); // decelerating follow-through
+        const q = (e - hitT[n - 1]) / Math.max(1, t1 - hitT[n - 1]);
+        s = def.impacts[n - 1] + (def.sEnd - def.impacts[n - 1]) * (1 - Math.pow(1 - clamp01(q), 2.4)); // decelerating follow-through
       }
-      const r = this.movePose(def, s, bodyAt(s));
-      return { pose: r.pose, spin: r.spin, swingMain: swingsMain, swingOff: swingsOff };
+      this.cues(def, s, out);
+      const f = this.movePose(def, s);
+      out.swingMain = swingsMain;
+      out.swingOff = swingsOff;
+      out.swingKick = !!f.kick && f.kick.w > 0.5;
+      out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
+      return f;
     }
-    // recovery: settle out of the overshoot, hang a beat, then flow back to guard
+    // recovery: settle out of the follow-through (or play the flourish), then flow back to guard
     const k = (e - t1) / Math.max(1, total - t1);
-    const s = S_END + (1 - S_END) * easeOut(k / 0.3, 2);
-    const end = this.movePose(def, s, 1);
+    const s = def.sEnd + (def.sRest - def.sEnd) * (def.settle >= 0.45 ? easeInOut(k / def.settle) : easeOut(k / def.settle, 2));
+    this.cues(def, s, out);
+    const f = this.movePose(def, s);
+    const guardFrom = Math.max(0.18, def.settle * 0.75);
+    const gw = easeInOut((k - guardFrom) / (1 - guardFrom));
     const guard = this.guardPose(a);
-    return { pose: lerpResolved(end.pose, guard, easeInOut((k - 0.18) / 0.82)), spin: end.spin, swingMain: false, swingOff: false };
+    const rot = { ...f.rot };
+    for (const c of ROT_CHANNELS) rot[c] = f.rot[c] + (settleTurn(f.rot[c], c) - f.rot[c]) * gw;
+    return { pose: lerpResolved(f.pose, guard, gw), rot, kick: f.kick && { ...f.kick, w: f.kick.w * (1 - gw) } };
+  }
+
+  /** Leap and vanish abilities: the dodge state plays a whole move over its duration. */
+  private abilityPose(a: AnimInput, def: MoveDef, out: AnimFrame): MoveFrame {
+    const dur = Math.max(1, a.dur);
+    const k = clamp01(a.elapsed / dur);
+    const s = def.sStart + (def.sRest - def.sStart) * k;
+    this.cues(def, s, out);
+    out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
+    out.trail = def.trail;
+    const f = this.movePose(def, s);
+    const bin = easeOut(k / 0.2, 2);
+    const bout = easeInOut((k - 0.8) / 0.2);
+    const guard = this.guardPose(a);
+    const pose = lerpResolved(lerpResolved(this.snapshot, f.pose, bin), guard, bout);
+    const rot = lerpRot(this.snapRot, f.rot, bin);
+    for (const c of ROT_CHANNELS) rot[c] += (settleTurn(rot[c], c) - rot[c]) * bout;
+    return { pose, rot, kick: null };
   }
 
   // ---------------------------------------------------------------- other states
@@ -523,11 +695,26 @@ export class Animator {
       stance.L.set(0.13, 0.42, lead === 'L' ? 0.18 : -0.05);
       stance.R.set(-0.13, 0.36, lead === 'R' ? 0.18 : -0.05);
     }
+    // hops tuck the legs up a little with the jump
+    if (b.lift > 0.06) {
+      const k = smooth((b.lift - 0.06) / 0.3);
+      stance.L.y += 0.25 * k;
+      stance.R.y += 0.18 * k;
+    }
     const k = Math.min(1, dt * 24);
     this.feet.L.lerp(stance.L, k);
     this.feet.R.lerp(stance.R, k);
     return this.feet;
   }
+}
+
+function lerpRot(a: Rot, b: Rot, t: number): Rot {
+  return { spin: a.spin + (b.spin - a.spin) * t, flip: a.flip + (b.flip - a.flip) * t, roll: a.roll + (b.roll - a.roll) * t, hop: a.hop + (b.hop - a.hop) * t };
+}
+
+/** Where a rotation channel comes to rest: whole turns for spins and flips, the ground for hops. */
+function settleTurn(v: number, c: keyof Rot): number {
+  return c === 'hop' ? 0 : Math.round(v);
 }
 
 const UP = new THREE.Vector3(0, 1, 0);

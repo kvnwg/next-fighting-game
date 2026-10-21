@@ -110,6 +110,13 @@ export class Arc {
     this.total = Math.max(total, 1e-4);
   }
 
+  /** How far along the path (0..1) the i-th authored direction sits. */
+  fraction(i: number): number {
+    let acc = 0;
+    for (let k = 0; k < Math.min(i, this.angles.length); k++) acc += this.angles[k];
+    return acc / this.total;
+  }
+
   /** Direction at s (0..1 along the path), and optionally the travel direction (tangent). */
   at(s: number, out: THREE.Vector3, tangent?: THREE.Vector3): THREE.Vector3 {
     let target = s * this.total;
