@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { PropKind } from '../../../shared/maps';
-import { fbm3, hash3, rng } from './noise';
+import { fbm2, fbm3, hash3, rng } from './noise';
 import { VoxelVolume, ColorInput, hex, meshVoxels, mixHex, shadeHex } from './voxel';
 
 export type PropStyle = 'plain' | 'moss' | 'snow' | 'ash' | 'spirit';
@@ -605,6 +605,39 @@ function reeds(seed: number): PropParts {
   return { sway: meshVoxels(vol, { jitter: 0.06, seed, sway: (_px, py) => py * 0.12 }) };
 }
 
+/** A plank jetty running 4.6 m along z out over the water, its deck at ground level. */
+function jetty(seed: number): PropParts {
+  const v = 0.1;
+  const vol = new VoxelVolume(26, 20, 48, [v, v, v], [-1.3, -0.8, -2.4]);
+  const dark = (x: number, y: number, z: number) => pickH(DARK_WOOD, x, y, z, seed);
+  // planks laid across, each its own shade, a hairline gap between them
+  for (let i = 0; i < 11; i++) {
+    const z0 = -2.3 + i * 0.42;
+    const c = WOOD[Math.floor(hash3(i, 0, 0, seed) * WOOD.length)];
+    vol.box([-1.0, 0, z0], [1.0, 0.1, z0 + 0.32], (x, y, z) => shadeHex(c, 0.92 + hash3(x, y, z, seed) * 0.14));
+  }
+  vol.box([-0.9, -0.2, -2.3], [-0.7, 0, 2.3], dark);
+  vol.box([0.7, -0.2, -2.3], [0.9, 0, 2.3], dark);
+  // posts down into the lake bed, standing proud of the deck at the far end
+  for (const z of [-0.6, 0.9, 2.15]) for (const x of [-1.05, 1.05]) vol.box([x - 0.1, -0.8, z - 0.1], [x + 0.1, z > 2 ? 0.4 : 0.1, z + 0.1], dark);
+  return { solid: mesh(vol, seed, 0.05) };
+}
+
+/** Fallen petals drifting on still water in loose rafts (hanaikada). */
+function petalRaft(seed: number): PropParts {
+  const v = 0.06;
+  const half = 2.4;
+  const n = Math.round((half * 2) / v);
+  const vol = new VoxelVolume(n, 1, n, [v, 0.02, v], [-half, 0, -half]);
+  const pinks = [hex('#f7a8c6'), hex('#fbbdd2'), hex('#ffd6e4'), hex('#f190b2'), hex('#fff0f5')];
+  vol.fill({ min: [-half, 0, -half], max: [half, 0.01, half] }, (px, _py, pz, x, y, z) => {
+    const d = Math.hypot(px, pz) / half;
+    const p = (fbm2(px * 0.9 + seed, pz * 0.9, 3, seed) - 0.35) * 0.8 * (1 - d * d);
+    return hash3(x, 0, z, seed) < p ? pickH(pinks, x, y, z, seed + 1) : null;
+  });
+  return { solid: meshVoxels(vol, { jitter: 0.08, seed }) };
+}
+
 // ----------------------------------------------------------------------------------------- cache
 
 const cache = new Map<string, PropParts>();
@@ -678,7 +711,7 @@ export function propParts(kind: PropKind, style: PropStyle = 'plain', variant = 
   return p;
 }
 
-export type SceneryKind = 'pagoda' | 'archBridge' | 'lilyPads' | 'steppingStones' | 'gardenRock' | 'arch' | 'altar' | 'reeds';
+export type SceneryKind = 'pagoda' | 'archBridge' | 'lilyPads' | 'steppingStones' | 'gardenRock' | 'arch' | 'altar' | 'reeds' | 'jetty' | 'petalRaft';
 
 const sceneryCache = new Map<string, PropParts>();
 
@@ -688,7 +721,7 @@ export function sceneryParts(kind: SceneryKind, variant = 0): PropParts {
   const hit = sceneryCache.get(key);
   if (hit) return hit;
   const seed = 900 + variant * 131 + kind.length * 7;
-  const builders: Record<SceneryKind, (s: number) => PropParts> = { pagoda, archBridge, lilyPads, steppingStones, gardenRock, arch, altar, reeds };
+  const builders: Record<SceneryKind, (s: number) => PropParts> = { pagoda, archBridge, lilyPads, steppingStones, gardenRock, arch, altar, reeds, jetty, petalRaft };
   const p = builders[kind](seed);
   for (const g of [p.solid, p.sway, p.glow, p.glass]) if (g) g.userData.cached = true;
   sceneryCache.set(key, p);

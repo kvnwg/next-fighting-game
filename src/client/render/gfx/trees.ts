@@ -9,7 +9,7 @@ import { litMaterial, swayDepthMaterial } from './materials';
 import { fbm3, hash3, rng } from './noise';
 import { VoxelVolume, hex, meshVoxels, mixHex } from './voxel';
 
-export type TreeKind = 'sakura' | 'pine' | 'snowPine' | 'bamboo' | 'maple' | 'deadTree' | 'bush' | 'flowerBush' | 'willow';
+export type TreeKind = 'sakura' | 'grandSakura' | 'pine' | 'snowPine' | 'bamboo' | 'maple' | 'deadTree' | 'bush' | 'flowerBush' | 'willow';
 
 type V3 = [number, number, number];
 
@@ -102,7 +102,7 @@ function sakura(seed: number, v: number): THREE.BufferGeometry {
     bark(vol, m, e2, 0.08, 0.04, BARK_DARK, seed + i * 3);
     crowns.push({ c: [e2[0], e2[1] + 0.15, e2[2]], r: 0.75 + R() * 0.35, sy: 0.75 });
   }
-  const pal = [hex('#c24a7c'), hex('#dc6496'), hex('#ec82ad'), hex('#f59cc0'), hex('#fbb6d1'), hex('#ffcfe0'), hex('#ffe6ef')];
+  const pal = [hex('#c04a86'), hex('#d862a2'), hex('#e87fb8'), hex('#f39bc9'), hex('#f9b5d8'), hex('#fdcfe6'), hex('#ffe7f2')];
   foliage(vol, crowns, pal, seed, { lacy: 0.75, noise: 2.1, speckle: [{ color: hex('#fff6fa'), p: 0.04 }, { color: hex('#b23c6c'), p: 0.04 }] });
   // a few blossom strands hanging under the crown
   for (let i = 0; i < 14; i++) {
@@ -122,6 +122,81 @@ function sakura(seed: number, v: number): THREE.BufferGeometry {
     jitter: 0.07,
     seed,
     sway: (px, py, pz) => smooth(H * 0.45, H + 2.2, py) * 0.11 + Math.hypot(px, pz) * 0.018 * smooth(H * 0.5, H, py),
+  });
+}
+
+/**
+ * The old cherry, one to a map: a short, massive trunk that splits low into great limbs reaching
+ * out and then up, a broad canopy of layered blossom clouds, and long strands weeping from it.
+ */
+function grandSakura(seed: number, v: number): THREE.BufferGeometry {
+  const R = rng(seed);
+  const reach = 7.8;
+  const n = Math.ceil((reach * 2) / v) + 2;
+  const vol = VoxelVolume.cubic(n, Math.ceil(9.8 / v), n, v);
+  // a trunk with a twist in it, and roots gripping the ground
+  const knee: V3 = [0.2, 1.3, -0.15];
+  const fork: V3 = [0.45, 2.5, 0.1];
+  bark(vol, [0, 0, 0], knee, 0.66, 0.52, BARK_DARK, seed);
+  bark(vol, knee, fork, 0.52, 0.44, BARK_DARK, seed);
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + R() * 0.5;
+    const L = 1.0 + R() * 0.7;
+    bark(vol, [0, 0.7, 0], [Math.cos(a) * L, -0.05, Math.sin(a) * L], 0.28, 0.09, BARK_DARK, seed + 40 + i);
+  }
+  const crowns: Crown[] = [];
+  const limbs = 5;
+  const turn = R() * Math.PI * 2;
+  for (let i = 0; i < limbs; i++) {
+    const a = turn + (i / limbs) * Math.PI * 2 + (R() - 0.5) * 0.5;
+    const el = 0.3 + R() * 0.35;
+    const L = 3.0 + R() * 0.9;
+    const dx = Math.cos(a);
+    const dz = Math.sin(a);
+    // up first, then out: a vase of limbs under the canopy
+    const mid: V3 = [fork[0] + dx * L * 0.38, fork[1] + L * 0.42, fork[2] + dz * L * 0.38];
+    const end: V3 = [fork[0] + dx * L * 0.9, fork[1] + L * (0.42 + 0.25 * Math.sin(el)) + 0.3, fork[2] + dz * L * 0.9];
+    bark(vol, fork, mid, 0.34, 0.24, BARK_DARK, seed + i);
+    bark(vol, mid, end, 0.24, 0.13, BARK_DARK, seed + i);
+    crowns.push({ c: [end[0], end[1] + 0.55, end[2]], r: 1.8 + R() * 0.4, sy: 0.6 });
+    // a fork off the middle of each limb and another off its end
+    for (let f = 0; f < 2; f++) {
+      const from = f === 0 ? mid : end;
+      const a2 = a + (f === 0 ? -1 : 1) * (0.55 + R() * 0.45);
+      const L2 = 1.2 + R() * 0.6;
+      const e2: V3 = [from[0] + Math.cos(a2) * L2, from[1] + 0.35 + R() * 0.6, from[2] + Math.sin(a2) * L2];
+      bark(vol, from, e2, 0.16, 0.06, BARK_DARK, seed + i * 7 + f);
+      crowns.push({ c: [e2[0], e2[1] + 0.35, e2[2]], r: 1.25 + R() * 0.3, sy: 0.66 });
+    }
+  }
+  // the crest of the canopy over the middle
+  crowns.push({ c: [fork[0], fork[1] + 4.3, fork[2]], r: 2.3, sy: 0.55 });
+  crowns.push({ c: [fork[0] + 0.8, fork[1] + 3.4, fork[2] - 1.0], r: 1.9, sy: 0.6 });
+  const pal = [hex('#b84280'), hex('#cf5a9a'), hex('#e277b2'), hex('#ef92c4'), hex('#f6acd4'), hex('#fbc6e2'), hex('#fedff0'), hex('#fff1f8')];
+  foliage(vol, crowns, pal, seed, { lacy: 0.8, noise: 1.7, speckle: [{ color: hex('#fff7fb'), p: 0.035 }, { color: hex('#a83668'), p: 0.03 }] });
+  // blossom hanging in short, ragged tassels under the clouds
+  for (let i = 0; i < 48; i++) {
+    const k = crowns[Math.floor(R() * crowns.length)];
+    const a = R() * Math.PI * 2;
+    const rr = k.r * (0.5 + R() * 0.5);
+    let x = k.c[0] + Math.cos(a) * rr;
+    let z = k.c[2] + Math.sin(a) * rr;
+    const top = k.c[1] - k.r * k.sy * 0.45;
+    const len = 0.25 + R() * 0.6;
+    const col = pal[2 + Math.floor(R() * 4)];
+    for (let y = top; y > top - len && y > 0.8; y -= v) {
+      const [cx, cy, cz] = vol.cellOf(x, y, z);
+      vol.add(cx, cy, cz, col, 1);
+      if (R() < 0.3) {
+        x += (R() - 0.5) * v * 2;
+        z += (R() - 0.5) * v * 2;
+      }
+    }
+  }
+  return meshVoxels(vol, {
+    jitter: 0.07,
+    seed,
+    sway: (px, py, pz) => smooth(2.6, 8, py) * 0.09 + Math.hypot(px, pz) * 0.012 * smooth(2.6, 5.5, py),
   });
 }
 
@@ -324,6 +399,9 @@ export function treeGeometry(kind: TreeKind, variant: number, detail = 1): THREE
   switch (kind) {
     case 'sakura':
       g = sakura(seed, 0.17 * k);
+      break;
+    case 'grandSakura':
+      g = grandSakura(seed, 0.15 * k);
       break;
     case 'maple':
       g = maple(seed, 0.17 * k);

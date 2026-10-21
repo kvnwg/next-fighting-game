@@ -437,6 +437,82 @@ export function mountainRing(spec: MountainSpec): THREE.Group {
   return g;
 }
 
+export interface PeakSpec {
+  count: number;
+  /** distance of the peaks' centres from the map's middle */
+  inner: number;
+  outer: number;
+  /** height range above `base` (metres) */
+  height: [number, number];
+  /** base radius per metre of height */
+  spread: [number, number];
+  base: number;
+  cell: number;
+  step: number;
+  rock: number[];
+  snow?: number[];
+  /** height above `base` where snow starts */
+  snowLine?: number;
+  seed?: number;
+}
+
+/**
+ * Lone mountains around the map, each a cone roughened with ridged noise into buttresses and
+ * gullies: peaks standing out of a sea of cloud, rather than a wall all the way round.
+ */
+export function peaks(spec: PeakSpec): THREE.Group {
+  const R = rng(spec.seed ?? 5);
+  const list: { x: number; z: number; r: number; h: number }[] = [];
+  for (let i = 0; i < spec.count; i++) {
+    const a = ((i + 0.5 + (R() - 0.5) * 0.7) / spec.count) * Math.PI * 2;
+    const d = spec.inner + R() * (spec.outer - spec.inner);
+    const h = spec.height[0] + R() * (spec.height[1] - spec.height[0]);
+    list.push({ x: Math.sin(a) * d, z: Math.cos(a) * d, h, r: h * (spec.spread[0] + R() * (spec.spread[1] - spec.spread[0])) });
+  }
+  const reach = Math.max(...list.map((p) => Math.hypot(p.x, p.z) + p.r));
+  const n = Math.ceil((reach * 2) / spec.cell);
+  const half = (n * spec.cell) / 2;
+  const seed = spec.seed ?? 5;
+  const heights = new Float32Array(n * n).fill(NaN);
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const x = -half + (i + 0.5) * spec.cell;
+      const z = -half + (j + 0.5) * spec.cell;
+      let h = 0;
+      for (const p of list) {
+        const d = Math.hypot(x - p.x, z - p.z) / p.r;
+        if (d >= 1) continue;
+        const ridge = 1 - Math.abs(fbm2(x * 0.02, z * 0.02, 3, seed) * 2 - 1);
+        h = Math.max(h, p.h * Math.pow(1 - d, 1.25) * (0.7 + ridge * 0.45));
+      }
+      if (h > spec.step) heights[j * n + i] = Math.round(h / spec.step);
+    }
+  }
+  const snowLine = spec.snowLine ?? Infinity;
+  const hf: Heightfield = {
+    x0: -half,
+    z0: -half,
+    nx: n,
+    nz: n,
+    cell: spec.cell,
+    step: spec.step,
+    height: (i, j) => (i < 0 || j < 0 || i >= n || j >= n ? NaN : heights[j * n + i]),
+    top: (i, j, h) => {
+      const r = hash3(i, h, j, seed);
+      return spec.snow && h * spec.step > snowLine - r * spec.step * 2 ? pick(spec.snow, r) : pick(spec.rock, r);
+    },
+    side: (i, j, l) => {
+      const r = hash3(i, l, j, seed + 1);
+      return spec.snow && l * spec.step > snowLine + spec.step && r < 0.55 ? pick(spec.snow, r) : pick(spec.rock, r);
+    },
+    floor: 0,
+  };
+  const g = terrain(hf, 32);
+  g.name = 'mountains';
+  g.position.y = spec.base;
+  return g;
+}
+
 /** Scatter points over an area, rejecting ones the predicate turns down, keeping a minimum spacing. */
 export function scatter(count: number, bounds: { x0: number; z0: number; x1: number; z1: number }, ok: (x: number, z: number) => boolean, spacing: number, seed: number, taken: { x: number; z: number; r: number }[] = []): { x: number; z: number }[] {
   const R = rng(seed);

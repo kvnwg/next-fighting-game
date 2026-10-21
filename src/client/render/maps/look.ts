@@ -59,7 +59,8 @@ export interface BuildContext {
   /** voxel props (instanced) */
   props(list: PropPlacement[], into?: THREE.Object3D): void;
   grass(o: GrassOptions): void;
-  particles(o: Omit<ParticleOptions, 'ambient'>): void;
+  /** ambient particles; falling kinds follow the camera unless `anchored` (e.g. petals under one tree) */
+  particles(o: Omit<ParticleOptions, 'ambient'> & { anchored?: boolean }): void;
   water(o: Omit<WaterOptions, 'reflections' | 'skyHorizon' | 'skyZenith' | 'ambient'>): void;
   /** a point light, if the budget allows */
   light(x: number, y: number, z: number, color: string, intensity: number, distance: number): void;

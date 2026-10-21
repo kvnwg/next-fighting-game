@@ -211,28 +211,31 @@ export class CloudLayer {
       for (let x = 0; x < n; x++) {
         const v = per(x / 6, z / 6, 6) * 0.6 + per(x / 3, z / 3, 3) * 0.3 + per(x / 1.5, z / 1.5, 1.5) * 0.1;
         if (v < 1 - o.cover) continue;
+        // the deeper into a cloud, the darker its underside: thin edges stay light
+        const depth = Math.min(1, (v - (1 - o.cover)) / (o.cover * 0.35));
+        const under = mixHex(side, bottom, 0.55 + depth * 0.45);
         for (let y = 0; y < layers; y++) {
-          // the upper layer only over the thick middle of each cloud
-          if (y > 0 && v < 1 - o.cover * 0.55) continue;
-          vol.set(x, y, z, y === layers - 1 ? top : mixHex(bottom, side, y / Math.max(1, layers - 1)));
+          // each layer up covers less: only the thick middle of a cloud rises to the top
+          if (y > 0 && v < 1 - o.cover * (1 - (0.45 * y) / (layers - 1))) continue;
+          vol.set(x, y, z, y === 0 ? under : top);
         }
       }
     }
     const geo = meshVoxels(vol, { jitter: 0, ao: [0.72, 0.8, 0.9, 1] });
-    // shade by facing: lit tops, softer sides, dark undersides
+    // shade by facing: lit tops, softer sides; undersides keep their depth shading
     const nor = geo.attributes.normal;
     const col = geo.attributes.color;
     const ct = new THREE.Color(top);
     const cs = new THREE.Color(side);
-    const cb = new THREE.Color(bottom);
     for (let i = 0; i < nor.count; i++) {
       const ny = nor.getY(i);
-      const c = ny > 0.5 ? ct : ny < -0.5 ? cb : cs;
+      if (ny < -0.5) continue;
+      const c = ny > 0.5 ? ct : cs;
       col.setXYZ(i, c.r, c.g, c.b);
     }
     const mat = patchMaterial(
       new THREE.MeshBasicMaterial({ vertexColors: true, transparent: (o.opacity ?? 1) < 1, opacity: o.opacity ?? 1, depthWrite: true }),
-      { ao: true },
+      { ao: true, cloud: true },
     );
     this.period = n * o.cell;
     for (const k of [0, 1]) {

@@ -22,6 +22,8 @@ export interface PatchOpts {
   push?: boolean;
   /** sprite atlas with this many cells side by side; each instance picks one with aSprite */
   atlas?: number;
+  /** clouds: sunlit faces, a glow where they cross the sun, and haze with distance */
+  cloud?: boolean;
 }
 
 const VERT_DECL = /* glsl */ `
@@ -121,8 +123,27 @@ const LIGHT_MODS = /* glsl */ `
 `;
 
 const FOG = /* glsl */ `
+#ifdef VOX_CLOUD
+  {
+    // faces turned to the sun catch it, the cloud glows where it crosses the sun (the silver
+    // lining), and far off it melts into the haze
+    vec3 voxN = normalize(cross(dFdx(vWorldPos), dFdy(vWorldPos)));
+    vec3 voxView = normalize(vWorldPos - cameraPosition);
+    float toward = max(dot(voxView, uSunDir), 0.0);
+    float lit = max(dot(voxN, uSunDir), 0.0);
+    gl_FragColor.rgb += uSunColor * (lit * 0.1 + pow(toward, 3.0) * 0.1 + pow(toward, 16.0) * 0.45);
+    float far = 1.0 - exp(-length(vWorldPos.xz - cameraPosition.xz) * 0.0018);
+    vec3 haze = mix(uFogColor, uFogSunColor, pow(toward, uFog.w));
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, haze, far * 0.3);
+  }
+#endif
 #ifdef USE_FOG
-  gl_FragColor.rgb = voxFog(gl_FragColor.rgb, vWorldPos);
+  #ifdef VOX_CLOUD
+    // half the ground haze: clouds keep their dark undersides against a bright sky
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, voxFog(gl_FragColor.rgb, vWorldPos), 0.5);
+  #else
+    gl_FragColor.rgb = voxFog(gl_FragColor.rgb, vWorldPos);
+  #endif
 #endif
 `;
 
@@ -133,6 +154,7 @@ function definesFor(o: PatchOpts): Record<string, string> {
   if (o.leaf) d.VOX_LEAF = '';
   if (o.rim) d.VOX_RIM = '';
   if (o.push) d.VOX_PUSH = '';
+  if (o.cloud) d.VOX_CLOUD = '';
   if (o.atlas) d.VOX_ATLAS = `${o.atlas.toFixed(1)}`;
   return d;
 }

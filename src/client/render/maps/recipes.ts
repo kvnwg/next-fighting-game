@@ -36,7 +36,7 @@ function fromTheme(map: MapDef): MapRecipe {
       hemi: { sky: th.ambient, ground: '#3a3530', intensity: th.ambientIntensity * 0.75 },
       fog: { color: th.fog, sun: th.sun, density: 0.02, falloff: 0.04 },
       lit: !!th.night || !!th.dusk,
-      clouds: th.night || map.id === 'forge' ? [] : [{ y: 120, cell: 14, thick: 5, cover: 0.35, half: 40, top: '#ffffff', side: '#e6ecf4', bottom: '#b8c4d4', speed: 1.5, layers: 2 }],
+      clouds: th.night || map.id === 'forge' ? [] : [{ y: 120, cell: 14, thick: 10, cover: 0.35, half: 40, top: '#ffffff', side: '#e6ecf4', bottom: '#b0bccf', speed: 1.5, layers: 3 }],
     },
     build(ctx) {
       const pal = GROUND[th.ground] ?? GROUND.stone;

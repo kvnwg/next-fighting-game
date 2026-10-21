@@ -26,7 +26,7 @@ export const lobbyRecipe: MapRecipe = {
     grade: { exposure: 1.0, contrast: 1.05, saturation: 1.12, gain: '#fffaf2', lift: '#101830', rays: 0.45, rayColor: '#fff0d0', bloom: 0.4 },
     wind: { dir: [0.8, 0.6], strength: 0.9, gust: 0.7 },
     rim: { color: '#fff4e0', strength: 0.55 },
-    clouds: [{ y: 120, cell: 14, thick: 5, cover: 0.4, half: 44, top: '#ffffff', side: '#eef3f9', bottom: '#c4d0e0', speed: 2, layers: 2 }],
+    clouds: [{ y: 120, cell: 14, thick: 12, cover: 0.4, half: 44, top: '#ffffff', side: '#eef3f9', bottom: '#b4c2d6', speed: 2, layers: 3 }],
     shadowExtent: 36,
   },
   build(ctx: BuildContext) {

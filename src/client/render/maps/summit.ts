@@ -5,12 +5,12 @@
  */
 import * as THREE from 'three';
 import { fbm2, hash3, rng } from '../gfx/noise';
-import { floatingIsland, hex, islet, mountainRing, pick, shadeHex, voxelFloor } from './kit';
+import { floatingIsland, hex, islet, mountainRing, peaks, pick, voxelFloor } from './kit';
 import { BuildContext, MapRecipe } from './look';
 
 const SNOW = [hex('#eef4fb'), hex('#e4ecf6'), hex('#f6f9fd'), hex('#dde7f2')];
 const SHADE = [hex('#c8d6e8'), hex('#d2deee')];
-const STONE = [hex('#98a0ac'), hex('#a4acb7'), hex('#8c94a0')];
+const STONE = [hex('#aab2be'), hex('#b6bec8'), hex('#a0a8b4')];
 const ICE = [hex('#bfe0f6'), hex('#cde8fa'), hex('#b2d6f0')];
 const ROCK = [hex('#5a6270'), hex('#646c7a'), hex('#525866'), hex('#6e7684')];
 const ICICLE = [hex('#cfeaff'), hex('#dff2ff'), hex('#bfe0fa')];
@@ -30,7 +30,7 @@ export const summitRecipe: MapRecipe = {
     rim: { color: '#fff4e0', strength: 0.6 },
     clouds: [
       { y: -24, cell: 9, thick: 5, cover: 0.66, half: 44, top: '#ffffff', side: '#dfe8f4', bottom: '#8fa2c2', speed: 3, layers: 2 },
-      { y: 140, cell: 16, thick: 4, cover: 0.25, half: 36, top: '#ffffff', side: '#eef2f8', bottom: '#c8d4e4', speed: 2, layers: 1 },
+      { y: 140, cell: 16, thick: 9, cover: 0.25, half: 36, top: '#ffffff', side: '#eef2f8', bottom: '#bccadc', speed: 2, layers: 2 },
     ],
     shadowExtent: 28,
   },
@@ -49,19 +49,17 @@ export const summitRecipe: MapRecipe = {
           const cx = Math.floor(x / 0.25);
           const cz = Math.floor(z / 0.25);
           const h = hash3(cx, 0, cz, 1);
-          // the ring of old stones, and a worn slab in the middle
+          // the ring of old stones, and a worn slab in the middle, both dusted with snow
           if (r < 5) {
             const a = Math.atan2(x, z);
             const stone = (r > 3.9 && Math.cos(a * 9) > 0.2) || r < 1.3;
-            if (stone) return { color: pick(STONE, h) };
-            return { color: r > 1.6 && r < 3.6 && fbm2(x, z, 2, 3) > 0.55 ? pick(STONE, h) : pick(SNOW, h) };
+            return { color: stone && h > 0.3 ? pick(STONE, h) : pick(SNOW, h) };
           }
           // wind-carved ripples across the snow, ice where it has been scoured bare
           const along = x * Math.cos(dir) + z * Math.sin(dir);
           const ripple = Math.sin(along * 3.2 + fbm2(x * 0.3, z * 0.3, 2, 5) * 6) > 0.72;
           const ice = fbm2(x * 0.18, z * 0.18, 3, 7) > 0.66;
           if (ice) return { color: pick(ICE, h) };
-          if (fbm2(x * 0.5, z * 0.5, 2, 8) > 0.8) return { color: pick(STONE, h) };
           return { color: ripple ? pick(SHADE, h) : pick(SNOW, h) };
         },
       }),
@@ -99,25 +97,41 @@ export const summitRecipe: MapRecipe = {
         Array.from({ length: n }, () => ({ kind: 'snowPine' as const, x: s.x + (R() - 0.5) * s.r, z: s.z + (R() - 0.5) * s.r, y: s.y - 0.2, s: 0.8 + R() * 0.5 })),
       );
     }
+    // lone peaks breaking through the sea of cloud, and a low range far off on the horizon
+    ctx.group.add(
+      peaks({
+        count: q.level === 'low' ? 9 : 12,
+        inner: 210,
+        outer: 380,
+        height: [40, 125],
+        spread: [0.9, 1.3],
+        base: -32,
+        cell: q.level === 'low' ? 12 : 8,
+        step: 4,
+        rock: [hex('#4c566a'), hex('#566078'), hex('#454e60'), hex('#5e687c')],
+        snow: [hex('#f2f6fb'), hex('#e6eef8'), hex('#dfe8f3')],
+        snowLine: 52,
+        seed: 61,
+      }),
+    );
     ctx.group.add(
       mountainRing({
-        inner: 280,
+        inner: 370,
         outer: 760,
-        cell: q.level === 'low' ? 16 : 10,
+        cell: q.level === 'low' ? 16 : 12,
         step: 6,
-        height: 220,
-        base: -60,
-        sharp: 4,
-        rock: [hex('#4c566a'), hex('#566078'), hex('#454e60')],
-        snow: [hex('#f2f6fb'), hex('#e6eef8')],
-        snowLine: 0.35,
-        seed: 61,
+        height: 70,
+        base: -40,
+        sharp: 2,
+        rock: [hex('#56607a'), hex('#5e6882'), hex('#4e5870')],
+        snow: [hex('#eef3f9'), hex('#e2eaf4')],
+        snowLine: 0.55,
+        seed: 62,
       }),
     );
 
     // ---------------------------------------------------------- weather
     ctx.particles({ kind: 'snow', count: 1700, center: new THREE.Vector3(0, 8, 0), size: new THREE.Vector3(50, 18, 50), scale: 0.045, colors: ['#ffffff', '#eef4ff'], ground: -30, seed: 23 });
     ctx.particles({ kind: 'dust', count: 220, center: new THREE.Vector3(0, 2.5, 0), size: new THREE.Vector3(30, 5, 30), scale: 0.022, colors: ['#e8f4ff'], seed: 24 });
-    void shadeHex;
   },
 };

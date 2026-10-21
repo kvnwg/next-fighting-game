@@ -70,7 +70,7 @@ void main() {
 }`;
 
 const MAX_LIGHTS = 8;
-const SCENERY = new Set<string>(['pagoda', 'archBridge', 'lilyPads', 'steppingStones', 'gardenRock', 'arch', 'altar', 'reeds']);
+const SCENERY = new Set<string>(['pagoda', 'archBridge', 'lilyPads', 'steppingStones', 'gardenRock', 'arch', 'altar', 'reeds', 'jetty', 'petalRaft']);
 const TREE_KINDS: Partial<Record<PropKind, TreeKind>> = { sakura: 'sakura', pine: 'pine', deadTree: 'deadTree', bamboo: 'bamboo', bush: 'bush' };
 /** collider-ish radius per prop kind, to keep scenery off the props */
 const FOOTPRINT: Partial<Record<PropKind, number>> = { shrine: 3, torii: 2.5, ruinWall: 2.6, statue: 1.2, well: 1.2, bamboo: 1.2, rock: 1.1, pillar: 0.9, brokenPillar: 1, rankBoard: 1.8 };
@@ -226,7 +226,7 @@ export class MapView {
         p.mesh.layers.set(DETAIL_LAYER);
         this.group.add(p.mesh);
         this.disposables.push(p);
-        if (o.kind !== 'fireflies' && o.kind !== 'spores' && o.kind !== 'embers') this.follow.push(p);
+        if (!o.anchored && o.kind !== 'fireflies' && o.kind !== 'spores' && o.kind !== 'embers') this.follow.push(p);
       },
       water: (o) => {
         const w = new Water({
