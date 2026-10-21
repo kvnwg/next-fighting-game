@@ -140,7 +140,7 @@ You can switch characters in the lobby safe zone (press **C**).
 **Arenas:**
 
 1. **Sakura Courtyard**: walled temple courtyard; lanterns and trees break sightlines.
-2. **Moonlit Grove**: night-time bamboo forest full of cover.
+2. **Moonlit Grove**: a night-time clearing walled in by bamboo, open floor.
 3. **Frozen Summit**: mountaintop with no walls; fall off and you lose the round.
 4. **Molten Forge**: lava pools in the corners burn you.
 5. **Sky Bridge**: a narrow bridge over the clouds with a central platform; ring-outs are deadly.

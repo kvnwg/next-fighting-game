@@ -320,25 +320,11 @@ const sakura: MapDef = {
   },
 };
 
-const bambooProps: Prop[] = (() => {
-  const rand = seededRandom(42);
-  const out: Prop[] = [];
-  let tries = 0;
-  while (out.length < 11 && tries++ < 500) {
-    const x = (rand() * 2 - 1) * 13.5;
-    const z = (rand() * 2 - 1) * 13.5;
-    if (Math.abs(x) < 2.5 && Math.abs(z) < 12) continue; // keep the spawn lane open
-    if (out.some((p) => Math.hypot(p.x - x, p.z - z) < 5)) continue;
-    out.push({ kind: 'bamboo', x, z, s: 0.9 + rand() * 0.4, rot: rand() * PI * 2, solid: true });
-  }
-  return out;
-})();
-
 const bamboo: MapDef = {
   id: 'bamboo',
   name: 'Moonlit Grove',
   jp: '月下竹林',
-  description: 'Dense bamboo under a full moon. Use the stalks to break line and reset.',
+  description: 'A moonlit clearing walled in by dense bamboo. Nothing stands between you.',
   kind: 'arena',
   floor: [{ type: 'rect', x: 0, z: 0, hw: 17, hd: 17 }],
   edge: 'wall',
@@ -346,12 +332,13 @@ const bamboo: MapDef = {
     { x: 0, z: -10, yaw: 0 },
     { x: 0, z: 10, yaw: PI },
   ],
+  // the floor is a clear clearing (stalks in the ring kept stealing the camera); the forest stands
+  // beyond the wall, and only lanterns and two boulders mark the edge
   props: [
-    ...bambooProps,
-    { kind: 'lantern', x: 2.5, z: 0, solid: true },
-    { kind: 'lantern', x: -2.5, z: 0, solid: true },
-    { kind: 'rock', x: 12, z: 12, s: 1.4, solid: true },
-    { kind: 'rock', x: -12.5, z: -11, s: 1.2, solid: true },
+    { kind: 'lantern', x: 15.5, z: 0, solid: true },
+    { kind: 'lantern', x: -15.5, z: 0, solid: true },
+    { kind: 'rock', x: 15, z: 15, s: 1.4, solid: true },
+    { kind: 'rock', x: -15, z: -14.5, s: 1.2, solid: true },
   ],
   decals: [{ shape: { type: 'rect', x: 0, z: 0, hw: 1.6, hd: 17 }, tex: 'stone' }],
   hazards: [],
