@@ -6,6 +6,9 @@
  */
 :root {
   color-scheme: dark;
+  /* In landscape the top inset is host chrome (the Claude app's close and menu buttons), which
+     only covers the corners: honour a little of it rather than pushing the whole HUD down. */
+  --hud-top: min(env(safe-area-inset-top, 0px), 12px);
   --text: #f4f1ea;
   --muted: #a8a49c;
   --dim: #6f6c66;
@@ -112,7 +115,7 @@ select { font-family: var(--ui); font-weight: 600; font-size: 14px; letter-spaci
 .fcard {
   --a: 14px;
   position: absolute;
-  top: calc(14px + env(safe-area-inset-top, 0px));
+  top: calc(14px + var(--hud-top));
   width: min(560px, 40.5vw);
   display: flex;
   align-items: center;
@@ -178,7 +181,7 @@ select { font-family: var(--ui); font-weight: 600; font-size: 14px; letter-spaci
 .fc-ping[data-q='bad'] { color: var(--red-hi); }
 
 /* the clock between the bars */
-.top-center { position: absolute; left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.top-center { position: absolute; left: 50%; top: calc(12px + var(--hud-top)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .match-round { font-weight: 700; font-size: 12px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--gold); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
 .match-timer { min-width: 76px; padding: 4px 16px 3px; font-weight: 700; font-size: 38px; line-height: 1; text-align: center; color: #fff; font-variant-numeric: tabular-nums; background: rgba(8, 8, 12, 0.72); clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%); box-shadow: inset 0 0 0 1px var(--line); }
 .match-timer.urgent { color: var(--red-hi); animation: blink 0.5s steps(2) infinite; }
@@ -200,7 +203,7 @@ select { font-family: var(--ui); font-weight: 600; font-size: 14px; letter-spaci
 .queue-panel::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: scan 1.4s linear infinite; }
 @keyframes scan { from { background-position: -50% 0; } to { background-position: 150% 0; } }
 
-.feed { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); top: calc(110px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.feed { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); top: calc(110px + var(--hud-top)); display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .feed-row { padding: 4px 12px; font-size: 14px; letter-spacing: 0.04em; background: linear-gradient(90deg, transparent, rgba(8, 8, 12, 0.75) 14%); border-right: 2px solid var(--red); }
 
 /* the old bottom posture gauge lives in the top bars now */
@@ -475,25 +478,30 @@ h3 { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.03
 .tc-ability.cooling .tc-name { display: none; }
 
 /* menu + chat, top left */
-.tc-top { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(8px + env(safe-area-inset-top, 0px)); display: flex; gap: 2px; padding: 3px 6px; border-radius: 24px; background: var(--glass); box-shadow: inset 0 0 0 1px var(--line-hi); pointer-events: auto; }
+.tc-top { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(8px + var(--hud-top)); display: flex; gap: 2px; padding: 3px 6px; border-radius: 24px; background: var(--glass); box-shadow: inset 0 0 0 1px var(--line-hi); pointer-events: auto; }
 .tc-round { width: 40px; height: 40px; border: none; border-radius: 50%; background: none; padding: 9px; pointer-events: auto; touch-action: manipulation; }
 .tc-round svg { width: 100%; height: 100%; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tc-round:active { background: rgba(255, 255, 255, 0.18); }
 
 /* everything else rearranged around the controls */
 .touch .hints, .touch .click-hint, .touch .esc-hint, .touch .key { display: none !important; }
-.touch .fcard { top: calc(56px + env(safe-area-inset-top, 0px)); }
-.touch .side-menu { left: max(12px, env(safe-area-inset-left, 0px)); right: auto; top: calc(56px + env(safe-area-inset-top, 0px)); transform: none; align-items: stretch; }
+.touch .fcard { top: calc(10px + var(--hud-top)); width: min(520px, 34vw); }
+.touch .zone-indicator { font-size: 11px; letter-spacing: 0.08em; padding: 3px 12px; }
+.touch .fcard.self { left: max(24px, env(safe-area-inset-left, 0px)); }
+.touch .fcard.opp { right: max(24px, env(safe-area-inset-right, 0px)); }
+/* the menu and chat pill sits under your fighter card, so the health bars stay at the top */
+.touch .tc-top { top: calc(104px + var(--hud-top)); left: max(24px, env(safe-area-inset-left, 0px)); }
+.touch .side-menu { left: max(12px, env(safe-area-inset-left, 0px)); right: auto; top: calc(154px + var(--hud-top)); transform: none; align-items: stretch; }
 .touch .side-menu:not(.open) > .btn, .touch .side-menu:not(.open) > .practice-group { display: none; }
-.touch .side-menu.open { z-index: 5; padding: 10px; background: rgba(12, 12, 18, 0.94); box-shadow: inset 0 0 0 1px var(--line), 0 10px 30px rgba(0, 0, 0, 0.5); }
+.touch .side-menu.open { max-height: calc(100% - 164px - var(--hud-top)); overflow-y: auto; z-index: 5; padding: 10px; background: rgba(12, 12, 18, 0.94); box-shadow: inset 0 0 0 1px var(--line), 0 10px 30px rgba(0, 0, 0, 0.5); }
 /* below your fighter card, clear of the stick and the buttons */
-.touch .challenge-popup { top: calc(128px + env(safe-area-inset-top, 0px)); }
+.touch .challenge-popup { top: calc(110px + var(--hud-top)); }
 .touch .side-menu .btn { min-width: 220px; justify-content: flex-start; font-size: 16px; padding: 12px 14px; }
 .touch .practice-group select { font-size: 15px; }
-.touch .queue-panel { position: fixed; left: 50%; top: calc(60px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); }
-.touch .chat { bottom: auto; top: calc(150px + env(safe-area-inset-top, 0px)); width: min(340px, 38vw); }
+.touch .queue-panel { position: fixed; left: 50%; top: calc(60px + var(--hud-top)); transform: translateX(-50%); }
+.touch .chat { bottom: auto; top: calc(160px + var(--hud-top)); width: min(340px, 38vw); }
 .touch .chat-log { max-height: 110px; }
-.touch .feed { top: calc(150px + env(safe-area-inset-top, 0px)); }
+.touch .feed { top: calc(150px + var(--hud-top)); }
 .touch .prompt { pointer-events: auto; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); padding: 9px 18px; font-size: 17px; }
 .touch .toasts { top: 100px; }
 .touch .modal-body { touch-action: pan-y; -webkit-overflow-scrolling: touch; }
