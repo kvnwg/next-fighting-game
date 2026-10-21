@@ -58,8 +58,8 @@ export const COMBAT = {
   brokenTime: 1800,
   knockdownTime: 1100,
   deathblowDamage: 40,
-  /** Posture is reset to this fraction of max if a posture break ends without a deathblow. */
-  brokenRecoverPosture: 0.55,
+  /** Posture left after a posture break ends without a deathblow (0: the guard comes back whole). */
+  brokenRecoverPosture: 0,
 
   /** Attack recovery can be cancelled into guard once this fraction of it has elapsed. */
   recoveryGuardCancel: 0.4,
@@ -83,8 +83,14 @@ export const COMBAT = {
   jumpEvadeStart: 50,
   jumpEvadeEnd: 620,
 
-  postureRegenDelay: 1100,
-  postureRegenRate: 14,
+  /**
+   * Posture recovers slowly, and only once you stop: not until this long (ms) after the last posture
+   * damage, and never while attacking, dodging or reeling, nor until this long after the last of
+   * those, so pressing an attack never lets the guard rebuild.
+   */
+  postureRegenDelay: 2500,
+  postureCalmDelay: 800,
+  postureRegenRate: 10,
   guardRegenMult: 1.6,
 
   hitKnockback: 0.55,
@@ -99,6 +105,8 @@ export const COMBAT = {
 
 // ---- Matches -------------------------------------------------------------------
 export const MATCH = {
+  /** The map and fighter select before a match. */
+  selectTime: 10_000,
   roundsToWin: 2,
   /** Drawn rounds don't count; after this many rounds the leader (or healthier fighter) wins. */
   maxRounds: 5,

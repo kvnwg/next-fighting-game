@@ -1,6 +1,7 @@
 /**
  * Third-person orbit camera with a Sekiro-style lock-on. Framed over the right shoulder: the player
  * sits in the lower-left third and, when locked on, the opponent sits right of centre, unblocked.
+ * Locked on, the angle is fixed (no tilting or zooming) so the opponent always reads clearly.
  */
 import * as THREE from 'three';
 import { angleDiff, clamp, forward, yawTo } from '../shared/math';
@@ -9,6 +10,9 @@ import { angleDiff, clamp, forward, yawTo } from '../shared/math';
 export const CAMERA_FOV = 50;
 /** Sideways offset of the camera (and its aim) to the player's right, in metres. */
 const SHOULDER = 1.4;
+/** The fixed framing while locked on: pitch and boom length (scaled with your fighter's size). */
+const LOCK_PITCH = 0.32;
+const LOCK_DISTANCE = 6.2;
 
 /** A camera pose for cinematic shots. */
 export interface CamPose {
@@ -49,6 +53,9 @@ export class CameraRig {
   distance = 6.6;
   /** settings ("reduce camera shake") and device scaling for shake and punch-ins */
   shakeScale = 1;
+  /** your fighter's size relative to the reference body: bigger fighters get a wider, longer framing */
+  subjectScale = 1;
+  private locked = false;
   private shakes: Shake[] = [];
   private time = 0;
   private pos = new THREE.Vector3();
@@ -69,12 +76,16 @@ export class CameraRig {
   }
 
   addMouse(dx: number, dy: number, sensitivity: number, invertY: boolean, locked: boolean): void {
+    // locked on, the framing is fixed: look-around only out of a duel
+    this.locked = locked;
+    if (locked) return;
     const k = 0.0024 * sensitivity;
-    if (!locked) this.yaw -= dx * k;
+    this.yaw -= dx * k;
     this.pitch = clamp(this.pitch + dy * k * (invertY ? -1 : 1), -0.35, 1.2);
   }
 
   zoom(dy: number): void {
+    if (this.locked) return;
     this.distance = clamp(this.distance + dy * 0.004, 3.2, 11);
   }
 
@@ -135,15 +146,19 @@ export class CameraRig {
   /** Where the follow camera wants to be and to look, at the current yaw. */
   private aim(player: THREE.Vector3, target: THREE.Vector3 | null) {
     const f = forward(this.yaw);
-    const cosP = Math.cos(this.pitch);
+    const k = Math.max(1, this.subjectScale);
+    const pitch = target ? LOCK_PITCH : this.pitch;
+    const distance = target ? LOCK_DISTANCE * k : this.distance;
+    const shoulder = SHOULDER * (target ? k : 1);
+    const cosP = Math.cos(pitch);
     const pos = new THREE.Vector3(
-      player.x - f.x * this.distance * cosP,
-      player.y + 2.0 + Math.sin(this.pitch) * this.distance,
-      player.z - f.z * this.distance * cosP,
+      player.x - f.x * distance * cosP,
+      player.y + 2.0 * k + Math.sin(pitch) * distance,
+      player.z - f.z * distance * cosP,
     );
     // over the right shoulder so the player doesn't block the opponent
-    pos.x += -Math.cos(this.yaw) * SHOULDER;
-    pos.z += Math.sin(this.yaw) * SHOULDER;
+    pos.x += -Math.cos(this.yaw) * shoulder;
+    pos.z += Math.sin(this.yaw) * shoulder;
     if (pos.y < 0.4) pos.y = 0.4;
     const subject = new THREE.Vector3(player.x, player.y + 1.6, player.z);
     this.constrain?.(subject, pos);
@@ -154,8 +169,8 @@ export class CameraRig {
       look.lerp(new THREE.Vector3(target.x, target.y + 1.3, target.z), 0.45);
     }
     // aim a little further right than the camera sits, pushing the player toward the left third
-    look.x += -Math.cos(this.yaw) * SHOULDER * 1.3;
-    look.z += Math.sin(this.yaw) * SHOULDER * 1.3;
+    look.x += -Math.cos(this.yaw) * shoulder * 1.3;
+    look.z += Math.sin(this.yaw) * shoulder * 1.3;
     return { pos, look, subject };
   }
 

@@ -1,10 +1,10 @@
 /** Top-level server state: connections, the lobby, running arenas, matchmaking and challenges. */
-import { CharacterId, isCharacterId } from '../shared/characters';
+import { CHARACTER_IDS, CharacterId, isCharacterId } from '../shared/characters';
 import { MATCH, SERVER_TICK_HZ } from '../shared/config';
 import { ARENA_MAPS, MapDef } from '../shared/maps';
-import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, ServerMsg } from '../shared/protocol';
+import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, SelectView, ServerMsg } from '../shared/protocol';
 import { eloDelta } from '../shared/ranks';
-import { Arena } from './arena';
+import { Arena, botName } from './arena';
 import { Player, SocketLike } from './entities';
 import { Lobby } from './lobby';
 import { Store, profileView } from './store';
@@ -22,6 +22,19 @@ function sanitizeChat(raw: unknown): string {
   return raw.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 140);
 }
 
+/** A match waiting on the map and fighter select. */
+interface PendingMatch {
+  mode: MatchMode;
+  players: [Player, Player | null];
+  diff?: BotDifficulty;
+  botRating?: number;
+  /** the AI opponent's own picks, made at voteAt */
+  bot: { char: CharacterId; name: string; voteAt: number } | null;
+  endsAt: number;
+  maps: string[];
+  votes: SelectView['votes'];
+}
+
 export interface GameOptions {
   /** Single-player mode (runs in the browser): ranked queues are matched against rated AI opponents. */
   offline?: boolean;
@@ -29,6 +42,8 @@ export interface GameOptions {
   roamers?: number;
   /** Always use this arena (dev/testing). */
   arena?: string;
+  /** How long the map and fighter select stays open before a match (ms). */
+  selectTime?: number;
 }
 
 export class Game {
@@ -38,6 +53,8 @@ export class Game {
   private queue: Player[] = [];
   /** pending challenges keyed by the challenged player's id */
   private challenges = new Map<string, { from: string; expires: number }>();
+  /** Matches waiting on the map and fighter select, by player. */
+  private selecting = new Map<Player, PendingMatch>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastMatchmake = 0;
   private lastQueueBroadcast = 0;
@@ -84,6 +101,15 @@ export class Game {
         p.lastPingS = Math.round(now);
         p.send({ t: 'sping', s: p.lastPingS });
       }
+    }
+    for (const pm of new Set(this.selecting.values())) {
+      if (pm.bot && now >= pm.bot.voteAt && !pm.votes.char[1]) {
+        // the AI makes its picks a moment in, like a person would
+        pm.votes.char[1] = pm.bot.char;
+        pm.votes.map[1] = Math.random() < 0.5 && pm.votes.map[0] ? pm.votes.map[0] : pm.maps[Math.floor(Math.random() * pm.maps.length)];
+        this.sendSelect(pm);
+      }
+      if (now >= pm.endsAt) this.finishSelect(pm);
     }
     if (now - this.lastMatchmake > 1000) {
       this.lastMatchmake = now;
@@ -172,6 +198,7 @@ export class Game {
   leave(p: Player): void {
     if (p.closed) return;
     p.closed = true;
+    this.cancelSelect(p, `${p.name} left.`);
     this.unqueue(p);
     this.challenges.delete(p.id);
     const inst = p.instance;
@@ -199,6 +226,9 @@ export class Game {
         break;
       case 'act':
         p.instance?.handleAction(p, msg);
+        break;
+      case 'vote':
+        this.vote(p, msg.map, msg.char);
         break;
       case 'char':
         if (!isCharacterId(msg.id)) return;
@@ -247,9 +277,10 @@ export class Game {
       p.send({ t: 'notice', text: 'You are already in a match.', kind: 'warn' });
       return;
     }
+    if (this.selecting.has(p)) return;
     if (mode === 'practice') {
       this.unqueue(p);
-      this.startMatch('practice', p, null, diff);
+      this.beginSelect('practice', p, null, diff);
       return;
     }
     if (mode !== 'ranked' || p.queue) return;
@@ -277,7 +308,7 @@ export class Game {
       for (const p of [...this.queue]) {
         if (now - p.queue!.since < 2500) continue;
         const rating = Math.max(600, Math.round(p.profile.mmr + (Math.random() - 0.45) * 120));
-        this.startMatch('ranked', p, null, undefined, this.pickMap(), rating);
+        this.beginSelect('ranked', p, null, undefined, rating);
       }
       return;
     }
@@ -304,7 +335,7 @@ export class Game {
           used.add(a);
           used.add(best);
         }
-        if (best) this.startMatch('ranked', a, best);
+        if (best) this.beginSelect('ranked', a, best);
       }
     }
     if (now - this.lastQueueBroadcast > 3000) {
@@ -319,14 +350,14 @@ export class Game {
     return ARENA_MAPS[Math.floor(Math.random() * ARENA_MAPS.length)];
   }
 
-  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap(), botRating?: number): Arena {
+  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap(), botRating?: number, bot?: { char: CharacterId; name: string }): Arena {
     for (const p of [a, b]) {
       if (!p) continue;
       this.unqueue(p);
       this.challenges.delete(p.id);
       p.instance?.removePlayer(p);
     }
-    const arena = new Arena(this, map, mode, a, b, diff, botRating);
+    const arena = new Arena(this, map, mode, a, b, diff, botRating, bot);
     this.arenas.add(arena);
     return arena;
   }
@@ -407,7 +438,7 @@ export class Game {
     if (typeof targetId !== 'string') return;
     const target = this.players.get(targetId);
     if (!target || target === p) return;
-    if (p.instance !== this.lobby || target.instance !== this.lobby) {
+    if (p.instance !== this.lobby || target.instance !== this.lobby || this.selecting.has(p) || this.selecting.has(target)) {
       p.send({ t: 'notice', text: `${target.name} is busy right now.`, kind: 'warn' });
       return;
     }
@@ -429,10 +460,80 @@ export class Game {
       challenger.send({ t: 'notice', text: `${p.name} declined your challenge.`, kind: 'info' });
       return;
     }
-    if (challenger.instance !== this.lobby || p.instance !== this.lobby) {
+    if (challenger.instance !== this.lobby || p.instance !== this.lobby || this.selecting.has(challenger) || this.selecting.has(p)) {
       p.send({ t: 'notice', text: 'That challenge is no longer available.', kind: 'warn' });
       return;
     }
-    this.startMatch('casual', challenger, p);
+    this.beginSelect('casual', challenger, p);
+  }
+
+  // ------------------------------------------------------------------ map and fighter select
+
+  /** Open the map and fighter select for a match; it starts when the vote closes. */
+  beginSelect(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, botRating?: number): void {
+    for (const p of [a, b]) {
+      if (!p) continue;
+      this.unqueue(p);
+      this.challenges.delete(p.id);
+    }
+    const now = this.now();
+    const fixed = ARENA_MAPS.find((m) => m.id === this.options.arena);
+    const pm: PendingMatch = {
+      mode,
+      players: [a, b],
+      diff,
+      botRating,
+      bot: b ? null : { char: CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)], name: botName(diff ?? 'normal', botRating), voteAt: now + 1200 + Math.random() * 2200 },
+      endsAt: now + (this.options.selectTime ?? MATCH.selectTime),
+      maps: fixed ? [fixed.id] : ARENA_MAPS.map((m) => m.id),
+      votes: { map: [null, null], char: [null, null] },
+    };
+    for (const p of pm.players) if (p) this.selecting.set(p, pm);
+    this.sendSelect(pm);
+  }
+
+  private sendSelect(pm: PendingMatch): void {
+    const [a, b] = pm.players;
+    const side = (p: Player | null, i: 0 | 1) => (p ? { name: p.name, bot: false, char: p.charId } : { name: pm.bot!.name, bot: true, char: pm.votes.char[i] ?? pm.bot!.char });
+    const base: Omit<SelectView, 'you'> = { mode: pm.mode, endsAt: pm.endsAt, sides: [side(a, 0), side(b, 1)], maps: pm.maps, votes: pm.votes };
+    a.send({ t: 'select', ...base, you: 0 });
+    b?.send({ t: 'select', ...base, you: 1 });
+  }
+
+  private vote(p: Player, map: unknown, char: unknown): void {
+    const pm = this.selecting.get(p);
+    if (!pm) return;
+    const i = pm.players[0] === p ? 0 : 1;
+    if (typeof map === 'string' && (map === 'random' || pm.maps.includes(map))) pm.votes.map[i] = map;
+    if (isCharacterId(char)) pm.votes.char[i] = char;
+    this.sendSelect(pm);
+  }
+
+  /** The vote closes: settle the arena and the fighters, and start the match. */
+  private finishSelect(pm: PendingMatch): void {
+    const [a, b] = pm.players;
+    for (const p of pm.players) if (p) this.selecting.delete(p);
+    if (a.closed || (b && b.closed)) return;
+    // one of the picked arenas (a "random" pick leaves it to chance), or any arena if nobody picked
+    const picked = pm.votes.map.filter((m): m is string => !!m).map((m) => (m === 'random' ? pm.maps[Math.floor(Math.random() * pm.maps.length)] : m));
+    const id = picked.length ? picked[Math.floor(Math.random() * picked.length)] : pm.maps[Math.floor(Math.random() * pm.maps.length)];
+    const map = ARENA_MAPS.find((m) => m.id === id) ?? this.pickMap();
+    for (const [i, p] of [a, b].entries()) {
+      const c = pm.votes.char[i];
+      if (p && c) p.charId = c;
+    }
+    const bot = pm.bot ? { char: pm.votes.char[1] ?? pm.bot.char, name: pm.bot.name } : undefined;
+    this.startMatch(pm.mode, a, b, pm.diff, map, pm.botRating, bot);
+  }
+
+  /** Someone left during the select: call it off and tell the other side. */
+  private cancelSelect(p: Player, reason: string): void {
+    const pm = this.selecting.get(p);
+    if (!pm) return;
+    for (const q of pm.players) {
+      if (!q) continue;
+      this.selecting.delete(q);
+      if (q !== p) q.send({ t: 'selectCancel', reason });
+    }
   }
 }

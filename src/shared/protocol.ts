@@ -4,7 +4,7 @@ import { Outcome } from './combat';
 import { Fighter, FighterState, InputAction } from './fighter';
 import { round2 } from './math';
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export type QueueMode = 'ranked' | 'practice';
 export type MatchMode = 'ranked' | 'practice' | 'casual';
@@ -98,7 +98,28 @@ export type ClientMsg =
   | { t: 'spong'; s: number }
   | { t: 'forfeit' }
   | { t: 'leaderboard' }
-  | { t: 'fell' };
+  | { t: 'fell' }
+  /** a pick on the map and fighter select before a match ('random' leaves the arena to chance) */
+  | { t: 'vote'; map?: string; char?: CharacterId };
+
+/** One side of the map and fighter select. */
+export interface SelectSide {
+  name: string;
+  bot: boolean;
+  /** the fighter they play unless they pick another */
+  char: CharacterId;
+}
+
+/** The map and fighter select before a match, sent when it opens and on every vote. */
+export interface SelectView {
+  mode: MatchMode;
+  endsAt: number;
+  you: 0 | 1;
+  sides: [SelectSide, SelectSide];
+  /** arena ids, in menu order */
+  maps: string[];
+  votes: { map: [string | null, string | null]; char: [CharacterId | null, CharacterId | null] };
+}
 
 export type ServerMsg =
   | { t: 'welcome'; id: string; token: string; profile: ProfileView; online: number; serverTime: number }
@@ -152,7 +173,10 @@ export type ServerMsg =
   | { t: 'notice'; text: string; kind?: 'info' | 'warn' | 'good' }
   | { t: 'chat'; name: string; text: string; sys?: boolean }
   | { t: 'feed'; killer: string; victim: string; how: string }
-  | { t: 'online'; n: number };
+  | { t: 'online'; n: number }
+  | ({ t: 'select' } & SelectView)
+  /** the select closed without a match (the other side left) */
+  | { t: 'selectCancel'; reason: string };
 
 export function fighterSnap(f: Fighter, flags: number): FighterSnap {
   const s: FighterSnap = {

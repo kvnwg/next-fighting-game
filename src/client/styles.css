@@ -207,7 +207,30 @@ select { font-family: var(--ui); font-weight: 600; font-size: 14px; letter-spaci
 .feed-row { padding: 4px 12px; font-size: 14px; letter-spacing: 0.04em; background: linear-gradient(90deg, transparent, rgba(8, 8, 12, 0.75) 14%); border-right: 2px solid var(--red); }
 
 /* the old bottom posture gauge lives in the top bars now */
-.posture-main { display: none; }
+/*
+ * Posture, as in the reference fights: your bar at the bottom centre and the opponent's floating
+ * above their head. White is the guard left; it drains from both ends toward the shield, which
+ * cracks as it gets low. A broken guard has no bar; it fades back in whole.
+ */
+.posture-main { position: absolute; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; align-items: center; gap: 3px; width: min(420px, 44vw); filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6)); transition: opacity 0.35s; }
+.posture-main.foe { bottom: auto; width: 150px; gap: 2px; transform: translate(-50%, -100%); }
+.pm-bar { position: relative; flex: 1; height: 9px; overflow: hidden; background: rgba(8, 8, 12, 0.78); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3); transform: skewX(-28deg); }
+.pm-bar.right { transform: skewX(28deg); }
+.posture-main.foe .pm-bar { height: 5px; }
+.pm-fill { position: absolute; top: 0; bottom: 0; width: 100%; background: linear-gradient(180deg, #ffffff, #d6d8de); transition: width 0.08s linear; }
+.pm-bar.left .pm-fill { right: 0; }
+.pm-bar.right .pm-fill { left: 0; }
+.posture-main[data-level='high'] .pm-fill { background: linear-gradient(180deg, #ffd2c8, #ff6a5a); }
+.pm-shield { flex: none; width: 26px; height: 31px; }
+.posture-main.foe .pm-shield { width: 15px; height: 18px; }
+.pm-shield-body { fill: #e4e4ea; stroke: #23232a; stroke-width: 2; }
+.pm-shield-line { stroke: #23232a; stroke-width: 1.6; }
+.pm-crack { fill: none; stroke: #23232a; stroke-width: 1.6; opacity: 0; }
+.posture-main.cracked .pm-crack { opacity: 1; }
+.posture-main[data-level='high'] .pm-shield-body { fill: #ffb4a8; }
+.posture-main.broken { opacity: 0; transition: opacity 0.12s 0.15s; }
+/* posture lives at the bottom and over heads now, so the top cards show health only */
+.fc-po { display: none; }
 
 /* control hints: quiet keycaps in the corners */
 .hints { position: absolute; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 6px; }
@@ -560,4 +583,54 @@ h3 { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.03
   .modal-box { max-height: calc(100vh - 32px); }
   .modal-head { padding: 12px 18px 8px; }
   .modal-head h2 { font-size: 22px; }
+}
+
+/* ---------------------------------------------------------------- map and fighter select */
+/* laid out like the reference: a dark band with the arenas, the fighters in a row along the bottom */
+/* the duel HUD steps aside while picking */
+.selecting .hud > :not(.toasts) { visibility: hidden; }
+.select-screen { position: absolute; inset: 0; z-index: 25; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: calc(28px + var(--hud-top)) 16px calc(18px + env(safe-area-inset-bottom, 0px)); background: radial-gradient(ellipse at 50% 40%, rgba(6, 6, 10, 0.25), rgba(6, 6, 10, 0.7) 85%); font-family: var(--ui); pointer-events: auto; }
+.sel-band { width: min(980px, 100%); padding: 10px 7% 18px; text-align: center; background: linear-gradient(90deg, transparent 0%, rgba(8, 8, 12, 0.82) 14%, rgba(8, 8, 12, 0.82) 86%, transparent 100%); }
+.sel-title { margin: 0; display: inline-flex; align-items: center; gap: 12px; font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8); }
+.sel-title .jp { font-size: 20px; color: var(--red-hi); font-style: normal; }
+.sel-count { font-weight: 700; font-size: 34px; line-height: 1.05; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8); }
+.sel-count.urgent { color: var(--red-hi); }
+.sel-maps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-top: 10px; }
+.sel-chars { display: grid; grid-template-columns: repeat(8, minmax(0, 92px)); gap: 8px; justify-content: center; width: min(820px, 100%); }
+.sel-tile, .sel-card { position: relative; overflow: hidden; padding: 0; border: none; cursor: pointer; background: #121218; color: #fff; text-align: left; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12), 0 6px 18px rgba(0, 0, 0, 0.45); transition: box-shadow 0.12s, transform 0.08s; }
+.sel-tile { aspect-ratio: 16 / 9; }
+.sel-card { aspect-ratio: 1 / 1.1; background: radial-gradient(ellipse at 50% 30%, #2c2c38, #101016 75%); }
+.sel-tile:hover, .sel-card:hover { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45), 0 6px 18px rgba(0, 0, 0, 0.45); }
+.sel-tile:active, .sel-card:active { transform: translateY(1px); }
+.sel-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.sel-card .sel-art { object-position: 50% 20%; }
+/* shade under the label so it reads on any picture */
+.sel-tile::after, .sel-card::after { content: ''; position: absolute; inset: 50% 0 0; background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.8)); pointer-events: none; }
+.sel-label { position: absolute; z-index: 1; left: 8px; bottom: 6px; font-weight: 800; font-style: italic; font-size: 16px; letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 1px 4px #000; }
+.sel-card .sel-label { font-size: 14px; }
+.sel-jp { position: absolute; z-index: 1; right: 6px; top: 4px; font-family: var(--jp); font-weight: 800; font-size: 13px; color: rgba(255, 255, 255, 0.7); text-shadow: 0 1px 3px #000; }
+.sel-tile.random { display: grid; place-items: center; }
+.sel-random { width: 34%; height: 50%; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.mine { box-shadow: inset 0 0 0 3px #3ad16a, 0 6px 18px rgba(0, 0, 0, 0.45) !important; }
+.theirs { box-shadow: inset 0 0 0 3px var(--red-hi), 0 6px 18px rgba(0, 0, 0, 0.45) !important; }
+.mine.theirs { box-shadow: inset 0 0 0 3px var(--gold), 0 6px 18px rgba(0, 0, 0, 0.45) !important; }
+/* voters' portraits at the top middle of their pick */
+.sel-badges { position: absolute; z-index: 2; left: 50%; top: 6px; transform: translateX(-50%); display: flex; gap: 5px; }
+.sel-badge { position: relative; width: 34px; height: 34px; border-radius: 50%; overflow: hidden; background: #2a2a34; box-shadow: 0 0 0 3px #3ad16a, 0 2px 6px rgba(0, 0, 0, 0.6); }
+.sel-badge.theirs { box-shadow: 0 0 0 3px var(--red-hi), 0 2px 6px rgba(0, 0, 0, 0.6); }
+.sel-badge img { width: 100%; height: 100%; object-fit: cover; }
+.sel-badge b { position: absolute; left: 0; right: 0; bottom: -1px; font-size: 10px; text-align: center; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; background: rgba(0, 0, 0, 0.55); }
+@media (max-height: 520px) {
+  .select-screen { padding-top: calc(10px + var(--hud-top)); }
+  .sel-band { padding: 4px 6% 10px; width: min(760px, 100%); }
+  .sel-title { font-size: 20px; }
+  .sel-title .jp { font-size: 14px; }
+  .sel-count { font-size: 22px; }
+  .sel-maps { gap: 6px; margin-top: 6px; grid-template-columns: repeat(7, 1fr); }
+  .sel-label { font-size: 11px; left: 5px; bottom: 3px; }
+  .sel-jp { display: none; }
+  .sel-chars { grid-template-columns: repeat(8, minmax(0, 70px)); gap: 6px; }
+  .sel-card .sel-label { font-size: 11px; }
+  .sel-badge { width: 22px; height: 22px; }
+  .sel-badge b { font-size: 7px; }
 }

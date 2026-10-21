@@ -1,5 +1,5 @@
 /** A 1v1 match: best of three rounds on one of the arena maps. */
-import { CHARACTER_IDS } from '../shared/characters';
+import { CHARACTER_IDS, CharacterId } from '../shared/characters';
 import { MATCH } from '../shared/config';
 import { MapDef } from '../shared/maps';
 import { BotDifficulty, MatchMode, MatchPhase, RosterEntry } from '../shared/protocol';
@@ -12,6 +12,12 @@ let botCounter = 0;
 
 /** Names for rated AI opponents (placeholders, like the rest of the cast). */
 const AI_NAMES = ['Kestrel', 'Marlo', 'Sable', 'Wren', 'Ivo', 'Tamsin', 'Kael', 'Juno', 'Orrin', 'Pell', 'Rook', 'Vesna'];
+
+/** What an AI opponent is called: a name for a rated one, its difficulty otherwise. */
+export function botName(diff: BotDifficulty, botRating?: number): string {
+  if (botRating !== undefined) return `${AI_NAMES[Math.floor(Math.random() * AI_NAMES.length)]} (AI)`;
+  return `${diff[0].toUpperCase() + diff.slice(1)} Bot`;
+}
 
 export class Arena extends Instance {
   readonly kind = 'arena' as const;
@@ -36,15 +42,16 @@ export class Arena extends Instance {
     diff: BotDifficulty = 'normal',
     /** When set (offline ranked), the AI opponent has this rating and plays at a matching skill. */
     readonly botRating?: number,
+    /** The bot's fighter and name, when the map and fighter select already settled them. */
+    bot?: { char: CharacterId; name: string },
   ) {
     super(game, map);
     const [s0, s1] = map.spawns;
     let fb: ServerFighter | null = null;
     if (!b) {
       // create the bot first so it is part of the human's initial roster
-      const char = CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)];
-      const label = diff[0].toUpperCase() + diff.slice(1);
-      const name = botRating !== undefined ? `${AI_NAMES[Math.floor(Math.random() * AI_NAMES.length)]} (AI)` : `${label} Bot`;
+      const char = bot?.char ?? CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)];
+      const name = bot?.name ?? botName(diff, botRating);
       fb = new ServerFighter(`bot-${++botCounter}`, name, char);
       fb.x = s1.x;
       fb.z = s1.z;

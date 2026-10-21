@@ -6,7 +6,7 @@ import { PROTOCOL_VERSION, ServerMsg } from '../src/shared/protocol';
 let server: RunningServer;
 
 beforeAll(async () => {
-  server = await startServer({ port: 0, dataFile: null });
+  server = await startServer({ port: 0, dataFile: null, selectTime: 200 });
 });
 
 afterAll(async () => {

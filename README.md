@@ -97,7 +97,7 @@ Everything in the world is voxels, lit the way a Minecraft shader pack lights th
 
 ## Combat
 
-- **Health and posture.** Blocking a hit costs posture. When posture fills you're **posture broken**: helpless for ~1.8s, and the next hit is a **Deathblow** (40 damage). Posture regenerates when you stop taking posture damage: faster while guarding, slower when your health is low.
+- **Health and posture.** Blocking a hit costs posture. When posture fills you're **posture broken**: helpless for ~1.8s, and the next hit is a **Deathblow** (40 damage). Posture recovers slowly and only once you stop: never while attacking, dodging or reeling, and not until 2.5s after the last posture damage (faster while guarding, slower when your health is low). A break that ends without a Deathblow leaves the guard whole.
 - **Deflect.** Pressing guard within ~200ms before a hit lands deflects it. Deflecting costs you almost nothing and hammers the attacker's posture. It also makes them recoil, and heavier swings recoil longer: deflecting a heavy or perilous attack gives you a free counter, while deflecting a quick poke only gives you the initiative. Mashing guard shrinks your deflect window (only whiffed presses count as spam).
 - **Special meter.** The thin bar under each fighter's health fills as their special recharges. It starts empty each round and fills over the special's cooldown (about 7s), and when it's full the special is ready.
 - **Perilous attacks (危).** Every character's special (**E**) is unblockable and flashes a red glyph:
@@ -174,7 +174,8 @@ scripts/         headless-browser screenshot helpers used during development
 ### Look and feel
 
 The UI keeps out of the way of the world: frosted-glass panels with thin borders, condensed type, and a few kanji accents (始め on FIGHT, 勝利 on a win).
-- **Fighter cards** have an angled gold health bar with a red damage trail that drains a beat after each hit. Under it, a posture gauge fills from the centre out and flashes BROKEN when it breaks. The round clock sits in a hexagon in the middle, with the round number under it.
+- **Fighter cards** have an angled gold health bar with a red damage trail that drains a beat after each hit.
+- **Posture bars**: yours at the bottom centre, your opponent's floating above their head. White is the guard left; it drains from both ends toward the shield, which cracks as it gets low, and the bar disappears while the guard is broken. The round clock sits in a hexagon in the middle, with the round number under it.
 - **Fonts** (Google Fonts): **Barlow Condensed** for everything in Latin, and **Shippori Mincho B1** for the kanji.
 - **Where to restyle:** colours and type live at the top of `src/client/styles.css`. Each character and map has a `jp` kanji name in `characters.ts` / `maps.ts`.
 - **Camera** (`src/client/camera.ts`):

@@ -207,6 +207,16 @@ export class UI {
           <svg class="pm-shield" viewBox="0 0 32 38" aria-hidden="true">
             <path class="pm-shield-body" d="M16 1 L30 6 V17 C30 27 23 33 16 37 C9 33 2 27 2 17 V6 Z" />
             <path class="pm-shield-line" d="M16 6 V32" />
+            <path class="pm-crack" d="M9 7 L13 15 L8 21 L12 29 M23 9 L19 17 L24 24" />
+          </svg>
+          <div class="pm-bar right"><div class="pm-fill"></div></div>
+        </div>
+        <div class="posture-main foe hidden">
+          <div class="pm-bar left"><div class="pm-fill"></div></div>
+          <svg class="pm-shield" viewBox="0 0 32 38" aria-hidden="true">
+            <path class="pm-shield-body" d="M16 1 L30 6 V17 C30 27 23 33 16 37 C9 33 2 27 2 17 V6 Z" />
+            <path class="pm-shield-line" d="M16 6 V32" />
+            <path class="pm-crack" d="M9 7 L13 15 L8 21 L12 29 M23 9 L19 17 L24 24" />
           </svg>
           <div class="pm-bar right"><div class="pm-fill"></div></div>
         </div>
@@ -243,9 +253,8 @@ export class UI {
       round: '.match-round',
       selfCard: '.fcard.self',
       oppCard: '.fcard.opp',
-      postureMain: '.posture-main',
-      pmLeft: '.pm-bar.left .pm-fill',
-      pmRight: '.pm-bar.right .pm-fill',
+      postureMain: '.posture-main:not(.foe)',
+      foePosture: '.posture-main.foe',
       hDodge: '#h-dodge',
       hSpecial: '#h-special',
       hAbility: '#h-ability',
@@ -436,12 +445,32 @@ export class UI {
     fill.dataset.level = f > 0.8 ? 'high' : f > 0.5 ? 'mid' : 'low';
   }
 
-  /** The big posture bar: fills outward from the shield as posture builds. */
+  /**
+   * Your posture bar, bottom centre: white is the guard you have left, draining from both ends toward
+   * the shield as posture builds (the shield cracks as it gets low). A broken guard has no bar; it
+   * fades back in whole when the stagger ends.
+   */
   setPostureMain(frac: number, broken: boolean): void {
-    this.setBar(this.els.pmLeft, frac);
-    this.setBar(this.els.pmRight, frac);
-    this.els.postureMain.classList.toggle('broken', broken);
-    this.els.postureMain.dataset.level = this.els.pmLeft.dataset.level;
+    this.postureBar(this.els.postureMain, frac, broken);
+  }
+
+  /** The same bar above the opponent's head (null hides it). */
+  setFoePosture(at: { x: number; y: number } | null, frac = 0, broken = false): void {
+    const el = this.els.foePosture;
+    el.classList.toggle('hidden', !at);
+    if (!at) return;
+    el.style.left = `${at.x}px`;
+    el.style.top = `${at.y}px`;
+    this.postureBar(el, frac, broken);
+  }
+
+  private postureBar(el: HTMLElement, frac: number, broken: boolean): void {
+    const f = Math.max(0, Math.min(1, frac));
+    const left = `${(1 - f) * 100}%`;
+    for (const fill of el.querySelectorAll<HTMLElement>('.pm-fill')) if (fill.style.width !== left) fill.style.width = left;
+    el.classList.toggle('broken', broken);
+    el.classList.toggle('cracked', f > 0.6);
+    el.dataset.level = f > 0.8 ? 'high' : f > 0.5 ? 'mid' : 'low';
   }
 
   setHints(char: CharacterDef, now: number, readyAt: { dodge: number[]; special: number; ability: number }): void {
@@ -777,7 +806,7 @@ export class UI {
               this.touch
                 ? `<table class="keys">
               <tr><td>Left thumb</td><td>Move (anywhere on the left side)</td></tr>
-              <tr><td>Drag right</td><td>Look around</td></tr>
+              <tr><td>Drag right</td><td>Look around (out of a duel; locked on, the camera holds still)</td></tr>
               <tr><td>Light</td><td>Light attack, three in a row (after a forward dodge: dash attack; walking away: backstep attack; in the air: air attack)</td></tr>
               <tr><td>Heavy</td><td>Heavy attack, three in a row, with the same dash, backstep and air versions (tap Parry during the windup to feint)</td></tr>
               <tr><td>Parry</td><td>Guard; tap right before a hit to DEFLECT</td></tr>
@@ -793,7 +822,7 @@ export class UI {
             }
             <table class="keys${this.touch ? ' hidden' : ''}">
               <tr><td>WASD</td><td>Move (Shift tap: dodge, hold: sprint)</td></tr>
-              <tr><td>Mouse</td><td>Look / aim (click to capture)</td></tr>
+              <tr><td>Mouse</td><td>Look / aim (click to capture; locked on, the camera holds still)</td></tr>
               <tr><td>LMB</td><td>Light attack, three in a row (after a forward dodge: dash attack; walking away: backstep attack; in the air: air attack)</td></tr>
               <tr><td>RMB</td><td>Heavy attack, three in a row, with the same dash, backstep and air versions (press F during windup to feint)</td></tr>
               <tr><td>F</td><td>Guard — tap right before a hit to DEFLECT</td></tr>
@@ -811,7 +840,7 @@ export class UI {
           <div>
             <h4>Posture & deflects</h4>
             <p>Every fighter has <b>health</b> and <b>posture</b>. Blocking a hit costs posture. <b>Deflecting</b> (pressing guard just before the hit lands) costs almost nothing and instead hammers the attacker's posture, staggering them for a free counter.</p>
-            <p>When posture fills up you are <b>posture broken</b>: helpless for a moment, and the next hit is a <b>Deathblow</b> for ${40} damage. Posture recovers over time — faster while guarding, slower when hurt.</p>
+            <p>When posture fills up you are <b>posture broken</b>: helpless for a moment, and the next hit is a <b>Deathblow</b> for ${40} damage. Posture recovers slowly, and only once you stop: not while you attack, dodge or reel, and not until a while after the last posture damage (faster while guarding, slower when hurt). After a break, the guard comes back whole.</p>
             <p>Mashing guard shrinks your deflect window. Read the swing, then commit.</p>
             <h4>Perilous attacks <span class="kanji">危</span></h4>
             <p>A red symbol means an unblockable attack: <b>Thrusts</b> must be deflected — or dodge <i>into</i> them for a Mikiri Counter. <b>Sweeps</b> must be jumped. <b>Grabs</b> must be dodged.</p>

@@ -17,6 +17,7 @@ import { CharacterModel } from './render/character';
 import { Effects } from './render/effects';
 import { GameRenderer } from './render/renderer';
 import { portraitURL } from './render/portrait';
+import { SelectScreen } from './select';
 import { MapView } from './render/world';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
@@ -41,6 +42,7 @@ class App {
   private input: Input;
   private net = new Net();
   private ui: UI;
+  private select: SelectScreen;
   private touch: TouchControls | null = null;
   private mapView: MapView | null = null;
   private map: MapDef = LOBBY_MAP;
@@ -111,6 +113,14 @@ class App {
       createPreview: (el) => createPreview(el),
       portrait: (id) => portraitURL(this.renderer.renderer, id),
     }, offline, touch);
+    this.select = new SelectScreen(root, (id) => portraitURL(this.renderer.renderer, id), (v) => {
+      this.net.send({ t: 'vote', ...v });
+      audio.play('click', 0.5);
+      if (v.char) {
+        settings.char = v.char;
+        saveSettings();
+      }
+    });
     if (touch) {
       this.touch = new TouchControls(this.ui.hud, this.input, {
         onMenu: () => this.ui.setTouchMenu(),
@@ -199,6 +209,21 @@ class App {
       this.queue = m.mode ? { since: m.since, count: m.searching } : null;
     });
     n.on('match', (m) => this.onMatch(m));
+    n.on('select', (m) => {
+      if (!this.select.open) {
+        this.queue = null;
+        this.input.exitLock();
+        this.touch?.cancel();
+        audio.play('matchFound');
+      }
+      this.select.show(m);
+      if (this.local) this.local.frozen = true;
+    });
+    n.on('selectCancel', (m) => {
+      this.select.hide();
+      if (this.local && this.kind === 'lobby') this.local.frozen = false;
+      this.ui.toast(m.reason, 'warn');
+    });
     n.on('result', (m) => {
       this.ui.showResult(m, this.profile);
       audio.play(m.won ? 'victory' : 'defeat');
@@ -250,6 +275,7 @@ class App {
 
   private enterInstance(m: Extract<ServerMsg, { t: 'enter' }>): void {
     this.cam.stopShots();
+    this.select.hide();
     this.clearFighters();
     const map = Object.prototype.hasOwnProperty.call(MAPS, m.map) ? MAPS[m.map] : LOBBY_MAP;
     this.loadMap(map);
@@ -782,7 +808,9 @@ class App {
 
     const mouse = this.input.consumeMouse();
     this.cam.addMouse(mouse.dx, mouse.dy, settings.sensitivity, settings.invertY, !!this.lock);
-    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen;
+    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open;
+    const left = this.select.tick(now);
+    if (left !== null && left > 0 && left <= 3) audio.play('countdown', 0.5);
 
     if (this.lock && (this.lock.s === 'dead' || !this.fighters.has(this.lock.id) || (this.local && dist2D(this.local.cf.pos.x, this.local.cf.pos.z, this.lock.pos.x, this.lock.pos.z) > 30))) {
       if (this.kind !== 'arena' || !this.fighters.has(this.lock.id)) this.lock = null;
@@ -812,6 +840,7 @@ class App {
     if (this.local) {
       const p = this.local.cf.pos;
       this.cam.shakeScale = settings.reduceShake ? 0.35 : this.touch ? 0.8 : 1;
+      this.cam.subjectScale = this.local.cf.model.scale;
       this.cam.update(dt, p, this.lock ? this.lock.pos : null, { dodging: this.local.sim.state === 'dodge' });
       this.mapView?.update(dt, p);
     } else {
@@ -913,6 +942,10 @@ class App {
         meta: '',
       });
     } else this.ui.setCard('opp', null);
+
+    // the opponent's posture bar floats above their head (as in the reference fights)
+    const foe = target && target.s !== 'dead' ? this.project(target.pos.x, target.pos.y + 2.25 * target.model.scale, target.pos.z) : null;
+    this.ui.setFoePosture(foe, target ? target.po / target.char.stats.posture : 0, target?.s === 'broken');
 
     // lock-on marker: a small diamond above the target's head
     if (this.lock) {

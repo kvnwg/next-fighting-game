@@ -5,6 +5,7 @@ import { Player } from '../src/server/entities';
 import { Store } from '../src/server/store';
 import { ServerMsg } from '../src/shared/protocol';
 import { PLACEMENT_MATCHES } from '../src/shared/ranks';
+import { MATCH } from '../src/shared/config';
 
 describe('offline mode', () => {
   it('fills the lobby with roaming AI and matches ranked against a rated AI', () => {
@@ -28,11 +29,23 @@ describe('offline mode', () => {
     step(4000);
     expect(roamers.some((f, i) => Math.hypot(f.x - start[i].x, f.z - start[i].z) > 1)).toBe(true);
 
-    // queue ranked: an AI opponent with a rating near ours shows up
+    // queue ranked: an AI opponent with a rating near ours shows up, after the map and fighter select
     (game as unknown as { enqueue(p: Player, m: 'ranked'): void }).enqueue(p, 'ranked');
     step(4500);
+    const select = inbox.find((m) => m.t === 'select') as Extract<ServerMsg, { t: 'select' }>;
+    expect(select).toBeTruthy();
+    expect(select.maps.length).toBeGreaterThan(1);
+    expect(select.sides[1].bot).toBe(true);
+    // pick a fighter and an arena; the match uses them
+    (game as unknown as { handle(p: Player, m: unknown): void }).handle(p, { t: 'vote', char: 'monk', map: select.maps[0] });
+    step(MATCH.selectTime + 500);
     const enter = inbox.find((m) => m.t === 'enter' && m.kind === 'arena') as Extract<ServerMsg, { t: 'enter' }>;
     expect(enter).toBeTruthy();
+    // differing votes are a coin flip between the two picks, like the reference
+    const last = inbox.filter((m) => m.t === 'select').pop() as Extract<ServerMsg, { t: 'select' }>;
+    expect(last.votes.map[0]).toBe(select.maps[0]);
+    expect([select.maps[0], last.votes.map[1]]).toContain(enter.map);
+    expect(enter.roster.find((r) => !r.bot)!.char).toBe('monk');
     const ai = enter.roster.find((r) => r.bot)!;
     expect(ai.mmr).toBeGreaterThan(0);
     expect(ai.placements).toBe(PLACEMENT_MATCHES);

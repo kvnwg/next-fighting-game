@@ -57,6 +57,9 @@ export interface InputOptions {
   dz?: number;
 }
 
+/** States that hold off posture recovery. */
+const POSTURE_BUSY: ReadonlySet<FighterState> = new Set<FighterState>(['attack', 'dodge', 'stagger', 'blockstun', 'deflected', 'knockdown']);
+
 export class Fighter {
   readonly id: string;
   char: CharacterDef;
@@ -98,6 +101,8 @@ export class Fighter {
   feintReadyAt = 0;
 
   lastPostureDamageAt = -Infinity;
+  /** Last moment the fighter was attacking, dodging or reeling (holds off posture recovery). */
+  lastBusyAt = -Infinity;
   lastDamageAt = -Infinity;
   buffUntil = 0;
   riposteUntil = 0;
@@ -691,11 +696,13 @@ export class Fighter {
       } else if (this.tryInput(this.buffered.action, now, this.buffered.opts)) this.buffered = null;
     }
 
-    // Posture recovers when you have not taken posture damage for a moment; faster while guarding,
-    // slower when your health is low.
+    // Posture recovers when you have not taken posture damage for a while and have stopped attacking,
+    // dodging and reeling; faster while guarding, slower when your health is low.
+    if (POSTURE_BUSY.has(this.state)) this.lastBusyAt = now;
     if (
       this.posture > 0 &&
       now - this.lastPostureDamageAt > COMBAT.postureRegenDelay &&
+      now - this.lastBusyAt > COMBAT.postureCalmDelay &&
       this.state !== 'broken' &&
       this.state !== 'dead'
     ) {
