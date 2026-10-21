@@ -382,6 +382,7 @@ export class Animator {
       out.pose = r.pose;
       rot = r.rot;
       out.kick = r.kick;
+      this.reachOut(out.pose, moveFor(this.style, a.attack.anim, a.key ?? ''), out.s);
     } else if (a.state === 'dodge' && a.dodgeKind && a.dodgeKind !== 'roll' && (a.dodgeKind === 'leap' ? this.style.leap : this.style.vanish)) {
       const def = (a.dodgeKind === 'leap' ? this.style.leap : this.style.vanish)!;
       const r = this.abilityPose(a, def, out);
@@ -433,6 +434,24 @@ export class Animator {
       }
     }
     return { pose: { body, main, off, free }, rot, kick: kickT };
+  }
+
+  /**
+   * At each impact the arms drive the weapon out toward the opponent, straight ahead of the body
+   * (whatever way the torso is turned), so every blow reaches forward rather than wrapping round
+   * the fighter; the long weapons reach furthest.
+   */
+  private reachOut(pose: ResolvedPose, def: MoveDef, s: number): void {
+    if (!Number.isFinite(s)) return;
+    let k = 0;
+    for (const at of def.impacts) k = Math.max(k, Math.exp(-(((s - at) / 0.11) ** 2)));
+    if (k < 0.01) return;
+    const reach = (REACH[this.char.weaponKind] ?? 0.15) * k;
+    const b = pose.body;
+    const ahead = bodyToTorso(_ahead.set(0, 0, 1), b.twist, b.lean).multiplyScalar(reach);
+    pose.main.pos.add(ahead);
+    if (pose.off) pose.off.pos.add(ahead);
+    pose.free.add(ahead.multiplyScalar(0.5));
   }
 
   /** Fire the cues between the furthest s reached so far and s. */
@@ -859,6 +878,18 @@ function settleTurn(v: number, c: keyof Rot): number {
 const UP = new THREE.Vector3(0, 1, 0);
 const BACK = new THREE.Vector3(0, 0, -1);
 const LEFT = new THREE.Vector3(1, 0, 0);
+const _ahead = new THREE.Vector3();
+/** How far each weapon is driven out ahead at the moment of impact (reference metres). */
+const REACH: Partial<Record<WeaponKind, number>> = {
+  spear: 0.3,
+  greathammer: 0.24,
+  scythe: 0.24,
+  rapier: 0.2,
+  katana: 0.16,
+  daggers: 0.16,
+  gauntlets: 0.16,
+  swordShield: 0.14,
+};
 
 /** How a fighter walks: the defaults, and each weapon style's character. */
 interface GaitStyle {

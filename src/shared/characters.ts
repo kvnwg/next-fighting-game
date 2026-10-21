@@ -172,6 +172,9 @@ type Named = { name: string; anim: AttackAnim } & Partial<AttackDef>;
  * a retreating attack of each weight, and an air attack of each weight. `n` names each move and
  * picks its swing; anything else it sets overrides the derived numbers.
  */
+/** The widest an attack's hit cone gets, each side of straight ahead (degrees). */
+export const ARC_MAX = 55;
+
 function kit(light: AttackDef, heavy: AttackDef, n: Record<ExtraKey, Named>): Record<ExtraKey, AttackDef> {
   const r = (v: number) => Math.round(v);
   const scaled = (b: AttackDef, k: { w: number; a?: number; rc: number; d: number; p: number; bp?: number; rg?: number; ar?: number }): AttackDef => ({
@@ -184,7 +187,8 @@ function kit(light: AttackDef, heavy: AttackDef, n: Record<ExtraKey, Named>): Re
     posture: r(b.posture * k.p),
     blockPosture: r(b.blockPosture * (k.bp ?? k.p)),
     range: +(b.range + (k.rg ?? 0)).toFixed(2),
-    arc: r(Math.min(180, b.arc * (k.ar ?? 1))),
+    // attacks hit in front of the fighter, never around them
+    arc: r(Math.min(ARC_MAX, b.arc * (k.ar ?? 1))),
   });
   const base: Record<ExtraKey, AttackDef> = {
     // the heavy chain: a second heavy a touch quicker, then a big finisher that knocks back
@@ -220,20 +224,20 @@ const ronin: BaseDef = {
   stats: { hp: 100, posture: 100, speed: 3.9, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 3, defense: 4, difficulty: 2 },
   lights: [
-    { name: 'Swallow Cut', anim: 'slashR', windup: 300, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 2.7, arc: 65, lunge: 0.6 },
-    { name: 'Falling Petal', anim: 'slashL', windup: 270, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 2.7, arc: 65, lunge: 0.5 },
+    { name: 'Swallow Cut', anim: 'slashR', windup: 300, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 3, arc: 36, lunge: 0.6 },
+    { name: 'Falling Petal', anim: 'slashL', windup: 270, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 3, arc: 36, lunge: 0.5 },
     // tsubame-gaeshi: two cuts, there and back, a blink apart
-    { name: 'Twin Swallow', anim: 'slashR', windup: 340, active: 150, recovery: 470, damage: 7, posture: 9, blockPosture: 11, range: 2.8, arc: 60, lunge: 0.8, hits: 2 },
+    { name: 'Twin Swallow', anim: 'slashR', windup: 340, active: 150, recovery: 470, damage: 7, posture: 9, blockPosture: 11, range: 3.1, arc: 33, lunge: 0.8, hits: 2 },
   ],
-  heavy: { name: 'Heaven Splitter', anim: 'overhead', windup: 620, active: 120, recovery: 520, damage: 18, posture: 26, blockPosture: 34, range: 2.9, arc: 55, lunge: 1.2, feintable: true },
-  special: { name: 'Flash Piercer', anim: 'thrust', windup: 720, active: 160, recovery: 650, damage: 22, posture: 30, blockPosture: 30, range: 4.0, arc: 25, lunge: 3.0, perilous: 'thrust', cooldown: 7000 },
+  heavy: { name: 'Heaven Splitter', anim: 'overhead', windup: 620, active: 120, recovery: 520, damage: 18, posture: 26, blockPosture: 34, range: 3.2, arc: 30, lunge: 1.2, feintable: true },
+  special: { name: 'Flash Piercer', anim: 'thrust', windup: 720, active: 160, recovery: 650, damage: 22, posture: 30, blockPosture: 30, range: 4.3, arc: 15, lunge: 3.0, perilous: 'thrust', cooldown: 7000 },
   ability: {
     kind: 'stance',
     name: 'Iai Stance',
     description: 'Sheathe your blade. Attack within 1.5s to unleash Iai Flash, a near-instant draw cut that wrecks posture.',
     cooldown: 8000,
     duration: 1500,
-    attack: { name: 'Iai Flash', anim: 'draw', windup: 130, active: 90, recovery: 450, damage: 16, posture: 32, blockPosture: 38, range: 3.3, arc: 70, lunge: 2.0 },
+    attack: { name: 'Iai Flash', anim: 'draw', windup: 130, active: 90, recovery: 450, damage: 16, posture: 32, blockPosture: 38, range: 3.6, arc: 38, lunge: 2.0 },
   },
   passive: { name: 'Clear Mind', description: 'Deflect window is 40ms longer.', mods: { parryWindowBonus: 40 } },
   palette: { primary: '#2a2b34', secondary: '#e6dcc4', accent: '#c8323c', skin: '#e8d9c4', hair: '#141418', metal: '#d9e2ec' },
@@ -251,14 +255,14 @@ const juggernaut: BaseDef = {
   ratings: { power: 5, speed: 1, reach: 3, defense: 3, difficulty: 2 },
   lights: [
     // dragged back along the floor and whipped round at shin height, the body dropping almost flat
-    { name: 'Ground Sweep', anim: 'sweep', windup: 440, active: 120, recovery: 420, damage: 14, posture: 16, blockPosture: 22, range: 3.0, arc: 75, lunge: 0.5 },
+    { name: 'Ground Sweep', anim: 'sweep', windup: 440, active: 120, recovery: 420, damage: 14, posture: 16, blockPosture: 22, range: 3.6, arc: 41, lunge: 0.5 },
     // one flat helicopter whirl overhead: slower to come out, but it sweeps a wide arc
-    { name: 'Hurricane', anim: 'spin', windup: 640, active: 130, recovery: 560, damage: 18, posture: 20, blockPosture: 28, range: 3.1, arc: 100, lunge: 0.6 },
+    { name: 'Hurricane', anim: 'spin', windup: 640, active: 130, recovery: 560, damage: 18, posture: 20, blockPosture: 28, range: 3.7, arc: 55, lunge: 0.6 },
     // up from the ground through them until the hammer stands straight up at full stretch
-    { name: 'Launcher', anim: 'uppercut', windup: 520, active: 120, recovery: 520, damage: 16, posture: 20, blockPosture: 26, range: 3.0, arc: 70, lunge: 0.7 },
+    { name: 'Launcher', anim: 'uppercut', windup: 520, active: 120, recovery: 520, damage: 16, posture: 20, blockPosture: 26, range: 3.6, arc: 38, lunge: 0.7 },
   ],
-  heavy: { name: 'Felled Oak', anim: 'slam', windup: 780, active: 140, recovery: 650, damage: 26, posture: 34, blockPosture: 46, range: 3.2, arc: 50, lunge: 1.0, feintable: true, knockback: 1.2 },
-  special: { name: 'Earthshaker', anim: 'sweep', windup: 800, active: 180, recovery: 700, damage: 24, posture: 30, blockPosture: 30, range: 3.8, arc: 110, perilous: 'sweep', cooldown: 7500 },
+  heavy: { name: 'Felled Oak', anim: 'slam', windup: 780, active: 140, recovery: 650, damage: 26, posture: 34, blockPosture: 46, range: 3.8, arc: 28, lunge: 1.0, feintable: true, knockback: 1.2 },
+  special: { name: 'Earthshaker', anim: 'sweep', windup: 800, active: 180, recovery: 700, damage: 24, posture: 30, blockPosture: 30, range: 4.4, arc: 55, perilous: 'sweep', cooldown: 7500 },
   ability: {
     kind: 'buff',
     name: 'War Cry',
@@ -283,19 +287,19 @@ const duelist: BaseDef = {
   stats: { hp: 90, posture: 90, speed: 4.2, postureRegen: 1.05 },
   ratings: { power: 2, speed: 4, reach: 4, defense: 2, difficulty: 4 },
   lights: [
-    { name: 'Lunge', anim: 'thrust', windup: 240, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.8, feintable: true },
-    { name: 'Disengage', anim: 'thrust', windup: 220, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.5, feintable: true },
+    { name: 'Lunge', anim: 'thrust', windup: 240, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.4, arc: 16, lunge: 0.8, feintable: true },
+    { name: 'Disengage', anim: 'thrust', windup: 220, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.4, arc: 16, lunge: 0.5, feintable: true },
     // a cut, not a thrust: it covers a wider angle
-    { name: 'Whip Cut', anim: 'slashL', windup: 220, active: 70, recovery: 300, damage: 7, posture: 9, blockPosture: 10, range: 3.0, arc: 45, lunge: 0.5, feintable: true },
+    { name: 'Whip Cut', anim: 'slashL', windup: 220, active: 70, recovery: 300, damage: 7, posture: 9, blockPosture: 10, range: 3.3, arc: 25, lunge: 0.5, feintable: true },
   ],
-  heavy: { name: 'Pirouette', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.4, arc: 30, lunge: 1.5, feintable: true },
-  special: { name: 'Coup de Grace', anim: 'thrust', windup: 620, active: 140, recovery: 600, damage: 20, posture: 30, blockPosture: 30, range: 4.4, arc: 20, lunge: 3.5, perilous: 'thrust', cooldown: 6500 },
+  heavy: { name: 'Pirouette', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.7, arc: 16, lunge: 1.5, feintable: true },
+  special: { name: 'Coup de Grace', anim: 'thrust', windup: 620, active: 140, recovery: 600, damage: 20, posture: 30, blockPosture: 30, range: 4.7, arc: 15, lunge: 3.5, perilous: 'thrust', cooldown: 6500 },
   ability: {
     kind: 'attack',
     name: 'Fleche',
     description: 'Explode forward in a 6m running thrust.',
     cooldown: 7000,
-    attack: { name: 'Fleche', anim: 'thrust', windup: 280, active: 200, recovery: 500, damage: 12, posture: 18, blockPosture: 24, range: 2.6, arc: 40, lunge: 6.5 },
+    attack: { name: 'Fleche', anim: 'thrust', windup: 280, active: 200, recovery: 500, damage: 12, posture: 18, blockPosture: 24, range: 2.9, arc: 22, lunge: 6.5 },
   },
   passive: {
     name: 'Riposte',
@@ -316,13 +320,13 @@ const lancer: BaseDef = {
   stats: { hp: 100, posture: 100, speed: 3.8, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 5, defense: 2, difficulty: 3 },
   lights: [
-    { name: 'Viper Jab', anim: 'thrust', windup: 300, active: 80, recovery: 320, damage: 8, posture: 10, blockPosture: 12, range: 3.7, arc: 25, lunge: 0.4 },
+    { name: 'Viper Jab', anim: 'thrust', windup: 300, active: 80, recovery: 320, damage: 8, posture: 10, blockPosture: 12, range: 4.3, arc: 15, lunge: 0.4 },
     // two jabs, in and in again: two hits to read and deflect
-    { name: 'Twin Fang', anim: 'thrust', windup: 260, active: 160, recovery: 320, damage: 5, posture: 6, blockPosture: 7, range: 3.7, arc: 25, lunge: 0.5, hits: 2 },
-    { name: 'Wheel Strike', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 3.5, arc: 80 },
+    { name: 'Twin Fang', anim: 'thrust', windup: 260, active: 160, recovery: 320, damage: 5, posture: 6, blockPosture: 7, range: 4.3, arc: 15, lunge: 0.5, hits: 2 },
+    { name: 'Wheel Strike', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 4.1, arc: 44 },
   ],
-  heavy: { name: 'Dragon Fang', anim: 'thrust', windup: 640, active: 110, recovery: 520, damage: 18, posture: 24, blockPosture: 30, range: 4.1, arc: 25, lunge: 1.4, feintable: true },
-  special: { name: 'Whirlwind', anim: 'spin', windup: 760, active: 220, recovery: 650, damage: 20, posture: 26, blockPosture: 26, range: 3.8, arc: 180, perilous: 'sweep', cooldown: 7000 },
+  heavy: { name: 'Dragon Fang', anim: 'thrust', windup: 640, active: 110, recovery: 520, damage: 18, posture: 24, blockPosture: 30, range: 4.7, arc: 15, lunge: 1.4, feintable: true },
+  special: { name: 'Whirlwind', anim: 'spin', windup: 760, active: 220, recovery: 650, damage: 20, posture: 26, blockPosture: 26, range: 4.4, arc: 55, perilous: 'sweep', cooldown: 7000 },
   ability: {
     kind: 'leap',
     name: 'Pole Vault',
@@ -347,15 +351,15 @@ const shade: BaseDef = {
   stats: { hp: 90, posture: 90, speed: 4.4, postureRegen: 1.1 },
   ratings: { power: 2, speed: 5, reach: 1, defense: 1, difficulty: 5 },
   lights: [
-    { name: 'Scissor Cut', anim: 'dualSlash', windup: 210, active: 60, recovery: 240, damage: 6, posture: 7, blockPosture: 9, range: 2.35, arc: 70, lunge: 0.7 },
+    { name: 'Scissor Cut', anim: 'dualSlash', windup: 210, active: 60, recovery: 240, damage: 6, posture: 7, blockPosture: 9, range: 2.65, arc: 38, lunge: 0.7 },
     // a full turn with both blades out: a touch slower to start
-    { name: 'Cross Open', anim: 'dualSlash', windup: 230, active: 60, recovery: 260, damage: 6, posture: 7, blockPosture: 9, range: 2.35, arc: 80, lunge: 0.5 },
+    { name: 'Cross Open', anim: 'dualSlash', windup: 230, active: 60, recovery: 260, damage: 6, posture: 7, blockPosture: 9, range: 2.65, arc: 44, lunge: 0.5 },
     // three quick stabs: three hits to read
-    { name: 'Whirl', anim: 'spin', windup: 190, active: 120, recovery: 260, damage: 2, posture: 3, blockPosture: 3, range: 2.35, arc: 60, lunge: 0.5, hits: 3 },
+    { name: 'Whirl', anim: 'spin', windup: 190, active: 120, recovery: 260, damage: 2, posture: 3, blockPosture: 3, range: 2.65, arc: 33, lunge: 0.5, hits: 3 },
     // a front flip that lands both blades
   ],
-  heavy: { name: 'Falling Fang', anim: 'overhead', windup: 520, active: 100, recovery: 460, damage: 14, posture: 18, blockPosture: 22, range: 2.4, arc: 40, lunge: 2.0, feintable: true },
-  special: { name: 'Swallow Dive', anim: 'grab', windup: 650, active: 150, recovery: 650, damage: 22, posture: 25, blockPosture: 25, range: 2.4, arc: 40, lunge: 2.0, perilous: 'grab', cooldown: 7500 },
+  heavy: { name: 'Falling Fang', anim: 'overhead', windup: 520, active: 100, recovery: 460, damage: 14, posture: 18, blockPosture: 22, range: 2.7, arc: 22, lunge: 2.0, feintable: true },
+  special: { name: 'Swallow Dive', anim: 'grab', windup: 650, active: 150, recovery: 650, damage: 22, posture: 25, blockPosture: 25, range: 2.7, arc: 22, lunge: 2.0, perilous: 'grab', cooldown: 7500 },
   ability: {
     kind: 'teleport',
     name: 'Shadow Step',
@@ -378,12 +382,12 @@ const reaper: BaseDef = {
   stats: { hp: 105, posture: 100, speed: 3.6, postureRegen: 0.95 },
   ratings: { power: 3, speed: 2, reach: 4, defense: 3, difficulty: 3 },
   lights: [
-    { name: 'Harvest', anim: 'slashR', windup: 340, active: 110, recovery: 360, damage: 10, posture: 11, blockPosture: 15, range: 3.2, arc: 100, lunge: 0.4 },
-    { name: 'Thresh', anim: 'slashL', windup: 320, active: 110, recovery: 360, damage: 10, posture: 11, blockPosture: 15, range: 3.2, arc: 100, lunge: 0.4 },
-    { name: 'Gyre', anim: 'spin', windup: 420, active: 160, recovery: 500, damage: 12, posture: 14, blockPosture: 18, range: 3.2, arc: 180 },
+    { name: 'Harvest', anim: 'slashR', windup: 340, active: 110, recovery: 360, damage: 10, posture: 11, blockPosture: 15, range: 3.8, arc: 55, lunge: 0.4 },
+    { name: 'Thresh', anim: 'slashL', windup: 320, active: 110, recovery: 360, damage: 10, posture: 11, blockPosture: 15, range: 3.8, arc: 55, lunge: 0.4 },
+    { name: 'Gyre', anim: 'spin', windup: 420, active: 160, recovery: 500, damage: 12, posture: 14, blockPosture: 18, range: 3.8, arc: 55 },
   ],
-  heavy: { name: 'Execution', anim: 'overhead', windup: 680, active: 120, recovery: 560, damage: 20, posture: 26, blockPosture: 34, range: 3.3, arc: 45, lunge: 0.8, feintable: true },
-  special: { name: 'Reaping Arc', anim: 'sweep', windup: 780, active: 200, recovery: 680, damage: 22, posture: 28, blockPosture: 28, range: 3.9, arc: 140, perilous: 'sweep', cooldown: 7000 },
+  heavy: { name: 'Execution', anim: 'overhead', windup: 680, active: 120, recovery: 560, damage: 20, posture: 26, blockPosture: 34, range: 3.9, arc: 25, lunge: 0.8, feintable: true },
+  special: { name: 'Reaping Arc', anim: 'sweep', windup: 780, active: 200, recovery: 680, damage: 22, posture: 28, blockPosture: 28, range: 4.5, arc: 55, perilous: 'sweep', cooldown: 7000 },
   ability: {
     kind: 'attack',
     name: 'Soul Hook',
@@ -406,20 +410,20 @@ const monk: BaseDef = {
   stats: { hp: 100, posture: 110, speed: 4.0, postureRegen: 1.3 },
   ratings: { power: 3, speed: 5, reach: 1, defense: 4, difficulty: 4 },
   lights: [
-    { name: 'Jab', anim: 'punchR', windup: 240, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 1.9, arc: 60, lunge: 0.6 },
-    { name: 'Cross', anim: 'punchL', windup: 220, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 1.9, arc: 60, lunge: 0.5 },
+    { name: 'Jab', anim: 'punchR', windup: 240, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 2.2, arc: 33, lunge: 0.6 },
+    { name: 'Cross', anim: 'punchL', windup: 220, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 2.2, arc: 33, lunge: 0.5 },
     // a spinning hook kick: a beat slower than the hands, but the leg reaches further
-    { name: 'Whirlwind Kick', anim: 'spin', windup: 280, active: 60, recovery: 300, damage: 6, posture: 9, blockPosture: 11, range: 2.2, arc: 70, lunge: 0.4 },
+    { name: 'Whirlwind Kick', anim: 'spin', windup: 280, active: 60, recovery: 300, damage: 6, posture: 9, blockPosture: 11, range: 2.5, arc: 38, lunge: 0.4 },
   ],
-  heavy: { name: 'Mountain Breaker', anim: 'punchR', windup: 560, active: 100, recovery: 480, damage: 14, posture: 28, blockPosture: 34, range: 2.1, arc: 50, lunge: 1.5, feintable: true, knockback: 1.0 },
-  special: { name: 'Iron Grapple', anim: 'grab', windup: 620, active: 150, recovery: 650, damage: 20, posture: 35, blockPosture: 35, range: 2.3, arc: 45, lunge: 1.5, perilous: 'grab', cooldown: 7500 },
+  heavy: { name: 'Mountain Breaker', anim: 'punchR', windup: 560, active: 100, recovery: 480, damage: 14, posture: 28, blockPosture: 34, range: 2.4, arc: 28, lunge: 1.5, feintable: true, knockback: 1.0 },
+  special: { name: 'Iron Grapple', anim: 'grab', windup: 620, active: 150, recovery: 650, damage: 20, posture: 35, blockPosture: 35, range: 2.6, arc: 25, lunge: 1.5, perilous: 'grab', cooldown: 7500 },
   ability: {
     kind: 'counter',
     name: 'Still Water',
     description: 'Hold a counter stance for 0.75s. If struck by a normal or thrust attack, negate it and strike back.',
     cooldown: 9000,
     duration: 750,
-    attack: { name: 'Counter Strike', anim: 'uppercut', windup: 60, active: 80, recovery: 360, damage: 12, posture: 35, blockPosture: 35, range: 2.5, arc: 90, noHitbox: true },
+    attack: { name: 'Counter Strike', anim: 'uppercut', windup: 60, active: 80, recovery: 360, damage: 12, posture: 35, blockPosture: 35, range: 2.8, arc: 50, noHitbox: true },
   },
   passive: { name: 'Inner Focus', description: 'Deal 15% more posture damage. Posture recovers 30% faster.', mods: { postureDamageMult: 1.15 } },
   palette: { primary: '#b0432a', secondary: '#e8e0d0', accent: '#f2c14e', skin: '#c28569', hair: '#e8e4dc', metal: '#8c6f4a' },
@@ -436,18 +440,18 @@ const paladin: BaseDef = {
   stats: { hp: 110, posture: 120, speed: 3.4, postureRegen: 1 },
   ratings: { power: 3, speed: 2, reach: 2, defense: 5, difficulty: 1 },
   lights: [
-    { name: 'Strike', anim: 'slashR', windup: 310, active: 90, recovery: 330, damage: 9, posture: 10, blockPosture: 13, range: 2.5, arc: 65, lunge: 0.5 },
-    { name: 'Backhand', anim: 'slashL', windup: 290, active: 90, recovery: 330, damage: 9, posture: 10, blockPosture: 13, range: 2.5, arc: 65, lunge: 0.4 },
-    { name: 'Shield Bash', anim: 'bash', windup: 340, active: 90, recovery: 460, damage: 7, posture: 18, blockPosture: 24, range: 2.0, arc: 60, lunge: 0.7 },
+    { name: 'Strike', anim: 'slashR', windup: 310, active: 90, recovery: 330, damage: 9, posture: 10, blockPosture: 13, range: 2.8, arc: 36, lunge: 0.5 },
+    { name: 'Backhand', anim: 'slashL', windup: 290, active: 90, recovery: 330, damage: 9, posture: 10, blockPosture: 13, range: 2.8, arc: 36, lunge: 0.4 },
+    { name: 'Shield Bash', anim: 'bash', windup: 340, active: 90, recovery: 460, damage: 7, posture: 18, blockPosture: 24, range: 2.3, arc: 33, lunge: 0.7 },
   ],
-  heavy: { name: 'Judgement', anim: 'overhead', windup: 640, active: 120, recovery: 540, damage: 18, posture: 26, blockPosture: 34, range: 2.7, arc: 55, lunge: 1.0, feintable: true },
-  special: { name: 'Holy Lance', anim: 'thrust', windup: 740, active: 160, recovery: 650, damage: 22, posture: 30, blockPosture: 30, range: 3.8, arc: 25, lunge: 3.0, perilous: 'thrust', cooldown: 7000 },
+  heavy: { name: 'Judgement', anim: 'overhead', windup: 640, active: 120, recovery: 540, damage: 18, posture: 26, blockPosture: 34, range: 3, arc: 30, lunge: 1.0, feintable: true },
+  special: { name: 'Holy Lance', anim: 'thrust', windup: 740, active: 160, recovery: 650, damage: 22, posture: 30, blockPosture: 30, range: 4.1, arc: 15, lunge: 3.0, perilous: 'thrust', cooldown: 7000 },
   ability: {
     kind: 'attack',
     name: 'Shield Charge',
     description: 'Charge 5m behind your shield. Cannot be deflected: block it or get out of the way.',
     cooldown: 8000,
-    attack: { name: 'Shield Charge', anim: 'charge', windup: 260, active: 260, recovery: 500, damage: 8, posture: 30, blockPosture: 38, range: 2.0, arc: 60, lunge: 5.0, unparryable: true, knockback: 2.0 },
+    attack: { name: 'Shield Charge', anim: 'charge', windup: 260, active: 260, recovery: 500, damage: 8, posture: 30, blockPosture: 38, range: 2.3, arc: 33, lunge: 5.0, unparryable: true, knockback: 2.0 },
   },
   passive: { name: 'Bulwark', description: 'Blocking takes 30% less posture damage and covers a wider angle.', mods: { blockPostureMult: 0.7, guardArcBonus: 35 } },
   palette: { primary: '#5a4a2e', secondary: '#1e2a4a', accent: '#c98f45', skin: '#e8b796', hair: '#733e39', metal: '#d9b47a' },
@@ -481,7 +485,7 @@ const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
     h1: { name: 'Prise de Fer', anim: 'thrust' },
     h2: { name: 'Grand Salut', anim: 'slashR' },
     // the hop and deep lunge, now what a forward dodge flows into
-    dl: { name: 'Balestra', anim: 'thrust', windup: 300, active: 80, recovery: 420, damage: 10, posture: 12, blockPosture: 14, range: 3.3, arc: 30, lunge: 1.4, feintable: true },
+    dl: { name: 'Balestra', anim: 'thrust', windup: 300, active: 80, recovery: 420, damage: 10, posture: 12, blockPosture: 14, range: 3.6, arc: 16, lunge: 1.4, feintable: true },
     dh: { name: 'Passata', anim: 'thrust' },
     bl: { name: 'Retreating Cut', anim: 'slashL' },
     bh: { name: 'Volte', anim: 'spin' },
@@ -502,7 +506,7 @@ const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
     h1: { name: 'Long Thorn', anim: 'thrust' },
     h2: { name: 'Sky Lotus', anim: 'spin', hits: 2 },
     // two cuts on the way through, out of a forward dodge
-    dl: { name: 'Dart', anim: 'dualSlash', windup: 300, active: 100, recovery: 420, damage: 5, posture: 6, blockPosture: 7, range: 2.4, arc: 70, lunge: 2.2, hits: 2 },
+    dl: { name: 'Dart', anim: 'dualSlash', windup: 300, active: 100, recovery: 420, damage: 5, posture: 6, blockPosture: 7, range: 2.7, arc: 38, lunge: 2.2, hits: 2 },
     dh: { name: 'Corkscrew', anim: 'thrust' },
     bl: { name: 'Fan Retreat', anim: 'slashL' },
     bh: { name: 'Low Viper', anim: 'thrust' },
@@ -523,7 +527,7 @@ const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
     h1: { name: 'Tiger Palm', anim: 'punchL' },
     h2: { name: 'Heaven Shaker', anim: 'uppercut' },
     // the uppercut that used to close the light chain, now thrown out of a forward dodge
-    dl: { name: 'Rising Dragon', anim: 'uppercut', windup: 300, active: 80, recovery: 420, damage: 8, posture: 14, blockPosture: 18, range: 2.0, arc: 60, lunge: 1.4 },
+    dl: { name: 'Rising Dragon', anim: 'uppercut', windup: 300, active: 80, recovery: 420, damage: 8, posture: 14, blockPosture: 18, range: 2.3, arc: 33, lunge: 1.4 },
     dh: { name: 'Charging Ox', anim: 'punchR' },
     bl: { name: 'Crane Step', anim: 'punchL' },
     bh: { name: 'Turning Mountain', anim: 'spin' },
