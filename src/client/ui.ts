@@ -899,8 +899,28 @@ export class UI {
       <div class="mi-vs">${card(players[you], true)}<div class="vs">対</div>${card(players[you === 0 ? 1 : 0], false)}</div>
       <div class="mi-desc">${esc(map?.description ?? '')}</div></div>`);
     this.hud.appendChild(el);
-    setTimeout(() => el.classList.add('out'), 3000);
-    setTimeout(() => el.remove(), 3600);
+    setTimeout(() => el.classList.add('out'), 1100);
+    setTimeout(() => el.remove(), 1600);
+  }
+
+  /**
+   * A fighter's name card at the end of their ring entrance, revealed in their own style (ink,
+   * chisel, mist, lightning, blades, flourish, seal, bronze; see .nc-<id> in the styles).
+   */
+  nameCard(r: RosterEntry, mine: boolean, title: string, line: string, ms: number): void {
+    const c = CHARACTERS[r.char];
+    const el = h(`<div class="name-card nc-${r.char} ${mine ? 'mine' : 'theirs'}" style="--c1:${c.palette.primary};--c2:${c.palette.accent};--nc-ms:${ms}ms">
+      <div class="nc-jp" aria-hidden="true">${c.jp}</div>
+      <div class="nc-main"><div class="nc-name">${esc(c.name)}</div><div class="nc-title">${esc(title)}</div><div class="nc-player">${esc(r.name)}</div></div>
+      <div class="nc-line">“${esc(line)}”</div></div>`);
+    this.hud.appendChild(el);
+    setTimeout(() => el.classList.add('out'), Math.max(300, ms - 350));
+    setTimeout(() => el.remove(), ms);
+  }
+
+  /** Letterbox the screen and hide the duel HUD while the intro camera runs. */
+  setCinematic(on: boolean): void {
+    this.hud.classList.toggle('cinematic', on);
   }
 
   showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null): void {

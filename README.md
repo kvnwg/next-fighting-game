@@ -134,6 +134,8 @@ You can switch characters in the lobby safe zone (press **C**).
 - **Ranked.** Press **K** or click **Ranked** to queue. Matchmaking pairs the closest ratings, and the allowed gap widens the longer you wait. Matches are best of 3 rounds with a 90s round timer (on time-out, the higher health % wins the round) on a random arena. Ratings are Elo: K=64 for your first 5 placement matches, 32 afterwards, 24 at Grandmaster. Leaving a ranked match counts as a loss.
 - **Tiers:** Bronze, Silver (850), Gold (1000), Platinum (1150), Diamond (1300), Master (1450), Grandmaster (1600). Each tier below Grandmaster has three divisions (III, II, I). Everyone starts at 900 MMR.
 - **Practice** puts you in the same match flow against an Easy, Normal or Hard bot, unranked. **Challenges** (G) start a casual duel with another player.
+- **Map and fighter select.** Every duel opens with a 10s vote: each side picks an arena (or Random) and a fighter, with portrait badges showing both picks. When the two map votes differ, a coin flip decides between them.
+- **Ring entrances.** Before round one the camera films each fighter's entrance in turn: the opponent's, then yours, then a swing behind your shoulder. Each entrance is 3.6s in three shots, with its own choreography, sounds, effects (lightning, fog, embers…) and a name card revealed in the fighter's style, with their line.
 
 **Arenas:**
 
@@ -212,7 +214,8 @@ Dev viewer:
   - `&chain=l0,l1,l2` (or `stance,ia`, `roar`, or states like `block,stagger`) plays a sequence, and `&walk=6` adds running.
   - `&target` marks where the opponent stands, `&at=300,340` freezes exact moments (ms), `&top` looks straight down, and `&ghosts` shows afterimages and smears.
 - `/?viewer&fxtest` shows the impact effects side by side.
-- `/?viewer&map=forge` previews a map, and `&shot=1.8` freezes the match intro's camera 1.8s in, with the fighters on the real spawns.
+- `/?viewer&map=forge` previews a map, and `&shot=1.8` freezes the match intro 1.8s in (camera and ring entrances), with the fighters on the real spawns; `&chars=monk,lancer` picks you and the opponent.
+- `/?viewer&char=lancer&anim=entrance&strip=8` lays out a ring entrance.
   - `&q=high` picks a quality tier, `&cam=x,y,z&look=x,y,z&fov=60` places the camera, and `&time=8&freeze` stops the wind and particles at a moment.
 
 ### Tuning
@@ -238,7 +241,7 @@ Eight voxel fighters designed from reference art, ready to bring into the game. 
 
 Characters: `ronin`, `warden`, `wraith`, `lancer`, `assassin`, `duelist`, `monk`, `knight`.
 
-Ring entrance cinematics (shot lists with camera, sound and visual effects) live in `characters/intros.js`, with a readable copy in `docs/ring-intros.md`.
+Ring entrance cinematics (shot lists with camera, sound and visual effects) live in `characters/intros.js`, with a readable copy in `docs/ring-intros.md`. The game plays a condensed 3.6s version of each: the choreography is the weapon style's `entrance` move, and the camera shots, sound cues and name cards are in `src/client/entrances.ts`.
 
 Shared tooling is in `tools/voxel/`. To regenerate:
 

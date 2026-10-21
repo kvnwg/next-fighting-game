@@ -8,7 +8,7 @@
  * green fire along the ground, and a chain of souls flung out to drag them in.
  */
 import { B, K, P, Style, X, arc, circle, fx, hitAt, line, mv, seq, track } from '../author';
-import type { V3 } from '../author';
+import type { Motion, V3 } from '../author';
 
 const body = B({ front: 'L', step: 0.26, back: 0.26, width: 0.16, crouch: -0.11, lean: 0.1, twist: -0.28 });
 const SOUL = '#63c74d';
@@ -72,6 +72,21 @@ const rites = seq([
   [0.0, 1.07, arc([0.06, 0.5, 0.15], 0.12, [[0.08, 0.35, -0.94], [0.02, 1, 0.05], [0, 0.45, 0.9], [0, -0.25, 0.97], [0, -0.7, 0.72], [0, -0.82, 0.57]], -0.45)],
 ]);
 const ritesHit = hitAt(rites, 4, 1);
+
+/** The scythe keyed along s (the entrance): straight moves between keyed grips [s, pos, dir, edge, grip2], held outside them. */
+type Grip = [number, V3, V3, V3, number];
+const keyed = (ks: Grip[], blend = 0.03): Motion => {
+  const hold = (k: Grip, from: number, to: number): [number, number, Motion] => [from, to, line(k[1], k[1], k[2], k[2], k[3], k[4], k[4])];
+  const parts: [number, number, Motion][] = [hold(ks[0], ks[0][0] - 1, ks[0][0])];
+  for (let i = 1; i < ks.length; i++) {
+    const a = ks[i - 1];
+    const b = ks[i];
+    parts.push([a[0], b[0], line(a[1], b[1], a[2], b[2], b[3], a[4], b[4])]);
+  }
+  parts.push(hold(ks[ks.length - 1], ks[ks.length - 1][0], ks[ks.length - 1][0] + 1));
+  return seq(parts, blend);
+};
+const BLOOD = '#ff3a3a';
 
 export const scythe: Style = {
   axis: '-x',
@@ -351,4 +366,58 @@ export const scythe: Style = {
       trail: { life: 0.2, glow: 0.6 },
     }),
   },
+  // Ring entrance, Out of the Mist: fog rolls in and the reaper rises out of it bent double with its
+  // back turned, turns slowly to face them with the blade dragged one-handed along the floor in green
+  // fire, then whirls once round under the scythe raised flat overhead and comes down into guard
+  entrance: mv({
+    keys: [
+      // sunk in the mist, rising, turned away
+      K(0.0, B({ ...body, lift: -1.05, crouch: -0.3, lean: 0.85, twist: 0.2, side: 0.12, headPitch: 0.6 }), { spin: 0.42 }),
+      K(0.1, B({ ...body, lift: -0.9, crouch: -0.3, lean: 0.8, twist: 0.2, side: 0.12, headPitch: 0.6 })),
+      K(0.22, B({ ...body, lift: -0.4, crouch: -0.22, lean: 0.5, twist: 0.15, side: 0.06, headPitch: 0.45 })),
+      K(0.34, B({ ...body, lift: 0.04, crouch: -0.1, lean: 0.2, twist: 0.05, headPitch: 0.25 })),
+      // the slow turn to face them, the head leading
+      K(0.4, B({ ...body, lift: 0.04, crouch: -0.12, lean: 0.24, twist: 0.0, headPitch: 0.2 }), { spin: 0.42 }),
+      K(0.52, B({ ...body, lift: 0.04, crouch: -0.14, lean: 0.28, twist: -0.7, hipTwist: 0.0, headPitch: 0.1 }), { spin: 0.3 }),
+      K(0.66, B({ ...body, lift: 0.03, crouch: -0.14, lean: 0.26, twist: -0.4, headPitch: 0.0 }), { spin: 0.0 }),
+      // one whirl round under the raised scythe
+      K(0.72, B({ ...body, lift: 0.08, crouch: -0.04, lean: -0.08, twist: 0.0, headPitch: -0.15 }), { spin: 0.0 }),
+      K(0.8, B({ ...body, lift: 0.22, crouch: 0.0, lean: -0.1, twist: 0.0, side: 0.06, headPitch: -0.1 }), { spin: -0.55 }),
+      K(0.86, B({ ...body, lift: 0.14, crouch: -0.04, lean: 0.0, twist: -0.1, headPitch: -0.05 }), { spin: -1 }),
+      K(0.97, body),
+    ],
+    main: keyed([
+      [0.0, [-0.34, 0.08, 0.0], [-0.15, 0.6, -0.8], [-0.4, 0.0, -0.2], NaN],
+      [0.3, [-0.34, 0.06, 0.02], [-0.2, 0.2, -1], [0, -1, 0], NaN],
+      // dragged along the floor, trailing behind on the right
+      [0.4, [-0.36, -0.08, 0.02], [-0.25, -0.75, -0.6], [-0.7, -0.5, 0.2], NaN],
+      [0.66, [-0.4, -0.06, 0.08], [-0.6, -0.75, -0.15], [-0.4, -0.5, 0.7], NaN],
+      // raised flat over the head, the blade pointing out ahead
+      [0.74, [-0.12, 0.98, 0.14], [-1, 0.08, 0.1], [0, -0.2, 1], -0.5],
+      [0.86, [-0.12, 0.98, 0.14], [-1, 0.08, 0.1], [0, -0.2, 1], -0.5],
+      [0.97, [-0.18, 0.1, 0.22], [0.3, 0.85, 0.45], [0.2, -0.2, 1], 0.45],
+    ]),
+    free: track([
+      [0.0, [0.3, 0.2, 0.2]],
+      [0.34, [0.34, 0.26, 0.28]],
+      [0.5, [0.38, 0.3, 0.34]],
+      [0.66, [0.34, 0.3, 0.3]],
+    ]),
+    lead: 0,
+    ghosts: [0.74, 0.88],
+    fx: [
+      fx(0.0, 'fog', 'root', 1.6),
+      fx(0.12, 'fog', 'root', 1.0),
+      fx(0.26, 'wisps', 'root', 0.8),
+      fx(0.4, 'soulfire', 'tip', 0.7),
+      fx(0.47, 'soulfire', 'tip', 0.8),
+      fx(0.5, 'wisps', 'tip', 0.7),
+      fx(0.55, 'soulfire', 'tip', 0.9),
+      fx(0.63, 'soulfire', 'tip', 0.8),
+      fx(0.75, 'whirl', 'root', 1.1, BLOOD),
+      fx(0.8, 'wisps', 'tip', 0.8, BLOOD),
+      fx(0.84, 'whirl', 'root', 0.8, BLOOD),
+      fx(0.9, 'wisps', 'tip', 0.6),
+    ],
+  }),
 };

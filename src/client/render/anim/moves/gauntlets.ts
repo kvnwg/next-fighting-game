@@ -446,4 +446,84 @@ export const gauntlets: Style = {
       trail: { life: 0.16, glow: 0.6 },
     }),
   },
+  // Ring entrance, Still Mountain: slow steps in place out of the mist, palms pressed together at
+  // the chest; a long breath drawn up through the hands and let out as they part and sink; then
+  // down into a horse stance and one palm driven out at them, the air ringing with it
+  entrance: mv({
+    keys: [
+      // arrival: upright, head bowed over the hands, one deliberate step with each foot
+      K(0.0, B({ ...body, front: 'L', step: 0.06, back: 0.06, width: 0.12, crouch: -0.04, lean: 0.04, twist: 0, headPitch: 0.3 })),
+      K(0.05, B({ ...body, front: 'L', step: 0.06, back: 0.06, width: 0.12, crouch: -0.06, lean: 0.04, twist: 0, side: 0.06, headPitch: 0.3 })),
+      K(0.16, B({ ...body, front: 'L', step: 0.06, back: 0.06, width: 0.12, crouch: -0.05, lean: 0.04, twist: 0, side: 0.0, headPitch: 0.3 })),
+      // the left foot lifts (hips held level while the legs fold under them)
+      K(0.19, B({ ...body, front: 'L', step: 0.06, back: 0.06, width: 0.12, crouch: -0.06, lean: 0.04, twist: 0, side: -0.06, headPitch: 0.3 })),
+      K(0.245, B({ ...body, front: 'L', step: 0.09, back: 0.06, width: 0.12, crouch: -0.27, lean: 0.04, twist: 0, side: -0.06, headPitch: 0.28, lift: 0.21 })),
+      K(0.3, B({ ...body, front: 'L', step: 0.1, back: 0.06, width: 0.13, crouch: -0.06, lean: 0.04, twist: 0, side: 0.0, headPitch: 0.28 })),
+      // signature: the breath drawn in, rising tall, eyes opening
+      K(0.36, B({ ...body, front: 'L', step: 0.1, back: 0.06, width: 0.13, crouch: -0.05, lean: 0.04, twist: 0, headPitch: 0.25 })),
+      K(0.5, B({ ...body, front: 'L', step: 0.1, back: 0.06, width: 0.13, crouch: 0.0, lean: -0.08, twist: 0, headPitch: -0.08 })),
+      // and let out as the hands sink
+      K(0.66, B({ ...body, front: 'L', step: 0.1, back: 0.06, width: 0.14, crouch: -0.09, lean: 0.04, twist: 0, headPitch: 0.0 })),
+      // challenge: down into the horse stance, the right shoulder drawn back, then the palm
+      K(0.71, B({ ...body, front: 'L', step: 0.1, back: 0.06, width: 0.15, crouch: -0.1, lean: 0.04, twist: -0.1, headPitch: 0.0 })),
+      K(0.755, B({ ...body, front: 'L', step: 0.08, back: 0.08, width: 0.32, crouch: -0.3, lean: 0.06, twist: -0.4, hipTwist: -0.05, headPitch: 0.02 })),
+      K(0.8, B({ ...body, front: 'L', step: 0.08, back: 0.08, width: 0.32, crouch: -0.31, lean: 0.16, twist: 0.32, hipTwist: 0.05, headPitch: 0.0 })),
+      K(0.87, B({ ...body, front: 'L', step: 0.08, back: 0.08, width: 0.32, crouch: -0.3, lean: 0.15, twist: 0.3, hipTwist: 0.05, headPitch: 0.0 })),
+      K(1.0, body),
+    ],
+    // the right hand: prayer, up with the breath, out and down, back to the hip, and the palm
+    main: seq(
+      [
+        [-0.1, 0.36, line([-0.1, 0.42, 0.28], [-0.1, 0.43, 0.28], [0, 1, 0.15], [0, 1, 0.15], [-1, 0, 0])],
+        [0.36, 0.48, line([-0.1, 0.43, 0.28], [-0.1, 0.53, 0.32], [0, 1, 0.15], [0, 1, 0.1], [-1, 0, 0])],
+        [0.48, 0.57, line([-0.1, 0.53, 0.32], [-0.36, 0.46, 0.26], [0, 1, 0.1], [-0.5, 0.2, 1], [0, 1, 0])],
+        [0.57, 0.68, line([-0.36, 0.46, 0.26], [-0.3, 0.16, 0.24], [-0.5, 0.2, 1], [-0.1, -0.1, 1], [0, 1, 0])],
+        [0.68, 0.755, line([-0.3, 0.16, 0.24], [-0.24, 0.16, -0.02], [-0.1, -0.1, 1], [0, 0.1, 1], [0, 1, 0])],
+        [0.755, 0.8, strike([-0.24, 0.2, -0.04], [-0.03, 0.56, 0.8], [0, 0.4, 1], [0, 1, 0.2], [0, 0, -1])],
+        [0.8, 1.0, strike([-0.03, 0.56, 0.8], [-0.04, 0.56, 0.74], [0, 1, 0.2], [0, 1, 0.25], [0, 0, -1])],
+      ],
+      0.04,
+    ),
+    // the left hand mirrors it, then is pulled to the hip as a fist
+    off: seq(
+      [
+        [-0.1, 0.36, line([0.1, 0.42, 0.28], [0.1, 0.43, 0.28], [0, 1, 0.15], [0, 1, 0.15], [1, 0, 0])],
+        [0.36, 0.48, line([0.1, 0.43, 0.28], [0.1, 0.53, 0.32], [0, 1, 0.15], [0, 1, 0.1], [1, 0, 0])],
+        [0.48, 0.57, line([0.1, 0.53, 0.32], [0.36, 0.46, 0.26], [0, 1, 0.1], [0.5, 0.2, 1], [0, 1, 0])],
+        [0.57, 0.68, line([0.36, 0.46, 0.26], [0.3, 0.16, 0.24], [0.5, 0.2, 1], [0.1, -0.1, 1], [0, 1, 0])],
+        [0.68, 0.76, line([0.3, 0.16, 0.24], [0.26, 0.16, 0.0], [0.1, -0.1, 1], [0, 0.1, 1], [0, 1, 0])],
+        [0.76, 1.0, line([0.26, 0.16, 0.0], [0.24, 0.18, 0.02], [0, 0.1, 1], [0, 0.1, 1], [0, 1, 0])],
+      ],
+      0.04,
+    ),
+    // the right foot's step (the left one's is the lift keyed above)
+    kick: {
+      foot: 'R',
+      from: 0.04,
+      to: 0.34,
+      path: kickPath(0.04, 0.34, [
+        [0.04, [-0.12, 0.05, -0.06]],
+        [0.1, [-0.13, 0.3, 0.04]],
+        [0.16, [-0.12, 0.05, -0.06]],
+        [0.34, [-0.12, 0.05, -0.06]],
+      ]),
+    },
+    lead: 0,
+    fx: [
+      fx(0.0, 'fog', 'root', 1.2),
+      fx(0.16, 'dust', 'feet', 0.4),
+      fx(0.3, 'dust', 'feet', 0.4),
+      fx(0.4, 'wisps', 'main', 0.6, '#ffb347'),
+      fx(0.4, 'wisps', 'off', 0.6, '#ffb347'),
+      fx(0.55, 'chi', 'main', 0.6, '#ffd08a'),
+      fx(0.55, 'chi', 'off', 0.6, '#ffd08a'),
+      fx(0.62, 'wisps', 'main', 0.8, '#ff9a2a'),
+      fx(0.62, 'wisps', 'off', 0.8, '#ff9a2a'),
+      fx(0.755, 'stomp', 'feet', 0.8),
+      fx(0.8, 'chi', 'main', 1.6),
+      fx(0.8, 'shockwave', 'front', 1.0, '#ffb347'),
+      fx(0.805, 'shake', 'root', 0.8),
+    ],
+    trail: { life: 0.2, glow: 0.6 },
+  }),
 };

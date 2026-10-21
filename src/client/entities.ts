@@ -11,6 +11,7 @@ import { FighterSnap, RosterEntry } from '../shared/protocol';
 import type { DodgeKind } from './render/anim/animator';
 import type { FxAnchor, FxCue } from './render/anim/author';
 import { AnimInput, CharacterModel } from './render/character';
+import { ENTRANCES } from './entrances';
 import { WeaponTrail, makeGlyph } from './render/effects';
 
 /** An effect cue from a move, resolved to a world position (and the fighter's facing). */
@@ -47,6 +48,8 @@ export class ClientFighter {
   readonly kickTrail: WeaponTrail;
   /** effect cues fired by the current move, waiting for the game loop */
   fxQueue: FxEvent[] = [];
+  /** the ring entrance window on the server clock (ms), while the match intro films this fighter */
+  entrance: { start: number; dur: number } | null = null;
   readonly glyph: THREE.Sprite;
   readonly isLocal: boolean;
 
@@ -292,19 +295,30 @@ export class ClientFighter {
       buff: buffActive,
       dodgeKind: v.dodgeKind,
     };
+    const ent = this.entrance;
+    // s along the ring entrance while it plays (NaN otherwise); before it they haven't arrived yet
+    let entS = NaN;
+    if (ent && v.state === 'idle' && serverNow >= ent.start && serverNow < ent.start + ent.dur) {
+      Object.assign(input, { entrance: true, elapsed: serverNow - ent.start, dur: ent.dur, speed: 0 });
+      entS = (serverNow - ent.start) / ent.dur;
+    } else if (ent && serverNow >= ent.start + ent.dur) this.entrance = null;
+    const waiting = !!ent && serverNow < ent.start;
     this.model.root.position.copy(this.pos);
     this.model.root.rotation.y = this.yaw;
     this.model.update(input, this.freezeMs > 0 ? dt * 0.1 : dt);
     // shadow step / dead fade
-    this.model.setVisible(!(v.state === 'dodge' && this.char.ability.kind === 'teleport' && v.elapsed < 250 && !v.attack && this.dodgeIsVanish()));
+    this.model.setVisible(!waiting && !(v.state === 'dodge' && this.char.ability.kind === 'teleport' && v.elapsed < 250 && !v.attack && this.dodgeIsVanish()));
 
     // weapon trails follow the swing, coloured by the character and how big the move is
     const atk = v.attack;
     const m = this.model;
     const frame = m.frame;
-    const live = (!!atk && v.state === 'attack' && !atk.noHitbox) || (v.state === 'dodge' && !!frame?.trail);
+    const live =
+      (!!atk && v.state === 'attack' && !atk.noHitbox) ||
+      (v.state === 'dodge' && !!frame?.trail) ||
+      ENTRANCES[this.roster.char].trails.some(([a, b]) => entS >= a && entS <= b);
     const tc = m.animator.style.trail;
-    const big = isHeavyKey(v.key) || v.key === 'ab' || v.key === 'ia' || v.key === 'ct';
+    const big = isHeavyKey(v.key) || v.key === 'ab' || v.key === 'ia' || v.key === 'ct' || !Number.isNaN(entS);
     const color = frame?.trail?.color ?? (atk?.perilous ? tc.special : big ? tc.heavy : tc.light);
     const life = frame?.trail?.life ?? (atk?.perilous ? 0.2 : big ? 0.17 : 0.13);
     const glow = frame?.trail?.glow ?? (atk?.perilous ? 0.8 : big ? 0.45 : 0.1);

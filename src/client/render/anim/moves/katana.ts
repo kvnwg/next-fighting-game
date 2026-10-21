@@ -87,6 +87,40 @@ const star = arc([-0.02, 0.44, 0.1], 0.26, [[0.05, 0.75, -0.66], [0.02, 1, -0.05
 const starHit = hitAt(star, 3);
 const starGround = hitAt(star, 5);
 
+
+// Ring entrance. Iai at rest: the blade in the scabbard, the right hand on the hilt and the left on the
+// saya; the koiguchi push slides the guard a finger's width out (ENT_KOI); then a flat nukitsuke at
+// throat height toward the opponent, held in zanshin, an o-chiburi off the right temple, and guard.
+/** Where an arc's grip sits for one of its directions. */
+const gripAt = (pivot: V3, r: number, dir: V3): V3 => {
+  const d = N(dir);
+  return [pivot[0] + d.x * r, pivot[1] + d.y * r, pivot[2] + d.z * r];
+};
+const ENT_KOI: V3 = gripAt(IAI_GRIP, -0.05, KATANA_SHEATH);
+const ENT_SAYA: V3 = [0.08, 0.09, 0.16];
+const ENT_HELD: V3 = [-0.85, 0.08, 0.52];
+const ENT_FLICKED: V3 = [-0.6, -0.45, 0.65];
+// the hilt runs out along the scabbard's line until the point clears the mouth, then the blade wheels
+// round the hand, flat, from the left hip to the opponent and on out to the right
+const ENT_OUT: V3 = gripAt(ENT_KOI, -0.32, KATANA_SHEATH);
+const entDraw = arc(gripAt(ENT_OUT, -0.08, KATANA_SHEATH), 0.08, [KATANA_SHEATH, [0.9, 0.02, -0.4], [0.7, 0.08, 0.7], [0, 0.1, 1], [-0.6, 0.1, 0.8], ENT_HELD], NaN, { pivot1: [-0.55, 0.42, 0.38] });
+const entDrawEnd = gripAt([-0.55, 0.42, 0.38], 0.08, ENT_HELD);
+const entFlickPivot: V3 = gripAt(entDrawEnd, -0.16, ENT_HELD);
+const entChiburi = arc(entFlickPivot, 0.16, [ENT_HELD, [-0.55, 0.8, -0.2], [-0.3, 0.9, 0.3], ENT_FLICKED]);
+const entFlicked = gripAt(entFlickPivot, 0.16, ENT_FLICKED);
+const entFlick = 0.875;
+const entrance = seq([
+  [-1, 0.4, line(IAI_GRIP, IAI_GRIP, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
+  [0.4, 0.45, line(IAI_GRIP, ENT_KOI, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
+  [0.45, 0.735, line(ENT_KOI, ENT_KOI, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
+  [0.735, 0.75, line(ENT_KOI, ENT_OUT, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
+  [0.75, 0.795, entDraw],
+  [0.795, 0.835, line(entDrawEnd, entDrawEnd, ENT_HELD, ENT_HELD, [0, 0.7, -0.7])],
+  [0.835, entFlick, entChiburi],
+  [entFlick, 0.96, line(entFlicked, [-0.03, 0.17, 0.33], ENT_FLICKED, [0.02, 0.5, 1], [0, -1, 0.3], G2)],
+  [0.96, 2, line([-0.03, 0.17, 0.33], [-0.03, 0.17, 0.33], [0.02, 0.5, 1], [0.02, 0.5, 1], [0, -1, 0.3], G2)],
+], 0.012);
+
 export const katana: Style = {
   axis: 'y',
   offAxis: 'y',
@@ -347,4 +381,43 @@ export const katana: Style = {
       trail: { life: 0.22, glow: 0.6 },
     }),
   },
+  // Ring entrance: still under the hat with a hand on the hilt; the thumb frees the guard and the
+  // eyes come up; then one flat draw at the opponent, zanshin, the chiburi, and guard
+  entrance: mv({
+    keys: [
+      K(0, B({ ...body, twist: 0.18, crouch: -0.04, lean: 0.1, step: 0.1, back: 0.1, width: 0.1, headPitch: 0.45 })),
+      K(0.1, B({ ...body, twist: 0.18, crouch: -0.05, lean: 0.12, step: 0.1, back: 0.1, width: 0.1, headPitch: 0.45 })),
+      K(0.19, B({ ...body, twist: 0.22, crouch: -0.13, lean: 0.16, step: 0.28, back: 0.24, width: 0.12, headPitch: 0.42 })),
+      K(0.4, B({ ...body, twist: 0.22, crouch: -0.14, lean: 0.17, step: 0.28, back: 0.24, width: 0.12, headPitch: 0.42 })),
+      K(0.47, B({ ...body, twist: 0.24, crouch: -0.15, lean: 0.17, step: 0.28, back: 0.24, width: 0.12, headPitch: 0.36 })),
+      K(0.62, B({ ...body, twist: 0.24, crouch: -0.15, lean: 0.12, step: 0.28, back: 0.24, width: 0.12, headPitch: -0.04 })),
+      K(0.73, B({ ...body, twist: 0.28, crouch: -0.19, lean: 0.16, step: 0.28, back: 0.26, width: 0.12, headPitch: -0.04 })),
+      K(0.795, B({ ...body, twist: -0.5, crouch: -0.26, lean: 0.3, step: 0.5, back: 0.34, width: 0.12, headPitch: 0.02 })),
+      K(0.835, B({ ...body, twist: -0.56, crouch: -0.27, lean: 0.28, step: 0.5, back: 0.34, width: 0.12, headPitch: 0.02 })),
+      K(entFlick, B({ ...body, twist: -0.4, crouch: -0.22, lean: 0.2, step: 0.44, back: 0.32, headPitch: 0.05 })),
+      K(0.96, body),
+    ],
+    main: entrance,
+    free: track([
+      [0.0, ENT_SAYA],
+      [0.735, ENT_SAYA],
+      [0.79, [0.24, 0.1, -0.02]],
+      [0.86, [0.22, 0.12, 0.02]],
+    ]),
+    start: 0,
+    rest: 1,
+    lead: 0,
+    ghosts: [0.735, 0.8],
+    fx: [
+      fx(0.02, 'dust', 'feet', 0.6),
+      fx(0.05, 'petals', 'root', 0.9),
+      fx(0.19, 'dust', 'feet', 0.7),
+      fx(0.45, 'sparkle', 'main', 0.5, '#ffffff'),
+      fx(0.75, 'dust', 'feet', 1),
+      fx(hitAt(entrance, 3, 4), 'flashline', 'tip', 1.6, '#ffffff'),
+      fx(hitAt(entrance, 3, 4) + 0.006, 'petals', 'tip', 1.3),
+      fx(entFlick, 'sparkle', 'tip', 0.5, '#ffffff'),
+    ],
+    trail: { life: 0.28, glow: 1 },
+  }),
 };

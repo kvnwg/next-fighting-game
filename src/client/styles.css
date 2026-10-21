@@ -634,3 +634,87 @@ h3 { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.03
   .sel-badge { width: 22px; height: 22px; }
   .sel-badge b { font-size: 7px; }
 }
+
+/* ---------------------------------------------------------------- ring entrances */
+/* the intro is a cinematic: letterbox bars, and the duel HUD steps aside */
+.hud::before, .hud::after { content: ''; position: absolute; left: 0; right: 0; height: 0; background: #000; z-index: 4; pointer-events: none; transition: height 0.45s ease; }
+.hud::before { top: 0; }
+.hud::after { bottom: 0; }
+.hud.cinematic::before, .hud.cinematic::after { height: 9vh; }
+.hud.cinematic .fcard, .hud.cinematic .match-round, .hud.cinematic .match-timer, .hud.cinematic .touch-ui, .hud.cinematic .posture-main, .hud.cinematic .plates, .hud.cinematic .lock-reticle { visibility: hidden; }
+
+.name-card { position: absolute; bottom: calc(9vh + 18px); z-index: 5; display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; align-items: center; column-gap: 16px; padding: 10px 22px 12px; max-width: min(620px, 80vw); font-family: var(--ui); color: #fff; pointer-events: none; animation: nc-in 0.35s ease-out both; transition: opacity 0.35s; }
+.name-card.theirs { right: 6vw; }
+.name-card.mine { left: 6vw; }
+.name-card.out { opacity: 0; }
+.nc-jp { grid-row: 1 / 3; font-size: 78px; line-height: 1; font-weight: 900; color: var(--c2); text-shadow: 0 3px 14px rgba(0, 0, 0, 0.7); }
+.nc-name { font-size: 40px; font-weight: 800; font-style: italic; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8); }
+.nc-title { margin-top: 4px; font-size: 14px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--c2); }
+.nc-player { margin-top: 2px; font-size: 13px; color: rgba(255, 255, 255, 0.7); }
+.nc-line { grid-column: 2; margin-top: 8px; font-size: 17px; font-style: italic; color: rgba(255, 255, 255, 0.92); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9); animation: nc-line 0.5s 0.45s ease-out both; }
+@keyframes nc-in { from { opacity: 0; transform: translateY(12px); } }
+@keyframes nc-line { from { opacity: 0; transform: translateX(-10px); } }
+
+/* Ronin: brushed on in ink across a strip of paper, red splatter behind the kanji */
+.nc-ronin { background: linear-gradient(90deg, transparent, #efe6d2 6%, #efe6d2 94%, transparent); color: #141210; animation: nc-brush 0.6s cubic-bezier(0.6, 0, 0.3, 1) both; }
+.nc-ronin .nc-jp { color: #141210; text-shadow: none; background: radial-gradient(circle at 30% 40%, #c8202a 0 6px, transparent 7px), radial-gradient(circle at 70% 70%, #c8202a 0 4px, transparent 5px), radial-gradient(circle at 60% 25%, #c8202a 0 3px, transparent 4px), radial-gradient(ellipse at 50% 55%, rgba(200, 32, 42, 0.55) 0 30%, transparent 55%); }
+.nc-ronin .nc-name, .nc-ronin .nc-line { color: #141210; text-shadow: none; }
+.nc-ronin .nc-title { color: #a01820; }
+.nc-ronin .nc-player { color: rgba(20, 18, 16, 0.65); }
+@keyframes nc-brush { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+
+/* Warden: chiselled out of a slab, the gold edges lighting last */
+.nc-juggernaut { background: linear-gradient(180deg, #4a4640, #2c2a26); border: 2px solid transparent; animation: nc-chisel 0.5s steps(6) both, nc-gold 0.5s 0.5s ease-out both; }
+.nc-juggernaut .nc-jp { color: #d8b45a; }
+@keyframes nc-chisel { 0% { opacity: 0; transform: translate(0, 0); } 20% { opacity: 1; transform: translate(-4px, 2px); } 40% { transform: translate(3px, -2px); } 60% { transform: translate(-2px, 1px); } 80% { transform: translate(1px, -1px); } 100% { transform: none; } }
+@keyframes nc-gold { from { border-color: transparent; box-shadow: none; } to { border-color: #d8b45a; box-shadow: 0 0 18px rgba(216, 180, 90, 0.5), inset 0 0 12px rgba(216, 180, 90, 0.25); } }
+
+/* Wraith: fades up out of mist, then a red brush slash cuts through it */
+.nc-reaper { animation: nc-mist 0.9s ease-out both; }
+.nc-reaper .nc-jp { color: #d8dde4; }
+.nc-reaper .nc-name { color: #c8ced6; }
+.nc-reaper::after { content: ''; position: absolute; left: -4%; right: -4%; top: 52%; height: 6px; background: linear-gradient(90deg, transparent, #c8202a 15%, #ff3040 50%, #c8202a 85%, transparent); transform: rotate(-8deg) scaleX(0); transform-origin: left; animation: nc-slash 0.25s 0.7s ease-in both; box-shadow: 0 0 12px #ff2030; }
+@keyframes nc-mist { from { opacity: 0; filter: blur(14px); letter-spacing: 0.3em; } to { opacity: 1; filter: blur(0); } }
+@keyframes nc-slash { to { transform: rotate(-8deg) scaleX(1); } }
+
+/* Lancer: burned in by a forking bolt of gold */
+.nc-lancer { animation: nc-bolt 0.6s linear both; }
+.nc-lancer .nc-jp, .nc-lancer .nc-name { color: #ffe27a; text-shadow: 0 0 10px #ffd040, 0 0 26px rgba(255, 200, 60, 0.6); }
+@keyframes nc-bolt { 0% { opacity: 0; filter: brightness(4); } 10% { opacity: 1; } 18% { opacity: 0.2; } 26% { opacity: 1; } 34% { opacity: 0.4; } 45% { opacity: 1; filter: brightness(2.2); } 100% { filter: brightness(1); } }
+
+/* Assassin: cut in by two crossing blade slashes, teal smoke out of the cuts */
+.nc-shade { animation: nc-cut 0.45s 0.15s ease-out both; }
+.nc-shade .nc-jp { color: #4ad8c8; text-shadow: 0 0 16px rgba(60, 220, 200, 0.6); }
+.nc-shade .nc-name { text-shadow: 0 0 14px rgba(60, 220, 200, 0.5), 0 2px 8px #000; }
+.nc-shade::before, .nc-shade::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 3px; background: linear-gradient(90deg, transparent, #e8fffb, transparent); box-shadow: 0 0 10px #4ad8c8; transform-origin: center; animation: nc-x 0.4s ease-out both; }
+.nc-shade::before { --r: 14deg; }
+.nc-shade::after { --r: -14deg; animation-delay: 0.1s; }
+@keyframes nc-cut { from { clip-path: polygon(50% 0, 50% 0, 50% 100%, 50% 100%); } to { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); } }
+@keyframes nc-x { 0% { transform: rotate(var(--r)) scaleX(0); opacity: 1; } 60% { transform: rotate(var(--r)) scaleX(1.1); opacity: 1; } 100% { transform: rotate(var(--r)) scaleX(1.1); opacity: 0; } }
+
+/* Duelist: written in a fencer's flourish of green light */
+.nc-duelist { animation: nc-write 0.7s cubic-bezier(0.5, 0, 0.2, 1) both; }
+.nc-duelist .nc-jp, .nc-duelist .nc-name { color: #b8ffb0; text-shadow: 0 0 10px #4ae04a, 0 0 24px rgba(74, 224, 74, 0.5); }
+.nc-duelist .nc-name { font-family: Georgia, 'Times New Roman', serif; text-transform: none; letter-spacing: 0.02em; }
+@keyframes nc-write { from { clip-path: polygon(0 0, 0 0, -20% 100%, -20% 100%); } to { clip-path: polygon(0 0, 120% 0, 100% 100%, 0 100%); } }
+
+/* Monk: stamped like a red seal, the edge rippling outward */
+.nc-monk .nc-jp { position: relative; padding: 6px 8px; color: #fff4e8; background: #b81c20; border-radius: 6px; box-shadow: inset 0 0 0 3px #e85048; font-size: 64px; animation: nc-stamp 0.35s cubic-bezier(0.3, 0, 0.5, 1.6) both; }
+.nc-monk .nc-jp::after { content: ''; position: absolute; inset: 0; border: 3px solid #e85048; border-radius: 8px; animation: nc-ripple 0.9s 0.3s ease-out both; }
+@keyframes nc-stamp { from { transform: scale(1.9) rotate(-8deg); opacity: 0; } }
+@keyframes nc-ripple { from { transform: scale(1); opacity: 0.9; } to { transform: scale(2.2); opacity: 0; } }
+
+/* Knight: engraved into a bronze plate, light sweeping across it */
+.nc-paladin { background: linear-gradient(180deg, #a87a3a, #6a4a1e); border: 2px solid #e0b060; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); overflow: hidden; }
+.nc-paladin .nc-jp, .nc-paladin .nc-name { color: #fff0cc; text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 240, 200, 0.4); }
+.nc-paladin .nc-title { color: #3a2408; }
+.nc-paladin::after { content: ''; position: absolute; top: -20%; bottom: -20%; width: 30%; left: -40%; background: linear-gradient(100deg, transparent, rgba(255, 250, 220, 0.7), transparent); animation: nc-sweep 0.9s 0.3s ease-in-out both; }
+@keyframes nc-sweep { to { left: 120%; } }
+
+@media (max-height: 520px) {
+  .name-card { bottom: calc(9vh + 8px); padding: 6px 14px 8px; column-gap: 10px; }
+  .nc-jp { font-size: 52px; }
+  .nc-monk .nc-jp { font-size: 42px; }
+  .nc-name { font-size: 28px; }
+  .nc-line { font-size: 14px; margin-top: 4px; }
+}

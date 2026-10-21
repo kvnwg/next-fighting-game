@@ -11,8 +11,6 @@ export const CAMERA_FOV = 50;
 /** Sideways offset of the camera (and its aim) to the player's right, in metres. */
 const SHOULDER = 1.4;
 /** The fixed framing while locked on: pitch and boom length (scaled with your fighter's size). */
-const LOCK_PITCH = 0.32;
-const LOCK_DISTANCE = 6.2;
 
 /** A camera pose for cinematic shots. */
 export interface CamPose {
@@ -55,6 +53,8 @@ export class CameraRig {
   shakeScale = 1;
   /** your fighter's size relative to the reference body: bigger fighters get a wider, longer framing */
   subjectScale = 1;
+  /** the same for the opponent being framed */
+  targetScale = 1;
   private locked = false;
   private shakes: Shake[] = [];
   private time = 0;
@@ -109,13 +109,14 @@ export class CameraRig {
   }
 
   /** Play cinematic shots (match intros); the follow camera resumes when they finish. */
-  playShots(shots: Shot[]): void {
+  playShots(shots: Shot[], startAt = 0): void {
     // the poses the shots start and end on keep clear of props too, so every held frame is clear
     for (const shot of shots) {
       for (const p of [shot.from, shot.to]) this.constrain?.(p.subject ?? p.look, p.pos);
     }
     this.shots = shots;
-    this.shotT = 0;
+    // joining late starts partway through
+    this.shotT = startAt;
   }
 
   stopShots(): void {
@@ -145,15 +146,15 @@ export class CameraRig {
 
   /** Where the follow camera wants to be and to look, at the current yaw. */
   private aim(player: THREE.Vector3, target: THREE.Vector3 | null) {
+    if (target) return this.duelAim(player, target);
     const f = forward(this.yaw);
-    const k = Math.max(1, this.subjectScale);
-    const pitch = target ? LOCK_PITCH : this.pitch;
-    const distance = target ? LOCK_DISTANCE * k : this.distance;
-    const shoulder = SHOULDER * (target ? k : 1);
+    const pitch = this.pitch;
+    const distance = this.distance;
+    const shoulder = SHOULDER;
     const cosP = Math.cos(pitch);
     const pos = new THREE.Vector3(
       player.x - f.x * distance * cosP,
-      player.y + 2.0 * k + Math.sin(pitch) * distance,
+      player.y + 2.0 + Math.sin(pitch) * distance,
       player.z - f.z * distance * cosP,
     );
     // over the right shoulder so the player doesn't block the opponent
@@ -163,14 +164,42 @@ export class CameraRig {
     const subject = new THREE.Vector3(player.x, player.y + 1.6, player.z);
     this.constrain?.(subject, pos);
 
-    // aim above the player's head so they sit low in frame; with a target, aim between the two
+    // aim above the player's head so they sit low in frame
     const look = new THREE.Vector3(player.x, player.y + 1.9, player.z);
-    if (target) {
-      look.lerp(new THREE.Vector3(target.x, target.y + 1.3, target.z), 0.45);
-    }
     // aim a little further right than the camera sits, pushing the player toward the left third
     look.x += -Math.cos(this.yaw) * shoulder * 1.3;
     look.z += Math.sin(this.yaw) * shoulder * 1.3;
+    return { pos, look, subject };
+  }
+
+  /**
+   * The duel camera, framed like a fighting game: from behind your right shoulder, looking at a
+   * point between the two of you, so you stand at the left of the frame and the opponent is whole
+   * and clear in the middle. Up close the camera swings further round to the side, so your own
+   * body never covers them; far apart it comes in behind you. It never takes the mouse.
+   */
+  private duelAim(player: THREE.Vector3, target: THREE.Vector3) {
+    // framed for the bigger of the two
+    const k = Math.max(1, this.subjectScale, this.targetScale);
+    const d = Math.max(0.5, Math.hypot(target.x - player.x, target.z - player.z));
+    // the axis follows the smoothed yaw, so the camera doesn't jitter with every step
+    const u = forward(this.yaw);
+    const rx = -u.z;
+    const rz = u.x;
+    // how far round to the side: about 55° when they're in your face, 22° across the arena
+    const close = THREE.MathUtils.smoothstep(d, 1.5, 7);
+    const phi = THREE.MathUtils.lerp(0.96, 0.38, close);
+    // far enough back that both fit in the frame with room to see the weapons move
+    const boom = THREE.MathUtils.clamp(2.5 + d * 0.42, 3.3, 6.8) * k;
+    const pivot = new THREE.Vector3(player.x + u.x * d * 0.42, player.y, player.z + u.z * d * 0.42);
+    const bx = -u.x * Math.cos(phi) + rx * Math.sin(phi);
+    const bz = -u.z * Math.cos(phi) + rz * Math.sin(phi);
+    const pos = new THREE.Vector3(pivot.x + bx * boom, player.y + (1.7 + d * 0.08) * k, pivot.z + bz * boom);
+    const subject = new THREE.Vector3(target.x, target.y + 1.2 * k, target.z);
+    // walls pull it in, but it keeps the opponent in sight rather than you
+    this.constrain?.(subject, pos);
+    // look a little past the middle, toward them, at chest height
+    const look = new THREE.Vector3(player.x + u.x * d * 0.62, player.y + 1.15 * k, player.z + u.z * d * 0.62);
     return { pos, look, subject };
   }
 

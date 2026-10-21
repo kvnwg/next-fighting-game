@@ -39,7 +39,12 @@ export interface AnimInput {
   buff: boolean;
   /** what kind of dodge this is (abilities reuse the dodge state) */
   dodgeKind?: DodgeKind;
+  /** the ring entrance is playing: elapsed and dur run over the whole entrance */
+  entrance?: boolean;
 }
+
+/** How long each fighter's ring entrance lasts. */
+export const ENTRANCE_MS = 3600;
 
 /** A pose with every optional part filled in, ready to blend and to drive the rig. */
 export interface ResolvedPose {
@@ -332,7 +337,7 @@ export class Animator {
   }
 
   update(a: AnimInput, dt: number): AnimFrame {
-    const key = `${a.state}|${a.serial ?? 0}|${a.key ?? ''}|${a.dodgeKind ?? ''}`;
+    const key = `${a.state}|${a.serial ?? 0}|${a.key ?? ''}|${a.dodgeKind ?? ''}|${a.entrance ? 'in' : ''}`;
     if (key !== this.stateKey || a.elapsed < this.lastElapsed - 30) {
       this.stateKey = key;
       this.snapshot = cloneResolved(this.current);
@@ -359,7 +364,15 @@ export class Animator {
     };
     let rot: Rot = { ...ZERO_ROT };
 
-    if (a.state === 'attack' && a.attack) {
+    if (a.entrance && this.style.entrance) {
+      // the fighter is hidden until their entrance, so it starts straight on its first pose, and it
+      // settles into guard over its last half second; the trails are gated per entrance by the caller
+      const r = this.abilityPose(a, this.style.entrance, out, 1e-3, 500 / Math.max(1, a.dur));
+      out.swingMain = out.swingOff = true;
+      out.pose = r.pose;
+      rot = r.rot;
+      out.kick = r.kick;
+    } else if (a.state === 'attack' && a.attack) {
       const r = this.attackPose(a, a.attack, out);
       out.pose = r.pose;
       rot = r.rot;
@@ -529,7 +542,7 @@ export class Animator {
   }
 
   /** Leap and vanish abilities: the dodge state plays a whole move over its duration. */
-  private abilityPose(a: AnimInput, def: MoveDef, out: AnimFrame): MoveFrame {
+  private abilityPose(a: AnimInput, def: MoveDef, out: AnimFrame, inFrac = 0.2, outFrac = 0.2): MoveFrame {
     const dur = Math.max(1, a.dur);
     const k = clamp01(a.elapsed / dur);
     const s = def.sStart + (def.sRest - def.sStart) * k;
@@ -537,13 +550,13 @@ export class Animator {
     out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
     out.trail = def.trail;
     const f = this.movePose(def, s);
-    const bin = easeOut(k / 0.2, 2);
-    const bout = easeInOut((k - 0.8) / 0.2);
+    const bin = easeOut(k / inFrac, 2);
+    const bout = easeInOut((k - (1 - outFrac)) / outFrac);
     const guard = this.guardPose(a);
     const pose = lerpResolved(lerpResolved(this.snapshot, f.pose, bin), guard, bout);
     const rot = lerpRot(this.snapRot, f.rot, bin);
     for (const c of ROT_CHANNELS) rot[c] += (settleTurn(rot[c], c) - rot[c]) * bout;
-    return { pose, rot, kick: null };
+    return { pose, rot, kick: f.kick && { ...f.kick, w: f.kick.w * (1 - bout) } };
   }
 
   /** The style's roar plays over the neutral pose (it never interrupts a move). */

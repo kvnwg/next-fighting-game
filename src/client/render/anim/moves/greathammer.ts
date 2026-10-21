@@ -4,7 +4,8 @@
  * diagonal smash into a full-turn cyclone, the heavy leaps and cracks the earth, and the special
  * tears a trench through the ground at ankle height.
  */
-import { B, K, P, Style, X, arc, fx, hitAt, line, mv, seq } from '../author';
+import { B, K, N, P, Style, X, arc, fx, hitAt, line, mv, seq, track } from '../author';
+import type { V3 } from '../author';
 
 const G2 = -0.33; // the left hand rides down by the pommel
 const body = B({ front: 'L', step: 0.26, back: 0.26, width: 0.17, crouch: -0.11, lean: 0.1, twist: -0.22 });
@@ -79,6 +80,36 @@ const boulderHit = hitAt(boulder, 3);
 const fall = arc([0, 0.45, 0.1], 0.2, [[-0.35, 0.85, -0.25], [0, 0.3, -0.95], [0, 0.95, -0.3], [0, 0.6, 0.8], [0, 0.0, 1], [0, -0.5, 0.86]], G2);
 const fallCocked = hitAt(fall, 1);
 const fallHit = hitAt(fall, 4);
+
+
+// Ring entrance. The hammer drags one-handed behind on the right with its head in the dirt while
+// he stamps in; the right arm heaves it up behind him onto the right shoulder and the left hand
+// takes the haft; then it is brought over and down head-first to stand upright beside him, and
+// hoisted back into guard.
+/** Where an arc's grip sits for one of its directions (negative r: the pivot behind the grip). */
+const gripAt = (pivot: V3, r: number, dir: V3): V3 => {
+  const d = N(dir);
+  return [pivot[0] + d.x * r, pivot[1] + d.y * r, pivot[2] + d.z * r];
+};
+const ENT_DRAG: V3 = [-0.12, -0.64, -0.76];
+const ENT_GUARD_AT: V3 = [0.07, 0.41, 0.13];
+const ENT_GUARD_DIR: V3 = [-0.35, 0.85, -0.25];
+const ENT_PLANT: V3 = [-0.18, -0.98, 0.06];
+const ENT_PLANT_AT: V3 = [-0.45, 0.4, 0.15];
+const entDragAt: V3 = [-0.3, -0.04, 0.0];
+const entHeave = arc(gripAt(entDragAt, -0.2, ENT_DRAG), 0.2, [ENT_DRAG, [-0.2, -0.25, -0.95], [-0.3, 0.35, -0.9], [-0.36, 0.75, -0.55], ENT_GUARD_DIR], NaN, { pivot1: gripAt(ENT_GUARD_AT, -0.2, ENT_GUARD_DIR) });
+const entSlam = arc(gripAt(ENT_GUARD_AT, -0.12, ENT_GUARD_DIR), 0.12, [ENT_GUARD_DIR, [-0.15, 1, 0.15], [-0.3, 0.6, 0.75], [-0.35, -0.15, 0.93], ENT_PLANT], G2, { pivot1: gripAt(ENT_PLANT_AT, -0.12, ENT_PLANT) });
+const entHoist = arc(gripAt(ENT_PLANT_AT, -0.12, ENT_PLANT), 0.12, [ENT_PLANT, [-0.35, -0.15, 0.93], [-0.3, 0.6, 0.75], [-0.2, 0.98, 0.1], ENT_GUARD_DIR], G2, { pivot1: gripAt(ENT_GUARD_AT, -0.12, ENT_GUARD_DIR), edgeSign: -1, roll: -0.28 });
+const entSlamHit = 0.785;
+const entrance = seq([
+  [-1, 0.36, line(entDragAt, entDragAt, ENT_DRAG, ENT_DRAG, [0, -0.76, 0.64])],
+  [0.36, 0.57, entHeave],
+  [0.57, 0.7, line(ENT_GUARD_AT, ENT_GUARD_AT, ENT_GUARD_DIR, ENT_GUARD_DIR, [0.05, 0.3, 0.95], G2)],
+  [0.7, entSlamHit, entSlam],
+  [entSlamHit, 0.885, line(ENT_PLANT_AT, ENT_PLANT_AT, ENT_PLANT, ENT_PLANT, [0, 0, -1])],
+  [0.885, 0.97, entHoist],
+  [0.97, 2, line(ENT_GUARD_AT, ENT_GUARD_AT, ENT_GUARD_DIR, ENT_GUARD_DIR, [-1, 0, 0.2], G2)],
+], 0.015);
 
 export const greathammer: Style = {
   axis: 'x',
@@ -352,5 +383,65 @@ export const greathammer: Style = {
     rest: 1,
     lead: 0,
     fx: [fx(0.32, 'roar', 'root', 1.2)],
+  }),
+  // Ring entrance: two stamps that shake the ring with the hammer dragging behind, the hammer
+  // heaved onto the shoulder as the head comes up, then slammed down beside him to stand like a wall
+  entrance: mv({
+    keys: [
+      K(0, B({ ...body, twist: -0.3, lean: 0.24, crouch: -0.12, side: 0, step: 0.24, back: 0.26, headPitch: 0.3 })),
+      K(0.08, B({ ...body, twist: -0.34, lean: 0.14, crouch: -0.02, side: 0.1, step: 0.26, back: 0.2, headPitch: 0.26 })),
+      K(0.15, B({ ...body, twist: -0.28, lean: 0.3, crouch: -0.22, side: -0.04, step: 0.24, back: 0.06, width: 0.22, headPitch: 0.3 })),
+      K(0.21, B({ ...body, twist: -0.28, lean: 0.22, crouch: -0.14, side: -0.02, step: 0.24, back: 0.06, width: 0.22, headPitch: 0.3 })),
+      K(0.26, B({ ...body, twist: -0.25, lean: 0.12, crouch: -0.03, side: 0, step: 0.24, back: 0.06, width: 0.22, headPitch: 0.24 }), { hop: 0.05 }),
+      K(0.3, B({ ...body, twist: -0.25, lean: 0.32, crouch: -0.32, side: 0, step: 0.28, back: 0.08, width: 0.27, headPitch: 0.3 }), { hop: 0 }),
+      K(0.36, B({ ...body, twist: -0.25, lean: 0.3, crouch: -0.3, step: 0.28, back: 0.08, width: 0.26, headPitch: 0.28 })),
+      K(0.45, B({ ...body, twist: -0.05, lean: 0.34, crouch: -0.3, step: 0.28, back: 0.1, width: 0.25, headPitch: 0.2 })),
+      K(0.57, B({ ...body, twist: -0.2, lean: -0.04, crouch: -0.08, step: 0.26, back: 0.14, width: 0.22, headPitch: -0.12 })),
+      K(0.69, B({ ...body, twist: -0.22, lean: -0.1, crouch: -0.07, step: 0.26, back: 0.14, width: 0.22, headPitch: -0.2 })),
+      K(0.74, B({ ...body, twist: -0.3, lean: -0.16, crouch: -0.04, step: 0.26, back: 0.16, width: 0.22, headPitch: -0.16 })),
+      K(entSlamHit, B({ ...body, twist: -0.1, lean: 0.12, crouch: -0.2, step: 0.26, back: 0.16, width: 0.24, headPitch: 0.0 })),
+      K(0.83, B({ ...body, twist: -0.06, lean: -0.04, crouch: -0.12, step: 0.26, back: 0.18, width: 0.24, headPitch: -0.06 })),
+      K(0.885, B({ ...body, twist: -0.06, lean: -0.04, crouch: -0.12, step: 0.26, back: 0.2, width: 0.22, headPitch: -0.04 })),
+      K(0.97, body),
+    ],
+    main: entrance,
+    free: track([
+      [0.0, [0.34, 0.02, 0.12]],
+      [0.08, [0.36, 0.06, 0.2]],
+      [0.15, [0.33, 0.0, 0.04]],
+      [0.26, [0.35, 0.05, 0.18]],
+      [0.3, [0.33, -0.02, 0.06]],
+      [0.36, [0.1, 0.05, 0.25]],
+      [entSlamHit, [0.26, 0.06, 0.18]],
+      [0.885, [0.26, 0.08, 0.2]],
+    ]),
+    kick: {
+      foot: 'R',
+      from: 0.04,
+      to: 0.15,
+      path: seq([
+        [0, 0.6, line([-0.17, 0.05, -0.26], [-0.21, 0.6, 0.02], [0, 0, 1], [0, 0, 1], [0, 1, 0])],
+        [0.6, 0.75, line([-0.21, 0.6, 0.02], [-0.22, 0.62, 0.0], [0, 0, 1], [0, 0, 1], [0, 1, 0])],
+        [0.75, 1, line([-0.22, 0.62, 0.0], [-0.22, 0.05, -0.06], [0, 0, 1], [0, 0, 1], [0, 1, 0])],
+      ], 0.04),
+    },
+    start: 0,
+    rest: 1,
+    lead: 0,
+    fx: [
+      fx(0.15, 'stomp', 'feet', 1.2),
+      fx(0.15, 'shake', 'root', 0.8),
+      fx(0.16, 'sparkle', 'tip', 0.6, '#ffb04a'),
+      fx(0.3, 'stomp', 'feet', 1.5),
+      fx(0.3, 'shake', 'root', 1.2),
+      fx(0.31, 'sparkle', 'tip', 0.7, '#ffb04a'),
+      fx(0.38, 'dust', 'tip', 1),
+      fx(0.575, 'shake', 'root', 0.4),
+      fx(entSlamHit, 'shockwave', 'tip', 1.6),
+      fx(entSlamHit, 'shake', 'root', 1.2),
+      fx(entSlamHit + 0.01, 'embers', 'root', 1.3),
+      fx(0.85, 'embers', 'root', 0.8),
+    ],
+    trail: { life: 0.22, glow: 0.5 },
   }),
 };

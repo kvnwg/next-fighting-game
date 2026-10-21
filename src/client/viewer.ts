@@ -8,9 +8,11 @@ import * as THREE from 'three';
 import { AttackKey, CHARACTER_IDS, CharacterId, getAttack } from '../shared/characters';
 import { FighterState } from '../shared/fighter';
 import { AnimInput, CharacterModel } from './render/character';
+import { ENTRANCE_MS } from './render/anim/animator';
 import { MAPS } from '../shared/maps';
 import { Effects } from './render/effects';
-import { CameraRig, introShots } from './camera';
+import { CameraRig } from './camera';
+import { entranceStarts, introSequence } from './entrances';
 import { buildBlockers, constrainCamera } from './cameraClip';
 import { GameRenderer } from './render/renderer';
 import type { QualitySetting } from './render/gfx/quality';
@@ -145,14 +147,14 @@ function showStrip(r: GameRenderer, params: URLSearchParams, n: number): void {
 
   // the timeline: each attack in the chain starts when the previous one's active frames end + gap;
   // non-attack entries (block, stagger, stance...) hold that state for a typical duration
-  const STATE_MS: Partial<Record<FighterState | 'roar' | 'leap' | 'vanish', number>> = { idle: 600, roar: 1100, leap: 460, vanish: 300, block: 800, blockstun: 300, stagger: 400, deflected: 600, broken: 1500, dodge: 380, stance: 900, dead: 1200, knockdown: 1400 };
+  const STATE_MS: Partial<Record<FighterState | 'roar' | 'leap' | 'vanish' | 'entrance', number>> = { entrance: ENTRANCE_MS, idle: 600, roar: 1100, leap: 460, vanish: 300, block: 800, blockstun: 300, stagger: 400, deflected: 600, broken: 1500, dodge: 380, stance: 900, dead: 1200, knockdown: 1400 };
   const probe = new CharacterModel(id);
   const steps: { key: string; start: number; dur: number; atk: ReturnType<typeof getAttack> }[] = [];
   let t = 0;
   for (const k of chain) {
     const atk = k in STATE_MS ? null : getAttack(probe.char, k as AttackKey);
     if (!atk && !(k in STATE_MS)) continue;
-    const dur = atk ? atk.windup + atk.active + atk.recovery : STATE_MS[k as FighterState | 'roar' | 'leap' | 'vanish']!;
+    const dur = atk ? atk.windup + atk.active + atk.recovery : STATE_MS[k as FighterState | 'roar' | 'leap' | 'vanish' | 'entrance']!;
     steps.push({ key: k, start: t, dur, atk });
     t += atk && chain.length > 1 ? atk.windup + atk.active + Math.min(atk.recovery, 120) : dur;
   }
@@ -218,6 +220,9 @@ function showStrip(r: GameRenderer, params: URLSearchParams, n: number): void {
       else if (cur.key === 'leap' || cur.key === 'vanish') {
         // abilities that play through the dodge state
         input = { ...IDLE, state: 'dodge', elapsed: e, dur: cur.dur, serial, dodgeKind: cur.key };
+      } else if (cur.key === 'entrance') {
+        // the ring entrance plays over idle for its whole length
+        input = { ...IDLE, elapsed: e, dur: cur.dur, serial, entrance: true };
       } else if (cur.key === 'roar') {
         // the War Cry plays over idle
         if (e < 10) m.react('roar');
@@ -241,26 +246,73 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
   const view = new MapView(map, r.scene, r);
   const fx = new Effects(r.scene);
   void fx;
-  const chars = ['ronin', 'reaper'] as const;
-  // `shot=1.8`: the two fighters stand on the real spawns and the camera is frozen 1.8s into the match intro
+  // `chars=monk,lancer`: you, then the opponent
+  const chars = (params.get('chars')?.split(',') ?? ['ronin', 'reaper']) as CharacterId[];
+  // `shot=1.8`: the two fighters stand on the real spawns and the camera is frozen 1.8s into the match
+  // intro, their ring entrances played to that moment
   const shotT = params.get('shot');
-  const subjects: { pos: THREE.Vector3; yaw: number; scale: number }[] = [];
+  const subjects: { pos: THREE.Vector3; yaw: number; scale: number; char: CharacterId }[] = [];
+  const models: CharacterModel[] = [];
   map.spawns.slice(0, 2).forEach((s, i) => {
     const m = new CharacterModel(chars[i]);
+    models.push(m);
     const k = map.kind === 'lobby' || shotT !== null ? 1 : 0.55;
     m.root.position.set(s.x * k, 0, s.z * k);
     m.root.rotation.y = s.yaw;
     r.scene.add(m.root);
     for (let j = 0; j < 30; j++) m.update(IDLE, 0.05);
-    subjects.push({ pos: m.root.position.clone(), yaw: s.yaw, scale: m.scale });
+    subjects.push({ pos: m.root.position.clone(), yaw: s.yaw, scale: m.scale, char: chars[i] });
   });
+  // `lock=2.5`: the fighters stand that far apart mid-arena and the game's duel camera frames them,
+  // `foe=h&at=420` freezes the opponent that far into an attack
+  const lock = params.get('lock');
+  if (lock !== null) {
+    const d = Number(lock) || 3;
+    models.forEach((m, i) => {
+      m.root.position.set(0, 0, i === 0 ? -d / 2 : d / 2);
+      m.root.rotation.y = i === 0 ? 0 : Math.PI;
+    });
+    const foeKey = params.get('foe');
+    const foeAtk = foeKey ? getAttack(models[1].char, foeKey as AttackKey) : null;
+    if (foeAtk) {
+      const at = Number(params.get('at') ?? foeAtk.windup);
+      for (let t = 0; t <= at; t += 10) {
+        models[1].update({ ...IDLE, state: 'attack', elapsed: t, dur: foeAtk.windup + foeAtk.active + foeAtk.recovery, attack: foeAtk, windup: foeAtk.windup, key: foeKey!, serial: 1 }, 0.01);
+      }
+    }
+    const rig = new CameraRig(r.camera);
+    const blockers = buildBlockers(map);
+    rig.constrain = (from, to, wallsOnly) => constrainCamera(map, wallsOnly ? [] : blockers, from, to);
+    rig.subjectScale = models[0].scale;
+    rig.targetScale = models[1].scale;
+    const me = models[0].root.position;
+    const foe = models[1].root.position;
+    rig.snapBehind(0);
+    for (let i = 0; i < 120; i++) rig.update(1 / 60, me, foe);
+    const loopLock = () => {
+      view.update(0.016, r.camera.position);
+      r.render();
+      requestAnimationFrame(loopLock);
+    };
+    loopLock();
+    return;
+  }
   if (shotT !== null) {
     // the game's own camera rig, run straight to that moment
     const rig = new CameraRig(r.camera);
     const blockers = buildBlockers(map);
     rig.constrain = (from, to, wallsOnly) => constrainCamera(map, wallsOnly ? [] : blockers, from, to);
-    rig.playShots(introShots(subjects[0], subjects[1], rig.restPose(subjects[0].pos, subjects[1].pos)));
+    rig.playShots(introSequence(subjects[0], subjects[1], rig.restPose(subjects[0].pos, subjects[1].pos)));
     rig.update(Number(shotT), subjects[0].pos, subjects[1].pos);
+    const at = entranceStarts();
+    const tMs = Number(shotT) * 1000;
+    models.forEach((m, i) => {
+      const start = i === 0 ? at.me : at.op;
+      for (let t = 0; t <= tMs; t += 16) {
+        const e = t - start;
+        m.update(e >= 0 && e < ENTRANCE_MS ? { ...IDLE, elapsed: e, dur: ENTRANCE_MS, entrance: true } : { ...IDLE, elapsed: t }, 0.016);
+      }
+    });
     const loopShot = () => {
       view.update(0.016, r.camera.position);
       r.render();

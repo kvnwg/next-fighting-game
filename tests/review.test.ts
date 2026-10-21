@@ -1,7 +1,7 @@
 /** Regression tests for issues found in the netcode review. */
 import { describe, expect, it } from 'vitest';
 import { applyHit, decideOutcome, defenseAt, pruneDefenseLog, pushDefense } from '../src/shared/combat';
-import { COMBAT } from '../src/shared/config';
+import { COMBAT, MATCH } from '../src/shared/config';
 import { DefenseEvent, Fighter } from '../src/shared/fighter';
 import { CharacterId } from '../src/shared/characters';
 import { ServerMsg } from '../src/shared/protocol';
@@ -104,7 +104,7 @@ function setup(a: CharacterId, b: CharacterId) {
       game.tick();
     }
   };
-  step(7000); // intro + countdown
+  step(MATCH.introTime + MATCH.countdownTime + 500); // intro + countdown
   expect(arena.phase).toBe('fight');
   return { game, arena, pa, pb, fa: arena.slots[0] as ServerFighter, fb: arena.slots[1] as ServerFighter, inboxA, step, now: () => t };
 }

@@ -6,7 +6,7 @@
  * from the air, a throat grab with a reverse-grip finish, and a shadow step that reappears in smoke.
  */
 import { B, K, P, Style, X, arc, fx, hitAt, line, mv, seq } from '../author';
-import type { V3 } from '../author';
+import type { Motion, V3 } from '../author';
 
 const body = B({ front: 'L', step: 0.26, back: 0.3, width: 0.16, crouch: -0.2, lean: 0.24, twist: -0.1 });
 const R_SH: V3 = [-0.3, 0.48, 0.0];
@@ -64,6 +64,23 @@ const fall = (x: number) =>
     [0.0, 0.45, line([x * 0.13, 1.04, 0.0], [x * 0.1, -0.1, 0.5], [0, -0.92, 0.38], [x * -0.05, -1, 0.18], [0, 0, 1], NaN, NaN, { body: true })],
     [0.45, 1.07, line([x * 0.1, -0.1, 0.5], [x * 0.1, -0.12, 0.52], [x * -0.05, -1, 0.18], [x * -0.05, -1, 0.18], [0, 0, 1], NaN, NaN, { body: true })],
   ]);
+
+/** A blade keyed along s (the entrance): straight moves between keyed grips [s, pos, dir, edge], held outside them. */
+type Grip = [number, V3, V3, V3];
+const keyed = (ks: Grip[], blend = 0.03): Motion => {
+  const hold = (k: Grip, from: number, to: number): [number, number, Motion] => [from, to, line(k[1], k[1], k[2], k[2], k[3])];
+  const parts: [number, number, Motion][] = [hold(ks[0], ks[0][0] - 1, ks[0][0])];
+  for (let i = 1; i < ks.length; i++) parts.push([ks[i - 1][0], ks[i][0], line(ks[i - 1][1], ks[i][1], ks[i - 1][2], ks[i][2], ks[i][3])]);
+  parts.push(hold(ks[ks.length - 1], ks[ks.length - 1][0], ks[ks.length - 1][0] + 1));
+  return seq(parts, blend);
+};
+
+// Entrance blades: sheathed-looking in reverse grip along the forearms, drawn from the right thigh
+// and the small of the back, then crossed point-down in front of the hood
+const SHEATH_R: V3 = [-0.1, -0.3, -1];
+const SHEATH_L: V3 = [0.1, -0.3, -1];
+const UP: V3 = [0, 1, 0];
+const FWD: V3 = [0, 0, 1];
 
 export const daggers: Style = {
   axis: 'y',
@@ -378,5 +395,66 @@ export const daggers: Style = {
     rest: 1,
     fx: [fx(0.8, 'smoke', 'feet', 1.2)],
   }),
+  // Ring entrance, From Above: out of smoke he drops from high overhead through a front flip into a
+  // low landing crouch, stays down with the head bowed and rises slowly as the hands go to the
+  // sheaths, then both blades are drawn in reverse grip and crossed point-down before the hood
+  entrance: mv({
+    keys: [
+      // the drop
+      K(0.0, B({ ...body, crouch: -0.04, lean: 0.0, twist: 0, step: 0.12, back: 0.12, width: 0.1, headPitch: 0.3 }), { hop: 3.4, flip: 0 }),
+      K(0.09, B({ ...body, crouch: -0.12, lean: 0.3, twist: 0, step: 0.06, back: 0.06, width: 0.1, headPitch: 0.4 }), { hop: 3.1, flip: 0.2 }),
+      K(0.17, B({ ...body, crouch: -0.2, lean: 0.5, twist: 0, step: 0.04, back: 0.04, width: 0.1, headPitch: 0.4 }), { hop: 2.2, flip: 0.65 }),
+      K(0.24, B({ ...body, crouch: -0.1, lean: 0.15, twist: 0, step: 0.16, back: 0.16, width: 0.16, headPitch: 0.2 }), { hop: 0.95, flip: 0.95 }),
+      K(0.29, B({ ...body, crouch: -0.2, lean: 0.25, twist: 0, step: 0.24, back: 0.28, width: 0.22, headPitch: 0.3 }), { hop: 0, flip: 1 }),
+      // the landing crouch, head down
+      K(0.33, B({ ...body, crouch: -0.56, lean: 0.62, twist: 0.05, step: 0.32, back: 0.38, width: 0.26, headPitch: 0.55 }), { hop: 0 }),
+      K(0.48, B({ ...body, crouch: -0.54, lean: 0.6, twist: 0.05, step: 0.32, back: 0.38, width: 0.26, headPitch: 0.6 })),
+      // rising slowly, the hands going to the sheaths
+      K(0.68, B({ ...body, crouch: -0.3, lean: 0.3, twist: -0.05, step: 0.28, back: 0.32, width: 0.2, headPitch: 0.3 })),
+      // the draw, crossed before the hood
+      K(0.76, B({ ...body, crouch: -0.24, lean: 0.12, twist: 0, step: 0.24, back: 0.3, width: 0.18, headPitch: -0.05 })),
+      K(0.86, B({ ...body, crouch: -0.26, lean: 0.14, twist: 0, step: 0.24, back: 0.3, width: 0.18, headPitch: -0.05 })),
+      K(0.97, body),
+    ],
+    main: keyed([
+      [0.0, [-0.3, 0.3, 0.1], SHEATH_R, UP],
+      [0.12, [-0.16, 0.34, 0.24], [-0.05, -0.4, -1], UP],
+      [0.24, [-0.2, 0.32, 0.18], [-0.05, -0.4, -1], UP],
+      [0.3, [-0.42, 0.34, -0.02], [-0.3, -0.3, -1], UP],
+      // the right arm held back for balance on landing
+      [0.34, [-0.4, 0.18, -0.16], [-0.2, -0.2, -1], UP],
+      [0.5, [-0.38, 0.16, -0.12], [-0.2, -0.2, -1], UP],
+      // down to the right thigh
+      [0.68, [-0.26, -0.02, 0.06], [0, -1, -0.2], FWD],
+      // drawn, raised and crossed point-down in front of the hood
+      [0.76, [-0.17, 0.76, 0.34], [0.7, -0.55, 0.3], FWD],
+      [0.86, [-0.17, 0.74, 0.34], [0.7, -0.55, 0.3], FWD],
+      [0.97, [-0.22, 0.28, 0.3], [0.15, 0.35, 1], [0, -1, 0.2]],
+    ]),
+    off: keyed([
+      [0.0, [0.3, 0.3, 0.1], SHEATH_L, UP],
+      [0.12, [0.16, 0.34, 0.24], [0.05, -0.4, -1], UP],
+      [0.24, [0.2, 0.32, 0.18], [0.05, -0.4, -1], UP],
+      [0.3, [0.3, 0.1, 0.3], [0.1, -0.3, -1], UP],
+      // the left hand down to the ground on landing
+      [0.34, [0.22, -0.06, 0.42], [0.2, -0.3, -1], UP],
+      [0.5, [0.22, -0.06, 0.42], [0.2, -0.3, -1], UP],
+      // round to the small of the back
+      [0.68, [0.24, 0.02, -0.14], [-0.2, -0.6, -0.8], UP],
+      [0.76, [0.17, 0.78, 0.37], [-0.7, -0.55, 0.3], FWD],
+      [0.86, [0.17, 0.76, 0.37], [-0.7, -0.55, 0.3], FWD],
+      [0.97, [0.2, 0.35, 0.36], [-0.15, 0.3, 1], [0, -1, 0.2]],
+    ]),
+    lead: 0,
+    ghosts: [0.04, 0.3],
+    fx: [
+      fx(0.0, 'smoke', 'root', 1.4),
+      fx(0.31, 'dust', 'feet', 1.1),
+      fx(0.31, 'smoke', 'feet', 1.3),
+      fx(0.31, 'stomp', 'feet', 0.5),
+      fx(0.74, 'smoke', 'feet', 0.6),
+      fx(0.77, 'sparkle', 'tip', 0.9, '#ff2a6a'),
+      fx(0.78, 'sparkle', 'offTip', 0.9, '#ff2a6a'),
+    ],
+  }),
 };
-

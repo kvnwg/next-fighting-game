@@ -24,7 +24,28 @@ type Sfx =
   | 'burn'
   | 'blink'
   | 'buff'
-  | 'death';
+  | 'death'
+  // ring entrances
+  | 'wind'
+  | 'taiko'
+  | 'tink'
+  | 'draw'
+  | 'rumble'
+  | 'stomp'
+  | 'whoosh'
+  | 'gong'
+  | 'pluck'
+  | 'shing'
+  | 'chime'
+  | 'thunder'
+  | 'zap'
+  | 'whisper'
+  | 'scrape'
+  | 'bell'
+  | 'breath'
+  | 'thump'
+  | 'fanfare'
+  | 'clang';
 
 class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -39,7 +60,8 @@ class AudioEngine {
       this.ctx = new Ctx();
       this.master = this.ctx.createGain();
       this.master.connect(this.ctx.destination);
-      const len = this.ctx.sampleRate;
+      // long enough for the entrance swells; bursts loop it besides
+      const len = this.ctx.sampleRate * 3;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const d = this.noise.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -84,6 +106,7 @@ class AudioEngine {
     const t = ctx.currentTime + delay;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
+    src.loop = true;
     const bq = ctx.createBiquadFilter();
     bq.type = filter;
     bq.Q.value = q;
@@ -197,6 +220,84 @@ class AudioEngine {
         break;
       case 'death':
         this.tone('triangle', 300, 60, 0.8, 0.3 * v);
+        break;
+      case 'wind':
+        this.noiseBurst(2.2, 0.12 * v, 'bandpass', 500, 900, 2.5);
+        this.noiseBurst(1.6, 0.08 * v, 'bandpass', 1400, 700, 4, 0.5);
+        break;
+      case 'taiko':
+        this.tone('sine', 110, 45, 0.7, 0.8 * v);
+        this.noiseBurst(0.15, 0.4 * v, 'lowpass', 900, 120);
+        break;
+      case 'tink':
+        this.ring(2600, 0.35, 0.18 * v);
+        break;
+      case 'draw':
+        this.noiseBurst(0.35, 0.3 * v, 'highpass', 2500, 7000, 0.8);
+        this.ring(1800, 0.6, 0.14 * v);
+        break;
+      case 'rumble':
+        this.tone('sine', 42, 36, 2.0, 0.5 * v);
+        this.noiseBurst(2.0, 0.25 * v, 'lowpass', 220, 90, 0.7);
+        break;
+      case 'stomp':
+        this.tone('sine', 80, 32, 0.45, 0.9 * v);
+        this.noiseBurst(0.2, 0.45 * v, 'lowpass', 700, 80);
+        break;
+      case 'whoosh':
+        this.noiseBurst(0.5, 0.35 * v, 'bandpass', 300, 2400, 1.1);
+        break;
+      case 'gong':
+        this.ring(95, 2.6, 0.5 * v);
+        this.tone('sine', 48, 44, 2.4, 0.5 * v);
+        break;
+      case 'pluck':
+        [784, 988, 1175, 1568, 1319].forEach((f, i) => this.tone('triangle', f, f, 0.16, 0.12 * v, i * 0.11));
+        break;
+      case 'shing':
+        this.noiseBurst(0.28, 0.25 * v, 'highpass', 4000, 9000, 0.7);
+        this.ring(2200, 0.7, 0.16 * v);
+        break;
+      case 'chime':
+        this.ring(1320, 1.6, 0.14 * v);
+        break;
+      case 'thunder':
+        this.noiseBurst(0.12, 0.9 * v, 'highpass', 1200, 400);
+        this.noiseBurst(2.4, 0.7 * v, 'lowpass', 1600, 60, 0.6, 0.05);
+        this.tone('sine', 55, 30, 1.8, 0.6 * v, 0.05);
+        break;
+      case 'zap':
+        this.tone('sawtooth', 1800, 300, 0.18, 0.12 * v);
+        this.noiseBurst(0.16, 0.25 * v, 'highpass', 3500, 1500);
+        break;
+      case 'whisper':
+        this.noiseBurst(1.4, 0.14 * v, 'bandpass', 3000, 5200, 6);
+        this.noiseBurst(1.2, 0.1 * v, 'bandpass', 4400, 2600, 6, 0.25);
+        break;
+      case 'scrape':
+        this.noiseBurst(1.1, 0.25 * v, 'bandpass', 1800, 900, 3);
+        this.tone('sawtooth', 220, 180, 1.0, 0.04 * v);
+        break;
+      case 'bell':
+        this.ring(330, 2.8, 0.35 * v);
+        break;
+      case 'breath':
+        this.noiseBurst(1.5, 0.16 * v, 'lowpass', 1100, 300, 0.8);
+        this.tone('sawtooth', 73, 70, 1.6, 0.05 * v);
+        break;
+      case 'thump':
+        this.tone('sine', 70, 28, 0.6, 1.0 * v);
+        this.noiseBurst(0.35, 0.5 * v, 'lowpass', 500, 60);
+        break;
+      case 'fanfare':
+        [392, 523, 659, 784].forEach((f, i) => {
+          this.tone('sawtooth', f, f, i === 3 ? 0.7 : 0.2, 0.07 * v, i * 0.16);
+          this.tone('square', f / 2, f / 2, i === 3 ? 0.7 : 0.2, 0.04 * v, i * 0.16);
+        });
+        break;
+      case 'clang':
+        this.ring(640, 0.9, 0.3 * v);
+        this.noiseBurst(0.08, 0.5 * v, 'highpass', 3000, 5000);
         break;
     }
   }

@@ -66,7 +66,7 @@ export class Arena extends Instance {
     this.slots = [fa, fb];
     this.humans = [a, b];
     this.rosters = [fa.roster(), fb.roster()];
-    this.setPhase('intro', game.now() + MATCH.introTime);
+    this.setPhase('intro', game.now() + (game.options.introTime ?? MATCH.introTime));
   }
 
   isFrozen(): boolean {

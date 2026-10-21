@@ -125,6 +125,9 @@ export type FxKind =
   | 'holy' // a golden flare and light shafts
   | 'roar' // a red pulse and shockwave from the fighter
   | 'chain' // a spectral chain flung straight ahead (scale = metres)
+  | 'bolt' // a lightning bolt from the sky onto the anchor (gold unless coloured)
+  | 'fog' // low mist rolling out across the ground
+  | 'embers' // sparks and embers rising around the fighter
   | 'shake'; // camera shake only
 
 export type FxAnchor = 'tip' | 'main' | 'off' | 'offTip' | 'kick' | 'feet' | 'root' | 'front';
@@ -210,6 +213,8 @@ export interface Style {
   vanish?: MoveDef;
   /** the buff roar */
   roar?: MoveDef;
+  /** the ring entrance: played once from s=0 to 1 over ENTRANCE_MS while the intro camera is on them */
+  entrance?: MoveDef;
   /** trail colours: lights, heavies/abilities, perilous specials */
   trail: { light: string; heavy: string; special: string };
   /** spark colours this weapon throws on impact */

@@ -7,7 +7,9 @@ import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
 import { audio, Sfx } from './audio';
-import { CameraRig, introShots } from './camera';
+import { CameraRig } from './camera';
+import { CARD_AT, ENTRANCES, entranceStarts, introSequence } from './entrances';
+import { ENTRANCE_MS } from './render/anim/animator';
 import { buildBlockers, constrainCamera } from './cameraClip';
 import { ClientFighter } from './entities';
 import { Bind, Input } from './input';
@@ -53,6 +55,8 @@ class App {
   private kind: 'lobby' | 'arena' | null = null;
   private match: MatchMsg | null = null;
   private lastCountdown = -1;
+  /** the ring entrances playing in the match intro: whose, when, and which cues have fired */
+  private intro: { start: number; turns: { f: ClientFighter; r: RosterEntry; mine: boolean; at: number }[]; fired: Set<string> } | null = null;
   private queue: { since: number; count: number } | null = null;
   private lock: ClientFighter | null = null;
   private online = 0;
@@ -275,6 +279,7 @@ class App {
 
   private enterInstance(m: Extract<ServerMsg, { t: 'enter' }>): void {
     this.cam.stopShots();
+    this.endEntrances();
     this.select.hide();
     this.clearFighters();
     const map = Object.prototype.hasOwnProperty.call(MAPS, m.map) ? MAPS[m.map] : LOBBY_MAP;
@@ -362,19 +367,18 @@ class App {
         // a close-up on them, one on you, and back behind your shoulder for the countdown
         const me = this.fighters.get(this.myId);
         const op = this.fighters.get(oppId);
-        if (me && op) {
-          const end = this.cam.restPose(me.pos, op.pos);
-          this.cam.playShots(introShots({ pos: me.pos, yaw: me.yaw, scale: me.model.scale }, { pos: op.pos, yaw: op.yaw, scale: op.model.scale }, end));
-        }
+        if (me && op) this.startEntrances(m, me, op);
         break;
       }
       case 'countdown':
+        this.endEntrances();
         this.lastCountdown = -1;
         this.lock = this.fighters.get(oppId) ?? null;
         break;
       case 'fight':
         // a slow device can still be mid-intro: the fight always starts on the follow camera
         this.cam.stopShots();
+        this.endEntrances();
         this.ui.banner('Fight', '', 900, 'fight', '始め');
         audio.play('fight');
         this.lock = this.fighters.get(oppId) ?? null;
@@ -387,6 +391,60 @@ class App {
       case 'matchEnd':
         this.ui.hideBanner();
         break;
+    }
+  }
+
+  /** The wide shot, the opponent's ring entrance, then yours, then round behind your shoulder. */
+  private startEntrances(m: MatchMsg, me: ClientFighter, op: ClientFighter): void {
+    const start = m.endsAt - MATCH.introTime;
+    const at = entranceStarts();
+    const mine = m.players[m.you];
+    const theirs = m.players[m.you === 0 ? 1 : 0];
+    me.entrance = { start: start + at.me, dur: ENTRANCE_MS };
+    op.entrance = { start: start + at.op, dur: ENTRANCE_MS };
+    this.intro = {
+      start,
+      turns: [
+        { f: op, r: theirs, mine: false, at: start + at.op },
+        { f: me, r: mine, mine: true, at: start + at.me },
+      ],
+      fired: new Set(),
+    };
+    const subject = (f: ClientFighter) => ({ pos: f.pos, yaw: f.yaw, scale: f.model.scale, char: f.roster.char });
+    const end = this.cam.restPose(me.pos, op.pos);
+    this.cam.playShots(introSequence(subject(me), subject(op), end), Math.max(0, this.net.serverNow() - start) / 1000);
+    this.ui.setCinematic(true);
+  }
+
+  private endEntrances(): void {
+    if (!this.intro) return;
+    for (const t of this.intro.turns) t.f.entrance = null;
+    this.intro = null;
+    this.ui.setCinematic(false);
+  }
+
+  /** Each entrance's sounds and its name card, fired as it plays. */
+  private entranceCues(now: number): void {
+    const intro = this.intro;
+    if (!intro) return;
+    if (now > intro.start + MATCH.introTime + 500) return this.endEntrances();
+    for (const t of intro.turns) {
+      const s = (now - t.at) / ENTRANCE_MS;
+      if (s < 0 || s > 1) continue;
+      const e = ENTRANCES[t.r.char];
+      // a cue more than a beat late (a slow frame, joining late) is dropped, not bunched up
+      e.sfx.forEach((c, i) => {
+        const key = `${t.r.id}:${i}`;
+        if (s >= c.s && s < c.s + 0.12 && !intro.fired.has(key)) {
+          intro.fired.add(key);
+          audio.play(c.sound, c.vol ?? 1);
+        }
+      });
+      const key = `${t.r.id}:card`;
+      if (s >= CARD_AT && s < CARD_AT + 0.15 && !intro.fired.has(key)) {
+        intro.fired.add(key);
+        this.ui.nameCard(t.r, t.mine, e.title, e.line, (1 - CARD_AT) * ENTRANCE_MS + 250);
+      }
     }
   }
 
@@ -745,6 +803,19 @@ class App {
         case 'shake':
           this.shakeNear(f, 0.1 * sc, 0.15);
           break;
+        case 'bolt':
+          pos.y = Math.max(0, f.pos.y);
+          fx.bolt(pos, cue.color ?? '#ffe27a', sc);
+          this.renderer.flash = Math.max(this.renderer.flash, Math.min(0.6, 0.45 * sc));
+          this.renderer.flashColor.set('#fff8e0');
+          this.shakeNear(f, 0.2 * sc, 0.3);
+          break;
+        case 'fog':
+          fx.fog(f.pos, sc, cue.color);
+          break;
+        case 'embers':
+          fx.embers(f.pos, sc, cue.color);
+          break;
       }
     }
     f.fxQueue.length = 0;
@@ -809,6 +880,7 @@ class App {
     const mouse = this.input.consumeMouse();
     this.cam.addMouse(mouse.dx, mouse.dy, settings.sensitivity, settings.invertY, !!this.lock);
     this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open;
+    this.entranceCues(now);
     const left = this.select.tick(now);
     if (left !== null && left > 0 && left <= 3) audio.play('countdown', 0.5);
 
@@ -841,6 +913,7 @@ class App {
       const p = this.local.cf.pos;
       this.cam.shakeScale = settings.reduceShake ? 0.35 : this.touch ? 0.8 : 1;
       this.cam.subjectScale = this.local.cf.model.scale;
+      this.cam.targetScale = this.lock?.model.scale ?? 1;
       this.cam.update(dt, p, this.lock ? this.lock.pos : null, { dodging: this.local.sim.state === 'dodge' });
       this.mapView?.update(dt, p);
     } else {

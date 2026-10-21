@@ -342,6 +342,47 @@ export class Effects {
     }
   }
 
+  /** A lightning bolt from the sky onto `pos`: a jagged main channel, a few forks, a flash and a scorch ring. */
+  bolt(pos: THREE.Vector3, color = '#ffe27a', scale = 1): void {
+    const top = new THREE.Vector3(pos.x + (Math.random() - 0.5) * 2, pos.y + 16, pos.z + (Math.random() - 0.5) * 2);
+    let a = top;
+    const steps = 9;
+    for (let i = 1; i <= steps; i++) {
+      const k = i / steps;
+      const j = i === steps ? 0 : 0.7 * (1 - k * 0.6);
+      const b = new THREE.Vector3(top.x + (pos.x - top.x) * k + (Math.random() - 0.5) * j, top.y + (pos.y - top.y) * k, top.z + (pos.z - top.z) * k + (Math.random() - 0.5) * j);
+      this.beam(a, b, color, 0.12 * scale, 0.32);
+      this.beam(a, b, '#ffffff', 0.04 * scale, 0.26);
+      if (i > 2 && i < steps && Math.random() < 0.45) {
+        const fork = b.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.4, -1.4 - Math.random(), (Math.random() - 0.5) * 2.4));
+        this.beam(b, fork, color, 0.05 * scale, 0.22);
+      }
+      a = b;
+    }
+    this.flash(new THREE.Vector3(pos.x, pos.y + 0.6, pos.z), '#fff6d0', 4 * scale, 0.25);
+    this.ring(pos, color, 2.6 * scale, 0.5, undefined, true);
+    this.spray(new THREE.Vector3(pos.x, pos.y + 0.1, pos.z), new THREE.Vector3(0, 1, 0), [color, '#ffffff'], 26 * scale, 6, 1.2, { life: 0.5, size: 0.05, gravity: 9, stretch: 0.05 });
+  }
+
+  /** Low mist rolling out across the ground. */
+  fog(pos: THREE.Vector3, scale = 1, color = '#b8c0cc'): void {
+    for (let i = 0; i < 34 * scale; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * 0.8;
+      const sp = 0.4 + Math.random() * 1.1;
+      this.emit(pos.x + Math.cos(a) * r, 0.05 + Math.random() * 0.25, pos.z + Math.sin(a) * r, Math.cos(a) * sp, 0.03, Math.sin(a) * sp, i % 3 ? color : '#8a92a0', { life: 2.6, size: 0.3 * scale, drag: 0.7, grow: 3.2 });
+    }
+  }
+
+  /** Sparks and embers rising around a fighter. */
+  embers(pos: THREE.Vector3, scale = 1, color = '#ff9a3a'): void {
+    for (let i = 0; i < 28 * scale; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 0.3 + Math.random() * 1.1;
+      this.emit(pos.x + Math.cos(a) * r, 0.1 + Math.random() * 1.4, pos.z + Math.sin(a) * r, Math.cos(a) * 0.3, 0.8 + Math.random() * 1.4, Math.sin(a) * 0.3, i % 4 ? color : '#ffe2a0', { life: 1.4, size: 0.04, gravity: -0.6, drag: 0.8 });
+    }
+  }
+
   /** Soul wisps rising and curling away. */
   wisps(pos: THREE.Vector3, color = '#7cffb2', scale = 1): void {
     for (let i = 0; i < 12 * scale; i++) {

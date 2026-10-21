@@ -44,6 +44,8 @@ export interface GameOptions {
   arena?: string;
   /** How long the map and fighter select stays open before a match (ms). */
   selectTime?: number;
+  /** How long the match intro (the ring entrances) runs (ms). */
+  introTime?: number;
 }
 
 export class Game {

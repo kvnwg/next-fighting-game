@@ -108,6 +108,31 @@ const thunderfall = seq(
 );
 const fallHit = hitAt(thunderfall, 3, 1);
 
+// Entrance: planted upright beside the kneeling body where the bolt struck, wrenched out, twirled
+// once in both hands across the front, then raised and its butt spike slammed into the floor
+const UPRIGHT: V3 = [0.04, 1, 0.08];
+const IN_PLANT: V3 = [-0.42, 0.28, 0.22];
+const IN_LIFT: V3 = [-0.36, 0.6, 0.3];
+const IN_RAISE: V3 = [-0.3, 0.5, 0.32];
+const IN_SLAM: V3 = [-0.3, 0.04, 0.32];
+const IN_STAND: V3 = [-0.32, -0.08, 0.3];
+// the twirl's plane leans back, so the blade passes low in front and high behind the head
+const TWIRL_UP: V3 = [0, 0.7, -0.72];
+const entranceSpear = seq(
+  [
+    [0.0, 0.34, line(IN_PLANT, [-0.42, 0.27, 0.22], UPRIGHT, UPRIGHT, FLAT, NaN, NaN, { body: true })],
+    [0.34, 0.42, line(IN_PLANT, IN_LIFT, UPRIGHT, [0.1, 1, 0.1], FLAT, NaN, NaN, { body: true })],
+    [0.42, 0.47, line(IN_LIFT, [-0.1, 0.41, 0.52], [0.1, 1, 0.1], TWIRL_UP, FLAT, 0.3, 0.6, { body: true })],
+    [0.47, 0.65, arc([-0.1, 0.62, 0.3], -0.3, circle(TWIRL_UP, [-1, 0, 0], 1, 0, 12), 0.6, { body: true })],
+    [0.65, 0.71, line([-0.1, 0.41, 0.52], IN_RAISE, TWIRL_UP, UPRIGHT, FLAT, 0.6, 0.6, { body: true })],
+    [0.71, 0.76, line(IN_RAISE, IN_SLAM, UPRIGHT, UPRIGHT, FLAT, 0.6, 0.6, { body: true })],
+    [0.76, 0.82, line(IN_SLAM, IN_STAND, UPRIGHT, UPRIGHT, FLAT, 0.6, NaN, { body: true })],
+    [0.82, 0.9, line(IN_STAND, [-0.32, -0.08, 0.3], UPRIGHT, UPRIGHT, FLAT, NaN, NaN, { body: true })],
+    [0.9, 1.0, line([-0.32, -0.08, 0.3], [-0.22, 0.2, -0.05], UPRIGHT, [0.05, 0.12, 1], FLAT, NaN, 0.55, { body: true })],
+  ],
+  0.025,
+);
+
 export const spear: Style = {
   axis: 'x',
   offAxis: 'x',
@@ -403,5 +428,47 @@ export const spear: Style = {
     ghosts: [0.1, 0.9],
     fx: [fx(0.05, 'dust', 'feet', 1.0), fx(0.98, 'dust', 'feet', 0.9)],
     trail: { life: 0.2, glow: 0.4 },
+  }),
+  // Entrance: revealed kneeling where the lightning struck, head bowed and the spear planted beside
+  // him; he wrenches it free, twirls it once across his front, and slams the butt spike down
+  entrance: mv({
+    keys: [
+      K(0.0, B({ ...body, twist: -0.35, crouch: -0.5, lean: 0.34, step: 0.34, back: 0.36, width: 0.22, headPitch: 0.45 })),
+      K(0.3, B({ ...body, twist: -0.35, crouch: -0.51, lean: 0.36, step: 0.34, back: 0.36, width: 0.22, headPitch: 0.5 })),
+      K(0.37, B({ ...body, twist: -0.3, crouch: -0.3, lean: 0.14, step: 0.3, back: 0.3, width: 0.18, headPitch: 0.1 })),
+      K(0.44, B({ ...body, twist: -0.2, crouch: -0.14, lean: 0.0, step: 0.26, back: 0.26, width: 0.16, headPitch: -0.04 })),
+      K(0.56, B({ ...body, twist: -0.05, crouch: -0.16, lean: 0.02, step: 0.26, back: 0.26, width: 0.16 })),
+      K(0.65, B({ ...body, twist: -0.25, crouch: -0.14, lean: 0.0, step: 0.26, back: 0.26, width: 0.16 })),
+      K(0.71, B({ ...body, twist: -0.3, crouch: -0.06, lean: -0.08, step: 0.24, back: 0.24, width: 0.16, headPitch: -0.06 })),
+      K(0.76, B({ ...body, twist: -0.3, crouch: -0.22, lean: 0.12, step: 0.28, back: 0.28, width: 0.2, headPitch: 0.04 })),
+      K(0.82, B({ ...body, twist: -0.3, crouch: -0.03, lean: -0.06, step: 0.22, back: 0.22, width: 0.16, headPitch: -0.12 })),
+      K(0.9, B({ ...body, twist: -0.3, crouch: -0.03, lean: -0.06, step: 0.22, back: 0.22, width: 0.16, headPitch: -0.12 })),
+      K(1.0, B({ ...body })),
+    ],
+    main: entranceSpear,
+    // the left hand braced on the knee, then on the shaft for the twirl and slam, then a fist at the hip
+    free: track([
+      [0.0, [0.22, -0.02, 0.36]],
+      [0.34, [0.22, -0.02, 0.36]],
+      [0.42, [0.28, 0.2, 0.2]],
+      [0.8, [0.26, 0.2, 0.2]],
+      [0.86, [0.28, 0.02, 0.04]],
+      [0.95, [0.28, 0.02, 0.04]],
+    ]),
+    lead: 0,
+    ghosts: [0.47, 0.65],
+    fx: [
+      fx(0.02, 'bolt', 'root', 1.4),
+      fx(0.02, 'shockwave', 'root', 0.8, BOLT),
+      fx(0.04, 'dust', 'feet', 1.4),
+      fx(0.2, 'sparkle', 'tip', 0.6, BOLT),
+      fx(0.38, 'dust', 'feet', 0.8),
+      fx(0.5, 'sparkle', 'tip', 0.8, BOLT),
+      fx(0.56, 'bolt', 'tip', 0.5),
+      fx(0.62, 'sparkle', 'tip', 0.8, BOLT),
+      fx(0.76, 'shockwave', 'feet', 1.2, BOLT),
+      fx(0.76, 'bolt', 'root', 1.0),
+      fx(0.77, 'embers', 'root', 0.8, BOLT),
+    ],
   }),
 };

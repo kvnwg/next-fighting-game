@@ -110,7 +110,8 @@ export const MATCH = {
   roundsToWin: 2,
   /** Drawn rounds don't count; after this many rounds the leader (or healthier fighter) wins. */
   maxRounds: 5,
-  introTime: 3500,
+  /** a wide shot, both ring entrances (see client/entrances.ts) and the swing behind you */
+  introTime: 9800,
   countdownTime: 3000,
   roundTime: 90_000,
   roundEndTime: 3500,
