@@ -60,6 +60,7 @@ export class Hud {
   private readonly postureL: HTMLElement;
   private readonly postureR: HTMLElement;
   private readonly postureGlow: HTMLElement;
+  private readonly postureRoot: HTMLElement;
   private readonly shield: HTMLElement;
   private readonly charges: HTMLElement[];
   private readonly crit: HTMLElement;
@@ -132,6 +133,7 @@ export class Hud {
     this.postureL = this.root.querySelector('.posture-bar.l > div')!;
     this.postureR = this.root.querySelector('.posture-bar.r > div')!;
     this.postureGlow = this.root.querySelector('.posture-glow')!;
+    this.postureRoot = this.root.querySelector('.posture')!;
     this.shield = this.root.querySelector('.shield')!;
     this.charges = [...this.root.querySelectorAll<HTMLElement>('.charge')];
     this.crit = this.root.querySelector('.crit-ready')!;
@@ -265,9 +267,10 @@ export class Hud {
     this.postureL.style.width = pct;
     this.postureR.style.width = pct;
     const frac = mine / MAX_POSTURE;
-    const broken = state.broken[this.you] || frac >= 0.85;
-    this.shield.classList.toggle('broken', broken);
-    this.shield.classList.toggle('cracked', !broken && frac >= 0.6);
+    const shattered = frac >= 0.85;
+    this.shield.classList.toggle('broken', shattered);
+    this.shield.classList.toggle('cracked', !shattered && frac >= 0.6);
+    this.postureRoot.classList.toggle('broken', state.broken[this.you]);
     this.charges.forEach((c, k) => c.classList.toggle('empty', k >= state.dodgeCharges));
     this.crit.classList.toggle('cooling', !state.critReady);
 

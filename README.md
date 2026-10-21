@@ -34,7 +34,7 @@ npm run start:server # production server (PORT env var, default 2567)
 | Jump, then attack for a plunge | Space | JUMP |
 | Menu | P or the pause button | Pause button |
 
-Drag on the right half of a touch screen to look around. The settings menu has volume sliders, graphics quality and a reduce shake and flashes option, plus a left-handed layout on touch devices.
+The camera holds a fixed angle behind your shoulder and swings wider only when your fighter would hide the opponent. The settings menu has volume sliders, graphics quality and a reduce shake and flashes option, plus a left-handed layout on touch devices.
 
 ## How a match flows
 

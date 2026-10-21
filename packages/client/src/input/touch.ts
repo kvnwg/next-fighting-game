@@ -27,8 +27,6 @@ export class TouchControls {
   private knob: HTMLElement;
   private stickId: number | null = null;
   private stickOrigin = { x: 0, y: 0 };
-  private lookId: number | null = null;
-  private lookX = 0;
   private lightHeldFor = -1;
   private repeatTimer = 0;
 
@@ -105,9 +103,6 @@ export class TouchControls {
       this.base.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
       this.base.classList.add('active');
       this.knob.style.transform = 'translate(0px, 0px)';
-    } else if (!stickSide && this.lookId === null) {
-      this.lookId = e.pointerId;
-      this.lookX = e.clientX;
     }
   };
 
@@ -122,15 +117,11 @@ export class TouchControls {
       }
       this.knob.style.transform = `translate(${dx}px, ${dy}px)`;
       this.input.touchStick(dx / STICK_RADIUS, -dy / STICK_RADIUS);
-    } else if (e.pointerId === this.lookId) {
-      this.input.look += (e.clientX - this.lookX) / window.innerWidth;
-      this.lookX = e.clientX;
     }
   };
 
   private onZoneUp = (e: PointerEvent): void => {
     if (e.pointerId === this.stickId) this.resetStick();
-    if (e.pointerId === this.lookId) this.lookId = null;
   };
 
   private resetStick(): void {

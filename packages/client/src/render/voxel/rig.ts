@@ -99,6 +99,21 @@ interface Limb {
   pole: Vector3;
 }
 
+const TRUNK = new Set(['pelvis', 'torso']);
+/** Weapons some bodies carry (a sheathed blade, a prop held for the character sheet). */
+const CARRIED = /hammer|scythe|spear|katana|rapier|dagger|sword|shield|lightning/i;
+
+function bodySize(model: VoxelModel): { height: number; halfWidth: number } {
+  let top = 0;
+  let side = 0;
+  for (const v of model.voxels) {
+    if (!CARRIED.test(v.bone)) top = Math.max(top, v.y + 1);
+    if (TRUNK.has(v.bone)) side = Math.max(side, Math.abs(v.x + 0.5));
+  }
+  // Arms and pauldrons hang a little wider than the trunk in a fighting stance.
+  return { height: top * VOXEL, halfWidth: Math.max(0.25, side * VOXEL * 1.3) };
+}
+
 export interface VoxelRigOptions {
   ghost?: Material;
 }
@@ -113,6 +128,8 @@ export class VoxelRig {
   readonly uniforms: FighterUniforms;
   readonly bladeBase = new Object3D();
   readonly bladeTip = new Object3D();
+  /** Standing height and the half-width of the torso and shoulders, in meters (for camera framing). */
+  readonly size: { height: number; halfWidth: number };
   private readonly groups = new Map<string, Group>();
   private readonly arms: Limb[] = [];
   private readonly legs: Limb[] = [];
@@ -127,6 +144,8 @@ export class VoxelRig {
   /** Body bones hidden in a fight (a sheathed blade), shown again by `setSheathed`. */
   private readonly sheathed: Mesh[] = [];
   private readonly pelvisRest: Vector3;
+  private readonly materials: { mat: Material; opacity: number }[] = [];
+  private fade = 1;
 
   constructor(
     readonly weapon: WeaponId,
@@ -134,12 +153,16 @@ export class VoxelRig {
   ) {
     const spec = VOXEL_FIGHTERS[weapon];
     this.uniforms = makeFighterUniforms();
-    const solidMat = opts.ghost ?? makeFighterMaterial(0xffffff, this.uniforms, { vertexColors: true, roughness: 0.82 });
+    const own = <M extends Material>(m: M, opacity = 1): M => {
+      this.materials.push({ mat: m, opacity });
+      return m;
+    };
+    const solidMat = opts.ghost ?? own(makeFighterMaterial(0xffffff, this.uniforms, { vertexColors: true, roughness: 0.82 }));
     const matFor = (bone: VoxelBone): Material => {
       if (opts.ghost) return opts.ghost;
       const opacity = bone.opacity ?? 1;
-      if (bone.emissive) return new MeshBasicMaterial({ vertexColors: true, transparent: opacity < 1, opacity, toneMapped: false });
-      if (opacity < 1) return makeFighterMaterial(0xffffff, this.uniforms, { vertexColors: true, opacity, roughness: 0.9 });
+      if (bone.emissive) return own(new MeshBasicMaterial({ vertexColors: true, transparent: opacity < 1, opacity, toneMapped: false }), opacity);
+      if (opacity < 1) return own(makeFighterMaterial(0xffffff, this.uniforms, { vertexColors: true, opacity, roughness: 0.9 }), opacity);
       return solidMat;
     };
 
@@ -169,6 +192,7 @@ export class VoxelRig {
       g.position.set((bone.pivot[0] - pp[0]!) * VOXEL, (bone.pivot[1] - pp[1]!) * VOXEL, (bone.pivot[2] - pp[2]!) * VOXEL);
       (parent ? this.groups.get(parent.name)! : this.root).add(g);
     }
+    this.size = bodySize(body.model);
     const pivot = (name: string) => vec(body.bones.get(name)!.pivot).multiplyScalar(VOXEL);
     const torso = pivot('torso');
     this.pelvisRest = pivot('pelvis');
@@ -351,6 +375,22 @@ export class VoxelRig {
     for (const m of this.sheathed) m.visible = on;
     this.weaponPivot.visible = !on;
     this.offhandPivot.visible = !on;
+  }
+
+  /** See-through when below 1, so your own fighter never hides the opponent. */
+  setFade(k: number): void {
+    if (Math.abs(k - this.fade) < 0.005) return;
+    const was = this.fade < 1;
+    this.fade = k;
+    for (const { mat, opacity } of this.materials) {
+      mat.opacity = opacity * k;
+      const see = k < 1 || opacity < 1;
+      if (was !== k < 1) {
+        mat.transparent = see;
+        mat.depthWrite = !see;
+        mat.needsUpdate = true;
+      }
+    }
   }
 
   /** Shows charged prop parts (lightning), flickering; `on` false hides them. */

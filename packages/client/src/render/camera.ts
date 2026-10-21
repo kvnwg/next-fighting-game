@@ -41,7 +41,27 @@ const SHAKES: Record<ShakeKind, { amp: number; roll: number; dur: number }> = {
  * height, so you stand left of center and the opponent shows in the upper middle of the frame
  * instead of behind your back (as in the reference clips).
  */
-const FRAME = { yaw: 0.5, elev: 0.36, boom: 4.7, side: 0.4, pivot: 1.5, lookAtOpponent: 0.65 };
+const FRAME = { yaw: 0.45, maxYaw: 1.1, elev: 0.3, boom: 3.6, side: 0.4, pivot: 1.5, lookAtOpponent: 0.65 };
+
+export interface FighterSize {
+  height: number;
+  halfWidth: number;
+}
+
+const DEFAULT_SIZE: FighterSize = { height: 1.75, halfWidth: 0.32 };
+
+/** Whether, seen from `cam`, the opponent stands clear of your fighter instead of behind them. */
+function clearView(cam: Vector3, me: Subject, op: Subject, mine: FighterSize, theirs: FighterSize): boolean {
+  const dx = op.x - cam.x;
+  const dz = op.z - cam.z;
+  const len2 = dx * dx + dz * dz || 1;
+  // How far along the sight line to the opponent you stand (0 at the camera, 1 at them).
+  const t = ((me.x - cam.x) * dx + (me.z - cam.z) * dz) / len2;
+  if (t <= 0 || t >= 1) return true;
+  const off = Math.hypot(cam.x + dx * t - me.x, cam.z + dz * t - me.z);
+  // At your depth the opponent looks t times as wide as they are.
+  return off >= mine.halfWidth + theirs.halfWidth * t + 0.1;
+}
 
 const PUNCH_IN = 0.08;
 const PUNCH_HOLD = 0.35;
@@ -74,7 +94,10 @@ export class LockOnCamera {
   private kickOffset = new Vector3();
   private kickVel = new Vector3();
   private knockdown = 0;
-  private lookYaw = 0;
+  /** Each fighter's height and half-width (you, then the opponent), so a big fighter never hides the other. */
+  sizes: [FighterSize, FighterSize] = [DEFAULT_SIZE, DEFAULT_SIZE];
+  /** True while even the widest angle leaves your fighter in front of the opponent; they fade out. */
+  blocking = false;
   private shots: Shot[] = [];
   private shotT = 0;
   private shotDone: (() => void) | null = null;
@@ -102,10 +125,6 @@ export class LockOnCamera {
   kick(dirX: number, dirZ: number, amount = 0.2): void {
     this.kickVel.x += dirX * amount * 14;
     this.kickVel.z += dirZ * amount * 14;
-  }
-
-  addLook(delta: number): void {
-    this.lookYaw = Math.max(-0.9, Math.min(0.9, this.lookYaw + delta * 2.2));
   }
 
   /** Plays a list of cinematic shots; lock-on resumes when they finish. */
@@ -139,9 +158,7 @@ export class LockOnCamera {
     }
 
     this.knockdown += ((opts.knockedDown ? 1 : 0) - this.knockdown) * damp(dt, 0.3);
-    // Look-around offset from touch drags, easing back to center.
-    this.lookYaw *= 1 - damp(dt, 1.2);
-    const target = this.framing(me, op, this.knockdown, this.lookYaw);
+    const target = this.framing(me, op, this.knockdown);
 
     if (this.snapNext) {
       this.pos.copy(target.pos);
@@ -204,7 +221,7 @@ export class LockOnCamera {
   }
 
   /** Where the lock-on rig wants to be for these two fighters (no smoothing, shakes or punch-ins). */
-  private framing(me: Subject, op: Subject, knockdown: number, lookYaw: number): { pos: Vector3; look: Vector3 } {
+  private framing(me: Subject, op: Subject, knockdown: number): { pos: Vector3; look: Vector3 } {
     let ax = me.x - op.x;
     let az = me.z - op.z;
     const dist = Math.hypot(ax, az) || 1;
@@ -213,24 +230,33 @@ export class LockOnCamera {
     // Right of the fighter, who faces the opponent (forward = -away).
     const rightX = az;
     const rightZ = -ax;
-    const yaw = FRAME.yaw + lookYaw;
-    const boomX = ax * Math.cos(yaw) + rightX * Math.sin(yaw);
-    const boomZ = az * Math.cos(yaw) + rightZ * Math.sin(yaw);
     const ce = Math.cos(FRAME.elev);
     const se = Math.sin(FRAME.elev);
+    // A taller fighter gets a higher pivot and a longer boom, so they don't fill the frame.
+    const [mine, theirs] = this.sizes;
+    const scale = Math.sqrt(Math.max(1, mine.height / DEFAULT_SIZE.height));
 
     // Lengthen the boom as the fighters separate, and pull back while you're on the floor.
-    let boom = Math.min(8, Math.max(4, FRAME.boom + (dist - 3) * 0.35));
-    boom += knockdown * 1.5 + (this.mobile ? 0.6 : 0);
-    const pivot = framePivot.set(me.x + rightX * FRAME.side, me.y * 0.6 + FRAME.pivot, me.z + rightZ * FRAME.side);
-    boom = this.collide(pivot, boomX, boomZ, boom * ce) / ce;
-    framePos.set(pivot.x + boomX * boom * ce, pivot.y + boom * se - knockdown * 0.35, pivot.z + boomZ * boom * ce);
+    let reach = Math.min(6.5, Math.max(3.1, FRAME.boom + (dist - 3) * 0.35)) * scale;
+    reach += knockdown * 1.5 + (this.mobile ? 0.6 : 0);
+    const pivot = framePivot.set(me.x + rightX * FRAME.side * scale, me.y * 0.6 + FRAME.pivot * scale, me.z + rightZ * FRAME.side * scale);
+
+    // The angle is fixed, except that it swings wider when your fighter would cover the opponent.
+    for (let yaw = FRAME.yaw; ; yaw += 0.05) {
+      const boomX = ax * Math.cos(yaw) + rightX * Math.sin(yaw);
+      const boomZ = az * Math.cos(yaw) + rightZ * Math.sin(yaw);
+      const boom = this.collide(pivot, boomX, boomZ, reach * ce) / ce;
+      framePos.set(pivot.x + boomX * boom * ce, pivot.y + boom * se - knockdown * 0.35, pivot.z + boomZ * boom * ce);
+      const clear = clearView(framePos, me, op, mine, theirs);
+      this.blocking = !clear;
+      if (clear || yaw >= FRAME.maxYaw) break;
+    }
 
     // Mostly toward the opponent's chest, and up after them when they jump over you.
     const k = FRAME.lookAtOpponent;
     frameLook.set(
       op.x * k + me.x * (1 - k),
-      1.2 + op.y * k + me.y * (1 - k) + Math.max(0, op.y - me.y - 1.5) * 0.4,
+      theirs.height * 0.68 + op.y * k + me.y * (1 - k) + Math.max(0, op.y - me.y - 1.5) * 0.4,
       op.z * k + me.z * (1 - k),
     );
     return { pos: framePos, look: frameLook };
@@ -238,7 +264,7 @@ export class LockOnCamera {
 
   /** The resting lock-on pose, so a cinematic can end exactly where the fight camera starts. */
   restPose(me: Subject, op: Subject): CamPose {
-    const { pos, look } = this.framing(me, op, 0, 0);
+    const { pos, look } = this.framing(me, op, 0);
     return { pos: pos.clone(), look: look.clone(), fov: this.baseFov, roll: 0 };
   }
 

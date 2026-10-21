@@ -62,6 +62,8 @@ export class World {
       new FighterVisual(this.scene, weapons[0], you === 0 ? 0 : 1, ghosts),
       new FighterVisual(this.scene, weapons[1], you === 1 ? 0 : 1, ghosts),
     ];
+    const them = you === 0 ? 1 : 0;
+    this.cam.sizes = [this.visuals[you].rig.size, this.visuals[them].rig.size];
   }
 
   /** Screen position (CSS pixels) of a world point, or null if it is behind the camera. */

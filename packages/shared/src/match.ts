@@ -61,6 +61,8 @@ export interface MatchConfig {
 /** Button priority when several go down on the same tick. */
 const PRIORITY = [BTN.DODGE, BTN.PARRY, BTN.SPECIAL, BTN.ABILITY, BTN.HEAVY, BTN.LIGHT, BTN.JUMP];
 const MAX_ROUNDS = 5;
+/** States that hold off posture recovery: attacking, dodging and reeling from a hit. */
+const POSTURE_BUSY = new Set<FighterState>(['attack', 'dodge', 'hitstun', 'blockstun', 'stagger', 'parryWhiff']);
 const KNOCKBACK_DECAY = 0.85;
 const KNOCKBACK_SPEED = 9;
 const DODGE_WEIGHT_SUM = (C.DODGE_MOVE_FRAMES * (C.DODGE_MOVE_FRAMES + 1)) / 2;
@@ -230,7 +232,9 @@ export class Match {
     if (f.buffer && ++f.bufferAge > C.INPUT_BUFFER) f.buffer = 0;
 
     if (f.state === 'guardbreak') return;
-    if (f.postureDelay > 0) {
+    if (POSTURE_BUSY.has(f.state)) {
+      f.postureDelay = Math.max(f.postureDelay, C.POSTURE_CALM_DELAY);
+    } else if (f.postureDelay > 0) {
       f.postureDelay--;
     } else if (f.posture > 0) {
       const scale = f.state === 'idle' ? C.POSTURE_REGEN_IDLE_SCALE : 1;
@@ -608,11 +612,13 @@ export class Match {
     b.guardBreakBonus = false;
     b.comboCount++;
     b.hp = Math.max(0, b.hp - damage);
-    if (b.state !== 'guardbreak') {
-      b.posture = Math.min(C.MAX_POSTURE - 1, b.posture + m.posture * share * C.HIT_POSTURE_SCALE);
-      b.postureDelay = C.POSTURE_REGEN_DELAY;
-    }
     const armored = outcome === 'armor' && b.hp > 0;
+    let breaks = false;
+    if (b.state !== 'guardbreak') {
+      b.posture = Math.min(armored ? C.MAX_POSTURE - 1 : C.MAX_POSTURE, b.posture + m.posture * share * C.HIT_POSTURE_SCALE);
+      b.postureDelay = C.POSTURE_REGEN_DELAY;
+      breaks = b.posture >= C.MAX_POSTURE;
+    }
     if (!armored) this.push(a, b, (last ? m.knockback : 0.15) * (m.pull && last ? -0.6 : 1));
 
     if (outcome === 'block') {
@@ -633,6 +639,9 @@ export class Match {
       // guard break already set the state, or armor soaks the flinch
     } else if (m.knockdown && last) {
       this.enter(b, 'knockdown', C.KNOCKDOWN_FRAMES);
+    } else if (breaks) {
+      // Worn down by clean hits: the guard shatters instead of a flinch.
+      this.guardBreak(a, b, at, damage);
     } else {
       this.enter(b, 'hitstun', last ? m.hitstun : Math.max(m.hitstun, 14));
       if (last && m.launch > 0) b.vy = Math.max(b.vy, m.launch);

@@ -251,11 +251,12 @@ export class App {
     if (!this.rs) return;
     const me = this.rs[this.you];
     const op = this.rs[this.you === 0 ? 1 : 0];
-    this.world.cam.addLook(this.input.takeLook());
     this.world.cam.update(dt, me, op, {
       dodging: me.state === 'dodge',
       knockedDown: me.state === 'knockdown' || me.state === 'ko',
     });
+    const v = this.world.visuals?.[this.you];
+    if (v) v.seeThrough = this.world.cam.blocking && !this.world.cam.inCinematic;
   }
 
   private updateHud(dt: number): void {

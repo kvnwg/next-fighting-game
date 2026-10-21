@@ -133,6 +133,33 @@ describe('posture and guard break', () => {
     expect(hit && hit.type === 'hit' && hit.bonus).toBe(true);
     expect(hit && hit.type === 'hit' && hit.damage).toBe(Math.round(WEAPONS.monk.moves.L1.damage * GUARD_BREAK_BONUS));
   });
+
+  it('holds posture while the fighter keeps attacking or dodging, and recovers slowly once they stop', () => {
+    const m = fightAt(1.4, ['monk', 'lancer']);
+    run(m, 40, (t) => [t === 0 ? tap(BTN.HEAVY) : NO_INPUT, hold(BTN.PARRY)]);
+    const worn = m.fighters[1].posture;
+    expect(worn).toBeGreaterThan(0);
+    // The defender swings and dodges away for four seconds: nothing comes back.
+    m.fighters[0].z = -4;
+    run(m, 240, (t) => [NO_INPUT, t % 30 === 0 ? tap(t % 60 === 0 ? BTN.LIGHT : BTN.DODGE) : NO_INPUT]);
+    expect(m.fighters[1].posture).toBe(worn);
+    // Standing still, it waits a moment to start and takes several seconds to finish.
+    run(m, 40, () => [NO_INPUT, NO_INPUT]);
+    expect(m.fighters[1].posture).toBe(worn);
+    run(m, 600, () => [NO_INPUT, NO_INPUT]);
+    expect(m.fighters[1].posture).toBe(0);
+  });
+
+  it('breaks the guard of a fighter worn down by clean hits, and the guard comes back whole', () => {
+    const m = fightAt(1.4, ['monk', 'lancer']);
+    m.fighters[1].posture = MAX_POSTURE - 2;
+    const ev = run(m, 40, (t) => [t === 0 ? tap(BTN.LIGHT) : NO_INPUT, NO_INPUT]);
+    expect(ev.some((e) => e.type === 'guardbreak')).toBe(true);
+    expect(m.fighters[1].state).toBe('guardbreak');
+    run(m, 120, () => [NO_INPUT, NO_INPUT]);
+    expect(m.fighters[1].state).not.toBe('guardbreak');
+    expect(m.fighters[1].posture).toBe(0);
+  });
 });
 
 describe('critical attacks', () => {

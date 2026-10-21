@@ -37,8 +37,6 @@ export class InputManager {
   /** Cumulative presses per button, sent to the server so no tap is lost between ticks. */
   readonly counts = new Array<number>(BUTTON_COUNT).fill(0);
   lastDevice: InputDevice = 'keyboard';
-  /** Horizontal camera drag accumulated since the last read (touch "look around"). */
-  look = 0;
   private keys = new Set<string>();
   private mouseHeld = 0;
   private touchHeld = 0;
@@ -170,11 +168,5 @@ export class InputManager {
   /** Drops presses that happened while gameplay input was ignored (menus, cutscenes). */
   flush(): void {
     this.pending = 0;
-  }
-
-  takeLook(): number {
-    const v = this.look;
-    this.look = 0;
-    return v;
   }
 }

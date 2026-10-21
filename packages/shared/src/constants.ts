@@ -21,11 +21,14 @@ export const LIGHT_HEIGHT_LIMIT = 0.9;
 
 export const MAX_HP = 100;
 export const MAX_POSTURE = 100;
-export const POSTURE_REGEN_DELAY = 90;
-export const POSTURE_REGEN = 0.25;
-export const POSTURE_REGEN_IDLE_SCALE = 1.6;
-// Clean hits also wear down posture a little.
-export const HIT_POSTURE_SCALE = 0.25;
+// Posture comes back slowly, and only once you stop: none while attacking, dodging or reeling,
+// and not until this long after the last posture damage or the last attack or dodge.
+export const POSTURE_REGEN_DELAY = 150;
+export const POSTURE_CALM_DELAY = 50;
+export const POSTURE_REGEN = 0.16;
+export const POSTURE_REGEN_IDLE_SCALE = 1.5;
+// Clean hits wear posture down too, and enough of them break the guard.
+export const HIT_POSTURE_SCALE = 0.5;
 
 export const INPUT_BUFFER = 9;
 export const PARRY_WINDOW = 8;
@@ -35,7 +38,8 @@ export const PARRY_STAGGER = 20;
 export const PARRY_POSTURE_DAMAGE = 22;
 export const GUARD_BREAK_STAGGER = 45;
 export const GUARD_BREAK_BONUS = 1.5;
-export const GUARD_BREAK_POSTURE_RESET = 30;
+// The guard comes back whole once a break's stagger ends.
+export const GUARD_BREAK_POSTURE_RESET = 0;
 
 export const KNOCKDOWN_FRAMES = 60;
 export const GETUP_FRAMES = 22;

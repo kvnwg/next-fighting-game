@@ -305,10 +305,10 @@ button {
   background: #17141e;
 }
 .posture-bar.l > div {
-  right: 0;
+  left: 0;
 }
 .posture-bar.r > div {
-  left: 0;
+  right: 0;
 }
 .posture-glow {
   position: absolute;
@@ -431,10 +431,22 @@ button {
   background: #17141e;
 }
 .enemy-posture > .half:first-child > div {
+  left: 0;
+}
+.enemy-posture > .half:nth-child(2) > div {
   right: 0;
 }
-.enemy-posture.broken > .half {
-  background: #ff3946;
+/* A broken guard has no bar: it fades back in whole when the stagger ends. */
+.enemy-posture,
+.posture-bar,
+.posture .shield {
+  transition: opacity 0.35s;
+}
+.enemy-posture.broken,
+.posture.broken .posture-bar,
+.posture.broken .shield {
+  opacity: 0;
+  transition: opacity 0.12s 0.15s;
 }
 .shield.mini {
   width: calc(2 * var(--u));

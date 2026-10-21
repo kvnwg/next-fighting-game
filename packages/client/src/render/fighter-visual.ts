@@ -72,6 +72,9 @@ export class FighterVisual {
   charged = false;
   /** A cinematic's own pose, used in place of the state's. */
   pose: Pose | null = null;
+  /** Fades the fighter out (your own, when it stands between the camera and the opponent). */
+  seeThrough = false;
+  private fadeK = 1;
   readonly bladeTip = new Vector3();
   private readonly bladeBase = new Vector3();
 
@@ -164,6 +167,8 @@ export class FighterVisual {
 
     if (!frozen) this.tint = Math.max(0, this.tint - this.tintDecay * dt);
     this.rig.setTint(Math.min(1, this.tint), ...this.tintColor);
+    this.fadeK += ((this.seeThrough ? 0.35 : 1) - this.fadeK) * Math.min(1, dt * 10);
+    this.rig.setFade(this.fadeK);
 
     this.shadow.position.set(s.x, 0.02, s.z);
     this.shadow.scale.setScalar(Math.max(0.5, 1 - s.y * 0.2));
