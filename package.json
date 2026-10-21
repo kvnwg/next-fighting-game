@@ -1,16 +1,25 @@
 {
   "name": "next-fighting-game",
   "private": true,
-  "version": "0.0.1",
   "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/client",
+    "packages/server"
+  ],
   "scripts": {
-    "render": "node tools/voxel/render-sheet.mjs",
-    "export": "node tools/voxel/export-vox.mjs"
-  },
-  "dependencies": {
-    "three": "0.170.0"
+    "dev": "npm run dev --workspace @nfg/client",
+    "dev:server": "npm run dev --workspace @nfg/server",
+    "build": "npm run build --workspace @nfg/client",
+    "start:server": "npm run start --workspace @nfg/server",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/client && tsc -p packages/server",
+    "render:voxel": "node tools/voxel/render-sheet.mjs",
+    "export:voxel": "node tools/voxel/export-vox.mjs"
   },
   "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5",
     "playwright": "1.56.1"
   }
 }
