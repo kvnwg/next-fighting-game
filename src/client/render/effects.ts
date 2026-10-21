@@ -53,7 +53,7 @@ const DEBRIS = ['#6b5a48', '#4a3d31', '#8a7660'];
 
 const MAX_PARTICLES = 900;
 const MAX_SPLATS = 72;
-const BLOOD = ['#c8101e', '#8e0a16', '#e0202c', '#5a0610'];
+const BLOOD = ['#a80c1a', '#7a0812', '#c41824', '#560610'];
 
 let starGeo: THREE.BufferGeometry | null = null;
 /** Four-pointed sparkle used for deflect/impact flashes. */
@@ -103,7 +103,7 @@ export class Effects {
     this.mesh.count = 0;
     this.group.add(this.mesh);
     const disc = new THREE.CircleGeometry(0.5, 10).rotateX(-Math.PI / 2);
-    this.splatMesh = new THREE.InstancedMesh(disc, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), MAX_SPLATS);
+    this.splatMesh = new THREE.InstancedMesh(disc, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.7, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), MAX_SPLATS);
     this.splatMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.splatMesh.frustumCulled = false;
     this.splatMesh.layers.set(FX_LAYER);
@@ -122,29 +122,29 @@ export class Effects {
     if (_a.lengthSq() < 1e-4) _a.set(1, 0, 0);
     _a.normalize();
     const side = _b.set(-_a.z, 0, _a.x);
-    const n = Math.round(26 * scale);
+    const n = Math.round(16 * scale);
     for (let i = 0; i < n; i++) {
       const sp = (3 + Math.random() * 6) * Math.sqrt(scale);
       const s = (Math.random() - 0.5) * 1.1;
       const vx = (_a.x + side.x * s) * sp;
       const vz = (_a.z + side.z * s) * sp;
       const vy = 1 + Math.random() * 4;
-      this.emit(pos.x, pos.y, pos.z, vx, vy, vz, BLOOD[i % BLOOD.length], { life: 0.75, size: 0.06 + Math.random() * 0.05, gravity: 16, drag: 1.2, stretch: 0.06 });
+      this.emit(pos.x, pos.y, pos.z, vx, vy, vz, BLOOD[i % BLOOD.length], { life: 0.6, size: 0.04 + Math.random() * 0.04, gravity: 16, drag: 1.2, stretch: 0.06 });
     }
-    this.burst(pos, { count: Math.round(10 * scale), color: ['#a00a18', '#6a0610'], speed: 1.6, life: 0.4, size: 0.12, gravity: 1, drag: 4, grow: 2 });
+    this.burst(pos, { count: Math.round(5 * scale), color: ['#a00a18', '#6a0610'], speed: 1.4, life: 0.3, size: 0.08, gravity: 1, drag: 4, grow: 1.8 });
     // splats along the line the spray travels, landing in the order they'd hit the floor
-    const k = Math.round(5 + 4 * scale);
+    const k = Math.round(2 + 2 * scale);
     for (let i = 0; i < k; i++) {
       const d = 0.3 + Math.random() * 1.8 * Math.sqrt(scale);
       const s = (Math.random() - 0.5) * 0.9 * d;
       const sp = this.splats.length < MAX_SPLATS ? (this.splats.push({ x: 0, z: 0, r: 0, rot: 0, stretch: 1, delay: 0, life: 0, max: 1, color: new THREE.Color() }), this.splats[this.splats.length - 1]) : this.splats[this.splatNext++ % MAX_SPLATS];
       sp.x = pos.x + _a.x * d + side.x * s;
       sp.z = pos.z + _a.z * d + side.z * s;
-      sp.r = (0.12 + Math.random() * 0.22) * Math.min(1.5, scale) * (i === 0 ? 1.6 : 1);
+      sp.r = (0.06 + Math.random() * 0.1) * Math.min(1.4, scale) * (i === 0 ? 1.5 : 1);
       sp.rot = Math.atan2(_a.x, _a.z) + (Math.random() - 0.5) * 0.6;
       sp.stretch = 1 + Math.random() * 1.2;
       sp.delay = 0.18 + d * 0.12;
-      sp.max = sp.life = 7 + Math.random() * 3;
+      sp.max = sp.life = 5 + Math.random() * 2;
       sp.color.set(BLOOD[(i + 1) % BLOOD.length]);
     }
   }
