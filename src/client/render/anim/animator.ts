@@ -10,7 +10,7 @@
  * Every new state blends from the current pose, so combos chain from where the last cut ended.
  */
 import * as THREE from 'three';
-import { AttackDef, CharacterDef } from '../../../shared/characters';
+import { AttackDef, CharacterDef, WeaponKind } from '../../../shared/characters';
 import { FighterState } from '../../../shared/fighter';
 import { BodyKey, BodyPose, FxCue, Motion, MoveDef, Pose, Rot, Style, TrailStyle, WeaponXf, bodyToTorso } from './author';
 import { clamp01, easeIn, easeInOut, easeOut, kick, orientWeapon, smooth } from './math';
@@ -311,6 +311,10 @@ export class Animator {
   private lastElapsed = 0;
   private walkPhase = 0;
   private walkWeight = 0;
+  /** how this fighter walks */
+  private readonly gaitStyle: GaitStyle;
+  /** this fighter's leg length over the reference body's: strides are planned in reference metres */
+  legScale = 1;
   private breath = Math.random() * 10;
   private reactions: { kind: Reaction; t: number }[] = [];
   private feet = { L: new THREE.Vector3(0.13, 0.05, 0.2), R: new THREE.Vector3(-0.13, 0.05, -0.18) };
@@ -322,6 +326,7 @@ export class Animator {
 
   constructor(readonly char: CharacterDef) {
     this.style = STYLES[char.weaponKind];
+    this.gaitStyle = { ...GAIT, ...GAITS[char.weaponKind] };
     this.current = resolve(this.style.guard);
     this.snapshot = cloneResolved(this.current);
   }
@@ -694,22 +699,34 @@ export class Animator {
 
   private locomotion(a: AnimInput, pose: ResolvedPose, dt: number): void {
     const b = pose.body;
+    const G = this.gaitStyle;
+    const v = a.speed / this.legScale;
     const moving = !a.airborne && a.speed > 0.35 && a.state !== 'dead' && a.state !== 'knockdown' && a.state !== 'broken';
-    this.walkWeight += ((moving ? smooth(a.speed / 2.2) : 0) - this.walkWeight) * Math.min(1, dt * 10);
+    this.walkWeight += ((moving ? smooth(v / 1.2) : 0) - this.walkWeight) * Math.min(1, dt * 8);
     // a planted foot covers one stride during the stance part of the cycle, so feet don't slide
-    const g = gait(a.speed);
-    if (moving) this.walkPhase = (this.walkPhase + (a.speed * dt * g.stance) / g.stride) % 1;
+    const g = gait(v, G);
+    if (moving) this.walkPhase = (this.walkPhase + g.freq * dt) % 1;
     const w = this.walkWeight;
     if (w > 0.01) {
       const ph = this.walkPhase * Math.PI * 2;
-      // lowest as the feet pass, highest mid-stride
-      b.lift += (Math.abs(Math.cos(ph)) * 0.045 - 0.03) * w;
-      b.lean += 0.22 * a.moveForward * w * Math.min(1, a.speed / 6);
+      // stand up out of the fighting crouch to walk (not mid-attack, where the move owns the legs)
+      if (a.state === 'idle' || a.state === 'block') b.crouch += (Math.max(b.crouch, G.crouch) - b.crouch) * w;
+      // and sink a little into long strides, so the legs can reach them
+      b.crouch -= 0.05 * smooth((g.stride - 0.55) / 0.3) * w;
+      // lowest as each foot lands and takes the weight, highest as the body vaults over it
+      const land = 0.5 + 0.5 * Math.cos(2 * ph);
+      b.lift += (-Math.pow(land, G.heavy) * G.bob + G.bob * 0.35) * w;
+      // the weight rolls over onto whichever foot is planted (L is planted around phase st/2)
+      const onL = Math.cos(ph - Math.PI * g.stance);
+      b.side -= onL * G.roll * w;
       b.side -= 0.07 * a.moveSide * w;
-      b.twist += Math.sin(ph) * 0.07 * w;
-      b.hipTwist -= Math.sin(ph) * 0.1 * w;
-      // the weapon bobs with the step
-      shiftHands(pose, UP, Math.sin(ph * 2) * 0.012 * w);
+      b.lean += G.lean * a.moveForward * w * Math.min(1, v / 4);
+      // hips swing with the legs, shoulders counter-turn
+      b.hipTwist -= Math.sin(ph) * G.hips * w;
+      b.twist += Math.sin(ph) * G.hips * 0.6 * w;
+      // the weapon rides the bob and sways with the roll
+      shiftHands(pose, UP, (Math.pow(land, G.heavy) * -0.6 + 0.2) * G.bob * 0.5 * w);
+      shiftHands(pose, LEFT, -onL * G.roll * 0.25 * w);
     }
     // breathing
     this.breath += dt;
@@ -783,7 +800,8 @@ export class Animator {
       const dirX = a.moveSide;
       const dirZ = a.moveForward;
       const len = Math.hypot(dirX, dirZ) || 1;
-      const { stride, stance: st, lift } = gait(a.speed);
+      const G = this.gaitStyle;
+      const { stride, stance: st, lift } = gait(a.speed / this.legScale, G);
       for (const [foot, off] of [['L', 0], ['R', 0.5]] as const) {
         const p = (this.walkPhase + off) % 1;
         let along: number;
@@ -792,9 +810,10 @@ export class Animator {
         else {
           const q = (p - st) / (1 - st);
           along = -stride / 2 + stride * easeInOut(q);
-          up = Math.sin(Math.PI * q) * lift;
+          // the knee comes up early and the foot drops onto the ground (hard, for the heavy)
+          up = Math.pow(Math.sin(Math.PI * Math.pow(q, 0.8)), 1 / G.heavy) * lift;
         }
-        const target = new THREE.Vector3((foot === 'L' ? 0.13 : -0.13) + (dirX / len) * along, 0.05 + up, (dirZ / len) * along);
+        const target = new THREE.Vector3((foot === 'L' ? G.width : -G.width) + (dirX / len) * along, 0.05 + up, (dirZ / len) * along);
         stance[foot].lerp(target, w);
       }
     }
@@ -826,8 +845,64 @@ function settleTurn(v: number, c: keyof Rot): number {
 
 const UP = new THREE.Vector3(0, 1, 0);
 const BACK = new THREE.Vector3(0, 0, -1);
+const LEFT = new THREE.Vector3(1, 0, 0);
 
-/** Stride length, the share of the cycle a foot is planted (less when running) and step height. */
-function gait(speed: number): { stride: number; stance: number; lift: number } {
-  return { stride: Math.min(0.72, 0.2 + speed * 0.08), stance: 0.6 - 0.28 * smooth((speed - 2) / 4), lift: 0.08 + speed * 0.022 };
+/** How a fighter walks: the defaults, and each weapon style's character. */
+interface GaitStyle {
+  /** steps per second relative to a person's */
+  cadence: number;
+  /** feet apart (reference metres, each side) */
+  width: number;
+  /** vertical bob (m) and how hard each step lands (1 soft, higher drops onto the foot) */
+  bob: number;
+  heavy: number;
+  /** the body rolls over onto the planted foot (rad) */
+  roll: number;
+  /** hip swing (rad; the shoulders counter-turn about half as much) */
+  hips: number;
+  /** forward lean at full speed (rad) */
+  lean: number;
+  /** step height (reference metres at a walk) */
+  lift: number;
+  /** legs straighten to at least this crouch to walk */
+  crouch: number;
+  /** the longest stride a planted foot covers (reference metres) before steps just come faster */
+  reach: number;
+}
+
+const GAIT: GaitStyle = { cadence: 1, width: 0.14, bob: 0.035, heavy: 1, roll: 0.035, hips: 0.12, lean: 0.14, lift: 0.1, crouch: -0.05, reach: 0.78 };
+
+const GAITS: Partial<Record<WeaponKind, Partial<GaitStyle>>> = {
+  // the Warden lumbers: wide-legged, slow heavy steps that drop onto each foot, the whole bulk
+  // rolling from side to side over the planted leg
+  greathammer: { cadence: 0.78, width: 0.2, bob: 0.075, heavy: 2.2, roll: 0.11, hips: 0.2, lean: 0.2, lift: 0.13, crouch: -0.09, reach: 0.88 },
+  // armoured, measured
+  swordShield: { cadence: 0.9, width: 0.16, bob: 0.045, heavy: 1.5, roll: 0.05, hips: 0.12, lift: 0.1 },
+  spear: { cadence: 0.95, width: 0.15, bob: 0.04, heavy: 1.3, roll: 0.045 },
+  // light on their feet
+  rapier: { cadence: 1.08, width: 0.12, bob: 0.03, roll: 0.025, hips: 0.14, lift: 0.09, crouch: -0.02 },
+  daggers: { cadence: 1.12, width: 0.13, bob: 0.028, roll: 0.03, hips: 0.1, lift: 0.08, crouch: -0.07, reach: 0.82 },
+  // the old monk: unhurried, grounded
+  gauntlets: { cadence: 0.92, width: 0.15, bob: 0.03, heavy: 1.2, roll: 0.04, hips: 0.1 },
+  // the wraith floats: a slow glide, no footfalls
+  scythe: { cadence: 0.7, bob: 0.025, heavy: 1, roll: 0.015, hips: 0.05, lean: 0.1 },
+};
+
+/**
+ * The walk cycle at a speed (reference metres per second): how fast the cycle turns, the stride
+ * a planted foot covers, the share of the cycle a foot is planted, and the step height. A person
+ * takes about 1.8 steps a second at a stroll and nearly 3 at a run; the stride grows with speed
+ * until the legs can't reach further, and beyond that the steps come faster with more air.
+ */
+function gait(v: number, G: GaitStyle): { freq: number; stride: number; stance: number; lift: number } {
+  let freq = G.cadence * Math.min(1.7, 0.62 + 0.2 * v);
+  let stance = 0.62 - 0.2 * smooth((v - 1.8) / 2.5);
+  let stride = (v * stance) / freq;
+  const reach = G.reach;
+  if (stride > reach) {
+    stride = reach;
+    stance = Math.max(0.3, (reach * freq) / Math.max(0.01, v));
+    freq = (v * stance) / stride;
+  }
+  return { freq, stride, stance, lift: G.lift * (1 + 0.25 * Math.min(3, v)) };
 }

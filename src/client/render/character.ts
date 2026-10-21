@@ -24,6 +24,8 @@ const POSE_SHOULDER = new THREE.Vector3(0, 0.5, 0);
 const POSE_ARM = 0.56;
 const POSE_LEG = 0.85;
 const POSE_ANKLE = 0.05;
+/** the reference body's hip joints, each side of centre */
+const POSE_HIP = 0.12;
 const POSE_HIPS = 0.92;
 const POSE_HEIGHT = 1.95;
 // elbows bend out, down and back
@@ -108,6 +110,8 @@ export class CharacterModel {
   private readonly d: RigDims;
   private readonly armK: number;
   private readonly legK: number;
+  /** how much wider this fighter's hips are than the reference body's: the feet move out with them */
+  private readonly hipSpread: number;
   private readonly shoulderMid: THREE.Vector3;
   /** prop parts lit only during heavy swings and specials (the spear's lightning) */
   private readonly charged: THREE.Mesh[] = [];
@@ -147,6 +151,8 @@ export class CharacterModel {
     const d = (this.d = rigDims(body.model));
     this.armK = (d.upperArm + d.forearm) / POSE_ARM;
     this.legK = d.hasLegs ? (d.thigh + d.shin) / POSE_LEG : d.hipsY / POSE_HIPS;
+    this.hipSpread = Math.max(0, Math.abs(d.hipR.x) - POSE_HIP * this.legK);
+    this.animator.legScale = this.legK;
     this.shoulderMid = d.shoulderR.clone().add(d.shoulderL).multiplyScalar(0.5);
 
     const g = (parent: THREE.Object3D, x = 0, y = 0, z = 0): THREE.Group => {
@@ -302,7 +308,7 @@ export class CharacterModel {
   /** A root-frame foot target from the reference stance onto this fighter's legs. */
   private mapFoot(from: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
     const k = this.legK;
-    return out.set(from.x * k, (from.y - POSE_ANKLE) * k + this.d.ankle, from.z * k);
+    return out.set(from.x * k + Math.sign(from.x) * this.hipSpread, (from.y - POSE_ANKLE) * k + this.d.ankle, from.z * k);
   }
 
   get rightHand(): THREE.Group {
