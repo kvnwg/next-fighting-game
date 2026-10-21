@@ -9,7 +9,7 @@ import { CHARACTERS, CharacterDef, CharacterId } from '../../shared/characters';
 import { AnimFrame, AnimInput, Animator, Reaction, handTargets } from './anim/animator';
 import { smooth, solveTwoBone } from './anim/math';
 import { CHAR_LAYER, FX_LAYER } from './renderer';
-import { charRamp } from './textures';
+import { patchMaterial } from './gfx/materials';
 import { WeaponParts, buildWeapon } from './weapons';
 
 export type { AnimFrame, AnimInput, Reaction };
@@ -98,7 +98,7 @@ export class CharacterModel {
   private readonly legL: Limb;
   private readonly mainPivot = new THREE.Group();
   private readonly offPivot = new THREE.Group();
-  private readonly materials: THREE.MeshToonMaterial[] = [];
+  private readonly materials: THREE.MeshLambertMaterial[] = [];
   private flashT = 0;
   private flashColor = new THREE.Color('#ffffff');
   private ghosts: Ghost[] = [];
@@ -117,10 +117,11 @@ export class CharacterModel {
     this.animator = new Animator(this.char);
     const pal = this.char.palette;
     const mat = (color: string, emissive?: string) => {
-      const m = new THREE.MeshToonMaterial({ color, gradientMap: charRamp() });
+      // lit like the world, with a rim of light so the silhouette reads against busy scenery
+      const m = patchMaterial(new THREE.MeshLambertMaterial({ color }), { rim: true });
       // a little self-light in the outfit's own colour keeps the shadow side from taking on the
       // world's (often warm) light, so fighters keep their identity against the scenery
-      const base = emissive ? new THREE.Color(emissive) : new THREE.Color(color).multiplyScalar(0.22);
+      const base = emissive ? new THREE.Color(emissive) : new THREE.Color(color).multiplyScalar(0.12);
       m.emissive.copy(base);
       m.userData.baseEmissive = base;
       this.materials.push(m);
@@ -212,7 +213,7 @@ export class CharacterModel {
   private headgear(
     head: THREE.Group,
     torso: THREE.Group,
-    m: { prim: THREE.Material; sec: THREE.Material; acc: THREE.Material; hair: THREE.Material; dark: THREE.Material; skin: THREE.Material; mat: (c: string, e?: string) => THREE.MeshToonMaterial },
+    m: { prim: THREE.Material; sec: THREE.Material; acc: THREE.Material; hair: THREE.Material; dark: THREE.Material; skin: THREE.Material; mat: (c: string, e?: string) => THREE.MeshLambertMaterial },
     box: (m: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number, p: THREE.Object3D) => THREE.Mesh,
   ): void {
     switch (this.char.id) {

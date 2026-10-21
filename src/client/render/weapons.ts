@@ -22,10 +22,10 @@ export interface WeaponParts {
   hideHands: boolean;
   /** extra pieces worn on the body (e.g. a scabbard), positioned in torso space */
   worn: THREE.Object3D | null;
-  materials: THREE.MeshToonMaterial[];
+  materials: THREE.MeshLambertMaterial[];
 }
 
-type Mat = (color: string, emissive?: string) => THREE.MeshToonMaterial;
+type Mat = (color: string, emissive?: string) => THREE.MeshLambertMaterial;
 
 function box(mat: THREE.Material, w: number, h: number, d: number, x = 0, y = 0, z = 0, parent?: THREE.Object3D): THREE.Mesh {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);

@@ -806,8 +806,7 @@ export class UI {
         <h4>Arenas</h4><ul class="maps">${maps}</ul>
         <h4>Settings</h4>
         <div class="settings">
-          <label>Art style <select id="set-style"><option value="clean" ${settings.artStyle === 'clean' ? 'selected' : ''}>Clean</option><option value="pixel" ${settings.artStyle === 'pixel' ? 'selected' : ''}>Pixel</option></select></label>
-          <label class="${settings.artStyle === 'pixel' ? '' : 'hidden'}" id="set-px-row">Pixel size <input type="range" min="1" max="6" step="1" id="set-px" value="${settings.pixelSize}"><span id="set-px-v">${settings.pixelSize}</span></label>
+          <label>Graphics <select id="set-gfx">${(['auto', 'low', 'medium', 'high', 'ultra'] as const).map((q) => `<option value="${q}" ${settings.graphics === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}</select></label>
           <label>${this.touch ? 'Look' : 'Mouse'} sensitivity <input type="range" min="0.2" max="3" step="0.1" id="set-sens" value="${settings.sensitivity}"><span id="set-sens-v">${settings.sensitivity}</span></label>
           <label>Volume <input type="range" min="0" max="1" step="0.05" id="set-vol" value="${settings.volume}"></label>
           <label><input type="checkbox" id="set-cue" ${settings.parryCue ? 'checked' : ''}> Weapon glint before a hit lands</label>
@@ -826,13 +825,8 @@ export class UI {
         this.handlers.onSettingsChanged();
       });
     };
-    bind<HTMLSelectElement>('#set-style', (el) => {
-      settings.artStyle = el.value === 'pixel' ? 'pixel' : 'clean';
-      this.modal.querySelector('#set-px-row')!.classList.toggle('hidden', settings.artStyle !== 'pixel');
-    });
-    bind('#set-px', (el) => {
-      settings.pixelSize = Number(el.value);
-      this.modal.querySelector('#set-px-v')!.textContent = el.value;
+    bind<HTMLSelectElement>('#set-gfx', (el) => {
+      settings.graphics = el.value as typeof settings.graphics;
     });
     bind('#set-sens', (el) => {
       settings.sensitivity = Number(el.value);

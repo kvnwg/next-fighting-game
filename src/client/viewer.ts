@@ -12,13 +12,14 @@ import { MAPS } from '../shared/maps';
 import { Effects } from './render/effects';
 import { CameraRig, introShots } from './camera';
 import { buildBlockers, constrainCamera } from './cameraClip';
-import { PixelRenderer } from './render/renderer';
+import { GameRenderer } from './render/renderer';
+import type { QualitySetting } from './render/gfx/quality';
 import { groundTexture } from './render/textures';
 import { MapView } from './render/world';
 
 export function startViewer(root: HTMLElement): void {
   const params = new URLSearchParams(location.search);
-  const r = new PixelRenderer(root, Number(params.get('px') ?? 3), params.get('style') === 'pixel' ? 'pixel' : 'clean');
+  const r = new GameRenderer(root, (params.get('q') ?? 'high') as QualitySetting);
   const mapId = params.get('map');
   if (mapId && MAPS[mapId]) {
     showMap(r, mapId, params);
@@ -137,7 +138,7 @@ export function startViewer(root: HTMLElement): void {
 const IDLE: AnimInput = { state: 'idle', elapsed: 0, dur: 0, attack: null, windup: 0, speed: 0, moveForward: 1, moveSide: 0, airborne: false, blockHeld: false, buff: false };
 
 /** One character frozen at several moments of a move (or a chain of moves), side by side. */
-function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
+function showStrip(r: GameRenderer, params: URLSearchParams, n: number): void {
   const id = (params.get('char') ?? 'ronin') as CharacterId;
   const chain = (params.get('chain') ?? params.get('anim') ?? 'l0').split(',');
   const scene = r.scene;
@@ -235,13 +236,11 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
 }
 
 /** /?viewer&map=forge — orbit a map with two fighters squaring off at the spawns. */
-function showMap(r: PixelRenderer, mapId: string, params: URLSearchParams): void {
+function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void {
   const map = MAPS[mapId];
-  const view = new MapView(map, r.scene);
-  r.sunDir.copy(view.sunDir);
-  r.setRim(view.rimColor);
+  const view = new MapView(map, r.scene, r);
   const fx = new Effects(r.scene);
-  fx.setWeather(map.theme.weather);
+  void fx;
   const chars = ['ronin', 'reaper'] as const;
   // `shot=1.8`: the two fighters stand on the real spawns and the camera is frozen 1.8s into the match intro
   const shotT = params.get('shot');
@@ -273,14 +272,24 @@ function showMap(r: PixelRenderer, mapId: string, params: URLSearchParams): void
   const angle = Number(params.get('a') ?? 0.7);
   const dist = Number(params.get('dist') ?? (map.kind === 'lobby' ? 34 : 24));
   const height = Number(params.get('h') ?? 11);
+  // `cam=x,y,z&look=x,y,z` places the camera exactly; `time=12` starts the clock (wind, particles) there
+  const vec = (k: string) => (params.get(k) ? new THREE.Vector3(...(params.get(k)!.split(',').map(Number) as [number, number, number])) : null);
+  const camAt = vec('cam');
+  const lookAt = vec('look') ?? new THREE.Vector3(0, 1, 0);
+  if (params.get('fov')) {
+    r.camera.fov = Number(params.get('fov'));
+    r.camera.updateProjectionMatrix();
+  }
+  view.update(Number(params.get('time') ?? 0), new THREE.Vector3());
   let last = performance.now();
   const loop = () => {
     const now = performance.now();
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    r.camera.position.set(Math.sin(angle) * dist, height, Math.cos(angle) * dist);
-    r.camera.lookAt(0, 1, 0);
-    view.update(dt, new THREE.Vector3());
+    if (camAt) r.camera.position.copy(camAt);
+    else r.camera.position.set(Math.sin(angle) * dist, height, Math.cos(angle) * dist);
+    r.camera.lookAt(lookAt);
+    view.update(params.has('freeze') ? 0 : dt, camAt ?? new THREE.Vector3());
     fx.update(dt, r.camera);
     r.render();
     requestAnimationFrame(loop);
@@ -289,7 +298,7 @@ function showMap(r: PixelRenderer, mapId: string, params: URLSearchParams): void
 }
 
 /** /?viewer&fxtest&t=0.05 — the impact effects (light hit, heavy hit, deflect) side by side, frozen `t` seconds in. */
-function showFxTest(r: PixelRenderer, params: URLSearchParams): void {
+function showFxTest(r: GameRenderer, params: URLSearchParams): void {
   const fx = new Effects(r.scene);
   const t = Number(params.get('t') ?? 0.04);
   const style = new CharacterModel((params.get('char') ?? 'ronin') as CharacterId).animator.style;

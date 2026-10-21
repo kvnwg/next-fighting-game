@@ -1,15 +1,14 @@
 /** Per-browser preferences and identity, kept in localStorage (or CrazyGames' cloud data there). */
 import { CharacterId, isCharacterId } from '../shared/characters';
 import { platform } from './platform';
+import type { QualitySetting } from './render/gfx/quality';
 
 export interface Settings {
   name: string;
   token: string;
   char: CharacterId;
-  /** 'clean' renders at full resolution with cel shading; 'pixel' is the chunky 3D pixel look */
-  artStyle: 'clean' | 'pixel';
-  /** size of one "pixel" in screen pixels (pixel style only) */
-  pixelSize: number;
+  /** graphics tier; 'auto' picks one for the device and trims resolution when frames run slow */
+  graphics: QualitySetting;
   sensitivity: number;
   invertY: boolean;
   volume: number;
@@ -26,8 +25,7 @@ const DEFAULTS: Settings = {
   name: '',
   token: '',
   char: 'ronin',
-  artStyle: 'clean',
-  pixelSize: 3,
+  graphics: 'auto',
   sensitivity: 1,
   invertY: false,
   volume: 0.7,
@@ -42,8 +40,7 @@ function load(): Settings {
     if (!raw) return { ...DEFAULTS };
     const s = { ...DEFAULTS, ...JSON.parse(raw) } as Settings;
     if (!isCharacterId(s.char)) s.char = 'ronin';
-    if (s.artStyle !== 'pixel') s.artStyle = 'clean';
-    s.pixelSize = Math.max(1, Math.min(6, Math.round(s.pixelSize)));
+    if (!['auto', 'low', 'medium', 'high', 'ultra'].includes(s.graphics)) s.graphics = 'auto';
     return s;
   } catch {
     return { ...DEFAULTS };

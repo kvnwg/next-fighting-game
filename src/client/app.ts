@@ -15,7 +15,7 @@ import { LocalController } from './local';
 import { Net } from './net';
 import { CharacterModel } from './render/character';
 import { Effects } from './render/effects';
-import { PixelRenderer } from './render/renderer';
+import { GameRenderer } from './render/renderer';
 import { portraitURL } from './render/portrait';
 import { MapView } from './render/world';
 import { platform } from './platform';
@@ -33,7 +33,8 @@ export function startApp(root: HTMLElement, offline = false): void {
 }
 
 class App {
-  private renderer: PixelRenderer;
+  private renderer: GameRenderer;
+  private graphics = settings.graphics;
   private scene: THREE.Scene;
   private cam: CameraRig;
   private effects: Effects;
@@ -67,7 +68,7 @@ class App {
     root: HTMLElement,
     private readonly offline: boolean,
   ) {
-    this.renderer = new PixelRenderer(root, settings.pixelSize, settings.artStyle);
+    this.renderer = new GameRenderer(root, settings.graphics, { dynamicResolution: settings.graphics === 'auto' });
     this.scene = this.renderer.scene;
     this.cam = new CameraRig(this.renderer.camera);
     this.effects = new Effects(this.scene);
@@ -87,8 +88,12 @@ class App {
       onChallengeReply: (from, accept) => this.net.send({ t: 'challengeReply', from, accept }),
       onForfeit: () => this.net.send({ t: 'forfeit' }),
       onSettingsChanged: () => {
-        this.renderer.setPixelSize(settings.pixelSize);
-        this.renderer.setStyle(settings.artStyle);
+        if (settings.graphics !== this.graphics) {
+          // a new tier changes how much scenery, grass and particle detail the map is built with
+          this.graphics = settings.graphics;
+          this.renderer.setQuality(settings.graphics);
+          if (this.map) this.loadMap(this.map);
+        }
         audio.setVolume(settings.volume);
         saveSettings();
       },
@@ -228,12 +233,11 @@ class App {
   private loadMap(map: MapDef): void {
     this.mapView?.dispose();
     this.map = map;
-    this.mapView = new MapView(map, this.scene);
-    this.renderer.sunDir.copy(this.mapView.sunDir);
-    this.renderer.setRim(this.mapView.rimColor);
+    this.mapView = new MapView(map, this.scene, this.renderer);
     const blockers = buildBlockers(map);
     this.cam.constrain = (from, to, wallsOnly) => constrainCamera(map, wallsOnly ? [] : blockers, from, to);
-    this.effects.setWeather(map.theme.weather);
+    // weather and ambient particles belong to the map's recipe now
+    this.effects.setWeather(null);
     if (this.local) this.local.map = map;
   }
 
@@ -797,6 +801,13 @@ class App {
       this.moveFx(f);
     }
 
+    // grass parts around the fighters nearest the camera
+    if (this.mapView) {
+      const cam = this.renderer.camera.position;
+      const near = [...this.fighters.values()].sort((a, b) => a.pos.distanceToSquared(cam) - b.pos.distanceToSquared(cam)).slice(0, 4);
+      this.mapView.setPushers(near.map((f) => f.pos));
+    }
+
     // camera
     if (this.local) {
       const p = this.local.cf.pos;
@@ -942,7 +953,7 @@ function createPreview(container: HTMLElement): Preview {
   const holder = document.createElement('div');
   holder.className = 'preview-holder';
   container.appendChild(holder);
-  const r = new PixelRenderer(holder, 3, settings.artStyle);
+  const r = new GameRenderer(holder, 'medium', { preview: true });
   const scene = r.scene;
   scene.background = new THREE.Color('#1c1a24');
   scene.add(new THREE.HemisphereLight('#d8e4ff', '#4a4038', 1.5));
