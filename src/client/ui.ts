@@ -3,6 +3,7 @@ import { CHARACTERS, CHARACTER_IDS, CharacterDef, CharacterId, Perilous } from '
 import { ARENA_MAPS, MAPS } from '../shared/maps';
 import { BotDifficulty, LeaderboardEntry, MatchMode, ProfileView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { PLACEMENT_MATCHES, RankInfo, TIERS, rankOf } from '../shared/ranks';
+import { LobbyBar } from './lobbybar';
 import { settings } from './settings';
 
 const h = (html: string): HTMLElement => {
@@ -90,6 +91,7 @@ export class UI {
   private floatLayer: HTMLElement;
   private floaters: Floater[] = [];
   private bannerTimer = 0;
+  private lobbyBar!: LobbyBar;
   private toastBox: HTMLElement;
   private feed: HTMLElement;
   private preview: Preview | null = null;
@@ -202,6 +204,20 @@ export class UI {
         <div class="rotate-hint">Turn your device sideways to play</div>
       </div>`);
     this.root.appendChild(this.hud);
+    this.lobbyBar = new LobbyBar(this.hud, {
+      onPractice: (d) => this.handlers.onPractice(d),
+      onRanked: () => this.handlers.onRanked(),
+      onCancelQueue: () => this.handlers.onCancelQueue(),
+      onFighters: () => this.toggleModal('chars'),
+      onLadder: () => this.toggleModal('ladder'),
+      onHelp: () => this.toggleModal('help'),
+      onSettings: () => {
+        this.openModal('help');
+        this.modal.querySelector('.settings')?.scrollIntoView({ block: 'center' });
+      },
+      portrait: (id) => this.handlers.portrait(id),
+    }, offline);
+    this.lobbyBar.setChar(settings.char);
     this.modal = h(`<div class="modal hidden"></div>`);
     this.root.appendChild(this.modal);
 
@@ -319,6 +335,9 @@ export class UI {
 
   setLobbyMode(inLobby: boolean): void {
     this.els.menuButtons.classList.toggle('in-match', !inLobby);
+    this.hud.classList.toggle('lobby', inLobby);
+    this.lobbyBar.setVisible(inLobby);
+    this.lobbyBar.setChar(settings.char);
     for (const id of ['btnRanked', 'btnPractice']) (this.els[id] as HTMLButtonElement).disabled = !inLobby;
     this.els.btnForfeit.classList.toggle('hidden', inLobby);
     if (!inLobby) this.els.queue.classList.add('hidden');
@@ -327,8 +346,9 @@ export class UI {
   setQueue(searching: boolean, since: number, count: number, serverNow: number): void {
     this.els.queue.classList.toggle('hidden', !searching);
     (this.els.btnRanked as HTMLButtonElement).disabled = searching;
-    if (!searching) return;
     const s = Math.max(0, Math.floor((serverNow - since) / 1000));
+    this.lobbyBar.setQueue(searching, s);
+    if (!searching) return;
     this.els.queueTime.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
     this.els.queueCount.textContent = count > 1 ? `${count} players searching` : 'Waiting for another player…';
   }
@@ -343,8 +363,20 @@ export class UI {
     this.els.escHint.classList.toggle('hidden', !locked);
   }
 
+  /** The lobby bar shows your current fighter. */
+  setLobbyChar(id: CharacterId): void {
+    this.lobbyBar.setChar(id);
+  }
+
+  /** Close the play panel if it's open (Escape); true if it was. */
+  closePlayPanel(): boolean {
+    if (!this.lobbyBar.isOpen) return false;
+    this.lobbyBar.setPanel(false);
+    return true;
+  }
+
   practiceDifficulty(): BotDifficulty {
-    return this.hud.querySelector<HTMLSelectElement>('#practice-diff')!.value as BotDifficulty;
+    return this.lobbyBar.difficulty;
   }
 
   // ------------------------------------------------------------------ combat HUD

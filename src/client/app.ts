@@ -130,6 +130,7 @@ class App {
       if (v.char) {
         settings.char = v.char;
         saveSettings();
+        this.ui.setLobbyChar(v.char);
       }
     });
     if (touch) {
@@ -386,6 +387,7 @@ class App {
       if (r.id === this.myId) {
         settings.char = r.char;
         saveSettings();
+        this.ui.setLobbyChar(r.char);
         this.ui.toast(`Now playing ${CHARACTERS[r.char].name}.`, 'good');
       }
       return;
@@ -417,6 +419,7 @@ class App {
   private selectChar(id: CharacterId): void {
     settings.char = id;
     saveSettings();
+    this.ui.setLobbyChar(id);
     if (this.net.connected) this.net.send({ t: 'char', id });
   }
 
@@ -525,6 +528,7 @@ class App {
       if (!pressed) return;
       if (this.ui.chatOpen) this.ui.closeChat();
       else if (this.ui.modalOpen) this.ui.closeModal();
+      else if (this.ui.closePlayPanel()) return;
       else this.input.exitLock();
       this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen;
       return;
