@@ -1,6 +1,6 @@
 /** The client application: wires networking, input, simulation, rendering and UI together. */
 import * as THREE from 'three';
-import { CHARACTERS, CharacterId } from '../shared/characters';
+import { AttackKey, CHARACTERS, CharacterId, getAttack, isHeavyKey } from '../shared/characters';
 import { MATCH } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
@@ -489,7 +489,7 @@ class App {
     };
     if (mine && e.a && e.d) this.lastHitTarget = { id: meA ? e.d : e.a, until: performance.now() + 5000 };
     // heavies, specials and abilities hit harder: longer freeze, bigger shake, more sparks
-    const heavy = e.key === 'h' || e.key === 'sp' || e.key === 'ab' || e.key === 'ia' || e.key === 'ct';
+    const heavy = isHeavyKey(e.key) || e.key === 'sp' || e.key === 'ab' || e.key === 'ia' || e.key === 'ct';
     const style = a?.model.animator.style;
     const swing = a ? a.swingDir : new THREE.Vector3(0, 0, 1);
 
@@ -751,7 +751,7 @@ class App {
     if (v.state === 'attack' && v.attack && !v.attack.noHitbox) {
       if (v.elapsed >= v.windup - 30 && f.lastSwingSerial !== v.serial) {
         f.lastSwingSerial = v.serial;
-        audio.play(v.key === 'h' || v.attack.perilous ? 'heavySwing' : 'swing', this.volumeAt(f.pos.x, f.pos.z));
+        audio.play(isHeavyKey(v.key) || v.attack.perilous ? 'heavySwing' : 'swing', this.volumeAt(f.pos.x, f.pos.z));
       }
       if (settings.parryCue && !f.isLocal && f.lastCueSerial !== v.serial && v.elapsed >= v.windup - 160 && v.elapsed < v.windup) {
         f.lastCueSerial = v.serial;
@@ -971,15 +971,13 @@ function createPreview(container: HTMLElement): Preview {
   let raf = 0;
   let t = 0;
   let last = performance.now();
-  const cycle: { key: 'l0' | 'l1' | 'h' | 'sp' | null; ms: number }[] = [
-    { key: null, ms: 1400 },
-    { key: 'l0', ms: 0 },
-    { key: 'l1', ms: 0 },
-    { key: null, ms: 600 },
-    { key: 'h', ms: 0 },
-    { key: null, ms: 600 },
-    { key: 'sp', ms: 0 },
-  ];
+  // the whole moveset in turn: the light chain, the heavy chain, dash, backstep and air attacks, the special
+  const moves: AttackKey[][] = [['l0', 'l1', 'l2'], ['h', 'h1', 'h2'], ['dl', 'dh'], ['bl', 'bh'], ['jl', 'jh'], ['sp']];
+  const cycle: { key: AttackKey | null; ms: number }[] = [{ key: null, ms: 1400 }];
+  for (const group of moves) {
+    for (const key of group) cycle.push({ key, ms: 0 });
+    cycle.push({ key: null, ms: 600 });
+  }
   let idx = 0;
   let stateT = 0;
   const loop = () => {
@@ -991,7 +989,7 @@ function createPreview(container: HTMLElement): Preview {
     if (!model) return;
     model.root.rotation.y = Math.sin(t * 0.6) * 0.6;
     const step = cycle[idx];
-    const atk = step.key ? (step.key[0] === 'l' ? model.char.lights[Number(step.key[1])] : step.key === 'h' ? model.char.heavy : model.char.special) : null;
+    const atk = step.key ? getAttack(model.char, step.key) : null;
     const total = atk ? atk.windup + atk.active + atk.recovery + 150 : step.ms;
     stateT += dt * 1000;
     model.update(

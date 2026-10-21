@@ -2,7 +2,7 @@
  * The fighter combat state machine. The server runs it authoritatively for every fighter; the
  * client runs a copy for the local player so inputs feel instant (server corrections win).
  */
-import { AbilityDef, AttackDef, AttackKey, CHARACTERS, CharacterDef, CharacterId, getAttack, lightKey } from './characters';
+import { AbilityDef, AttackDef, AttackKey, CHARACTERS, CharacterDef, CharacterId, getAttack, isHeavyKey, lightKey } from './characters';
 import { COMBAT, JUMP_VELOCITY } from './config';
 import { forward } from './math';
 
@@ -52,7 +52,7 @@ export interface InputOptions {
   tag?: number;
   /** When the input actually happened (lag-compensated). Defaults to now. */
   pressTime?: number;
-  /** Desired dodge direction in world space. */
+  /** Desired dodge direction in world space; for attacks, the direction the fighter is walking. */
   dx?: number;
   dz?: number;
 }
@@ -87,6 +87,10 @@ export class Fighter {
   dodgeDz = 0;
   dodgeDist = 0;
   dodgeDur = 0;
+  /** The current dodge is a plain dodge toward where the fighter faces (it flows into dash attacks). */
+  dodgeForward = false;
+  /** A light or heavy pressed before this lands as a dash attack (just after a forward dodge). */
+  dashUntil = -Infinity;
   lastJump = -Infinity;
 
   specialReadyAt = 0;
@@ -196,7 +200,7 @@ export class Fighter {
     if (now < this.stateStart) return false; // the attack hadn't started yet at that moment
     if (this.attackPhase(now) === 'recovery') return false;
     if (this.attack.hyperArmor) return true;
-    if (this.attackKey === 'h' && this.mods.heavyHyperArmor) return true;
+    if (isHeavyKey(this.attackKey) && this.mods.heavyHyperArmor) return true;
     const ab = this.char.ability;
     return ab.kind === 'buff' && ab.hyperArmor && this.buffUntil > now;
   }
@@ -245,7 +249,7 @@ export class Fighter {
     }
   }
 
-  /** Forward lunge speed (m/s) from the current attack, if any. */
+  /** Forward lunge speed (m/s) from the current attack, if any; negative for attacks that give ground. */
   lungeSpeed(now: number): number {
     if (this.state !== 'attack' || !this.attack?.lunge) return 0;
     const start = this.atkWindup * 0.55;
@@ -343,9 +347,9 @@ export class Fighter {
   private tryInput(action: InputAction, now: number, opts: InputOptions): boolean {
     switch (action) {
       case 'light':
-        return this.pressLight(now);
+        return this.pressLight(now, opts);
       case 'heavy':
-        return this.pressHeavy(now);
+        return this.pressHeavy(now, opts);
       case 'blockDown':
         return this.pressBlock(now, opts.pressTime ?? now);
       case 'blockUp':
@@ -369,9 +373,14 @@ export class Fighter {
     return this.state === 'idle' || this.state === 'block' || this.inComboWindow(now);
   }
 
-  pressLight(now: number): boolean {
+  pressLight(now: number, opts: InputOptions = {}): boolean {
     if (this.state === 'stance' && this.char.ability.kind === 'stance') {
       this.startAttack('ia', now);
+      return true;
+    }
+    const v = this.variant(now, opts, 'jl', 'dl', 'bl');
+    if (v) {
+      this.startAttack(v, now);
       return true;
     }
     if (this.state === 'idle' || this.state === 'block') {
@@ -388,10 +397,44 @@ export class Fighter {
     return false;
   }
 
-  pressHeavy(now: number): boolean {
+  /** Heavies chain like lights: a press in the recovery of the first or second heavy throws the next one. */
+  pressHeavy(now: number, opts: InputOptions = {}): boolean {
+    const v = this.variant(now, opts, 'jh', 'dh', 'bh');
+    if (v) {
+      this.startAttack(v, now);
+      return true;
+    }
+    if (this.state === 'attack' && this.attackPhase(now) === 'recovery' && (this.attackKey === 'h' || this.attackKey === 'h1')) {
+      this.startAttack(this.attackKey === 'h' ? 'h1' : 'h2', now);
+      return true;
+    }
     if (!this.canStartAttack(now)) return false;
     this.startAttack('h', now);
     return true;
+  }
+
+  /**
+   * Which situational attack a press becomes, if any: in the air, out of (or just after) a forward
+   * dodge, or while walking away from where the fighter faces. Air and backstep attacks start from
+   * neutral like any attack; a dash attack may cut the end of the dodge short.
+   */
+  private variant(now: number, opts: InputOptions, air: AttackKey, dash: AttackKey, back: AttackKey): AttackKey | null {
+    const neutral = this.state === 'idle' || this.state === 'block';
+    if (!this.onGround) return neutral || this.inComboWindow(now) ? air : null;
+    const dashing = this.state === 'dodge' && this.dodgeForward && now - this.stateStart >= this.dodgeDur * COMBAT.dashCancelFrom;
+    if (dashing || (neutral && now <= this.dashUntil)) {
+      this.dashUntil = -Infinity;
+      return dash;
+    }
+    if (!neutral) return null;
+    const mx = opts.dx ?? 0;
+    const mz = opts.dz ?? 0;
+    const len = Math.hypot(mx, mz);
+    if (len > 0.3) {
+      const f = forward(this.yaw);
+      if ((mx * f.x + mz * f.z) / len < -COMBAT.backstepDot) return back;
+    }
+    return null;
   }
 
   pressSpecial(now: number): boolean {
@@ -528,11 +571,14 @@ export class Fighter {
       len = 1;
     }
     this.beginDodge(now, dx / len, dz / len, COMBAT.dodgeDistance, COMBAT.dodgeTime, COMBAT.dodgeIframes, pressTime);
+    const f = forward(this.yaw);
+    this.dodgeForward = (dx * f.x + dz * f.z) / len > COMBAT.dashDot;
     return true;
   }
 
   private beginDodge(now: number, dx: number, dz: number, dist: number, dur: number, iframes: number, pressTime: number): void {
     this.setState('dodge', now, dur, pressTime);
+    this.dodgeForward = false;
     this.dodgeDx = dx;
     this.dodgeDz = dz;
     this.dodgeDist = dist;
@@ -604,7 +650,10 @@ export class Fighter {
         if (e >= this.attackTotal()) this.toNeutral(now);
         break;
       case 'dodge':
-        if (e >= this.dodgeDur) this.toNeutral(now);
+        if (e >= this.dodgeDur) {
+          if (this.dodgeForward) this.dashUntil = now + COMBAT.dashWindow;
+          this.toNeutral(now);
+        }
         break;
       case 'stance':
       case 'stagger':

@@ -52,8 +52,21 @@ export type AttackAnim =
  */
 export type Perilous = 'thrust' | 'sweep' | 'grab';
 
-/** l0..l4 = light chain, h = heavy, sp = special, ab = ability attack, ia = stance attack, ct = counter strike */
-export type AttackKey = 'l0' | 'l1' | 'l2' | 'l3' | 'l4' | 'h' | 'sp' | 'ab' | 'ia' | 'ct';
+/**
+ * l0..l2 = light chain, h/h1/h2 = heavy chain, dl/dh = dash light/heavy (out of a forward dodge),
+ * bl/bh = backstep light/heavy (walking away), jl/jh = jump light/heavy (in the air),
+ * sp = special, ab = ability attack, ia = stance attack, ct = counter strike
+ */
+export type AttackKey = 'l0' | 'l1' | 'l2' | 'l3' | 'l4' | 'h' | 'sp' | 'ab' | 'ia' | 'ct' | ExtraKey;
+
+/** The moves beyond the light chain, the first heavy, the special and the ability. */
+export type ExtraKey = 'h1' | 'h2' | 'dl' | 'dh' | 'bl' | 'bh' | 'jl' | 'jh';
+export const EXTRA_KEYS: readonly ExtraKey[] = ['h1', 'h2', 'dl', 'dh', 'bl', 'bh', 'jl', 'jh'];
+
+/** Heavy attacks of every kind (they share hyper armor, heavy trails and sounds). */
+export function isHeavyKey(key: string | null | undefined): boolean {
+  return key === 'h' || key === 'h1' || key === 'h2' || key === 'dh' || key === 'bh' || key === 'jh';
+}
 
 export interface AttackDef {
   name: string;
@@ -140,15 +153,59 @@ export interface CharacterDef {
   };
   /** Ratings shown on the select screen, 1-5. */
   ratings: { power: number; speed: number; reach: number; defense: number; difficulty: number };
+  /** The light chain: three presses in succession. */
   lights: AttackDef[];
+  /** The first heavy; `extra.h1` and `extra.h2` follow it in the heavy chain. */
   heavy: AttackDef;
+  extra: Record<ExtraKey, AttackDef>;
   special: AttackDef & { cooldown: number };
   ability: AbilityDef;
   passive: { name: string; description: string; mods: PassiveMods };
   palette: Palette;
 }
 
-const ronin: CharacterDef = {
+type Named = { name: string; anim: AttackAnim } & Partial<AttackDef>;
+
+/**
+ * The extended moveset, derived from a character's opening light and first heavy so it keeps their
+ * speed and weight: two more heavies to chain, a dash attack of each weight out of a forward dodge,
+ * a retreating attack of each weight, and an air attack of each weight. `n` names each move and
+ * picks its swing; anything else it sets overrides the derived numbers.
+ */
+function kit(light: AttackDef, heavy: AttackDef, n: Record<ExtraKey, Named>): Record<ExtraKey, AttackDef> {
+  const r = (v: number) => Math.round(v);
+  const scaled = (b: AttackDef, k: { w: number; a?: number; rc: number; d: number; p: number; bp?: number; rg?: number; ar?: number }): AttackDef => ({
+    name: '',
+    anim: b.anim,
+    windup: r(b.windup * k.w),
+    active: r(b.active * (k.a ?? 1)),
+    recovery: r(b.recovery * k.rc),
+    damage: r(b.damage * k.d),
+    posture: r(b.posture * k.p),
+    blockPosture: r(b.blockPosture * (k.bp ?? k.p)),
+    range: +(b.range + (k.rg ?? 0)).toFixed(2),
+    arc: r(Math.min(180, b.arc * (k.ar ?? 1))),
+  });
+  const base: Record<ExtraKey, AttackDef> = {
+    // the heavy chain: a second heavy a touch quicker, then a big finisher that knocks back
+    h1: { ...scaled(heavy, { w: 0.92, rc: 0.95, d: 1, p: 1, ar: 1.15 }), lunge: (heavy.lunge ?? 0.8) * 0.9 },
+    h2: { ...scaled(heavy, { w: 1.12, rc: 1.12, d: 1.25, p: 1.2, bp: 1.15, ar: 1.3 }), lunge: (heavy.lunge ?? 0.8) * 0.8, knockback: 1 },
+    // out of a forward dodge: quick, covering ground
+    dl: { ...scaled(light, { w: 0.8, rc: 1.05, d: 1.15, p: 1.1, rg: 0.2, ar: 0.7 }), lunge: 1.6 },
+    dh: { ...scaled(heavy, { w: 0.8, rc: 1, d: 1.05, p: 1, rg: 0.2, ar: 0.8 }), lunge: 2.6 },
+    // walking away: the attack gives ground as it lands
+    bl: { ...scaled(light, { w: 1, rc: 1, d: 0.9, p: 0.9, ar: 1.1 }), lunge: -0.9 },
+    bh: { ...scaled(heavy, { w: 0.9, rc: 1, d: 0.9, p: 0.9 }), lunge: -1.2 },
+    // in the air: a quick cut on the way down, or a plunge that lands hard
+    jl: { ...scaled(light, { w: 0.75, rc: 1.1, d: 1, p: 1, ar: 1.2 }), lunge: 0.6 },
+    jh: { ...scaled(heavy, { w: 0.6, rc: 1.05, d: 0.95, p: 1.1 }), lunge: 0.8, knockback: 0.6 },
+  };
+  const out = {} as Record<ExtraKey, AttackDef>;
+  for (const k of EXTRA_KEYS) out[k] = { ...base[k], ...n[k] };
+  return out;
+}
+
+const ronin: BaseDef = {
   id: 'ronin',
   name: 'Ronin',
   jp: '浪人',
@@ -178,7 +235,7 @@ const ronin: CharacterDef = {
   palette: { primary: '#2a2b34', secondary: '#e6dcc4', accent: '#c8323c', skin: '#e8d9c4', hair: '#141418', metal: '#d9e2ec' },
 };
 
-const juggernaut: CharacterDef = {
+const juggernaut: BaseDef = {
   id: 'juggernaut',
   name: 'Warden',
   jp: '石衛',
@@ -192,6 +249,8 @@ const juggernaut: CharacterDef = {
     { name: 'Skullcrusher', anim: 'slashR', windup: 440, active: 120, recovery: 420, damage: 14, posture: 16, blockPosture: 22, range: 3.0, arc: 75, lunge: 0.5 },
     // a full turn with the hammer dragged behind: slower to come out, but it sweeps a wide arc
     { name: 'Cyclone', anim: 'spin', windup: 640, active: 130, recovery: 560, damage: 18, posture: 20, blockPosture: 28, range: 3.1, arc: 100, lunge: 0.6 },
+    // the hammer brought up from the ground under the chin
+    { name: 'Grave Bell', anim: 'uppercut', windup: 520, active: 120, recovery: 520, damage: 16, posture: 20, blockPosture: 26, range: 3.0, arc: 70, lunge: 0.7 },
   ],
   heavy: { name: 'Meteor', anim: 'slam', windup: 780, active: 140, recovery: 650, damage: 26, posture: 34, blockPosture: 46, range: 3.2, arc: 50, lunge: 1.0, feintable: true, knockback: 1.2 },
   special: { name: 'Earthshaker', anim: 'sweep', windup: 800, active: 180, recovery: 700, damage: 24, posture: 30, blockPosture: 30, range: 3.8, arc: 110, perilous: 'sweep', cooldown: 7500 },
@@ -208,7 +267,7 @@ const juggernaut: CharacterDef = {
   palette: { primary: '#6e6c66', secondary: '#3a3834', accent: '#d8b25a', skin: '#8a857a', hair: '#3a3834', metal: '#9aa3ad' },
 };
 
-const duelist: CharacterDef = {
+const duelist: BaseDef = {
   id: 'duelist',
   name: 'Duelist',
   jp: '細剣士',
@@ -223,7 +282,6 @@ const duelist: CharacterDef = {
     { name: 'Disengage', anim: 'thrust', windup: 220, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.5, feintable: true },
     // a cut, not a thrust: it covers a wider angle
     { name: 'Whip Cut', anim: 'slashL', windup: 220, active: 70, recovery: 300, damage: 7, posture: 9, blockPosture: 10, range: 3.0, arc: 45, lunge: 0.5, feintable: true },
-    { name: 'Balestra', anim: 'thrust', windup: 300, active: 80, recovery: 420, damage: 10, posture: 12, blockPosture: 14, range: 3.3, arc: 30, lunge: 0.9, feintable: true },
   ],
   heavy: { name: 'Pirouette', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.4, arc: 30, lunge: 1.5, feintable: true },
   special: { name: 'Coup de Grace', anim: 'thrust', windup: 620, active: 140, recovery: 600, damage: 20, posture: 30, blockPosture: 30, range: 4.4, arc: 20, lunge: 3.5, perilous: 'thrust', cooldown: 6500 },
@@ -242,7 +300,7 @@ const duelist: CharacterDef = {
   palette: { primary: '#4f7a3a', secondary: '#ecebe6', accent: '#8fd46a', skin: '#e8b796', hair: '#e0c060', metal: '#e6eef5' },
 };
 
-const lancer: CharacterDef = {
+const lancer: BaseDef = {
   id: 'lancer',
   name: 'Lancer',
   jp: '槍騎士',
@@ -273,7 +331,7 @@ const lancer: CharacterDef = {
   palette: { primary: '#26242a', secondary: '#d9d4c8', accent: '#f2c14e', skin: '#e4a672', hair: '#3e2731', metal: '#f2d27a' },
 };
 
-const shade: CharacterDef = {
+const shade: BaseDef = {
   id: 'shade',
   name: 'Assassin',
   jp: '影刃',
@@ -290,7 +348,6 @@ const shade: CharacterDef = {
     // three quick stabs: three hits to read
     { name: 'Hornet Flurry', anim: 'dualSlash', windup: 190, active: 120, recovery: 260, damage: 2, posture: 3, blockPosture: 3, range: 2.35, arc: 60, lunge: 0.5, hits: 3 },
     // a front flip that lands both blades
-    { name: 'Eviscerate', anim: 'dualSlash', windup: 300, active: 100, recovery: 420, damage: 5, posture: 6, blockPosture: 7, range: 2.4, arc: 70, lunge: 0.9, hits: 2 },
   ],
   heavy: { name: 'Viper Fang', anim: 'thrust', windup: 520, active: 100, recovery: 460, damage: 14, posture: 18, blockPosture: 22, range: 2.4, arc: 40, lunge: 2.0, feintable: true },
   special: { name: 'Throat Grab', anim: 'grab', windup: 650, active: 150, recovery: 650, damage: 22, posture: 25, blockPosture: 25, range: 2.4, arc: 40, lunge: 2.0, perilous: 'grab', cooldown: 7500 },
@@ -305,7 +362,7 @@ const shade: CharacterDef = {
   palette: { primary: '#173a3a', secondary: '#262b30', accent: '#38bea8', skin: '#e8b796', hair: '#1a2a2a', metal: '#b8c0d8' },
 };
 
-const reaper: CharacterDef = {
+const reaper: BaseDef = {
   id: 'reaper',
   name: 'Wraith',
   jp: '鎌鬼',
@@ -333,7 +390,7 @@ const reaper: CharacterDef = {
   palette: { primary: '#d8d6d0', secondary: '#2a2a30', accent: '#c4161c', skin: '#e6e4de', hair: '#101012', metal: '#a7b5ae' },
 };
 
-const monk: CharacterDef = {
+const monk: BaseDef = {
   id: 'monk',
   name: 'Monk',
   jp: '老師',
@@ -348,7 +405,6 @@ const monk: CharacterDef = {
     { name: 'Cross', anim: 'punchL', windup: 220, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 1.9, arc: 60, lunge: 0.5 },
     // a spinning hook kick: a beat slower than the hands, but the leg reaches further
     { name: 'Whirlwind Kick', anim: 'spin', windup: 280, active: 60, recovery: 300, damage: 6, posture: 9, blockPosture: 11, range: 2.2, arc: 70, lunge: 0.4 },
-    { name: 'Rising Dragon', anim: 'uppercut', windup: 300, active: 80, recovery: 420, damage: 8, posture: 14, blockPosture: 18, range: 2.0, arc: 60, lunge: 0.8 },
   ],
   heavy: { name: 'Mountain Breaker', anim: 'punchR', windup: 560, active: 100, recovery: 480, damage: 14, posture: 28, blockPosture: 34, range: 2.1, arc: 50, lunge: 1.5, feintable: true, knockback: 1.0 },
   special: { name: 'Iron Grapple', anim: 'grab', windup: 620, active: 150, recovery: 650, damage: 20, posture: 35, blockPosture: 35, range: 2.3, arc: 45, lunge: 1.5, perilous: 'grab', cooldown: 7500 },
@@ -364,7 +420,7 @@ const monk: CharacterDef = {
   palette: { primary: '#b0432a', secondary: '#e8e0d0', accent: '#f2c14e', skin: '#c28569', hair: '#e8e4dc', metal: '#8c6f4a' },
 };
 
-const paladin: CharacterDef = {
+const paladin: BaseDef = {
   id: 'paladin',
   name: 'Knight',
   jp: '騎士',
@@ -392,15 +448,106 @@ const paladin: CharacterDef = {
   palette: { primary: '#5a4a2e', secondary: '#1e2a4a', accent: '#c98f45', skin: '#e8b796', hair: '#733e39', metal: '#d9b47a' },
 };
 
+type BaseDef = Omit<CharacterDef, 'extra'>;
+
+/** What each character calls its extended moves and how each one swings (see `kit`). */
+const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
+  ronin: {
+    h1: { name: 'Wind Splitter', anim: 'slashL' },
+    h2: { name: 'Crescent Moon', anim: 'spin' },
+    dl: { name: 'Gale Step', anim: 'thrust' },
+    dh: { name: 'Thunder Draw', anim: 'slashR' },
+    bl: { name: 'Fading Cut', anim: 'slashL' },
+    bh: { name: 'Mountain Wall', anim: 'overhead' },
+    jl: { name: 'Swallow Dive', anim: 'slashR' },
+    jh: { name: 'Falling Star', anim: 'overhead' },
+  },
+  juggernaut: {
+    h1: { name: 'Avalanche', anim: 'slashL' },
+    h2: { name: 'Worldbreaker', anim: 'slam', knockback: 1.4 },
+    dl: { name: 'Battering Ram', anim: 'bash', lunge: 1.2 },
+    dh: { name: 'Landslide', anim: 'charge', lunge: 2.2 },
+    bl: { name: 'Rampart', anim: 'slashR' },
+    bh: { name: 'Gravestone', anim: 'slam' },
+    jl: { name: 'Boulder Drop', anim: 'overhead' },
+    jh: { name: 'Meteor Fall', anim: 'slam', knockback: 1.2 },
+  },
+  duelist: {
+    h1: { name: 'Prise de Fer', anim: 'thrust' },
+    h2: { name: 'Grand Salut', anim: 'slashR' },
+    // the hop and deep lunge, now what a forward dodge flows into
+    dl: { name: 'Balestra', anim: 'thrust', windup: 300, active: 80, recovery: 420, damage: 10, posture: 12, blockPosture: 14, range: 3.3, arc: 30, lunge: 1.4, feintable: true },
+    dh: { name: 'Passata', anim: 'thrust' },
+    bl: { name: 'Retreating Cut', anim: 'slashL' },
+    bh: { name: 'Volte', anim: 'spin' },
+    jl: { name: 'Petal Lunge', anim: 'thrust' },
+    jh: { name: 'Sky Piercer', anim: 'thrust' },
+  },
+  lancer: {
+    h1: { name: 'Dragon Tail', anim: 'sweep' },
+    h2: { name: 'Thunder Spiral', anim: 'spin' },
+    dl: { name: 'Lightning Lunge', anim: 'thrust' },
+    dh: { name: 'Storm Charge', anim: 'thrust' },
+    bl: { name: 'Fending Jab', anim: 'thrust' },
+    bh: { name: 'Bolt Wheel', anim: 'slashR' },
+    jl: { name: 'Falcon Strike', anim: 'thrust' },
+    jh: { name: 'Thunderfall', anim: 'slam' },
+  },
+  shade: {
+    h1: { name: 'Twin Fang', anim: 'dualSlash' },
+    h2: { name: 'Death Lotus', anim: 'spin', hits: 2 },
+    // two cuts on the way through, out of a forward dodge
+    dl: { name: 'Eviscerate', anim: 'dualSlash', windup: 300, active: 100, recovery: 420, damage: 5, posture: 6, blockPosture: 7, range: 2.4, arc: 70, lunge: 2.2, hits: 2 },
+    dh: { name: 'Viper Rush', anim: 'thrust' },
+    bl: { name: 'Smoke Cut', anim: 'slashL' },
+    bh: { name: 'Hidden Thorn', anim: 'dualSlash' },
+    jl: { name: 'Kite', anim: 'dualSlash' },
+    jh: { name: 'Nightfall', anim: 'thrust' },
+  },
+  reaper: {
+    h1: { name: 'Severance', anim: 'slashL' },
+    h2: { name: 'Requiem', anim: 'spin' },
+    dl: { name: 'Drift Reap', anim: 'slashR' },
+    dh: { name: 'Soul Rend', anim: 'sweep' },
+    bl: { name: 'Mournful Step', anim: 'slashL' },
+    bh: { name: 'Grave Wind', anim: 'spin' },
+    jl: { name: 'Ghost Fall', anim: 'slashR' },
+    jh: { name: 'Last Rites', anim: 'overhead' },
+  },
+  monk: {
+    h1: { name: 'Tiger Palm', anim: 'punchL' },
+    h2: { name: 'Heaven Shaker', anim: 'uppercut' },
+    // the uppercut that used to close the light chain, now thrown out of a forward dodge
+    dl: { name: 'Rising Dragon', anim: 'uppercut', windup: 300, active: 80, recovery: 420, damage: 8, posture: 14, blockPosture: 18, range: 2.0, arc: 60, lunge: 1.4 },
+    dh: { name: 'Charging Ox', anim: 'punchR' },
+    bl: { name: 'Crane Step', anim: 'punchL' },
+    bh: { name: 'Turning Mountain', anim: 'spin' },
+    jl: { name: 'Falling Leaf Kick', anim: 'spin' },
+    jh: { name: 'Thunder Heel', anim: 'slam' },
+  },
+  paladin: {
+    h1: { name: 'Oathkeeper', anim: 'slashL' },
+    h2: { name: 'Bronze Verdict', anim: 'overhead' },
+    dl: { name: 'Lunging Edge', anim: 'thrust' },
+    dh: { name: 'Rampart Charge', anim: 'bash' },
+    bl: { name: 'Guarded Cut', anim: 'slashR' },
+    bh: { name: 'Shield Wall', anim: 'bash' },
+    jl: { name: 'Leaping Strike', anim: 'slashR' },
+    jh: { name: 'Crashing Oath', anim: 'overhead' },
+  },
+};
+
+const withExtra = (c: BaseDef): CharacterDef => ({ ...c, extra: kit(c.lights[0], c.heavy, EXTRA[c.id]) });
+
 export const CHARACTERS: Record<CharacterId, CharacterDef> = {
-  ronin,
-  juggernaut,
-  duelist,
-  lancer,
-  shade,
-  reaper,
-  monk,
-  paladin,
+  ronin: withExtra(ronin),
+  juggernaut: withExtra(juggernaut),
+  duelist: withExtra(duelist),
+  lancer: withExtra(lancer),
+  shade: withExtra(shade),
+  reaper: withExtra(reaper),
+  monk: withExtra(monk),
+  paladin: withExtra(paladin),
 };
 
 export const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
@@ -422,6 +569,15 @@ export function getAttack(char: CharacterDef, key: AttackKey): AttackDef | null 
       return char.ability.kind === 'stance' ? char.ability.attack : null;
     case 'ct':
       return char.ability.kind === 'counter' ? char.ability.attack : null;
+    case 'h1':
+    case 'h2':
+    case 'dl':
+    case 'dh':
+    case 'bl':
+    case 'bh':
+    case 'jl':
+    case 'jh':
+      return char.extra[key];
     default: {
       const i = Number(key.slice(1));
       return char.lights[i] ?? null;

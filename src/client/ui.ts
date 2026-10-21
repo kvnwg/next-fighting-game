@@ -712,8 +712,11 @@ export class UI {
           </div>
         </div>
         <div class="moves">
-          <div><h4>Light chain [LMB]</h4><ul>${c.lights.map((l) => atkRow(l.name, l.damage * (l.hits ?? 1))).join('')}</ul></div>
-          <div><h4>Heavy [RMB]</h4><ul>${atkRow(c.heavy.name, c.heavy.damage, c.heavy.feintable ? ' · feint with F' : '')}</ul>
+          <div><h4>Light chain [LMB ×3]</h4><ul>${c.lights.map((l) => atkRow(l.name, l.damage * (l.hits ?? 1))).join('')}</ul>
+            <h4>Heavy chain [RMB ×3]</h4><ul>${[c.heavy, c.extra.h1, c.extra.h2].map((h, i) => atkRow(h.name, h.damage * (h.hits ?? 1), i === 0 && h.feintable ? ' · feint with F' : '')).join('')}</ul></div>
+          <div><h4>Dash [dodge forward, then LMB / RMB]</h4><ul>${atkRow(c.extra.dl.name, c.extra.dl.damage * (c.extra.dl.hits ?? 1))}${atkRow(c.extra.dh.name, c.extra.dh.damage)}</ul>
+            <h4>Backstep [walk away + LMB / RMB]</h4><ul>${atkRow(c.extra.bl.name, c.extra.bl.damage)}${atkRow(c.extra.bh.name, c.extra.bh.damage)}</ul>
+            <h4>Air [jump, then LMB / RMB]</h4><ul>${atkRow(c.extra.jl.name, c.extra.jl.damage)}${atkRow(c.extra.jh.name, c.extra.jh.damage)}</ul>
             <h4>Perilous [E]</h4><ul>${atkRow(c.special.name, c.special.damage, ` · ${c.special.cooldown / 1000}s`)}<li class="tip">${PERILOUS_TIP[c.special.perilous!]}</li></ul></div>
           <div><h4>Ability [R] · ${c.ability.name}</h4><p>${esc(c.ability.description)} <span class="muted">(${c.ability.cooldown / 1000}s)</span></p>
             <h4>Passive · ${c.passive.name}</h4><p>${esc(c.passive.description)}</p></div>
@@ -775,8 +778,8 @@ export class UI {
                 ? `<table class="keys">
               <tr><td>Left thumb</td><td>Move (anywhere on the left side)</td></tr>
               <tr><td>Drag right</td><td>Look around</td></tr>
-              <tr><td>Light</td><td>Light attack (chain up to 3-4)</td></tr>
-              <tr><td>Heavy</td><td>Heavy attack (tap Parry during the windup to feint)</td></tr>
+              <tr><td>Light</td><td>Light attack, three in a row (after a forward dodge: dash attack; walking away: backstep attack; in the air: air attack)</td></tr>
+              <tr><td>Heavy</td><td>Heavy attack, three in a row, with the same dash, backstep and air versions (tap Parry during the windup to feint)</td></tr>
               <tr><td>Parry</td><td>Guard; tap right before a hit to DEFLECT</td></tr>
               <tr><td>Dodge</td><td>Dodge (hold to sprint)</td></tr>
               <tr><td>Jump</td><td>Jump (evades perilous sweeps)</td></tr>
@@ -791,8 +794,8 @@ export class UI {
             <table class="keys${this.touch ? ' hidden' : ''}">
               <tr><td>WASD</td><td>Move (Shift tap: dodge, hold: sprint)</td></tr>
               <tr><td>Mouse</td><td>Look / aim (click to capture)</td></tr>
-              <tr><td>LMB</td><td>Light attack (chain up to 3-4)</td></tr>
-              <tr><td>RMB</td><td>Heavy attack (press F during windup to feint)</td></tr>
+              <tr><td>LMB</td><td>Light attack, three in a row (after a forward dodge: dash attack; walking away: backstep attack; in the air: air attack)</td></tr>
+              <tr><td>RMB</td><td>Heavy attack, three in a row, with the same dash, backstep and air versions (press F during windup to feint)</td></tr>
               <tr><td>F</td><td>Guard — tap right before a hit to DEFLECT</td></tr>
               <tr><td>Space</td><td>Jump (evades perilous sweeps)</td></tr>
               <tr><td>E</td><td>Perilous special (unblockable)</td></tr>

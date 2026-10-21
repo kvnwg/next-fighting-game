@@ -72,6 +72,13 @@ export const COMBAT = {
   dodgeCooldown: 850,
   /** Minimum time between jumps (longer than a jump's airtime, so evasion can't be chained). */
   jumpCooldown: 900,
+  /** A forward dodge (stick within ~45° of facing) turns light and heavy into dash attacks... */
+  dashDot: 0.7,
+  /** ...from this fraction of the dodge on, and for this long (ms) after it ends. */
+  dashCancelFrom: 0.45,
+  dashWindow: 260,
+  /** Walking away (stick within ~50° of straight back) turns them into backstep attacks. */
+  backstepDot: 0.65,
   /** Window after a jump press during which sweeps and grabs pass under you. */
   jumpEvadeStart: 50,
   jumpEvadeEnd: 620,

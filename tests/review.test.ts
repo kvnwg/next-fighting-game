@@ -155,7 +155,7 @@ describe('server authority', () => {
     fb.z = 1.6;
     fb.yaw = Math.PI;
     fa.owner = null; // server-driven attacker so its position stays put
-    fa.startAttack('l3', now());
+    fa.startAttack('dl', now()); // Eviscerate: two hits
     const tHit = now() + fa.atkWindup;
     step(fa.atkWindup - 60);
     arena.handleAction(pb, { t: 'act', a: 'blockDown', vt: tHit - 40, r: Math.PI });

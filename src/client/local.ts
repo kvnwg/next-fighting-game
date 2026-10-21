@@ -88,9 +88,11 @@ export class LocalController {
       else return;
     }
 
+    // dodges go where the stick points; lights and heavies read it too (walking away, they become
+    // backstep attacks)
     let dx = 0;
     let dz = 0;
-    if (action === 'dodge') {
+    if (action === 'dodge' || action === 'light' || action === 'heavy') {
       dx = this.moveDir.x;
       dz = this.moveDir.z;
     }
@@ -171,9 +173,10 @@ export class LocalController {
     if (want !== null && !this.frozen) sim.yaw = turnToward(sim.yaw, want, sim.turnRate(now) * dt);
 
     const lunge = sim.lungeSpeed(now);
-    if (lunge > 0) {
+    if (lunge !== 0) {
       const fw = forward(sim.yaw);
-      const blocked = ctx.others.some((o) => {
+      // stop short of lunging into someone (retreating attacks always back off)
+      const blocked = lunge > 0 && ctx.others.some((o) => {
         const ox = o.pos.x - sim.x;
         const oz = o.pos.z - sim.z;
         return Math.hypot(ox, oz) < 1.15 && ox * fw.x + oz * fw.z > 0;

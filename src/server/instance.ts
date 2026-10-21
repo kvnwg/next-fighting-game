@@ -265,7 +265,7 @@ export abstract class Instance {
   /** When a fighter starts a dash or lunge, allow the distance it will legitimately cover. */
   private grantMovement(f: ServerFighter, before: { serial: number; state: string; start: number }): void {
     if (!f.owner) return;
-    if (f.attackSerial !== before.serial && f.attack?.lunge) f.moveAllowance += f.attack.lunge + 0.5;
+    if (f.attackSerial !== before.serial && f.attack?.lunge) f.moveAllowance += Math.abs(f.attack.lunge) + 0.5;
     if (f.state === 'dodge' && (before.state !== 'dodge' || f.stateStart !== before.start)) f.moveAllowance += f.dodgeDist + 0.5;
   }
 
@@ -362,10 +362,10 @@ export abstract class Instance {
     let vx = f.moveX * speed;
     let vz = f.moveZ * speed;
     const lunge = f.lungeSpeed(now);
-    if (lunge > 0) {
+    if (lunge !== 0) {
       const fw = forward(f.yaw);
-      // stop lunging into someone
-      const blocked = all.some((o) => o !== f && o.isAlive() && Math.hypot(o.x - f.x, o.z - f.z) < 1.1);
+      // stop lunging into someone (retreating attacks always back off)
+      const blocked = lunge > 0 && all.some((o) => o !== f && o.isAlive() && Math.hypot(o.x - f.x, o.z - f.z) < 1.1);
       if (!blocked) {
         vx += fw.x * lunge;
         vz += fw.z * lunge;

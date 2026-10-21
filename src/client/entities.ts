@@ -3,7 +3,7 @@
  * interpolated replica of server state (everyone else).
  */
 import * as THREE from 'three';
-import { AttackDef, CHARACTERS, getAttack } from '../shared/characters';
+import { AttackDef, CHARACTERS, getAttack, isHeavyKey } from '../shared/characters';
 import { INTERP_DELAY_MS } from '../shared/config';
 import { Fighter, FighterState } from '../shared/fighter';
 import { angleDiff, forward } from '../shared/math';
@@ -304,7 +304,7 @@ export class ClientFighter {
     const frame = m.frame;
     const live = (!!atk && v.state === 'attack' && !atk.noHitbox) || (v.state === 'dodge' && !!frame?.trail);
     const tc = m.animator.style.trail;
-    const big = v.key === 'h' || v.key === 'ab' || v.key === 'ia' || v.key === 'ct';
+    const big = isHeavyKey(v.key) || v.key === 'ab' || v.key === 'ia' || v.key === 'ct';
     const color = frame?.trail?.color ?? (atk?.perilous ? tc.special : big ? tc.heavy : tc.light);
     const life = frame?.trail?.life ?? (atk?.perilous ? 0.2 : big ? 0.17 : 0.13);
     const glow = frame?.trail?.glow ?? (atk?.perilous ? 0.8 : big ? 0.45 : 0.1);
