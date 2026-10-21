@@ -212,7 +212,7 @@ export function glyphTexture(text: string, color: string, bg: string): THREE.Can
     g.arc(16, 16, 14, 0, Math.PI * 2);
     g.fill();
     g.fillStyle = color;
-    g.font = `800 22px 'Shippori Mincho B1', serif`;
+    g.font = `22px 'DotGothic16', monospace`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText(text, 16, 17);

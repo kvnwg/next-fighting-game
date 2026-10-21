@@ -25,6 +25,10 @@ export class Net {
   rtt = 0;
   connected = false;
   onClose: ((reason: string) => void) | null = null;
+  /** messages waiting while the connection is held (see hold) */
+  private held: ServerMsg[] | null = null;
+  /** sees each message as it's queued while held */
+  onHeld: ((m: ServerMsg) => void) | null = null;
 
   /** Connect to a WebSocket URL, or pass a factory for another transport (offline mode). */
   connect(target: string | (() => SocketLike)): Promise<void> {
@@ -44,6 +48,7 @@ export class Net {
         const was = this.connected;
         this.connected = false;
         if (this.pingTimer) clearInterval(this.pingTimer);
+        this.held = null;
         if (was) this.onClose?.(e.reason || 'Connection lost');
       };
       ws.onmessage = (e) => {
@@ -58,14 +63,38 @@ export class Net {
         if (m.t === 'welcome' && !this.synced) {
           this.offset = m.serverTime - performance.now();
         }
-        const hs = this.handlers.get(m.t);
-        if (hs) for (const h of hs) h(m);
+        if (this.held) {
+          this.held.push(m);
+          this.onHeld?.(m);
+          return;
+        }
+        this.dispatch(m);
       };
     });
   }
 
   close(): void {
     this.ws?.close();
+  }
+
+  private dispatch(m: ServerMsg): void {
+    const hs = this.handlers.get(m.t);
+    if (hs) for (const h of hs) h(m);
+  }
+
+  /**
+   * Queue incoming messages instead of handling them (clock sync and pings carry on), so the title
+   * screen can finish its scene before the game takes over. release() handles the queue in order.
+   */
+  hold(): void {
+    this.held ??= [];
+  }
+
+  release(): void {
+    const q = this.held;
+    this.held = null;
+    this.onHeld = null;
+    if (q) for (const m of q) this.dispatch(m);
   }
 
   on<T extends ServerMsg['t']>(t: T, h: Handler<T>): void {

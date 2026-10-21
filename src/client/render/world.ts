@@ -209,7 +209,7 @@ export class MapView {
       taken: [],
       trees: (list, opts = {}) => {
         if (!list.length) return;
-        const g = buildTrees(list, opts.detail ?? detail, { shadows: opts.shadows ?? true });
+        const g = buildTrees(list, opts.detail ?? detail, { shadows: opts.shadows ?? true, chunk: opts.chunk });
         (opts.into ?? this.group).add(g);
       },
       props: (list, into) => this.addProps(list, into),
@@ -376,6 +376,8 @@ export class MapView {
     this.boardTex = new THREE.CanvasTexture(c);
     this.boardTex.colorSpace = THREE.SRGBColorSpace;
     this.boardTex.anisotropy = 4;
+    // pixel type: keep the letters blocky up close
+    this.boardTex.magFilter = THREE.NearestFilter;
     const face = new THREE.Mesh(new THREE.PlaneGeometry(2.84, 2.2), new THREE.MeshBasicMaterial({ map: this.boardTex }));
     face.position.set(0, 1.9, 0.02);
     const holder = new THREE.Group();
@@ -395,14 +397,14 @@ export class MapView {
     g.fillStyle = '#16120f';
     g.fillRect(0, 0, c.width, c.height);
     g.fillStyle = '#e8c44a';
-    g.font = '600 18px "Barlow Condensed", sans-serif';
+    g.font = '600 18px "Pixelify Sans", monospace';
     g.textBaseline = 'top';
     g.textAlign = 'center';
     g.fillText('RANKED LADDER', c.width / 2, 10);
     g.fillStyle = 'rgba(232,196,74,0.4)';
     g.fillRect(16, 34, c.width - 32, 1);
     g.textAlign = 'left';
-    g.font = '500 15px "Barlow Condensed", sans-serif';
+    g.font = '500 15px "Pixelify Sans", monospace';
     if (entries.length === 0) {
       g.fillStyle = '#c9b8a0';
       g.textAlign = 'center';

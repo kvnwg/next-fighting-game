@@ -1,8 +1,9 @@
 import './styles.css';
 import { platform } from './platform';
 
-// the kanji font is also drawn into canvas textures (the 危 perilous glyph), so fetch it early
-void document.fonts?.load(`800 22px 'Shippori Mincho B1'`, '危').catch(() => undefined);
+// the pixel fonts are also drawn into canvas textures (the 危 perilous glyph, the ladder board), and
+// the title screen sets its logo in them the moment it opens: fetch them early
+for (const f of [`22px 'DotGothic16'`, `600 18px 'Pixelify Sans'`, `700 64px 'Silkscreen'`]) void document.fonts?.load(f, '危弾DEFLECT').catch(() => undefined);
 
 const root = document.getElementById('app')!;
 const params = new URLSearchParams(location.search);

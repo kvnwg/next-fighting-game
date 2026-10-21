@@ -55,7 +55,7 @@ export interface BuildContext {
   quality: Quality;
   look: Look;
   /** voxel trees (instanced), into the map or a moving group (`into`) */
-  trees(list: TreePlacement[], opts?: { shadows?: boolean; detail?: number; into?: THREE.Object3D }): void;
+  trees(list: TreePlacement[], opts?: { shadows?: boolean; detail?: number; into?: THREE.Object3D; chunk?: number }): void;
   /** voxel props (instanced) */
   props(list: PropPlacement[], into?: THREE.Object3D): void;
   grass(o: GrassOptions): void;

@@ -458,14 +458,15 @@ export interface TreePlacement {
 }
 
 /** Instanced trees, one draw call per kind and variant, casting swaying shadows. */
-export function buildTrees(list: TreePlacement[], detail = 1, opts: { shadows?: boolean } = {}): THREE.Group {
+export function buildTrees(list: TreePlacement[], detail = 1, opts: { shadows?: boolean; chunk?: number } = {}): THREE.Group {
+  const chunk = opts.chunk ?? 30;
   const g = new THREE.Group();
   const groups = new Map<string, TreePlacement[]>();
   for (const t of list) {
     const variant = t.variant ?? Math.floor(hash3(Math.round(t.x * 10), 0, Math.round(t.z * 10), 7) * 3);
     // instances are grouped in 30 m chunks so the camera (and the sun's shadow camera) can skip
-    // whole chunks out of view
-    const key = `${t.kind}:${variant}:${Math.floor(t.x / 30)},${Math.floor(t.z / 30)}`;
+    // whole chunks out of view (a distant forest takes bigger chunks: fewer draws)
+    const key = `${t.kind}:${variant}:${Math.floor(t.x / chunk)},${Math.floor(t.z / chunk)}`;
     const arr = groups.get(key) ?? [];
     arr.push({ ...t, variant });
     groups.set(key, arr);

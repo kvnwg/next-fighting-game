@@ -124,6 +124,8 @@ interface Mirror {
   proj: THREE.Matrix4;
   stamp: number;
   users: number;
+  /** every surface sharing it, all hidden while it renders (they sample it, so can't draw into it) */
+  meshes: Set<THREE.Mesh>;
 }
 const mirrors = new Map<string, Mirror>();
 
@@ -139,7 +141,7 @@ export class Water {
     if (o.reflections > 0) {
       let m = mirrors.get(this.key);
       if (!m) {
-        m = { target: new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true }), cam: new THREE.PerspectiveCamera(), proj: new THREE.Matrix4(), stamp: -1, users: 0 };
+        m = { target: new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true }), cam: new THREE.PerspectiveCamera(), proj: new THREE.Matrix4(), stamp: -1, users: 0, meshes: new Set() };
         // only the world and fighters: no particles, grass or combat effects in the reflection
         m.cam.layers.set(0);
         mirrors.set(this.key, m);
@@ -170,6 +172,7 @@ export class Water {
     this.mesh.receiveShadow = false;
     const mirror = this.mirror;
     if (!mirror) return;
+    mirror.meshes.add(this.mesh);
 
     const scale = o.reflections;
     const plane = new THREE.Plane();
@@ -231,7 +234,7 @@ export class Water {
       const w = Math.max(1, Math.round(size.x * scale));
       const h = Math.max(1, Math.round(size.y * scale));
       if (mirror.target.width !== w || mirror.target.height !== h) mirror.target.setSize(w, h);
-      mesh.visible = false;
+      for (const m of mirror.meshes) m.visible = false;
       reflecting = true;
       const prevTarget = renderer.getRenderTarget();
       const prevShadow = renderer.shadowMap.autoUpdate;
@@ -243,13 +246,14 @@ export class Water {
       renderer.shadowMap.autoUpdate = prevShadow;
       renderer.setRenderTarget(prevTarget);
       reflecting = false;
-      mesh.visible = true;
+      for (const m of mirror.meshes) m.visible = true;
     };
   }
 
   dispose(): void {
     this.mesh.geometry.dispose();
     this.mat.dispose();
+    this.mirror?.meshes.delete(this.mesh);
     if (this.mirror && --this.mirror.users <= 0) {
       this.mirror.target.dispose();
       mirrors.delete(this.key);

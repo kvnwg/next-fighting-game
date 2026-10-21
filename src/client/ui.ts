@@ -1,6 +1,5 @@
 /** DOM user interface: HUD, menus, overlays. Pure presentation; App drives it. */
 import { CHARACTERS, CHARACTER_IDS, CharacterDef, CharacterId, Perilous } from '../shared/characters';
-import { GAME_SUBTITLE, GAME_TITLE } from '../shared/config';
 import { ARENA_MAPS, MAPS } from '../shared/maps';
 import { BotDifficulty, LeaderboardEntry, MatchMode, ProfileView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { PLACEMENT_MATCHES, RankInfo, TIERS, rankOf } from '../shared/ranks';
@@ -82,7 +81,6 @@ interface Floater {
 
 export class UI {
   readonly root: HTMLElement;
-  private title: HTMLElement;
   readonly hud: HTMLElement;
   private modal: HTMLElement;
   private chatLog: HTMLElement;
@@ -109,37 +107,6 @@ export class UI {
   ) {
     this.root = h(`<div id="ui" class="${touch ? 'touch' : ''}"></div>`);
     parent.appendChild(this.root);
-
-    this.title = h(`
-      <div class="title-screen">
-        <div class="title-waves"></div>
-        <div class="title-box">
-          <div class="logo-wrap">
-            <div class="logo-sun"></div>
-            <h1 class="logo">${GAME_TITLE}</h1>
-            <div class="hanko" aria-hidden="true">弾</div>
-          </div>
-          <div class="subtitle"><span class="jp">一騎打ち</span>${GAME_SUBTITLE}</div>
-          <label class="field"><span>Your name <i class="jp">名</i></span><input id="name-input" maxlength="16" autocomplete="off" spellcheck="false" /></label>
-          <button class="btn big" id="enter-btn">${jpLabel('参る', offline ? 'Play' : 'Enter the Grounds')}</button>
-          <div class="title-status" id="title-status">${
-            offline ? 'Single player: roam the lobby, spar, practice, and climb ranked against AI opponents. Progress saves in this browser.' : ''
-          }</div>
-          <div class="title-hint">${
-            touch
-              ? 'Left thumb moves · drag the right side to look · tap PARRY just before a hit lands to deflect'
-              : 'WASD move · Mouse aim · LMB attack · RMB heavy · F guard/deflect · Shift dodge · Space jump · E perilous · R ability · Tab lock-on'
-          }</div>
-        </div>
-      </div>`);
-    this.root.appendChild(this.title);
-    const nameInput = this.title.querySelector<HTMLInputElement>('#name-input')!;
-    nameInput.value = settings.name;
-    const enter = () => this.handlers.onEnter(nameInput.value.trim());
-    this.title.querySelector('#enter-btn')!.addEventListener('click', enter);
-    nameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') enter();
-    });
 
     this.hud = h(`
       <div class="hud hidden">
@@ -321,28 +288,15 @@ export class UI {
     this.hud.querySelectorAll('button, select').forEach((b) => b.addEventListener('mouseup', () => (b as HTMLElement).blur()));
   }
 
-  // ------------------------------------------------------------------ title
-
-  setTitleStatus(text: string, error = false): void {
-    const el = this.title.querySelector<HTMLElement>('#title-status')!;
-    el.textContent = text;
-    el.classList.toggle('error', error);
-  }
+  // ------------------------------------------------------------------ title & game
 
   showGame(): void {
-    this.title.classList.add('hidden');
     this.hud.classList.remove('hidden');
   }
 
+  /** Back to the title screen (App puts it up): the HUD goes. */
   showTitle(): void {
-    this.title.classList.remove('hidden');
     this.hud.classList.add('hidden');
-  }
-
-  /** Fill in the name field (a signed-in platform account), unless the player already typed one. */
-  setTitleName(name: string): void {
-    const input = this.title.querySelector<HTMLInputElement>('#name-input');
-    if (input && !input.value) input.value = name.slice(0, 16);
   }
 
   // ------------------------------------------------------------------ profile & lobby chrome

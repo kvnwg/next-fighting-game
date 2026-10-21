@@ -13,7 +13,7 @@ npm install
 npm run dev          # game server on :3000 + Vite client on :5173
 ```
 
-Open <http://localhost:5173>, enter a name, and click **Enter the Grounds**. Open a second browser window (or an incognito one, so it gets a separate identity) to test ranked matchmaking against yourself.
+Open <http://localhost:5173>, tap (or press any key) on the title screen, enter a name, and press **Enter the Grounds**. Open a second browser window (or an incognito one, so it gets a separate identity) to test ranked matchmaking against yourself.
 
 Production:
 
@@ -169,16 +169,32 @@ src/client/      three.js client
     maps/            one recipe per map (lighting mood + build) on a shared kit
   app.ts           main loop + networking glue      local.ts   local player prediction
   ui.ts            HUD, menus, character select, ladder, results
+  title/           the title screen: the Ronin on the cliff, the camera shots, the way into the game
 tests/           vitest: combat rules + server integration
 scripts/         headless-browser screenshot helpers used during development
 ```
 
+### Title screen
+
+`src/client/title/` plays the way in, over a 3D scene of its own (`render/maps/title.ts`): a promontory over a deep valley at sunset, with a forest of pines and cherries around a lake, a river winding toward a great snow-capped peak, and an old cherry shedding petals over the edge.
+
+- **The Ronin** (`title/ronin.ts`) sits at the tip with his legs over the drop, built from his voxel model on a rig of his own: two-bone IK keeps his hands on his knees, his robe is re-draped for sitting (a morph target lets it fall straight again when he stands), and a long crimson scarf streams off his collar. The scarf, the hem and his hair move in a cloth shader that sends waves down them, on the world's wind, and gusts harder on cue.
+- **The flow** (`title/screen.ts`):
+  1. **Boot:** the frame dissolves in from black through an ordered dither while big pixels resolve into the scene, close on his back, and the camera pulls back over the valley.
+  2. **Tap to continue:** the logo drops in letter by letter and the 弾 hanko stamps down with a taiko hit. Any tap, click or key moves on.
+  3. **Name:** a gust whips his scarf, the camera swings out over the drop to his side, and a pixel-bordered panel opens and types out its question. Typing throws off pixel sparks.
+  4. **Forging:** a block bar fills while the game connects and makes (or finds) your account.
+  5. **Welcome:** he turns to look at you, your initial is stamped on a seal beside your name and rank, and he rises and sets his hand on his sword.
+  6. **The cut:** a blade of light crosses the screen, the last frame splits along it and falls away, and the lobby is behind it. The game's messages are held back (`Net.hold`) until then.
+- If the connection drops, you land back on the cliff at the name panel.
+- **Post effects** (`render/renderer.ts`): the final composite can pixelate the frame (`pixelate`, in CSS pixels) and dissolve it through a 4x4 Bayer dither (`fade`). The title uses both for its reveals and transitions.
+
 ### Look and feel
 
-The UI keeps out of the way of the world: frosted-glass panels with thin borders, condensed type, and a few kanji accents (始め on FIGHT, 勝利 on a win).
+The UI keeps out of the way of the world: frosted-glass panels with thin borders, pixel type, and a few kanji accents (始め on FIGHT, 勝利 on a win).
 - **Fighter cards** have an angled gold health bar with a red damage trail that drains a beat after each hit.
 - **Posture bars**: yours at the bottom centre, your opponent's floating above their head. White is the guard left; it drains from both ends toward the shield, which cracks as it gets low, and the bar disappears while the guard is broken. The round clock sits in a hexagon in the middle, with the round number under it.
-- **Fonts** (Google Fonts): **Barlow Condensed** for everything in Latin, and **Shippori Mincho B1** for the kanji.
+- **Fonts** (Google Fonts): every word in the game is pixel type. **Pixelify Sans** for everything you read, **Silkscreen** for big display lines (the logo, your name on the title screen), and **DotGothic16** for the kanji. Text drawn into textures (the 危 glyph, the ladder board) uses the same fonts.
 - **Where to restyle:** colours and type live at the top of `src/client/styles.css`. Each character and map has a `jp` kanji name in `characters.ts` / `maps.ts`.
 - **Camera** (`src/client/camera.ts`):
   - A match opens on a close-up of your opponent, then of you, before the camera swings round behind your shoulder.

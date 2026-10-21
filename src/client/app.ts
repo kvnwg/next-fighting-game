@@ -21,6 +21,9 @@ import { GameRenderer } from './render/renderer';
 import { portraitURL } from './render/portrait';
 import { SelectScreen } from './select';
 import { MapView } from './render/world';
+import { TITLE_MAP } from './render/maps/title';
+import { TitleScene } from './title/scene';
+import { TitleScreen } from './title/screen';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
 import { TouchControls, isTouchDevice } from './touch';
@@ -68,7 +71,11 @@ class App {
   private tmp = new THREE.Vector3();
   private tmp2 = new THREE.Vector3();
   private tmp3 = new THREE.Vector3();
-  private titleTime = 0;
+  /** the title screen: the Ronin on the cliff (3D) and the menus over it, until the game starts */
+  private titleScene: TitleScene | null = null;
+  private titleScreen: TitleScreen | null = null;
+  /** someone wants a copy of the next rendered frame (the title's cut into the game) */
+  private snapWant: ((frame: HTMLCanvasElement) => void) | null = null;
 
   constructor(
     root: HTMLElement,
@@ -134,7 +141,8 @@ class App {
         },
       });
     }
-    this.loadMap(LOBBY_MAP);
+    this.openTitle();
+    this.titleScreen!.boot();
     this.bindNet();
     requestAnimationFrame((t) => this.frame(t));
     // the title screen is up: loading is over
@@ -142,9 +150,48 @@ class App {
     audio.setMuted('platform', platform.settings.muteAudio);
     platform.onSettingsChange((p) => audio.setMuted('platform', p.muteAudio));
     // a signed-in CrazyGames player gets their name filled in
-    if (!settings.name) void platform.username().then((name) => name && this.ui.setTitleName(name));
+    if (!settings.name) void platform.username().then((name) => name && this.titleScreen?.setName(name));
     // dev builds: reach the app from the console / screenshot scripts
     if (import.meta.env.DEV) (window as unknown as { __app: App }).__app = this;
+  }
+
+  // ------------------------------------------------------------------ title screen
+
+  /** The cliff at sunset, with the Ronin and the menus over it. */
+  private openTitle(): void {
+    this.loadMap(TITLE_MAP);
+    this.titleScene = new TitleScene(this.scene, this.renderer, this.mapView!);
+    this.titleScreen ??= new TitleScreen(this.renderer.container, {
+      touch: this.input.touchMode,
+      offline: this.offline,
+      name: settings.name,
+      renderer: this.renderer,
+      scene: () => this.titleScene,
+      onSubmit: (name) => void this.connect(name),
+    });
+  }
+
+  private closeTitle(): void {
+    this.titleScene?.dispose();
+    this.titleScene = null;
+    this.titleScreen = null;
+  }
+
+  /** The account is ready: play the welcome, cut to the game, then let the game's messages in. */
+  private async onWelcomeHeld(profile: ProfileView, isNew: boolean): Promise<void> {
+    const screen = this.titleScreen;
+    if (!screen) return this.net.release();
+    if (!(await screen.welcome(profile, isNew)) || !this.net.connected) return;
+    const frame = await new Promise<HTMLCanvasElement | null>((res) => {
+      this.snapWant = res;
+      // no frame within a moment (a hidden tab): dissolve instead
+      setTimeout(() => res(null), 400);
+    });
+    this.snapWant = null;
+    if (frame) screen.slash(frame);
+    else screen.dissolve();
+    this.closeTitle();
+    this.net.release();
   }
 
   // ------------------------------------------------------------------ connection
@@ -152,13 +199,17 @@ class App {
   private async connect(name: string): Promise<void> {
     audio.unlock();
     audio.play('click');
+    const screen = this.titleScreen;
+    if (!screen) return;
     if (name.length < 2) {
-      this.ui.setTitleStatus('Pick a name (2-16 letters).', true);
+      screen.setStatus('Pick a name (2-16 letters).', true);
       return;
     }
     settings.name = name;
     saveSettings();
-    this.ui.setTitleStatus(this.offline ? 'Starting…' : 'Connecting…');
+    screen.setStatus('');
+    screen.forging();
+    const isNew = !settings.token;
     try {
       if (this.offline) {
         const { connectOffline } = await import('./offline');
@@ -167,9 +218,14 @@ class App {
         await this.net.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
       }
     } catch (e) {
-      this.ui.setTitleStatus(`${(e as Error).message} Is the server running? (npm run dev)`, true);
+      screen.failed(`${(e as Error).message}${this.offline ? '' : ' Is the server running? (npm run dev)'}`);
       return;
     }
+    // hold the game back until the welcome has played out
+    this.net.hold();
+    this.net.onHeld = (m) => {
+      if (m.t === 'welcome') void this.onWelcomeHeld(m.profile, isNew);
+    };
     this.net.send({ t: 'hello', v: PROTOCOL_VERSION, token: settings.token || undefined, name, char: settings.char });
   }
 
@@ -179,13 +235,26 @@ class App {
       platform.gameplayStop();
       this.myId = '';
       this.ui.showTitle();
-      this.ui.setTitleStatus(`Disconnected: ${reason}. Press Enter to reconnect.`, true);
       this.input.exitLock();
       this.clearFighters();
       this.local = null;
       this.kind = null;
       this.match = null;
-      this.loadMap(LOBBY_MAP);
+      this.cam.stopShots();
+      this.endEntrances();
+      this.select.hide();
+      const text = `Disconnected: ${reason}. Press Enter to reconnect.`;
+      if (this.titleScreen?.active) {
+        // dropped while the welcome was playing
+        this.titleScreen.failed(text);
+        return;
+      }
+      this.titleScreen?.el.remove();
+      this.titleScreen = null;
+      this.titleScene?.dispose();
+      this.titleScene = null;
+      this.openTitle();
+      this.titleScreen!.resume(text);
     };
     n.on('welcome', (m) => {
       this.myId = m.id;
@@ -879,7 +948,8 @@ class App {
 
     const mouse = this.input.consumeMouse();
     this.cam.addMouse(mouse.dx, mouse.dy, settings.sensitivity, settings.invertY, !!this.lock);
-    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open;
+    // the title screen has its own keys (and a name being typed)
+    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active;
     this.entranceCues(now);
     const left = this.select.tick(now);
     if (left !== null && left > 0 && left <= 3) audio.play('countdown', 0.5);
@@ -916,17 +986,25 @@ class App {
       this.cam.targetScale = this.lock?.model.scale ?? 1;
       this.cam.update(dt, p, this.lock ? this.lock.pos : null, { dodging: this.local.sim.state === 'dodge' });
       this.mapView?.update(dt, p);
+    } else if (this.titleScene) {
+      this.titleScene.update(dt);
     } else {
-      // title screen: slow orbit over the plaza
-      this.titleTime += dt;
-      const a = this.titleTime * 0.06;
-      this.renderer.camera.position.set(Math.sin(a) * 26, 9, Math.cos(a) * 26);
-      this.renderer.camera.lookAt(0, 2.5, 0);
       this.mapView?.update(dt, new THREE.Vector3());
     }
+    this.titleScreen?.update(dt);
     this.effects.update(dt, this.renderer.camera);
     this.updateHud(dt, now);
     this.renderer.render();
+    if (this.snapWant) {
+      // copy the frame now, while the canvas still holds it
+      const src = this.renderer.renderer.domElement;
+      const c = document.createElement('canvas');
+      c.width = src.width;
+      c.height = src.height;
+      c.getContext('2d')!.drawImage(src, 0, 0);
+      this.snapWant(c);
+      this.snapWant = null;
+    }
 
     this.fps.frames++;
     this.fps.t += dt;
