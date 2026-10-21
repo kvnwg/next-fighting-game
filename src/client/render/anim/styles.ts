@@ -9,6 +9,7 @@ import { greathammer } from './moves/greathammer';
 import { katana } from './moves/katana';
 import { LEGACY } from './moves/legacy';
 import { rapier } from './moves/rapier';
+import { swordShield } from './moves/swordShield';
 
 export { KATANA_SHEATH, KATANA_SHEATH_MOUTH } from './moves/katana';
 export type { BodyPose, Motion, MoveDef, Pose, Style, WeaponXf } from './author';
@@ -22,7 +23,7 @@ export const STYLES: Record<WeaponKind, Style> = {
   daggers: LEGACY.daggers,
   scythe: LEGACY.scythe,
   gauntlets: LEGACY.gauntlets,
-  swordShield: LEGACY.swordShield,
+  swordShield,
 };
 
 /** The move for an attack key (every style authors one per key; the first light is the fallback). */
