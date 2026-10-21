@@ -1,0 +1,22 @@
+{
+  "name": "next-fighting-game",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/client",
+    "packages/server"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @nfg/client",
+    "dev:server": "npm run dev --workspace @nfg/server",
+    "build": "npm run build --workspace @nfg/client",
+    "start:server": "npm run start --workspace @nfg/server",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/client && tsc -p packages/server"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

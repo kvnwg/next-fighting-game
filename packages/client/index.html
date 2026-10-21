@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Shrine Duel</title>
+    <!-- CrazyGames asks for the SDK in the head, before game code. Off their domains it stays inert. -->
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game"></canvas>
+      <div id="overlay"></div>
+      <div id="hud"></div>
+      <div id="ui"></div>
+      <div id="touch"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
