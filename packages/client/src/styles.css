@@ -655,19 +655,38 @@ button {
   background: rgba(5, 4, 10, 0.55);
 }
 .vote {
-  width: min(96vw, calc(110 * var(--u)));
-  padding: calc(2 * var(--u));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(2.2 * var(--u));
+  width: 100%;
+  height: 100%;
+  padding-top: calc(3 * var(--u));
+}
+/* The map vote sits on a dark band that fades out at both sides, as in the reference. */
+.vote-maps {
+  width: min(100vw, calc(92 * var(--u)));
+  padding: calc(1.4 * var(--u)) calc(10 * var(--u)) calc(2 * var(--u));
   text-align: center;
+  background: linear-gradient(90deg, transparent 0%, rgba(8, 10, 18, 0.8) 16%, rgba(8, 10, 18, 0.8) 84%, transparent 100%);
+}
+.vote h2,
+.vote .count,
+.tile .label {
+  font-family: 'Roboto Slab', Rockwell, 'Zilla Slab', Georgia, serif;
 }
 .vote h2 {
   margin: 0;
   font-size: calc(2.8 * var(--u));
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
 }
 .vote .count {
-  font-size: calc(3.2 * var(--u));
-  font-weight: 800;
+  font-size: calc(2.6 * var(--u));
+  font-weight: 700;
   line-height: 1.1;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
 }
 .vote .count.urgent {
   color: var(--red);
@@ -675,89 +694,113 @@ button {
 .tiles {
   display: grid;
   gap: calc(1 * var(--u));
-  margin-top: calc(1.4 * var(--u));
 }
 .tiles.maps {
+  margin-top: calc(1.2 * var(--u));
   grid-template-columns: repeat(4, 1fr);
 }
 .tiles.weapons {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(8, calc(9.4 * var(--u)));
+  gap: calc(0.9 * var(--u));
 }
 .tile {
   position: relative;
-  height: calc(13 * var(--u));
-  border-radius: calc(0.8 * var(--u));
-  border: 3px solid rgba(255, 255, 255, 0.12);
-  background: #221d2c;
+  aspect-ratio: 16 / 9;
+  border: 2px solid rgba(0, 0, 0, 0.6);
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+  background: #15151c;
   overflow: hidden;
   text-align: left;
   padding: 0;
+  color: var(--ink);
 }
 .tiles.weapons .tile {
-  height: calc(9.5 * var(--u));
-}
-.tile.fighter .art {
-  background: radial-gradient(ellipse at 50% 30%, #3a3150 0%, #1d1927 70%);
-}
-.tile .portrait {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 50% 18%;
-  pointer-events: none;
+  aspect-ratio: 1 / 1.08;
 }
 .tile .art {
   position: absolute;
   inset: 0;
 }
+.tile .art.random {
+  display: grid;
+  place-items: center;
+  background: #121218;
+}
+.tile .art.random svg {
+  width: 38%;
+  height: 52%;
+}
+.tile .map-art,
+.tile .fighter-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.tile .fighter-art {
+  object-position: 50% 15%;
+}
+.tile.fighter .art {
+  background: radial-gradient(ellipse at 50% 35%, #2b2b36 0%, #111117 75%);
+}
+/* Shade under the label so it reads on any picture. */
+.tile::after {
+  content: '';
+  position: absolute;
+  inset: 55% 0 0 0;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.75));
+  pointer-events: none;
+}
 .tile .label {
   position: absolute;
-  left: calc(0.8 * var(--u));
-  bottom: calc(0.6 * var(--u));
+  z-index: 1;
+  left: calc(0.7 * var(--u));
+  bottom: calc(0.5 * var(--u));
   font-weight: 700;
-  font-size: calc(1.8 * var(--u));
+  font-size: calc(1.7 * var(--u));
   text-shadow: 0 1px 3px #000;
 }
-.tile .sub {
-  position: absolute;
-  left: calc(0.8 * var(--u));
-  top: calc(0.6 * var(--u));
-  font-size: calc(1.3 * var(--u));
-  color: var(--ink-dim);
-  text-shadow: 0 1px 3px #000;
+.tiles.weapons .tile .label {
+  font-size: calc(1.35 * var(--u));
+}
+.tile:hover {
+  outline-color: rgba(255, 255, 255, 0.45);
 }
 .tile.mine {
-  border-color: var(--green);
+  border-color: #3ad16a;
 }
 .tile.theirs {
-  border-color: var(--red);
+  border-color: #e0283a;
 }
 .tile.mine.theirs {
-  border-color: var(--gold);
+  border-color: #d9a441;
 }
+/* Voters' avatars sit side by side at the top middle of their pick. */
 .badges {
   position: absolute;
-  right: calc(0.6 * var(--u));
+  z-index: 1;
+  left: 50%;
   top: calc(0.6 * var(--u));
+  transform: translateX(-50%);
   display: flex;
-  gap: calc(0.4 * var(--u));
+  gap: calc(0.5 * var(--u));
 }
 .badge {
-  width: calc(4 * var(--u));
-  height: calc(4 * var(--u));
+  width: calc(3.8 * var(--u));
+  height: calc(3.8 * var(--u));
   border-radius: 50%;
-  border: 2px solid var(--green);
+  border: 3px solid #3ad16a;
   background: #322a3e center / cover;
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: calc(1.5 * var(--u));
+  font-size: calc(1.4 * var(--u));
   position: relative;
 }
 .badge.theirs {
-  border-color: var(--red);
+  border-color: #e0283a;
 }
 .badge > div {
   width: 100%;
@@ -771,9 +814,9 @@ button {
 }
 .badge .you {
   position: absolute;
-  bottom: calc(-1.5 * var(--u));
-  font-size: calc(1.1 * var(--u));
-  font-weight: 800;
+  bottom: calc(-1.4 * var(--u));
+  font-size: calc(1.2 * var(--u));
+  font-weight: 700;
   text-shadow: 0 1px 2px #000;
 }
 
@@ -785,13 +828,20 @@ button {
   font-weight: 700;
   font-size: calc(2.2 * var(--u));
 }
+.loading .title::after {
+  content: '';
+  display: block;
+  width: calc(8 * var(--u));
+  margin: calc(0.4 * var(--u)) auto 0;
+  border-bottom: 2px solid currentColor;
+}
 .loading .rows {
   font-size: calc(1.6 * var(--u));
   color: var(--ink);
   margin: calc(0.6 * var(--u)) 0 calc(4 * var(--u));
 }
 .loading .map {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: 'Roboto Slab', Rockwell, 'Zilla Slab', Georgia, serif;
   font-weight: 700;
   font-size: calc(10 * var(--u));
   letter-spacing: 0.04em;

@@ -15,13 +15,20 @@ function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
+const RANDOM_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></svg>`;
+
 const TORII = `<svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMax meet" style="position:absolute;inset:auto 0 0 0;width:100%;height:70%;opacity:.85">
   <rect x="20" y="16" width="5" height="44" fill="#0a0a10"/><rect x="75" y="16" width="5" height="44" fill="#0a0a10"/>
   <rect x="10" y="10" width="80" height="6" fill="#0a0a10"/><rect x="16" y="22" width="68" height="4" fill="#0a0a10"/></svg>`;
 
 /** Fighter portraits, rendered from the voxel models by tools/voxel/render-portraits.mjs. */
-const portrait = (id: WeaponId) => `<img class="portrait" src="fighters/${id}.png" alt="" draggable="false">`;
+const portrait = (id: WeaponId) => `<img class="fighter-art" src="fighters/${id}.png" alt="" draggable="false">`;
 
+/** Map thumbnails, rendered from each arena in the game. */
+const mapThumb = (id: MapId) => `<img class="map-art" src="maps/${id}.jpg" alt="" draggable="false">`;
+
+/** A drawn backdrop in the map's colours, shown until (or instead of) its thumbnail. */
 function mapArt(id: MapId): string {
   const p = PALETTES[id];
   return `<div class="art" style="background:linear-gradient(180deg, ${hex(p.skyTop)} 0%, ${hex(p.skyHorizon)} 58%, ${hex(p.stone)} 59%, ${hex(p.stoneLine)} 100%)">${TORII}</div>`;
@@ -154,18 +161,18 @@ export class VoteScreen {
   show(ui: HTMLElement, view: VoteView, onVote: (v: { map?: MapId | 'random'; weapon?: WeaponId }) => void): void {
     this.hide();
     const mapTiles = [
-      `<button class="tile" data-map="random"><div class="art" style="background:#1a1622;display:grid;place-items:center;font-size:calc(5*var(--u))">&#x21bb;</div><div class="label">Random</div><div class="badges"></div></button>`,
-      ...MAP_IDS.map((id) => `<button class="tile" data-map="${id}">${mapArt(id)}<div class="label">${MAPS[id].name}</div><div class="badges"></div></button>`),
+      `<button class="tile" data-map="random"><div class="art random">${RANDOM_ICON}</div><div class="label">Random</div><div class="badges"></div></button>`,
+      ...MAP_IDS.map((id) => `<button class="tile" data-map="${id}">${mapArt(id)}${mapThumb(id)}<div class="label">${MAPS[id].name}</div><div class="badges"></div></button>`),
     ].join('');
     const weaponTiles = WEAPON_IDS.map(
       (id) =>
-        `<button class="tile fighter" data-weapon="${id}" title="${WEAPONS[id].blurb}"><div class="art">${portrait(id)}</div><div class="sub">${WEAPONS[id].weapon}</div><div class="label">${WEAPONS[id].name}</div><div class="badges"></div></button>`,
+        `<button class="tile fighter" data-weapon="${id}" title="${WEAPONS[id].weapon}: ${WEAPONS[id].blurb}"><div class="art">${portrait(id)}</div><div class="label">${WEAPONS[id].name}</div><div class="badges"></div></button>`,
     ).join('');
     this.root = el(
       'div',
       'screen dim',
-      `<div class="vote panel"><h2>Select Map &amp; Fighter</h2><div class="count"></div>
-        <div class="tiles maps">${mapTiles}</div><div class="tiles weapons">${weaponTiles}</div></div>`,
+      `<div class="vote"><div class="vote-maps"><h2>Select Map &amp; Fighter</h2><div class="count"></div>
+        <div class="tiles maps">${mapTiles}</div></div><div class="tiles weapons">${weaponTiles}</div></div>`,
     );
     this.count = this.root.querySelector('.count');
     for (const t of this.root.querySelectorAll<HTMLElement>('[data-map]')) {
