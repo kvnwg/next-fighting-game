@@ -90,6 +90,8 @@ export class ClientFighter {
   readonly swingDir = new THREE.Vector3(0, 0, 1);
   private lastTip = new THREE.Vector3();
   private tipValid = false;
+  /** how fast the weapon tip moved last frame (m/s): a fast tip keeps the swoosh going between moves */
+  private tipSpeed = 0;
   private tmpTip = new THREE.Vector3();
   private tmpPos = new THREE.Vector3();
   private tmpQuat = new THREE.Quaternion();
@@ -335,14 +337,19 @@ export class ClientFighter {
     const big = isHeavyKey(v.key) || v.key === 'ab' || v.key === 'ia' || v.key === 'ct' || !Number.isNaN(entS);
     const color = frame?.trail?.color ?? (atk?.perilous ? tc.special : big ? tc.heavy : tc.light);
     // long enough to read as a ribbon through the whole arc of the swing
-    const life = frame?.trail?.life ?? (atk?.perilous ? 0.26 : big ? 0.24 : 0.19);
+    const life = frame?.trail?.life ?? (atk?.perilous ? 0.34 : big ? 0.32 : 0.24);
     const glow = frame?.trail?.glow ?? (atk?.perilous ? 0.85 : big ? 0.55 : 0.25);
+    // big swings smear the whole crescent from the hand out; lights a band near the tip
+    const fill = atk?.perilous || big ? 0.95 : 0.5;
     for (const t of [this.trail, this.offTrail, this.kickTrail]) {
       t?.setColor(color);
-      t?.setStyle(life, glow);
+      t?.setStyle(life, glow, fill);
     }
+    // through a chain the swoosh doesn't stop between moves: while the weapon is still whipping
+    // round (recovery flowing into the next windup) it keeps drawing
+    const flowing = v.state === 'attack' && this.tipSpeed > 7;
     m.weaponXf('main', this.tmpPos, this.tmpQuat, this.tmpScale);
-    this.trail.update(dt, live && m.swingMain, this.tmpPos, this.tmpQuat, this.tmpScale.x, m.trailMain.base, m.trailMain.tip);
+    this.trail.update(dt, (live && m.swingMain) || flowing, this.tmpPos, this.tmpQuat, this.tmpScale.x, m.trailMain.base, m.trailMain.tip);
     if (this.offTrail && m.trailOff && m.weaponXf('off', this.tmpPos, this.tmpQuat, this.tmpScale)) {
       this.offTrail.update(dt, live && m.swingOff, this.tmpPos, this.tmpQuat, this.tmpScale.x, m.trailOff.base, m.trailOff.tip);
     }
@@ -355,6 +362,7 @@ export class ClientFighter {
     if (this.tipValid && dt > 0) {
       const vel = this.tmpPos.subVectors(this.tmpTip, this.lastTip).divideScalar(dt);
       const sp = vel.length();
+      this.tipSpeed = sp;
       if (sp > 2.5) this.swingDir.lerp(vel.divideScalar(sp), 0.6).normalize();
     }
     this.lastTip.copy(this.tmpTip);

@@ -52,6 +52,8 @@ const DUST = ['#c8b49a', '#a8957c', '#ddd0bc'];
 const DEBRIS = ['#6b5a48', '#4a3d31', '#8a7660'];
 
 const MAX_PARTICLES = 900;
+const MAX_SPLATS = 72;
+const BLOOD = ['#c8101e', '#8e0a16', '#e0202c', '#5a0610'];
 
 let starGeo: THREE.BufferGeometry | null = null;
 /** Four-pointed sparkle used for deflect/impact flashes. */
@@ -83,6 +85,10 @@ export class Effects {
   private tmpS = new THREE.Vector3();
   private tmpP = new THREE.Vector3();
   private weather: WeatherSystem | null = null;
+  /** blood on the ground: a flat disc per splat, landing a beat after the spray, fading out */
+  private splatMesh: THREE.InstancedMesh;
+  private splats: { x: number; z: number; r: number; rot: number; stretch: number; delay: number; life: number; max: number; color: THREE.Color }[] = [];
+  private splatNext = 0;
 
   constructor(readonly scene: THREE.Scene) {
     const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -96,7 +102,57 @@ export class Effects {
     }
     this.mesh.count = 0;
     this.group.add(this.mesh);
+    const disc = new THREE.CircleGeometry(0.5, 10).rotateX(-Math.PI / 2);
+    this.splatMesh = new THREE.InstancedMesh(disc, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), MAX_SPLATS);
+    this.splatMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.splatMesh.frustumCulled = false;
+    this.splatMesh.layers.set(FX_LAYER);
+    for (let i = 0; i < MAX_SPLATS; i++) this.splatMesh.setColorAt(i, new THREE.Color('#8e0a16'));
+    this.splatMesh.count = 0;
+    this.group.add(this.splatMesh);
     scene.add(this.group);
+  }
+
+  /**
+   * Blood from a cut: a fan of droplets flung the way the blade went and falling, a fine mist at
+   * the wound, and splats on the ground under where they land that linger a few seconds.
+   */
+  blood(pos: THREE.Vector3, dir: THREE.Vector3, scale = 1): void {
+    _a.set(dir.x, 0, dir.z);
+    if (_a.lengthSq() < 1e-4) _a.set(1, 0, 0);
+    _a.normalize();
+    const side = _b.set(-_a.z, 0, _a.x);
+    const n = Math.round(26 * scale);
+    for (let i = 0; i < n; i++) {
+      const sp = (3 + Math.random() * 6) * Math.sqrt(scale);
+      const s = (Math.random() - 0.5) * 1.1;
+      const vx = (_a.x + side.x * s) * sp;
+      const vz = (_a.z + side.z * s) * sp;
+      const vy = 1 + Math.random() * 4;
+      this.emit(pos.x, pos.y, pos.z, vx, vy, vz, BLOOD[i % BLOOD.length], { life: 0.75, size: 0.06 + Math.random() * 0.05, gravity: 16, drag: 1.2, stretch: 0.06 });
+    }
+    this.burst(pos, { count: Math.round(10 * scale), color: ['#a00a18', '#6a0610'], speed: 1.6, life: 0.4, size: 0.12, gravity: 1, drag: 4, grow: 2 });
+    // splats along the line the spray travels, landing in the order they'd hit the floor
+    const k = Math.round(5 + 4 * scale);
+    for (let i = 0; i < k; i++) {
+      const d = 0.3 + Math.random() * 1.8 * Math.sqrt(scale);
+      const s = (Math.random() - 0.5) * 0.9 * d;
+      const sp = this.splats.length < MAX_SPLATS ? (this.splats.push({ x: 0, z: 0, r: 0, rot: 0, stretch: 1, delay: 0, life: 0, max: 1, color: new THREE.Color() }), this.splats[this.splats.length - 1]) : this.splats[this.splatNext++ % MAX_SPLATS];
+      sp.x = pos.x + _a.x * d + side.x * s;
+      sp.z = pos.z + _a.z * d + side.z * s;
+      sp.r = (0.12 + Math.random() * 0.22) * Math.min(1.5, scale) * (i === 0 ? 1.6 : 1);
+      sp.rot = Math.atan2(_a.x, _a.z) + (Math.random() - 0.5) * 0.6;
+      sp.stretch = 1 + Math.random() * 1.2;
+      sp.delay = 0.18 + d * 0.12;
+      sp.max = sp.life = 7 + Math.random() * 3;
+      sp.color.set(BLOOD[(i + 1) % BLOOD.length]);
+    }
+  }
+
+  clearBlood(): void {
+    this.splats.length = 0;
+    this.splatNext = 0;
+    this.splatMesh.count = 0;
   }
 
   setWeather(kind: Weather | null): void {
@@ -547,6 +603,29 @@ export class Effects {
         this.rings.splice(i, 1);
       }
     }
+    let m = 0;
+    for (const sp of this.splats) {
+      if (sp.delay > 0) {
+        sp.delay -= dt;
+        continue;
+      }
+      if (sp.life <= 0) continue;
+      sp.life -= dt;
+      const age = sp.max - sp.life;
+      // spreads out as it lands, shrinks away over its last two seconds
+      const r = sp.r * Math.min(1, 0.35 + age * 6) * Math.min(1, sp.life / 2);
+      if (r <= 0) continue;
+      this.tmpP.set(sp.x, 0.015, sp.z);
+      this.tmpQ.setFromAxisAngle(_up, sp.rot);
+      this.tmpS.set(r * 2, 1, r * 2 * sp.stretch);
+      this.tmpM.compose(this.tmpP, this.tmpQ, this.tmpS);
+      this.splatMesh.setMatrixAt(m, this.tmpM);
+      this.splatMesh.setColorAt(m, sp.color);
+      m++;
+    }
+    this.splatMesh.count = m;
+    this.splatMesh.instanceMatrix.needsUpdate = true;
+    if (this.splatMesh.instanceColor) this.splatMesh.instanceColor.needsUpdate = true;
     this.weather?.update(dt, camera.position);
   }
 
@@ -564,12 +643,18 @@ function beamGeometry(): THREE.BufferGeometry {
   return beamGeo;
 }
 
-/** A ribbon following a weapon's base->tip segment while it swings. */
+/**
+ * The swoosh behind a swinging weapon, after hand-drawn smear arcs: a crescent from the hand (or
+ * partway up the weapon for quick cuts) out to the tip, smoky white at its core with brush
+ * streaks through it, a hot coloured rim along the edge that cut, fading from the tail.
+ */
 export class WeaponTrail {
   readonly mesh: THREE.Mesh;
   /** seconds a point of the ribbon lives */
   private life = 0.13;
-  private readonly max = 72;
+  /** 0..1: how far the swoosh reaches back from the blade toward the hand */
+  private fill = 0.4;
+  private readonly max = 110;
   private pts: { b: THREE.Vector3; t: THREE.Vector3; age: number }[] = [];
   private positions: Float32Array;
   private alphas: Float32Array;
@@ -583,8 +668,16 @@ export class WeaponTrail {
     const geo = new THREE.BufferGeometry();
     this.positions = new Float32Array(this.max * 2 * 3);
     this.alphas = new Float32Array(this.max * 2);
+    const side = new Float32Array(this.max * 2);
+    const along = new Float32Array(this.max * 2);
+    for (let i = 0; i < this.max; i++) {
+      side[i * 2 + 1] = 1;
+      along[i * 2] = along[i * 2 + 1] = i / (this.max - 1);
+    }
     geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     geo.setAttribute('alpha', new THREE.BufferAttribute(this.alphas, 1));
+    geo.setAttribute('side', new THREE.BufferAttribute(side, 1));
+    geo.setAttribute('along', new THREE.BufferAttribute(along, 1));
     const idx: number[] = [];
     for (let i = 0; i < this.max - 1; i++) {
       const a = i * 2;
@@ -593,9 +686,19 @@ export class WeaponTrail {
     geo.setIndex(idx);
     const mat = new THREE.ShaderMaterial({
       uniforms: { color: { value: new THREE.Color(color) }, glow: { value: 0 } },
-      vertexShader: `attribute float alpha; varying float vA; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      // the leading edge burns toward white; glow brightens heavy and special swings
-      fragmentShader: `uniform vec3 color; uniform float glow; varying float vA; void main(){ vec3 c = mix(color, vec3(1.0), vA * (0.35 + glow * 0.4)); gl_FragColor = vec4(c * (1.0 + glow * 0.6), min(1.0, vA * (0.85 + glow * 0.3))); }`,
+      vertexShader: `attribute float alpha; attribute float side; attribute float along; varying float vA; varying float vS; varying float vL; void main(){ vA = alpha; vS = side; vL = along; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      // across the swoosh (vS: 0 at the hand, 1 at the cutting edge) a smoky white body with brush
+      // streaks gives way to a hot rim of the weapon's colour; along it (vL) it thins to the tail
+      fragmentShader: `uniform vec3 color; uniform float glow; varying float vA; varying float vS; varying float vL;
+        void main(){
+          float streak = 0.72 + 0.28 * sin(vS * 41.0 + vL * 7.0) * sin(vS * 17.0 - vL * 3.0);
+          vec3 smoke = mix(vec3(0.78, 0.78, 0.82), vec3(1.0), vS);
+          float rim = smoothstep(0.62, 0.93, vS);
+          vec3 c = mix(smoke * streak, color * (1.25 + glow * 0.8), rim);
+          c = mix(c, vec3(1.0), smoothstep(0.96, 1.0, vS) * 0.6);
+          float body = mix(0.18, 1.0, pow(vS, 0.7)) * mix(1.0, 0.55, vL);
+          gl_FragColor = vec4(c, min(1.0, vA * body * (0.95 + glow * 0.25)));
+        }`,
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -611,8 +714,9 @@ export class WeaponTrail {
   }
 
   /** Per-move look: how long the ribbon lingers and how bright it burns. */
-  setStyle(life: number, glow: number): void {
+  setStyle(life: number, glow: number, fill = 0.4): void {
     this.life = life;
+    this.fill = fill;
     (this.mesh.material as THREE.ShaderMaterial).uniforms.glow.value = glow;
   }
 
@@ -632,7 +736,8 @@ export class WeaponTrail {
         this.p.lerpVectors(this.prevPos, pos, k);
         this.q.slerpQuaternions(this.prevQuat, quat, k);
         this.pts.unshift({
-          b: base.clone().multiplyScalar(scale).applyQuaternion(this.q).add(this.p),
+          // the inner edge sits partway back from the blade's base toward the hand (the grip)
+          b: base.clone().multiplyScalar((1 - this.fill) * scale).applyQuaternion(this.q).add(this.p),
           t: tip.clone().multiplyScalar(scale).applyQuaternion(this.q).add(this.p),
           age: dt * (1 - k),
         });
@@ -650,8 +755,8 @@ export class WeaponTrail {
       const pt = this.pts[Math.min(i, count - 1)];
       this.positions.set([pt.b.x, pt.b.y, pt.b.z], i * 6);
       this.positions.set([pt.t.x, pt.t.y, pt.t.z], i * 6 + 3);
-      const a = i < count ? Math.pow(1 - pt.age / this.life, 1.6) : 0;
-      this.alphas[i * 2] = a * 0.15;
+      const a = i < count ? Math.pow(1 - pt.age / this.life, 1.3) : 0;
+      this.alphas[i * 2] = a;
       this.alphas[i * 2 + 1] = a;
     }
     const g = this.mesh.geometry;

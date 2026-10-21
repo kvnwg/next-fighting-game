@@ -342,6 +342,7 @@ class App {
     this.cam.constrain = (from, to, wallsOnly) => constrainCamera(map, wallsOnly ? [] : blockers, from, to);
     // weather and ambient particles belong to the map's recipe now
     this.effects.setWeather(null);
+    this.effects.clearBlood();
     if (this.local) this.local.map = map;
   }
 
@@ -737,6 +738,8 @@ class App {
         this.effects.spray(pos, swing, style?.sparks ?? ['#ffffff', '#fee761', '#feae34'], heavy ? 26 : 16, heavy ? 12 : 9, 0.5);
         this.effects.burst(pos, { count: heavy ? 8 : 5, color: ['#ffffff', '#fee761'], speed: 7, life: 0.2, size: 0.04, gravity: 4, drag: 4, stretch: 0.08 });
         this.effects.burst(pos, { count: 10, color: ['#e43b44', '#a22633', '#3e2731'], speed: 4, life: 0.45, size: 0.07 });
+        // a clean hit draws blood, flung the way the blade went; armour soaks it
+        if (e.k === 'hit') this.effects.blood(pos, swing, heavy ? 1.5 : 1);
         this.effects.slash(pos, swing, heavy ? (style?.trail.heavy ?? '#ffd27a') : (style?.trail.light ?? '#ffffff'), heavy ? 1.7 : 1.15, heavy ? 0.09 : 0.06);
         // the flare across the target, along the cut
         this.effects.hitFlare(pos, swing, this.tmp3.subVectors(this.renderer.camera.position, pos).normalize(), heavy ? '#ff2a4a' : '#ff5a78', heavy ? 1.25 : 1);
