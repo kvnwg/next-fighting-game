@@ -347,15 +347,15 @@ const shade: BaseDef = {
   stats: { hp: 90, posture: 90, speed: 4.4, postureRegen: 1.1 },
   ratings: { power: 2, speed: 5, reach: 1, defense: 1, difficulty: 5 },
   lights: [
-    { name: 'Cross Slit', anim: 'dualSlash', windup: 210, active: 60, recovery: 240, damage: 6, posture: 7, blockPosture: 9, range: 2.35, arc: 70, lunge: 0.7 },
+    { name: 'Scissor Cut', anim: 'dualSlash', windup: 210, active: 60, recovery: 240, damage: 6, posture: 7, blockPosture: 9, range: 2.35, arc: 70, lunge: 0.7 },
     // a full turn with both blades out: a touch slower to start
-    { name: 'Wraith Spin', anim: 'spin', windup: 230, active: 60, recovery: 260, damage: 6, posture: 7, blockPosture: 9, range: 2.35, arc: 80, lunge: 0.5 },
+    { name: 'Cross Open', anim: 'dualSlash', windup: 230, active: 60, recovery: 260, damage: 6, posture: 7, blockPosture: 9, range: 2.35, arc: 80, lunge: 0.5 },
     // three quick stabs: three hits to read
-    { name: 'Hornet Flurry', anim: 'dualSlash', windup: 190, active: 120, recovery: 260, damage: 2, posture: 3, blockPosture: 3, range: 2.35, arc: 60, lunge: 0.5, hits: 3 },
+    { name: 'Whirl', anim: 'spin', windup: 190, active: 120, recovery: 260, damage: 2, posture: 3, blockPosture: 3, range: 2.35, arc: 60, lunge: 0.5, hits: 3 },
     // a front flip that lands both blades
   ],
-  heavy: { name: 'Viper Fang', anim: 'thrust', windup: 520, active: 100, recovery: 460, damage: 14, posture: 18, blockPosture: 22, range: 2.4, arc: 40, lunge: 2.0, feintable: true },
-  special: { name: 'Throat Grab', anim: 'grab', windup: 650, active: 150, recovery: 650, damage: 22, posture: 25, blockPosture: 25, range: 2.4, arc: 40, lunge: 2.0, perilous: 'grab', cooldown: 7500 },
+  heavy: { name: 'Falling Fang', anim: 'overhead', windup: 520, active: 100, recovery: 460, damage: 14, posture: 18, blockPosture: 22, range: 2.4, arc: 40, lunge: 2.0, feintable: true },
+  special: { name: 'Swallow Dive', anim: 'grab', windup: 650, active: 150, recovery: 650, damage: 22, posture: 25, blockPosture: 25, range: 2.4, arc: 40, lunge: 2.0, perilous: 'grab', cooldown: 7500 },
   ability: {
     kind: 'teleport',
     name: 'Shadow Step',
@@ -499,15 +499,15 @@ const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
     jh: { name: 'Thunderfall', anim: 'slam' },
   },
   shade: {
-    h1: { name: 'Twin Fang', anim: 'dualSlash' },
-    h2: { name: 'Death Lotus', anim: 'spin', hits: 2 },
+    h1: { name: 'Long Thorn', anim: 'thrust' },
+    h2: { name: 'Sky Lotus', anim: 'spin', hits: 2 },
     // two cuts on the way through, out of a forward dodge
-    dl: { name: 'Eviscerate', anim: 'dualSlash', windup: 300, active: 100, recovery: 420, damage: 5, posture: 6, blockPosture: 7, range: 2.4, arc: 70, lunge: 2.2, hits: 2 },
-    dh: { name: 'Viper Rush', anim: 'thrust' },
-    bl: { name: 'Smoke Cut', anim: 'slashL' },
-    bh: { name: 'Hidden Thorn', anim: 'dualSlash' },
-    jl: { name: 'Kite', anim: 'dualSlash' },
-    jh: { name: 'Nightfall', anim: 'thrust' },
+    dl: { name: 'Dart', anim: 'dualSlash', windup: 300, active: 100, recovery: 420, damage: 5, posture: 6, blockPosture: 7, range: 2.4, arc: 70, lunge: 2.2, hits: 2 },
+    dh: { name: 'Corkscrew', anim: 'thrust' },
+    bl: { name: 'Fan Retreat', anim: 'slashL' },
+    bh: { name: 'Low Viper', anim: 'thrust' },
+    jl: { name: 'Cartwheel', anim: 'spin' },
+    jh: { name: 'Nail Down', anim: 'thrust' },
   },
   reaper: {
     h1: { name: 'Severance', anim: 'slashL' },

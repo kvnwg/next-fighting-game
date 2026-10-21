@@ -121,7 +121,7 @@ The server is authoritative for combat. Each client predicts its own actions wit
 | **Warden** | Warhammer | Heavy bruiser | Heavies have hyper armor | Earthshaker (sweep) | **War Cry**: 5s of hyper armor and +20% damage |
 | **Duelist** | Rapier | Fencer / mind games | Faster attack after a deflect; lights can feint | Coup de Grace (thrust) | **Fleche**: 6m running thrust |
 | **Lancer** | Golden Spear | Zoner | Tip hits deal +25% | Whirlwind (sweep) | **Pole Vault**: invulnerable 6m backflip |
-| **Assassin** | Twin Daggers | Assassin | 2 dodge charges, +40% backstab damage | Throat Grab (grab) | **Shadow Step**: blink behind a target |
+| **Assassin** | Twin Daggers | Assassin | 2 dodge charges, +40% backstab damage | Swallow Dive (a diving grab) | **Shadow Step**: blink behind a target |
 | **Wraith** | Scythe | Sustain / control | Heals 20% of damage dealt | Reaping Arc (sweep) | **Soul Hook**: drag a target from 11m |
 | **Monk** | Fists | Posture breaker | +15% posture damage, faster posture regen | Iron Grapple (grab) | **Still Water**: counter stance |
 | **Knight** | Greatsword & Shield | Defender | Blocking costs 30% less posture, wider guard | Holy Lance (thrust) | **Shield Charge**: undeflectable 5m charge |
