@@ -341,8 +341,9 @@ const monk: CharacterDef = {
   lights: [
     { name: 'Jab', anim: 'punchR', windup: 240, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 1.9, arc: 60, lunge: 0.6 },
     { name: 'Cross', anim: 'punchL', windup: 220, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 1.9, arc: 60, lunge: 0.5 },
-    { name: 'Hook', anim: 'punchR', windup: 230, active: 60, recovery: 280, damage: 6, posture: 9, blockPosture: 11, range: 1.9, arc: 70, lunge: 0.5 },
-    { name: 'Palm Strike', anim: 'uppercut', windup: 300, active: 80, recovery: 420, damage: 8, posture: 14, blockPosture: 18, range: 2.0, arc: 60, lunge: 0.8 },
+    // a spinning hook kick: a beat slower than the hands, but the leg reaches further
+    { name: 'Whirlwind Kick', anim: 'spin', windup: 280, active: 60, recovery: 300, damage: 6, posture: 9, blockPosture: 11, range: 2.2, arc: 70, lunge: 0.4 },
+    { name: 'Rising Dragon', anim: 'uppercut', windup: 300, active: 80, recovery: 420, damage: 8, posture: 14, blockPosture: 18, range: 2.0, arc: 60, lunge: 0.8 },
   ],
   heavy: { name: 'Mountain Breaker', anim: 'punchR', windup: 560, active: 100, recovery: 480, damage: 14, posture: 28, blockPosture: 34, range: 2.1, arc: 50, lunge: 1.5, feintable: true, knockback: 1.0 },
   special: { name: 'Iron Grapple', anim: 'grab', windup: 620, active: 150, recovery: 650, damage: 20, posture: 35, blockPosture: 35, range: 2.3, arc: 45, lunge: 1.5, perilous: 'grab', cooldown: 7500 },
