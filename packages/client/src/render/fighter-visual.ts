@@ -1,6 +1,7 @@
 import { CanvasTexture, CircleGeometry, Mesh, MeshBasicMaterial, Vector3, type Scene } from 'three';
 import { WEAPONS, type FighterState, type MoveId, type WeaponId } from '@nfg/shared';
-import { FighterRig, LOOKS, makeGhostMaterial } from './rig.ts';
+import { makeGhostMaterial } from './rig.ts';
+import { VoxelRig } from './voxel/rig.ts';
 import { POSE_SIZE, computePose, smoothPose, type FighterView, type Pose } from './poses.ts';
 import { WeaponTrail } from './vfx.ts';
 
@@ -26,7 +27,7 @@ export interface FighterRenderState {
 }
 
 interface Ghost {
-  rig: FighterRig;
+  rig: VoxelRig;
   material: MeshBasicMaterial;
   t: number;
   active: boolean;
@@ -51,7 +52,7 @@ function shadowTexture(): CanvasTexture {
 }
 
 export class FighterVisual {
-  readonly rig: FighterRig;
+  readonly rig: VoxelRig;
   private readonly current: Pose = new Float32Array(POSE_SIZE);
   private readonly target: Pose = new Float32Array(POSE_SIZE);
   private readonly shadow: Mesh;
@@ -67,6 +68,8 @@ export class FighterVisual {
   private tintColor: [number, number, number] = [1, 0.15, 0.1];
   private initialized = false;
   special: FighterView['special'] = null;
+  /** Keeps charged weapon effects lit regardless of state, for cinematics. */
+  charged = false;
   readonly bladeTip = new Vector3();
   private readonly bladeBase = new Vector3();
 
@@ -76,7 +79,7 @@ export class FighterVisual {
     lookIndex: number,
     ghostCount: number,
   ) {
-    this.rig = new FighterRig(weapon, LOOKS[lookIndex % LOOKS.length]!);
+    this.rig = new VoxelRig(weapon);
     scene.add(this.rig.root);
     this.shadow = new Mesh(new CircleGeometry(0.75, 20), new MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false }));
     this.shadow.rotation.x = -Math.PI / 2;
@@ -84,7 +87,7 @@ export class FighterVisual {
     this.trail = new WeaponTrail(scene);
     for (let i = 0; i < ghostCount; i++) {
       const material = makeGhostMaterial(lookIndex === 0 ? 0xfff2b0 : 0xf3d2ff);
-      const rig = new FighterRig(weapon, LOOKS[0]!, { ghost: material });
+      const rig = new VoxelRig(weapon, { ghost: material });
       rig.root.visible = false;
       scene.add(rig.root);
       this.ghosts.push({ rig, material, t: 0, active: false });
@@ -146,6 +149,10 @@ export class FighterVisual {
     }
     this.rig.applyPose(this.current);
 
+    // Lightning and similar effects crackle along the weapon during heavy and critical swings.
+    const swing = s.state === 'attack' && s.move ? WEAPONS[s.weapon].moves[s.move] : null;
+    this.rig.setCharged(this.charged || (!!swing && swing.kind !== 'light'), this.time);
+
     // Rim light: white glow on criticals, a ghostly rim during i-frames, a faint gold edge in a parry window.
     if (s.glowing) this.rig.setRim(0.85 + Math.sin(this.time * 40) * 0.15, 1, 1, 1);
     else if (s.invulnerable && s.state === 'dodge') this.rig.setRim(0.55, 0.85, 0.92, 1);
@@ -185,7 +192,7 @@ export class FighterVisual {
 
   private updateGhosts(s: FighterRenderState, dt: number): void {
     const wantGhost =
-      (s.state === 'dodge' && s.frame < 15) || (s.state === 'attack' && s.move === 'P') || (s.state === 'getup' && s.rollDir !== 0 && s.frame < 14);
+      (s.state === 'dodge' && s.frame < 15) || (s.state === 'attack' && !!s.move && WEAPONS[s.weapon].moves[s.move].lands) || (s.state === 'getup' && s.rollDir !== 0 && s.frame < 14);
     this.ghostTimer -= dt;
     if (wantGhost && this.ghostTimer <= 0 && this.ghosts.length > 0) {
       this.ghostTimer = 0.045;

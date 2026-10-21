@@ -3,7 +3,10 @@ import type { FighterState } from './fighter.ts';
 import { BTN, type InputFrame } from './input.ts';
 import type { Match, Side } from './match.ts';
 import { Rng } from './rng.ts';
-import { LIGHT_CHAIN, WEAPONS, type MoveId } from './weapons.ts';
+import { HEAVY_CHAIN, LIGHT_CHAIN, WEAPONS, type MoveId } from './weapons.ts';
+
+/** Moves with long enough recovery that blocking one leaves a punish. */
+const PUNISHABLE: readonly MoveId[] = ['L3', 'H1', 'H2', 'H3', 'DH', 'BH'];
 
 export type BotLevel = 'dummy' | 'easy' | 'normal' | 'hard';
 
@@ -85,7 +88,7 @@ export class Bot {
         const busy =
           this.punish(match, p, view, dist, press) || this.defend(match, p, view, dist, press) || this.guard(match, p, view, dist, press);
         if (!busy) {
-          [moveX, moveY] = this.position(tick, dist, me.weapon === 'katana' ? 2.0 : 2.5);
+          [moveX, moveY] = this.position(tick, dist, Math.max(1.2, WEAPONS[me.weapon].moves.L1.range - 0.4));
           this.attack(match, p, view, dist, free, press);
         }
         if (me.state === 'knockdown' && me.stateFrame > 50) moveX = this.rng.pick([-1, 0, 1]);
@@ -175,7 +178,7 @@ export class Bot {
     if (op.state === 'attack') {
       // Mid-swing is only an opening if it's a heavy or finisher we just blocked, with time to spare.
       const m = op.move ? WEAPONS[op.weapon].moves[op.move] : null;
-      if (m && op.moveContact === 'block' && (op.move === 'H' || op.move === 'L4')) {
+      if (m && op.moveContact === 'block' && op.move && PUNISHABLE.includes(op.move)) {
         const left = m.startup + m.active + m.recovery - op.stateFrame;
         const myLeft = me.state === 'blockstun' ? me.stateLen - me.stateFrame : 0;
         opening = left - myLeft > WEAPONS[me.weapon].moves.L1.startup;
@@ -211,7 +214,7 @@ export class Bot {
       const started = tick - me.stateFrame;
       if (me.stateLen - me.stateFrame <= 3 && this.gapDecided !== started) {
         this.gapDecided = started;
-        const chaining = view.state === 'attack' && !!view.move && LIGHT_CHAIN.includes(view.move) && view.move !== 'L4';
+        const chaining = view.state === 'attack' && !!view.move && LIGHT_CHAIN.includes(view.move) && view.move !== 'L3';
         if (chaining && this.rng.chance(p.parry * 1.2)) {
           // Buffered through the last frames of blockstun; holding on means a misread still blocks.
           press(BTN.PARRY, 16);
@@ -269,13 +272,17 @@ export class Bot {
     const tick = match.tick;
 
     // Keep a string going once it connects.
-    if (me.state === 'attack' && me.move && LIGHT_CHAIN.includes(me.move) && me.moveContact) {
+    const inLight = !!me.move && LIGHT_CHAIN.includes(me.move);
+    const inHeavy = !!me.move && HEAVY_CHAIN.includes(me.move);
+    if (me.state === 'attack' && me.move && (inLight || inHeavy) && me.moveContact) {
       const id = `${me.move}@${tick - me.stateFrame}`;
       const m = moves[me.move];
       if (this.decidedChain !== id && me.stateFrame >= m.startup + m.active) {
         this.decidedChain = id;
-        if (this.rng.chance(p.chain)) {
+        if (inLight && this.rng.chance(p.chain)) {
           press(me.moveContact === 'hit' && me.move === 'L2' && this.rng.chance(p.heavy) ? BTN.HEAVY : BTN.LIGHT);
+        } else if (inHeavy && me.moveContact === 'hit' && this.rng.chance(p.chain * 0.6)) {
+          press(BTN.HEAVY);
         }
       }
       return;

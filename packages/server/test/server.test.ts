@@ -103,7 +103,7 @@ class TestClient {
 }
 
 function stateOf(s: MatchSnapshot, seat: 0 | 1): FighterState {
-  const f = createFighter(seat, 'naginata');
+  const f = createFighter(seat, 'lancer');
   decodeFighterInto(f, s.f[seat]);
   return f.state;
 }
@@ -154,11 +154,11 @@ describe('match server', () => {
     expect(ra.players.map((p) => p?.name).sort()).toEqual(['Alpha', 'Bravo']);
     expect(ra.endsAt).toBeGreaterThan(Date.now() - 1000);
 
-    a.send({ t: 'vote', map: 'snow-court', weapon: 'katana' });
+    a.send({ t: 'vote', map: 'snow-court', weapon: 'ronin' });
     b.send({ t: 'vote', map: 'snow-court' });
     const loadA = await a.room('load');
     expect(loadA.map).toBe('snow-court');
-    expect(loadA.weapons[ra.you]).toBe('katana');
+    expect(loadA.weapons[ra.you]).toBe('ronin');
     expect(WEAPON_IDS).toContain(loadA.weapons[rb.you]);
     expect(MAP_IDS).toContain(loadA.map);
 

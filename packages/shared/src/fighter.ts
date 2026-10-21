@@ -50,10 +50,14 @@ export interface Fighter {
   move: MoveId | null;
   moveContact: Contact | null;
   moveDone: boolean;
+  /** Hits landed so far by the current move (multi-hit moves land several). */
+  moveHits: number;
   dodgeX: number;
   dodgeZ: number;
   dodgeCharges: number;
   dodgeRecharge: number;
+  /** Ticks left in which LIGHT or HEAVY comes out as a dash attack, set by a forward dodge. */
+  dashWindow: number;
   critCooldown: number;
   /** Hits taken in the current combo, used for damage scaling. */
   comboCount: number;
@@ -93,10 +97,12 @@ export function createFighter(id: 0 | 1, weapon: WeaponId): Fighter {
     move: null,
     moveContact: null,
     moveDone: false,
+    moveHits: 0,
     dodgeX: 0,
     dodgeZ: 0,
     dodgeCharges: DODGE_CHARGES,
     dodgeRecharge: DODGE_RECHARGE,
+    dashWindow: 0,
     critCooldown: 0,
     comboCount: 0,
     guardBreakBonus: false,

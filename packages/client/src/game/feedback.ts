@@ -1,4 +1,4 @@
-import type { Match, Side, SimEvent } from '@nfg/shared';
+import { WEAPONS, type Match, type Side, type SimEvent } from '@nfg/shared';
 import type { AudioEngine } from '../audio/engine.ts';
 import type { Hud } from '../ui/hud.ts';
 import type { ScreenFx } from '../ui/overlay.ts';
@@ -135,5 +135,5 @@ export function playEvent(e: SimEvent, c: FeedbackContext): void {
 }
 
 function classOf(match: Match, who: Side): 'blade' | 'blunt' {
-  return match.fighters[who].weapon === 'bo' ? 'blunt' : 'blade';
+  return WEAPONS[match.fighters[who].weapon].weaponClass;
 }

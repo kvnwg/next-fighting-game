@@ -4,6 +4,7 @@ import {
   MAX_HP,
   Rng,
   VOTE_MS,
+  WEAPONS,
   WEAPON_IDS,
   startPosition,
   type BotLevel,
@@ -48,7 +49,8 @@ import { World } from './world.ts';
 type Phase = 'boot' | 'practice' | 'vote' | 'load' | 'entrance' | 'fight' | 'results';
 type MapVote = MapId | 'random' | null;
 
-const BOT_NAMES: Record<BotLevel, string> = { dummy: 'Training Dummy', easy: 'Ronin (Easy)', normal: 'Ronin (Normal)', hard: 'Ronin (Hard)' };
+const BOT_NAMES: Record<BotLevel, string> = { dummy: 'Training Dummy', easy: 'Bot (Easy)', normal: 'Bot (Normal)', hard: 'Bot (Hard)' };
+const BOT_LEVEL_LABEL: Record<BotLevel, string> = { dummy: 'Dummy', easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 const BOT_TITLES: Record<BotLevel, string> = { dummy: 'Practice', easy: 'Wanderer', normal: 'Swordsman', hard: 'Sword Saint' };
 const SEARCH_BOT_OFFER_MS = 20_000;
 /** A build without a match server (VITE_OFFLINE=1, e.g. a hosted demo) offers practice and bot matches only. */
@@ -87,7 +89,7 @@ export class App {
     { name: 'You', avatar: null, title: '' },
     { name: 'Opponent', avatar: null, title: '' },
   ];
-  private weapons: [WeaponId, WeaponId] = ['naginata', 'bo'];
+  private weapons: [WeaponId, WeaponId] = ['ronin', 'warden'];
   private botLevel: BotLevel = 'normal';
   private paused = false;
   private last = performance.now();
@@ -345,7 +347,8 @@ export class App {
     this.mode = 'local';
     this.paused = false;
     this.you = 0;
-    this.weapons = [this.profile.weapon, 'bo'];
+    // The training dummy is the Warden: a big, patient target.
+    this.weapons = [this.profile.weapon, 'warden'];
     this.players = [playerInfo(this.profile), { name: BOT_NAMES.dummy, avatar: null, title: BOT_TITLES.dummy }];
     this.arrived = [true, true];
     this.world.setMap('moon-shrine');
@@ -463,6 +466,8 @@ export class App {
     const top = [...counts].filter(([, n]) => n === best).map(([m]) => m);
     const map = top.length > 0 ? this.rng.pick(top) : this.rng.pick(MAP_IDS);
     const weapons: [WeaponId, WeaponId] = [this.votes.weapon[0] ?? this.rng.pick(WEAPON_IDS), this.votes.weapon[1] ?? this.rng.pick(WEAPON_IDS)];
+    // The bot goes by the fighter it picked.
+    this.players[1] = { ...this.players[1], name: `${WEAPONS[weapons[1]].name} (${BOT_LEVEL_LABEL[this.botLevel]})` };
     this.startLoad(map, weapons);
   }
 
@@ -765,7 +770,7 @@ export class App {
         else this.voteScreen.update(this.voteView());
         break;
       case 'load':
-        if (changed && room.map) this.startLoad(room.map, [room.weapons[0] ?? 'naginata', room.weapons[1] ?? 'naginata']);
+        if (changed && room.map) this.startLoad(room.map, [room.weapons[0] ?? 'ronin', room.weapons[1] ?? 'ronin']);
         this.loading.setProgress(room.progress);
         break;
       case 'entrance':

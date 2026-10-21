@@ -11,16 +11,19 @@ import {
   PARRY_WHIFF_RECOVERY,
   Rng,
   WEAPONS,
+  WEAPON_IDS,
   applySnapshot,
   makeInput,
   snapshotMatch,
   type InputFrame,
+  type MoveId,
   type SimEvent,
+  type WeaponId,
 } from '../src/index.ts';
 
 type Script = (tick: number, m: Match) => [InputFrame, InputFrame];
 
-function fightAt(distance: number, weapons: [any, any] = ['naginata', 'naginata']): Match {
+function fightAt(distance: number, weapons: [WeaponId, WeaponId] = ['lancer', 'lancer']): Match {
   const m = new Match({ weapons });
   m.phase = 'fight';
   m.fighters[0].z = -distance / 2;
@@ -38,18 +41,26 @@ const tap = (btn: number) => makeInput({ pressed: btn, held: btn });
 const hold = (btn: number) => makeInput({ held: btn });
 
 describe('light chain', () => {
-  it('lands a four-hit string that ends in a knockdown, with damage scaling', () => {
+  it('lands a three-hit string with damage scaling', () => {
     const m = fightAt(2);
     // Mash LIGHT every 4 ticks; the input buffer turns that into a clean chain.
-    const ev = run(m, 140, (t) => [t % 4 === 0 ? tap(BTN.LIGHT) : NO_INPUT, NO_INPUT]);
+    const ev = run(m, 100, (t) => [t % 4 === 0 && t < 60 ? tap(BTN.LIGHT) : NO_INPUT, NO_INPUT]);
     const hits = ev.filter((e) => e.type === 'hit');
-    expect(hits.map((h) => h.type === 'hit' && h.move)).toEqual(['L1', 'L2', 'L3', 'L4']);
+    expect(hits.map((h) => h.type === 'hit' && h.move).slice(0, 3)).toEqual(['L1', 'L2', 'L3']);
     const dmg = hits.map((h) => (h.type === 'hit' ? h.damage : 0));
-    const base = WEAPONS.naginata.moves;
+    const base = WEAPONS.lancer.moves;
     expect(dmg[0]).toBe(base.L1.damage);
     expect(dmg[1]).toBe(Math.round(base.L2.damage * 0.9));
-    expect(dmg[3]).toBe(Math.round(base.L4.damage * 0.7));
-    expect(hits[3]?.type === 'hit' && hits[3].knockdown).toBe(true);
+    expect(dmg[2]).toBe(Math.round(base.L3.damage * 0.8));
+  });
+
+  it('is a true string on hit for every fighter', () => {
+    for (const id of WEAPON_IDS) {
+      const m = fightAt(Math.min(1.4, WEAPONS[id].moves.L1.range - 0.3), [id, 'lancer']);
+      const ev = run(m, 100, (t) => [t % 3 === 0 && t < 70 ? tap(BTN.LIGHT) : NO_INPUT, NO_INPUT]);
+      const moves = ev.filter((e) => e.type === 'hit').map((h) => h.type === 'hit' && h.move);
+      expect(moves, id).toEqual(expect.arrayContaining(['L1', 'L2', 'L3']));
+    }
   });
 
   it('cannot be escaped with a parry once the first hit lands', () => {
@@ -88,7 +99,7 @@ describe('light chain', () => {
 describe('parry', () => {
   it('staggers the attacker and costs them posture', () => {
     const m = fightAt(2);
-    const startup = WEAPONS.naginata.moves.H.startup;
+    const startup = WEAPONS.lancer.moves.H1.startup;
     const ev = run(m, 60, (t) => [t === 0 ? tap(BTN.HEAVY) : NO_INPUT, t === startup - 3 ? tap(BTN.PARRY) : NO_INPUT]);
     expect(ev.some((e) => e.type === 'parry')).toBe(true);
     expect(ev.some((e) => e.type === 'hit')).toBe(false);
@@ -106,7 +117,7 @@ describe('parry', () => {
 
 describe('posture and guard break', () => {
   it('breaks a guard that keeps blocking heavies, and the next hit deals bonus damage', () => {
-    const m = fightAt(2, ['bo', 'naginata']);
+    const m = fightAt(1.4, ['monk', 'lancer']);
     let broke = false;
     for (let t = 0; t < 600 && !broke; t++) {
       const out = m.step([t % 50 === 0 ? tap(BTN.HEAVY) : NO_INPUT, hold(BTN.PARRY)]);
@@ -120,7 +131,7 @@ describe('posture and guard break', () => {
     const ev = run(m, 80, (t) => [t % 3 === 0 ? tap(BTN.LIGHT) : NO_INPUT, NO_INPUT]);
     const hit = ev.find((e) => e.type === 'hit');
     expect(hit && hit.type === 'hit' && hit.bonus).toBe(true);
-    expect(hit && hit.type === 'hit' && hit.damage).toBe(Math.round(WEAPONS.bo.moves.L1.damage * GUARD_BREAK_BONUS));
+    expect(hit && hit.type === 'hit' && hit.damage).toBe(Math.round(WEAPONS.monk.moves.L1.damage * GUARD_BREAK_BONUS));
   });
 });
 
@@ -136,7 +147,7 @@ describe('critical attacks', () => {
 
   it('can be dodged through with i-frames', () => {
     const m = fightAt(2);
-    const c = WEAPONS.naginata.moves.C;
+    const c = WEAPONS.lancer.moves.C;
     const ev = run(m, 90, (t) => [
       t <= CRIT_HOLD_FRAMES + 2 ? makeInput({ held: BTN.HEAVY, pressed: t === 0 ? BTN.HEAVY : 0 }) : NO_INPUT,
       t === c.startup - 6 ? makeInput({ pressed: BTN.DODGE, held: BTN.DODGE, moveX: 1 }) : NO_INPUT,
@@ -148,7 +159,7 @@ describe('critical attacks', () => {
 
 describe('rounds', () => {
   it('practice mode never knocks anyone out', () => {
-    const m = new Match({ weapons: ['naginata', 'katana'], practice: true });
+    const m = new Match({ weapons: ['lancer', 'ronin'], practice: true });
     m.fighters[1].z = -0.5;
     const ev = run(m, 3000, (t) => [t % 4 === 0 ? tap(BTN.LIGHT) : NO_INPUT, NO_INPUT]);
     expect(ev.some((e) => e.type === 'ko')).toBe(false);
@@ -157,7 +168,7 @@ describe('rounds', () => {
 
   it('bot matches finish with a winner and identical results for identical seeds', () => {
     const play = () => {
-      const m = new Match({ weapons: ['naginata', 'bo'] });
+      const m = new Match({ weapons: ['lancer', 'monk'] });
       const a = new Bot(0, 'hard', 1);
       const b = new Bot(1, 'normal', 2);
       for (let t = 0; t < 60 * 60 * 6 && m.phase !== 'matchEnd'; t++) m.step([a.think(m), b.think(m)]);
@@ -181,7 +192,7 @@ describe('rounds', () => {
     const masherWins = (level: 'easy' | 'hard') => {
       let wins = 0;
       for (let i = 0; i < 12; i++) {
-        const m = new Match({ weapons: ['naginata', i % 2 ? 'katana' : 'bo'] });
+        const m = new Match({ weapons: [WEAPON_IDS[i % WEAPON_IDS.length]!, WEAPON_IDS[(i * 3 + 1) % WEAPON_IDS.length]!] });
         const bot = new Bot(1, level, 1000 + i);
         const rng = new Rng(77 + i);
         for (let t = 0; t < 60 * 60 * 6 && m.phase !== 'matchEnd'; t++) m.step([masher(m, rng), bot.think(m)]);
@@ -198,12 +209,99 @@ describe('snapshots', () => {
   it('round-trip a mid-fight state', () => {
     const m = fightAt(2);
     run(m, 30, (t) => [t % 4 === 0 ? tap(BTN.LIGHT) : NO_INPUT, NO_INPUT]);
-    const copy = new Match({ weapons: ['naginata', 'naginata'] });
+    const copy = new Match({ weapons: ['lancer', 'lancer'] });
     applySnapshot(copy, snapshotMatch(m));
     expect(snapshotMatch(copy)).toEqual(snapshotMatch(m));
     // Both copies keep simulating identically.
     const a = m.step([NO_INPUT, NO_INPUT]);
     const b = copy.step([NO_INPUT, NO_INPUT]);
     expect(b).toEqual(a);
+  });
+});
+
+const hitMoves = (ev: SimEvent[]): MoveId[] => ev.flatMap((e) => (e.type === 'hit' ? [e.move] : []));
+
+describe('movesets', () => {
+  it('walk the heavy chain with presses in succession', () => {
+    const m = fightAt(2, ['ronin', 'lancer']);
+    const ev = run(m, 200, (t) => [t % 6 === 0 && t < 150 ? tap(BTN.HEAVY) : NO_INPUT, NO_INPUT]);
+    expect(hitMoves(ev).slice(0, 3)).toEqual(['H1', 'H2', 'H3']);
+  });
+
+  it('turn a light or heavy into a dash attack after a forward dodge', () => {
+    for (const [btn, id] of [[BTN.LIGHT, 'DL'], [BTN.HEAVY, 'DH']] as const) {
+      const m = fightAt(4.5, ['ronin', 'lancer']);
+      const ev = run(m, 80, (t) => [
+        t === 0 ? makeInput({ pressed: BTN.DODGE, held: BTN.DODGE, moveY: 1 }) : t === 9 ? tap(btn) : NO_INPUT,
+        NO_INPUT,
+      ]);
+      expect(ev.some((e) => e.type === 'swing' && e.move === id), id).toBe(true);
+    }
+  });
+
+  it('use retreating attacks while walking away', () => {
+    for (const [btn, id] of [[BTN.LIGHT, 'BL'], [BTN.HEAVY, 'BH']] as const) {
+      const m = fightAt(2, ['knight', 'lancer']);
+      const startZ = m.fighters[0].z;
+      const ev = run(m, 60, (t) => [makeInput({ moveY: -1, pressed: t === 2 ? btn : 0, held: t === 2 ? btn : 0 }), NO_INPUT]);
+      expect(ev.some((e) => e.type === 'swing' && e.move === id), id).toBe(true);
+      expect(m.fighters[0].z).toBeLessThan(startZ);
+    }
+  });
+
+  it('use air attacks while jumping, and the jump heavy lands as a plunge', () => {
+    for (const [btn, id] of [[BTN.LIGHT, 'JL'], [BTN.HEAVY, 'JH']] as const) {
+      const m = fightAt(1.6, ['monk', 'lancer']);
+      const ev = run(m, 90, (t) => [t === 0 ? tap(BTN.JUMP) : t === 10 ? tap(btn) : NO_INPUT, NO_INPUT]);
+      expect(ev.some((e) => e.type === 'swing' && e.move === id), id).toBe(true);
+      expect(hitMoves(ev), id).toContain(id);
+      expect(m.fighters[0].y).toBe(0);
+    }
+  });
+
+  it('land every hit of a multi-hit move', () => {
+    const m = fightAt(1.4, ['assassin', 'lancer']);
+    // Walk the light chain to Twin Fangs (three hits).
+    const ev = run(m, 90, (t) => [t % 3 === 0 && t < 40 ? tap(BTN.LIGHT) : NO_INPUT, NO_INPUT]);
+    expect(hitMoves(ev).filter((id) => id === 'L3')).toHaveLength(WEAPONS.assassin.moves.L3.hits);
+  });
+
+  it('let armored heavies take a hit without flinching', () => {
+    const m = fightAt(1.6, ['warden', 'assassin']);
+    const h1 = WEAPONS.warden.moves.H1;
+    const ev = run(m, 70, (t) => [t === 0 ? tap(BTN.HEAVY) : NO_INPUT, t === 8 ? tap(BTN.LIGHT) : NO_INPUT]);
+    // The assassin's jab lands during the armor, and Hammerfall still connects.
+    expect(ev.some((e) => e.type === 'hit' && e.attacker === 1)).toBe(true);
+    expect(hitMoves(ev.filter((e) => e.type === 'hit' && e.attacker === 0))).toContain('H1');
+    expect(h1.armor).not.toBeNull();
+  });
+
+  it('fire a guard counter when struck during the guard frames', () => {
+    const m = fightAt(2, ['ronin', 'lancer']);
+    // Lancer jabs into the ronin's Sheathing Counter.
+    const ev = run(m, 70, (t) => [makeInput({ moveY: t === 0 ? -1 : 0, pressed: t === 0 ? BTN.HEAVY : 0 }), t === 0 ? tap(BTN.LIGHT) : NO_INPUT]);
+    expect(ev.some((e) => e.type === 'parry' && e.victim === 0)).toBe(true);
+    expect(hitMoves(ev.filter((e) => e.type === 'hit' && e.attacker === 0))).toContain('BH');
+    expect(ev.some((e) => e.type === 'hit' && e.attacker === 1)).toBe(false);
+  });
+
+  it('launch on hit and hold the victim in hitstun until they land', () => {
+    const m = fightAt(1.6, ['monk', 'lancer']);
+    let peak = 0;
+    for (let t = 0; t < 90; t++) {
+      // Iron Palm, then Crane Rising Knee.
+      m.step([t === 0 || t === 30 ? tap(BTN.HEAVY) : NO_INPUT, NO_INPUT]);
+      peak = Math.max(peak, m.fighters[1].y);
+      if (m.fighters[1].y > 0.05) expect(m.fighters[1].state).toBe('hitstun');
+    }
+    expect(peak).toBeGreaterThan(0.3);
+  });
+
+  it('gives every fighter all thirteen moves', () => {
+    for (const id of WEAPON_IDS) {
+      const moves = WEAPONS[id].moves;
+      expect(Object.keys(moves).sort(), id).toEqual(['BH', 'BL', 'C', 'DH', 'DL', 'H1', 'H2', 'H3', 'JH', 'JL', 'L1', 'L2', 'L3']);
+      expect(new Set(Object.values(moves).map((mv) => mv.name)).size, id).toBe(13);
+    }
   });
 });

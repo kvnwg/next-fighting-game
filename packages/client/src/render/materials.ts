@@ -17,13 +17,31 @@ export function makeFighterUniforms(): FighterUniforms {
   };
 }
 
+export interface FighterMaterialOptions {
+  roughness?: number;
+  metalness?: number;
+  /** Take colour from the geometry (voxel meshes) instead of `color`. */
+  vertexColors?: boolean;
+  /** Below 1 makes the material see-through (mist, wisps). */
+  opacity?: number;
+}
+
 /**
  * Standard material plus a fresnel rim (the white telegraph glow) and a flat tint
  * (red on hit, orange on a parried attacker). Both cost a few shader instructions,
  * which keeps them cheap enough for phones.
  */
-export function makeFighterMaterial(color: number, u: FighterUniforms, opts: { roughness?: number; metalness?: number } = {}): MeshStandardMaterial {
-  const mat = new MeshStandardMaterial({ color, roughness: opts.roughness ?? 0.72, metalness: opts.metalness ?? 0 });
+export function makeFighterMaterial(color: number, u: FighterUniforms, opts: FighterMaterialOptions = {}): MeshStandardMaterial {
+  const opacity = opts.opacity ?? 1;
+  const mat = new MeshStandardMaterial({
+    color,
+    roughness: opts.roughness ?? 0.72,
+    metalness: opts.metalness ?? 0,
+    vertexColors: opts.vertexColors ?? false,
+    transparent: opacity < 1,
+    opacity,
+    depthWrite: opacity >= 1,
+  });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uRim = u.uRim;
     shader.uniforms.uRimColor = u.uRimColor;

@@ -669,7 +669,7 @@ button {
   grid-template-columns: repeat(4, 1fr);
 }
 .tiles.weapons {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
 }
 .tile {
   position: relative;
@@ -682,7 +682,19 @@ button {
   padding: 0;
 }
 .tiles.weapons .tile {
-  height: calc(11 * var(--u));
+  height: calc(9.5 * var(--u));
+}
+.tile.fighter .art {
+  background: radial-gradient(ellipse at 50% 30%, #3a3150 0%, #1d1927 70%);
+}
+.tile .portrait {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 18%;
+  pointer-events: none;
 }
 .tile .art {
   position: absolute;

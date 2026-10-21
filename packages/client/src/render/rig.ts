@@ -36,7 +36,8 @@ interface WeaponSpec {
   bladeTip: number;
 }
 
-export const WEAPON_SPECS: Record<WeaponId, WeaponSpec> = {
+// The original placeholder weapons; voxel fighters (voxel/rig.ts) carry their own.
+export const WEAPON_SPECS: Record<string, WeaponSpec> = {
   naginata: { gripLeft: 0.42, bladeBase: 1.15, bladeTip: 1.72 },
   bo: { gripLeft: 0.42, bladeBase: 0.45, bladeTip: 0.95 },
   katana: { gripLeft: -0.13, bladeBase: 0.16, bladeTip: 0.98 },
@@ -75,7 +76,7 @@ function box(w: number, h: number, d: number, mat: Material): Mesh {
   return new Mesh(cached(`box-${w}-${h}-${d}`, () => new BoxGeometry(w, h, d)), mat);
 }
 
-function buildWeapon(id: WeaponId, mats: { wood: Material; steel: Material; wrap: Material; trim: Material }): Group {
+function buildWeapon(id: string, mats: { wood: Material; steel: Material; wrap: Material; trim: Material }): Group {
   const g = new Group();
   const cyl = (r: number, y0: number, y1: number, m: Material) => {
     const mesh = new Mesh(cached(`cyl-${r}-${(y1 - y0).toFixed(3)}`, () => new CylinderGeometry(r, r, y1 - y0, 8)), m);
@@ -178,7 +179,7 @@ export class FighterRig {
     opts: RigOptions = {},
   ) {
     this.uniforms = makeFighterUniforms();
-    this.spec = WEAPON_SPECS[weapon];
+    this.spec = WEAPON_SPECS[weapon] ?? WEAPON_SPECS.katana!;
     const m = (color: number, extra?: { roughness?: number; metalness?: number }) =>
       opts.ghost ?? makeFighterMaterial(color, this.uniforms, extra);
     const shirt = m(look.shirt);

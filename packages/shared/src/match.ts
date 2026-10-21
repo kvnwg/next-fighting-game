@@ -10,8 +10,10 @@ import {
 } from './fighter.ts';
 import { BTN, NO_INPUT, clampMove, type InputFrame } from './input.ts';
 import {
+  HEAVY_CHAIN,
   LIGHT_CHAIN,
   WEAPONS,
+  inRange,
   moveTotal,
   type CancelRule,
   type MoveData,
@@ -63,7 +65,7 @@ const KNOCKBACK_DECAY = 0.85;
 const KNOCKBACK_SPEED = 9;
 const DODGE_WEIGHT_SUM = (C.DODGE_MOVE_FRAMES * (C.DODGE_MOVE_FRAMES + 1)) / 2;
 
-type Outcome = 'hit' | 'block' | 'parry';
+type Outcome = 'hit' | 'block' | 'parry' | 'counter' | 'armor';
 
 interface PendingHit {
   attacker: Fighter;
@@ -196,6 +198,7 @@ export class Match {
       f.move = null;
       f.moveContact = null;
       f.moveDone = false;
+      f.moveHits = 0;
     }
   }
 
@@ -223,6 +226,7 @@ export class Match {
       f.dodgeRecharge = C.DODGE_RECHARGE;
     }
     if (f.critCooldown > 0) f.critCooldown--;
+    if (f.dashWindow > 0) f.dashWindow--;
     if (f.buffer && ++f.bufferAge > C.INPUT_BUFFER) f.buffer = 0;
 
     if (f.state === 'guardbreak') return;
@@ -253,15 +257,21 @@ export class Match {
         f.rollDir = Math.abs(input.moveX) > 0.5 ? Math.sign(input.moveX) : 0;
         this.emit({ type: 'getup', who: f.id });
         break;
+      case 'hitstun':
+        // A launched fighter stays in hitstun until they land.
+        if (f.y > 0.05) f.stateLen++;
+        else this.enter(f, 'idle');
+        break;
       default:
-        this.enter(f, 'idle');
+        // An air attack that finishes before landing falls the rest of the way.
+        this.enter(f, f.y > 0.05 ? 'jump' : 'idle');
     }
   }
 
   private updateAttack(f: Fighter, input: InputFrame): void {
     let m = moveOf(f)!;
     // Holding HEAVY past the charge point turns it into a critical.
-    if (m.id === 'H' && f.stateFrame === C.CRIT_HOLD_FRAMES && input.held & BTN.HEAVY && f.critCooldown === 0) {
+    if (m.id === 'H1' && f.stateFrame === C.CRIT_HOLD_FRAMES && input.held & BTN.HEAVY && f.critCooldown === 0) {
       f.move = 'C';
       m = moveOf(f)!;
       f.stateLen = moveTotal(m);
@@ -285,13 +295,19 @@ export class Match {
     switch (btn) {
       case BTN.LIGHT:
       case BTN.HEAVY: {
-        if (f.state === 'jump') return this.startPlunge(f, o);
-        if (btn === BTN.LIGHT) {
-          const next = this.nextLight(f);
-          if (next) return this.startAttack(f, o, next);
-          return free ? this.startAttack(f, o, 'L1') : false;
+        const light = btn === BTN.LIGHT;
+        if (f.state === 'jump') return light ? this.startAirAttack(f, o) : this.startPlunge(f, o);
+        // Pressed in succession, each button walks its own chain.
+        const next = this.nextInChain(f, light ? LIGHT_CHAIN : HEAVY_CHAIN);
+        if (next) return this.startAttack(f, o, next);
+        const dashing = f.dashWindow > 0 && (free || (f.state === 'dodge' && f.stateFrame >= C.DASH_CANCEL_FROM));
+        if (dashing) {
+          f.dashWindow = 0;
+          return this.startAttack(f, o, light ? 'DL' : 'DH');
         }
-        return free || this.cancelOpen(f, 'H') ? this.startAttack(f, o, 'H') : false;
+        if (light) return free ? this.startAttack(f, o, input.moveY <= -C.BACK_ATTACK_THRESHOLD ? 'BL' : 'L1') : false;
+        if (free && input.moveY <= -C.BACK_ATTACK_THRESHOLD) return this.startAttack(f, o, 'BH');
+        return free || this.cancelOpen(f, 'H1') ? this.startAttack(f, o, 'H1') : false;
       }
       case BTN.PARRY:
         if (!free) return false;
@@ -330,11 +346,11 @@ export class Match {
     return this.cancelRule(f, into) !== undefined;
   }
 
-  private nextLight(f: Fighter): MoveId | null {
+  private nextInChain(f: Fighter, chain: readonly MoveId[]): MoveId | null {
     if (!f.move) return null;
-    const i = LIGHT_CHAIN.indexOf(f.move);
-    if (i < 0 || i >= LIGHT_CHAIN.length - 1) return null;
-    const next = LIGHT_CHAIN[i + 1]!;
+    const i = chain.indexOf(f.move);
+    if (i < 0 || i >= chain.length - 1) return null;
+    const next = chain[i + 1]!;
     return this.cancelOpen(f, next) ? next : null;
   }
 
@@ -343,14 +359,23 @@ export class Match {
     f.move = id;
     f.moveContact = null;
     f.moveDone = false;
+    f.moveHits = 0;
     f.facing = yawTowards(f.x, f.z, o.x, o.z);
     return true;
   }
 
   private startPlunge(f: Fighter, o: Fighter): boolean {
     if (f.y < 0.3) return false;
-    this.startAttack(f, o, 'P');
+    this.startAttack(f, o, 'JH');
     f.vy = 0;
+    return true;
+  }
+
+  /** A light in the air: the fighter keeps falling while it swings. */
+  private startAirAttack(f: Fighter, o: Fighter): boolean {
+    if (f.y < 0.3) return false;
+    this.startAttack(f, o, 'JL');
+    f.vy = Math.max(f.vy, 1.2);
     return true;
   }
 
@@ -364,6 +389,8 @@ export class Match {
     const len = Math.hypot(dx, dz) || 1;
     f.dodgeX = dx / len;
     f.dodgeZ = dz / len;
+    // Dodging toward the opponent sets up a dash attack.
+    f.dashWindow = my / Math.max(1e-6, Math.hypot(mx, my)) > 0.5 ? C.DODGE_FRAMES + C.DASH_ATTACK_WINDOW : 0;
     if (f.dodgeCharges === C.DODGE_CHARGES) f.dodgeRecharge = C.DODGE_RECHARGE;
     f.dodgeCharges--;
     this.enter(f, 'dodge', C.DODGE_FRAMES);
@@ -400,6 +427,11 @@ export class Match {
         const step = Math.min(m.lunge / m.active, gap - C.MIN_SEPARATION - 0.15);
         f.x += fx * step;
         f.z += fz * step;
+      } else if (m.lunge < 0 && f.stateFrame < m.startup + m.active) {
+        // Retreating attacks back off through their startup and active frames.
+        const step = m.lunge / (m.startup + m.active);
+        f.x += fx * step;
+        f.z += fz * step;
       }
     } else if (f.state === 'dodge' && f.stateFrame < C.DODGE_MOVE_FRAMES) {
       const step = (C.DODGE_DISTANCE * (C.DODGE_MOVE_FRAMES - f.stateFrame)) / DODGE_WEIGHT_SUM;
@@ -430,7 +462,7 @@ export class Match {
   }
 
   private applyVertical(f: Fighter): void {
-    const plunging = f.state === 'attack' && f.move === 'P';
+    const plunging = f.state === 'attack' && moveOf(f)!.lands;
     if (plunging) {
       const m = moveOf(f)!;
       if (f.stateFrame < 4) {
@@ -449,7 +481,7 @@ export class Match {
       if (f.state === 'jump') {
         this.enter(f, 'idle');
         this.emit({ type: 'land', who: f.id });
-      } else if (plunging) {
+      } else if (f.state === 'attack') {
         this.emit({ type: 'land', who: f.id });
       }
     }
@@ -499,18 +531,25 @@ export class Match {
       const victim = this.fighters[attacker.id === 0 ? 1 : 0];
       const m = moveOf(attacker);
       if (!m || attacker.state !== 'attack' || attacker.moveDone) continue;
-      if (attacker.stateFrame < m.startup || attacker.stateFrame >= m.startup + m.active) continue;
-      if (m.kind === 'plunge' && attacker.y > 0.05) continue;
+      // Multi-hit moves spread their hits evenly over the active frames.
+      const nextHitAt = m.startup + Math.floor((attacker.moveHits * m.active) / m.hits);
+      if (attacker.stateFrame < nextHitAt || attacker.stateFrame >= m.startup + m.active) continue;
+      if (m.lands && attacker.y > 0.05) continue;
       if (isInvulnerable(victim)) continue;
-      if (m.kind === 'light' && victim.y > C.LIGHT_HEIGHT_LIMIT) continue;
+      if (m.kind === 'light' && victim.y - attacker.y > C.LIGHT_HEIGHT_LIMIT) continue;
       if (!this.inReach(attacker, victim, m)) continue;
       // Outcomes are decided from the state before this tick's contacts, so trades work.
-      const outcome: Outcome =
+      const vm = victim.state === 'attack' ? moveOf(victim) : null;
+      let outcome: Outcome =
         victim.state === 'parry'
           ? 'parry'
           : victim.state === 'block' || victim.state === 'blockstun'
             ? 'block'
             : 'hit';
+      if (vm && outcome === 'hit' && !m.unblockable) {
+        if (inRange(vm.guard, victim.stateFrame) && !victim.moveContact) outcome = 'counter';
+        else if (inRange(vm.armor, victim.stateFrame)) outcome = 'armor';
+      }
       pending.push({ attacker, victim, move: m, outcome });
     }
     for (const p of pending) this.applyContact(p);
@@ -522,10 +561,27 @@ export class Match {
 
   private applyContact({ attacker: a, victim: b, move: m, outcome }: PendingHit): void {
     const at = this.contactPoint(a, b);
-    a.moveDone = true;
+    a.moveHits++;
+    a.moveDone = a.moveHits >= m.hits;
+    const last = a.moveDone;
+    const share = 1 / m.hits;
     const weaponClass = WEAPONS[a.weapon].weaponClass;
 
+    if (outcome === 'counter') {
+      // A guard counter deflects the attack and fires its own strike straight away.
+      a.moveDone = true;
+      a.moveContact = 'parried';
+      this.enter(a, 'stagger', C.COUNTER_STAGGER);
+      const vm = moveOf(b)!;
+      b.moveContact = 'block';
+      b.stateFrame = Math.max(b.stateFrame, vm.startup - 1);
+      this.hitstop = Math.max(this.hitstop, C.HITSTOP.parry);
+      this.emit({ type: 'parry', attacker: a.id, victim: b.id, move: m.id, ...at });
+      return;
+    }
+
     if (outcome === 'parry') {
+      a.moveDone = true;
       a.moveContact = 'parried';
       this.enter(a, 'stagger', C.PARRY_STAGGER);
       this.enter(b, 'idle');
@@ -537,9 +593,9 @@ export class Match {
 
     if (outcome === 'block' && !m.unblockable) {
       a.moveContact = 'block';
-      this.push(a, b, m.knockback * 0.5 + 0.2);
+      this.push(a, b, (m.knockback * 0.5 + 0.2) * (last ? 1 : 0.3));
       this.hitstop = Math.max(this.hitstop, C.HITSTOP.block);
-      if (!this.addPosture(b, a, m.posture, at)) {
+      if (!this.addPosture(b, a, m.posture * share * (m.crush ? 1.5 : 1), at)) {
         this.enter(b, 'blockstun', m.blockstun);
         this.emit({ type: 'block', attacker: a.id, victim: b.id, move: m.id, weaponClass, ...at });
       }
@@ -548,15 +604,16 @@ export class Match {
 
     a.moveContact = 'hit';
     const bonus = b.guardBreakBonus;
-    const damage = Math.max(1, Math.round(m.damage * comboScale(b.comboCount) * (bonus ? C.GUARD_BREAK_BONUS : 1)));
+    const damage = Math.max(1, Math.round(m.damage * share * comboScale(b.comboCount) * (bonus ? C.GUARD_BREAK_BONUS : 1)));
     b.guardBreakBonus = false;
     b.comboCount++;
     b.hp = Math.max(0, b.hp - damage);
     if (b.state !== 'guardbreak') {
-      b.posture = Math.min(C.MAX_POSTURE - 1, b.posture + m.posture * C.HIT_POSTURE_SCALE);
+      b.posture = Math.min(C.MAX_POSTURE - 1, b.posture + m.posture * share * C.HIT_POSTURE_SCALE);
       b.postureDelay = C.POSTURE_REGEN_DELAY;
     }
-    this.push(a, b, m.knockback);
+    const armored = outcome === 'armor' && b.hp > 0;
+    if (!armored) this.push(a, b, (last ? m.knockback : 0.15) * (m.pull && last ? -0.6 : 1));
 
     if (outcome === 'block') {
       // An unblockable attack shatters the guard and still lands in full.
@@ -572,15 +629,18 @@ export class Match {
         ko = true;
         this.enter(b, 'ko');
       }
-    } else if (outcome === 'block') {
-      // guard break already set the state
-    } else if (m.knockdown) {
+    } else if (outcome === 'block' || armored) {
+      // guard break already set the state, or armor soaks the flinch
+    } else if (m.knockdown && last) {
       this.enter(b, 'knockdown', C.KNOCKDOWN_FRAMES);
     } else {
-      this.enter(b, 'hitstun', m.hitstun);
+      this.enter(b, 'hitstun', last ? m.hitstun : Math.max(m.hitstun, 14));
+      if (last && m.launch > 0) b.vy = Math.max(b.vy, m.launch);
     }
 
-    const stop = m.knockdown || ko ? C.HITSTOP.knockdown : m.kind === 'light' ? C.HITSTOP.light : C.HITSTOP.heavy;
+    const stop = !last
+      ? 3
+      : (m.knockdown || ko) ? C.HITSTOP.knockdown : m.kind === 'light' ? C.HITSTOP.light : C.HITSTOP.heavy;
     this.hitstop = Math.max(this.hitstop, stop);
     this.emit({
       type: 'hit',
@@ -590,7 +650,7 @@ export class Match {
       kind: m.kind,
       weaponClass,
       damage,
-      knockdown: m.knockdown || ko,
+      knockdown: (m.knockdown && last && !armored) || ko,
       bonus,
       ko,
       ...at,

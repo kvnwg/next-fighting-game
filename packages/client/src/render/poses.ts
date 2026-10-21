@@ -110,6 +110,103 @@ const ATTACKS: Record<MoveAnim, AttackKeys> = {
     strike: make({ hipY: 0.55, lean: 0.55, wpx: 0, wpy: 0.1, wpz: 0.5, wdx: 0, wdy: -1, wdz: 0.15, headPitch: 0.15, flx: 0.25, flz: 0.3, frx: -0.25, frz: -0.35 }),
     follow: make({ hipY: 0.55, lean: 0.55, wpx: 0, wpy: 0.1, wpz: 0.5, wdx: 0, wdy: -1, wdz: 0.15, headPitch: 0.15, flx: 0.25, flz: 0.3, frx: -0.25, frz: -0.35 }),
   },
+  lungeSlash: {
+    // A draw from the hip: crouched with the blade low and forward, then a cut across as the body passes.
+    windup: make({ hipY: 0.7, lean: 0.35, twist: 0.6, wpx: 0.25, wpy: 0.15, wpz: 0.1, wdx: -0.3, wdy: 0.1, wdz: 1, headYaw: -0.2, flx: 0.22, flz: 0.45, frx: -0.22, frz: -0.45 }),
+    strike: make({ hipY: 0.72, lean: 0.45, twist: -0.4, fwd: 0.35, wpx: -0.2, wpy: 0.38, wpz: 0.55, wdx: -0.95, wdy: 0.08, wdz: 0.3, headYaw: 0.1, flx: 0.2, flz: 0.6, frx: -0.2, frz: -0.55 }),
+    follow: make({ hipY: 0.72, lean: 0.4, twist: -0.9, fwd: 0.4, wpx: -0.5, wpy: 0.35, wpz: 0.2, wdx: -0.85, wdy: 0.2, wdz: -0.5, headYaw: 0.6, flx: 0.2, flz: 0.6, frx: -0.2, frz: -0.55 }),
+  },
+  dashThrust: {
+    windup: make({ hipY: 0.74, lean: 0.15, twist: -0.8, wpx: -0.26, wpy: 0.3, wpz: -0.3, wdx: 0.06, wdy: 0.05, wdz: 1, headYaw: 0.7, flx: 0.2, flz: 0.5, frx: -0.2, frz: -0.5 }),
+    strike: make({ hipY: 0.66, lean: 0.65, twist: 0.2, fwd: 0.45, wpx: -0.03, wpy: 0.38, wpz: 0.72, wdx: 0.02, wdy: 0.03, wdz: 1, headYaw: -0.1, flx: 0.2, flz: 0.75, frx: -0.22, frz: -0.6 }),
+    follow: make({ hipY: 0.68, lean: 0.6, twist: 0.2, fwd: 0.5, wpx: -0.03, wpy: 0.36, wpz: 0.7, wdx: 0.04, wdy: 0.02, wdz: 1, headYaw: -0.1, flx: 0.2, flz: 0.75, frx: -0.22, frz: -0.6 }),
+  },
+  counter: {
+    // Held across the body like a guard, then a snap cut the instant the counter fires.
+    windup: make({ hipY: 0.78, lean: 0, twist: 0.35, wpx: 0.15, wpy: 0.45, wpz: 0.3, wdx: -0.95, wdy: 0.25, wdz: 0.15, headYaw: 0, flx: 0.24, flz: 0.18, frx: -0.26, frz: -0.3 }),
+    strike: make({ hipY: 0.78, lean: 0.3, twist: -0.5, wpx: -0.1, wpy: 0.4, wpz: 0.55, wdx: -0.6, wdy: 0.15, wdz: 0.8, headYaw: 0.2, ...WIDE }),
+    follow: make({ hipY: 0.76, lean: 0.3, twist: -1.0, wpx: -0.48, wpy: 0.32, wpz: 0.25, wdx: -0.95, wdy: 0.1, wdz: -0.25, headYaw: 0.8, ...WIDE }),
+  },
+  shieldGuard: {
+    windup: make({ hipY: 0.76, lean: 0.1, twist: 0.6, wpx: -0.3, wpy: 0.3, wpz: 0.0, wdx: -0.2, wdy: 0.6, wdz: -0.75, headYaw: -0.3, flx: 0.24, flz: 0.3, frx: -0.26, frz: -0.3 }),
+    strike: make({ hipY: 0.76, lean: 0.4, twist: -0.3, fwd: 0.2, wpx: -0.05, wpy: 0.4, wpz: 0.62, wdx: 0.05, wdy: 0.1, wdz: 1, headYaw: 0, flx: 0.2, flz: 0.45, frx: -0.22, frz: -0.42 }),
+    follow: make({ hipY: 0.76, lean: 0.4, twist: -0.3, fwd: 0.25, wpx: -0.05, wpy: 0.38, wpz: 0.6, wdx: 0.05, wdy: 0.05, wdz: 1, headYaw: 0, flx: 0.2, flz: 0.45, frx: -0.22, frz: -0.42 }),
+  },
+  airSlash: {
+    windup: make({ hipY: 0.95, lean: -0.2, wpx: -0.1, wpy: 0.95, wpz: 0.0, wdx: 0.1, wdy: 0.5, wdz: -0.85, headPitch: -0.1, flx: 0.2, fly: 0.34, flz: 0.12, frx: -0.2, fry: 0.24, frz: -0.12 }),
+    strike: make({ hipY: 0.95, lean: 0.4, wpx: 0, wpy: 0.45, wpz: 0.55, wdx: 0.05, wdy: -0.1, wdz: 1, headPitch: 0.15, flx: 0.2, fly: 0.34, flz: 0.12, frx: -0.2, fry: 0.24, frz: -0.12 }),
+    follow: make({ hipY: 0.95, lean: 0.55, wpx: 0, wpy: 0.15, wpz: 0.5, wdx: 0, wdy: -0.8, wdz: 0.6, headPitch: 0.2, flx: 0.2, fly: 0.3, flz: 0.12, frx: -0.2, fry: 0.2, frz: -0.12 }),
+  },
+  airSpin: {
+    windup: make({ hipY: 0.95, lean: 0.2, twist: -0.9, wpx: -0.42, wpy: 0.3, wpz: -0.05, wdx: -0.9, wdy: 0.05, wdz: -0.4, headYaw: 0.8, flx: 0.2, fly: 0.4, flz: 0.15, frx: -0.2, fry: 0.3, frz: -0.1 }),
+    strike: make({ hipY: 0.95, lean: 0.15, bodyYaw: Math.PI, wpx: -0.45, wpy: 0.35, wpz: 0.28, wdx: -1, wdy: 0.05, wdz: 0.25, flx: 0.25, fly: 0.45, flz: 0.2, frx: -0.25, fry: 0.35, frz: -0.2 }),
+    follow: make({ hipY: 0.95, lean: 0.2, bodyYaw: Math.PI * 2, wpx: -0.42, wpy: 0.32, wpz: 0.3, wdx: -1, wdy: 0.08, wdz: 0.3, flx: 0.2, fly: 0.34, flz: 0.12, frx: -0.2, fry: 0.24, frz: -0.12 }),
+  },
+  slam: {
+    // A huge overhead that drives into the floor.
+    windup: make({ hipY: 0.94, lean: -0.4, twist: -0.1, wpx: -0.05, wpy: 1.05, wpz: -0.1, wdx: 0.1, wdy: 0.35, wdz: -0.93, headPitch: -0.2, flx: 0.24, flz: 0.32, frx: -0.24, frz: -0.32 }),
+    strike: make({ hipY: 0.64, lean: 0.7, wpx: 0, wpy: 0.2, wpz: 0.6, wdx: 0, wdy: -0.45, wdz: 0.9, headPitch: 0.25, flx: 0.3, flz: 0.4, frx: -0.3, frz: -0.38 }),
+    follow: make({ hipY: 0.6, lean: 0.75, wpx: 0, wpy: 0.05, wpz: 0.6, wdx: 0, wdy: -0.7, wdz: 0.7, headPitch: 0.3, flx: 0.3, flz: 0.4, frx: -0.3, frz: -0.38 }),
+  },
+  sweep: {
+    windup: make({ hipY: 0.66, lean: 0.35, twist: -1.1, wpx: -0.45, wpy: 0.12, wpz: -0.05, wdx: -0.85, wdy: -0.15, wdz: -0.5, headYaw: 0.9, flx: 0.3, flz: 0.35, frx: -0.3, frz: -0.35 }),
+    strike: make({ hipY: 0.64, lean: 0.4, twist: 0.1, wpx: -0.1, wpy: 0.12, wpz: 0.55, wdx: 0.1, wdy: -0.25, wdz: 1, headYaw: 0, flx: 0.3, flz: 0.35, frx: -0.3, frz: -0.35 }),
+    follow: make({ hipY: 0.64, lean: 0.4, twist: 1.0, wpx: 0.3, wpy: 0.15, wpz: 0.3, wdx: 0.95, wdy: -0.15, wdz: -0.2, headYaw: -0.8, flx: 0.3, flz: 0.35, frx: -0.3, frz: -0.35 }),
+  },
+  uppercut: {
+    windup: make({ hipY: 0.6, lean: 0.45, twist: -0.6, wpx: -0.25, wpy: 0.0, wpz: 0.1, wdx: -0.1, wdy: -0.3, wdz: 0.95, headPitch: 0.1, headYaw: 0.4, flx: 0.28, flz: 0.35, frx: -0.28, frz: -0.35 }),
+    strike: make({ hipY: 0.98, lean: -0.1, twist: 0.2, fwd: 0.2, wpx: -0.05, wpy: 0.85, wpz: 0.45, wdx: 0.05, wdy: 0.9, wdz: 0.4, headPitch: -0.25, headYaw: 0, flx: 0.2, flz: 0.3, frx: -0.2, fry: 0.15, frz: -0.3 }),
+    follow: make({ hipY: 0.98, lean: -0.2, twist: 0.2, fwd: 0.2, wpx: 0, wpy: 1.0, wpz: 0.25, wdx: 0.05, wdy: 0.95, wdz: -0.2, headPitch: -0.3, headYaw: 0 }),
+  },
+  backflip: {
+    windup: make({ hipY: 0.62, lean: 0.25, wpx: -0.25, wpy: 0.2, wpz: 0.3, wdx: 0.4, wdy: 0.6, wdz: 0.6, flx: 0.24, flz: 0.1, frx: -0.24, frz: -0.1 }),
+    strike: make({ hipY: 1.05, bodyPitch: -1.2, lean: -0.2, wpx: -0.3, wpy: 0.3, wpz: 0.1, wdx: 0.4, wdy: 0.7, wdz: 0.5, headPitch: 0.2, flx: 0.18, fly: 0.7, flz: 0.55, frx: -0.18, fry: 0.95, frz: 0.7 }),
+    follow: make({ hipY: 0.8, bodyPitch: -0.3, lean: 0.2, wpx: -0.25, wpy: 0.2, wpz: 0.3, wdx: 0.4, wdy: 0.6, wdz: 0.6, flx: 0.24, flz: 0.1, frx: -0.24, frz: -0.25 }),
+  },
+  flurry: {
+    // The per-hit whip through the active frames comes from attackPose.
+    windup: make({ hipY: 0.74, lean: 0.3, twist: -0.6, wpx: -0.3, wpy: 0.3, wpz: 0.2, wdx: -0.4, wdy: 0.3, wdz: 0.85, headYaw: 0.4, ...WIDE }),
+    strike: make({ hipY: 0.74, lean: 0.45, twist: 0, fwd: 0.2, wpx: -0.08, wpy: 0.36, wpz: 0.55, wdx: 0.1, wdy: 0.1, wdz: 1, headYaw: 0, ...WIDE }),
+    follow: make({ hipY: 0.74, lean: 0.45, twist: 0.5, fwd: 0.25, wpx: 0.1, wpy: 0.32, wpz: 0.45, wdx: 0.7, wdy: 0.1, wdz: 0.7, headYaw: -0.3, ...WIDE }),
+  },
+  punch: {
+    windup: make({ hipY: 0.8, lean: 0.1, twist: -0.55, wpx: -0.22, wpy: 0.36, wpz: 0.08, wdx: 0, wdy: 0.3, wdz: 0.95, headYaw: 0.4, flx: 0.22, flz: 0.32, frx: -0.24, frz: -0.3 }),
+    strike: make({ hipY: 0.78, lean: 0.3, twist: 0.45, fwd: 0.12, wpx: -0.02, wpy: 0.44, wpz: 0.7, wdx: 0, wdy: 0.15, wdz: 1, headYaw: -0.2, flx: 0.22, flz: 0.4, frx: -0.24, frz: -0.32 }),
+    follow: make({ hipY: 0.78, lean: 0.3, twist: 0.45, fwd: 0.12, wpx: -0.04, wpy: 0.42, wpz: 0.66, wdx: 0, wdy: 0.2, wdz: 1, headYaw: -0.2, flx: 0.22, flz: 0.4, frx: -0.24, frz: -0.32 }),
+  },
+  palm: {
+    windup: make({ hipY: 0.74, lean: -0.05, twist: -0.75, wpx: -0.3, wpy: 0.28, wpz: -0.05, wdx: 0, wdy: 0.95, wdz: 0.2, headYaw: 0.5, flx: 0.28, flz: 0.42, frx: -0.28, frz: -0.38 }),
+    strike: make({ hipY: 0.7, lean: 0.45, twist: 0.35, fwd: 0.25, wpx: 0, wpy: 0.36, wpz: 0.75, wdx: 0, wdy: 0.95, wdz: 0.25, headYaw: -0.1, flx: 0.28, flz: 0.55, frx: -0.28, frz: -0.42 }),
+    follow: make({ hipY: 0.7, lean: 0.45, twist: 0.35, fwd: 0.28, wpx: 0, wpy: 0.34, wpz: 0.72, wdx: 0, wdy: 0.95, wdz: 0.25, headYaw: -0.1, flx: 0.28, flz: 0.55, frx: -0.28, frz: -0.42 }),
+  },
+  kick: {
+    windup: make({ hipY: 0.84, lean: -0.1, twist: -0.2, frx: -0.18, fry: 0.4, frz: 0.05, flx: 0.2, flz: 0.1 }),
+    strike: make({ hipY: 0.84, lean: -0.3, twist: 0.1, fwd: 0.1, frx: -0.1, fry: 0.55, frz: 0.8, flx: 0.2, flz: -0.05, headPitch: 0.1 }),
+    follow: make({ hipY: 0.84, lean: -0.3, twist: 0.1, fwd: 0.1, frx: -0.1, fry: 0.5, frz: 0.75, flx: 0.2, flz: -0.05, headPitch: 0.1 }),
+  },
+  roundhouse: {
+    windup: make({ hipY: 0.84, lean: 0.1, twist: -0.6, frx: -0.25, fry: 0.2, frz: -0.2, headYaw: 0.6 }),
+    strike: make({ hipY: 0.88, lean: -0.25, bodyYaw: Math.PI, frx: -0.65, fry: 0.7, frz: 0.25, flx: 0.15, flz: 0.05, headYaw: 0 }),
+    follow: make({ hipY: 0.86, lean: -0.1, bodyYaw: Math.PI * 2, frx: -0.3, fry: 0.2, frz: -0.2, flx: 0.2, flz: 0.2 }),
+  },
+  shieldBash: {
+    // Leading shoulder first: the body drives forward with the weapon held back.
+    windup: make({ hipY: 0.76, lean: 0.15, twist: 0.7, wpx: -0.38, wpy: 0.3, wpz: -0.12, wdx: -0.2, wdy: 0.7, wdz: -0.6, headYaw: -0.4, flx: 0.24, flz: 0.42, frx: -0.24, frz: -0.38 }),
+    strike: make({ hipY: 0.74, lean: 0.55, twist: 0.35, fwd: 0.42, wpx: -0.36, wpy: 0.32, wpz: -0.05, wdx: -0.2, wdy: 0.7, wdz: -0.6, headYaw: -0.2, flx: 0.24, flz: 0.62, frx: -0.24, frz: -0.45 }),
+    follow: make({ hipY: 0.74, lean: 0.5, twist: 0.3, fwd: 0.45, wpx: -0.36, wpy: 0.32, wpz: -0.05, wdx: -0.2, wdy: 0.7, wdz: -0.6, headYaw: -0.2, flx: 0.24, flz: 0.62, frx: -0.24, frz: -0.45 }),
+  },
+  reap: {
+    // A long scything arc from the far left, across the front, to behind the right shoulder.
+    windup: make({ hipY: 0.78, lean: 0.1, twist: 1.1, wpx: 0.35, wpy: 0.4, wpz: 0.05, wdx: 0.9, wdy: 0.15, wdz: -0.4, wroll: -0.3, headYaw: -0.8, ...WIDE }),
+    strike: make({ hipY: 0.76, lean: 0.3, twist: -0.2, wpx: -0.05, wpy: 0.38, wpz: 0.5, wdx: -0.2, wdy: 0.05, wdz: 1, headYaw: 0.2, ...WIDE }),
+    follow: make({ hipY: 0.74, lean: 0.3, twist: -1.2, wpx: -0.5, wpy: 0.32, wpz: 0.1, wdx: -1, wdy: 0.08, wdz: -0.3, wroll: 0.3, headYaw: 0.9, ...WIDE }),
+  },
+  hook: {
+    // Reach out past the target, then haul the blade back toward the body.
+    windup: make({ hipY: 0.82, lean: 0.05, twist: -0.4, wpx: -0.2, wpy: 0.4, wpz: 0.15, wdx: 0.1, wdy: 0.35, wdz: 0.95, headYaw: 0.3, flx: 0.2, flz: 0.35, frx: -0.22, frz: -0.35 }),
+    strike: make({ hipY: 0.78, lean: 0.45, twist: 0.1, fwd: 0.2, wpx: -0.05, wpy: 0.42, wpz: 0.7, wdx: 0.05, wdy: 0.2, wdz: 1, headYaw: 0, flx: 0.2, flz: 0.5, frx: -0.22, frz: -0.4 }),
+    follow: make({ hipY: 0.8, lean: -0.1, twist: 0.3, fwd: -0.1, wpx: -0.1, wpy: 0.4, wpz: 0.2, wdx: 0.3, wdy: 0.35, wdz: 0.85, headYaw: -0.2, flx: 0.2, flz: 0.2, frx: -0.22, frz: -0.45 }),
+  },
 };
 
 for (const k of Object.values(ATTACKS)) {
@@ -151,7 +248,7 @@ function attackPose(out: Pose, m: MoveData, frame: number): Pose {
   const r = m.recovery;
   // Over-pulled wind-up held for the last ~quarter of startup: the hold is what the eye catches.
   const hold = Math.max(2, Math.round(s * 0.28));
-  return sampleKeys(
+  sampleKeys(
     out,
     [
       [0, POSES.stance, easeOutCubic],
@@ -164,6 +261,13 @@ function attackPose(out: Pose, m: MoveData, frame: number): Pose {
     ],
     frame,
   );
+  if (m.hits > 1 && frame >= s && frame < s + a) {
+    // Multi-hit moves whip back and forth once per hit through the active frames.
+    const w = Math.sin(((frame - s) / a) * m.hits * Math.PI);
+    out[P.twist]! += w * 0.45;
+    out[P.wpx]! += w * 0.15;
+  }
+  return out;
 }
 
 export interface FighterView {

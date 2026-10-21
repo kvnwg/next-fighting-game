@@ -359,6 +359,27 @@ export function buildRonin() {
   return b.build();
 }
 
+// The katana drawn, for fighting: grip at the bottom, blade up +Y with a
+// slight curve toward +Z (the cutting edge faces -Z).
+export function buildRoninKatana() {
+  const b = new VoxelBuilder(palette);
+  b.bone('katana', null, [0.5, 6, 0.5]);
+  const c = [0.5, 0, 0.5];
+  b.segment([c[0], 0.5, c[2]], [c[0], 10, c[2]], 0.95, (p, t, d) => (d < 1 ? 'metal' : (Math.floor(d * 1.25) + Math.floor(p[2] * 1.25)) % 2 ? 'wrapDark' : 'wrapLight'));
+  b.disc([c[0], 10.6, c[2]], [0, 1, 0], 2.3, 0.95, 'iron');
+  b.fill([-1, 11, -2], [2, 42, 3], (p) => {
+    const t = (p[1] - 11) / 31;
+    const bend = t * t * 1.6; // sori: the blade curves back as it rises
+    const half = 0.75 - Math.max(0, t - 0.9) * 6;
+    if (Math.abs(p[0] - c[0]) > 0.6 || half <= 0) return undefined;
+    const z = p[2] - c[2] - bend;
+    if (z < -half || z > half + 0.4) return undefined;
+    if (p[1] < 12.2) return 'steel';
+    return z < -half + 0.7 ? 'steel' : 'metal';
+  });
+  return b.build();
+}
+
 // Pose = per-bone Euler rotations in degrees (XYZ order) about the bone pivot.
 export const poses = {
   tpose: {},

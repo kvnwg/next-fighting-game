@@ -19,11 +19,8 @@ const TORII = `<svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMax meet" sty
   <rect x="20" y="16" width="5" height="44" fill="#0a0a10"/><rect x="75" y="16" width="5" height="44" fill="#0a0a10"/>
   <rect x="10" y="10" width="80" height="6" fill="#0a0a10"/><rect x="16" y="22" width="68" height="4" fill="#0a0a10"/></svg>`;
 
-const WEAPON_ICONS: Record<WeaponId, string> = {
-  naginata: `<svg viewBox="0 0 100 100"><line x1="18" y1="88" x2="70" y2="30" stroke="#6b3a2a" stroke-width="5"/><path d="M70 30 Q86 22 90 6 Q78 18 66 26 Z" fill="#e5ebf2" stroke="#9aa3ad" stroke-width="1.5"/><line x1="64" y1="37" x2="74" y2="27" stroke="#c8a04e" stroke-width="5"/></svg>`,
-  bo: `<svg viewBox="0 0 100 100"><line x1="12" y1="90" x2="88" y2="10" stroke="#7a4a2e" stroke-width="7"/><line x1="12" y1="90" x2="20" y2="82" stroke="#c8a04e" stroke-width="8"/><line x1="80" y1="18" x2="88" y2="10" stroke="#c8a04e" stroke-width="8"/></svg>`,
-  katana: `<svg viewBox="0 0 100 100"><path d="M34 70 Q60 40 86 12" stroke="#e5ebf2" stroke-width="5" fill="none"/><line x1="26" y1="66" x2="40" y2="80" stroke="#c8a04e" stroke-width="5"/><line x1="16" y1="90" x2="33" y2="73" stroke="#25222e" stroke-width="6"/></svg>`,
-};
+/** Fighter portraits, rendered from the voxel models by tools/voxel/render-portraits.mjs. */
+const portrait = (id: WeaponId) => `<img class="portrait" src="fighters/${id}.png" alt="" draggable="false">`;
 
 function mapArt(id: MapId): string {
   const p = PALETTES[id];
@@ -148,7 +145,7 @@ export interface VoteView {
   secondsLeft: number;
 }
 
-/** "Select Map & Weapon": shared map vote, personal weapon pick, picks shown live with avatars. */
+/** "Select Map & Fighter": shared map vote, personal fighter pick, picks shown live with avatars. */
 export class VoteScreen {
   private root: HTMLElement | null = null;
   private count: HTMLElement | null = null;
@@ -162,12 +159,12 @@ export class VoteScreen {
     ].join('');
     const weaponTiles = WEAPON_IDS.map(
       (id) =>
-        `<button class="tile" data-weapon="${id}"><div class="art" style="background:#1d1927;padding:calc(1*var(--u)) 30%">${WEAPON_ICONS[id]}</div><div class="sub">${WEAPONS[id].blurb}</div><div class="label">${WEAPONS[id].name}</div><div class="badges"></div></button>`,
+        `<button class="tile fighter" data-weapon="${id}" title="${WEAPONS[id].blurb}"><div class="art">${portrait(id)}</div><div class="sub">${WEAPONS[id].weapon}</div><div class="label">${WEAPONS[id].name}</div><div class="badges"></div></button>`,
     ).join('');
     this.root = el(
       'div',
       'screen dim',
-      `<div class="vote panel"><h2>Select Map &amp; Weapon</h2><div class="count"></div>
+      `<div class="vote panel"><h2>Select Map &amp; Fighter</h2><div class="count"></div>
         <div class="tiles maps">${mapTiles}</div><div class="tiles weapons">${weaponTiles}</div></div>`,
     );
     this.count = this.root.querySelector('.count');

@@ -53,6 +53,15 @@ export const DODGE_RECHARGE = 120;
 export const COMBO_SCALING_STEP = 0.1;
 export const COMBO_SCALING_FLOOR = 0.5;
 
+// A forward dodge turns LIGHT/HEAVY into dash attacks from this dodge frame on,
+// and for this many ticks after the dodge ends.
+export const DASH_CANCEL_FROM = 7;
+export const DASH_ATTACK_WINDOW = 8;
+// Walking away at least this hard turns LIGHT/HEAVY into retreating attacks.
+export const BACK_ATTACK_THRESHOLD = 0.5;
+// A guard counter deflects the incoming attack and staggers its owner this long.
+export const COUNTER_STAGGER = 16;
+
 // Holding HEAVY this long turns it into a critical (white glow) attack.
 export const CRIT_HOLD_FRAMES = 10;
 export const CRIT_COOLDOWN = 240;

@@ -1,9 +1,9 @@
 import { FIGHTER_STATES, type Contact, type Fighter } from './fighter.ts';
 import type { Match, MatchPhase, SimEvent, Winner } from './match.ts';
 import type { MapId } from './maps.ts';
-import type { MoveId, WeaponId } from './weapons.ts';
+import { MOVE_IDS, type MoveId, type WeaponId } from './weapons.ts';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 export const DEFAULT_SERVER_PORT = 2567;
 export const SNAPSHOT_EVERY = 2;
 export const VOTE_MS = 10_000;
@@ -73,7 +73,7 @@ export interface MatchSnapshot {
   f: [number[], number[]];
 }
 
-const MOVES: (MoveId | null)[] = [null, 'L1', 'L2', 'L3', 'L4', 'H', 'C', 'P'];
+const MOVES: (MoveId | null)[] = [null, ...MOVE_IDS];
 const CONTACTS: (Contact | null)[] = [null, 'hit', 'block', 'parried'];
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -83,8 +83,8 @@ export function encodeFighter(f: Fighter): number[] {
     round3(f.x), round3(f.y), round3(f.z), round3(f.vy), round3(f.kx), round3(f.kz), round3(f.facing),
     f.hp, round3(f.posture), f.postureDelay,
     FIGHTER_STATES.indexOf(f.state), f.stateFrame, f.stateLen,
-    MOVES.indexOf(f.move), CONTACTS.indexOf(f.moveContact), f.moveDone ? 1 : 0,
-    round3(f.dodgeX), round3(f.dodgeZ), f.dodgeCharges, f.dodgeRecharge, f.critCooldown,
+    MOVES.indexOf(f.move), CONTACTS.indexOf(f.moveContact), f.moveDone ? 1 : 0, f.moveHits,
+    round3(f.dodgeX), round3(f.dodgeZ), f.dodgeCharges, f.dodgeRecharge, f.dashWindow, f.critCooldown,
     f.comboCount, f.guardBreakBonus ? 1 : 0, f.buffer, f.bufferAge, f.rollDir, f.roundsWon,
     round3(f.moveX), round3(f.moveY),
   ];
@@ -96,8 +96,8 @@ export function decodeFighterInto(f: Fighter, a: readonly number[]): void {
   f.x = n(); f.y = n(); f.z = n(); f.vy = n(); f.kx = n(); f.kz = n(); f.facing = n();
   f.hp = n(); f.posture = n(); f.postureDelay = n();
   f.state = FIGHTER_STATES[n()] ?? 'idle'; f.stateFrame = n(); f.stateLen = n();
-  f.move = MOVES[n()] ?? null; f.moveContact = CONTACTS[n()] ?? null; f.moveDone = n() === 1;
-  f.dodgeX = n(); f.dodgeZ = n(); f.dodgeCharges = n(); f.dodgeRecharge = n(); f.critCooldown = n();
+  f.move = MOVES[n()] ?? null; f.moveContact = CONTACTS[n()] ?? null; f.moveDone = n() === 1; f.moveHits = n();
+  f.dodgeX = n(); f.dodgeZ = n(); f.dodgeCharges = n(); f.dodgeRecharge = n(); f.dashWindow = n(); f.critCooldown = n();
   f.comboCount = n(); f.guardBreakBonus = n() === 1; f.buffer = n(); f.bufferAge = n(); f.rollDir = n();
   f.roundsWon = n(); f.moveX = n(); f.moveY = n();
 }

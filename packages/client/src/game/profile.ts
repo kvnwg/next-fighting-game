@@ -59,7 +59,7 @@ export async function loadProfile(platform: Platform): Promise<Profile> {
     loggedIn: !!user,
     wins: stored.wins ?? 0,
     losses: stored.losses ?? 0,
-    weapon: stored.weapon && WEAPON_IDS.includes(stored.weapon) ? stored.weapon : 'naginata',
+    weapon: stored.weapon && WEAPON_IDS.includes(stored.weapon) ? stored.weapon : 'ronin',
     seenControls: stored.seenControls ?? false,
     seenEntrance: stored.seenEntrance ?? false,
     seenTelegraphHint: stored.seenTelegraphHint ?? false,

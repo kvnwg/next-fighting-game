@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Move Lab</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #1b1824; color: #eee; font: 14px system-ui, sans-serif; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+      #hud { position: fixed; left: 12px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: calc(100% - 24px); }
+      #hud select, #hud button { font: inherit; background: #2b2638; color: #eee; border: 1px solid #4a4360; border-radius: 6px; padding: 4px 8px; }
+      #label { position: fixed; left: 12px; bottom: 12px; font-size: 18px; font-weight: 700; text-shadow: 0 1px 3px #000; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="hud"></div>
+    <div id="label"></div>
+    <script type="module" src="/src/dev/lab.ts"></script>
+  </body>
+</html>
