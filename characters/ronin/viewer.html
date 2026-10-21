@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ronin Voxel Viewer</title>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+</script>
+<style>
+  :root { --paper: #f3f0e9; --ink: #141416; }
+  html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); font: 14px/1.4 Georgia, serif; overflow: hidden; }
+  canvas { display: block; }
+  .ui { position: fixed; top: 16px; left: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+  button { font: inherit; padding: 6px 14px; border: 1px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; letter-spacing: 0.1em; text-transform: uppercase; }
+  button[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
+</style>
+</head>
+<body>
+<div class="ui" id="ui"></div>
+<script type="module">
+  // Serve the repo root (e.g. `npx http-server .`) and open /characters/ronin/viewer.html
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { buildRonin, poses } from './model.js';
+  import { buildRig } from '../../tools/voxel/mesher.js';
+
+  const rig = buildRig(buildRonin());
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf3f0e9);
+  scene.add(rig.root);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8780, 2.1));
+  const key = new THREE.DirectionalLight(0xffffff, 2.2);
+  key.position.set(-45, 110, 60);
+  scene.add(key);
+
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(30, 48), new THREE.MeshBasicMaterial({ color: 0xe2ded4 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.01;
+  scene.add(ground);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(devicePixelRatio);
+  document.body.append(renderer.domElement);
+  const camera = new THREE.PerspectiveCamera(30, 1, 1, 2000);
+  camera.position.set(90, 70, 170);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 44, 0);
+  controls.enableDamping = true;
+
+  const ui = document.getElementById('ui');
+  const setPose = (name) => {
+    rig.setPose(poses[name]);
+    for (const b of ui.children) b.setAttribute('aria-pressed', String(b.dataset.pose === name));
+  };
+  for (const name of Object.keys(poses)) {
+    const b = document.createElement('button');
+    b.dataset.pose = name;
+    b.textContent = name.replace('pose', '-pose');
+    b.onclick = () => setPose(name);
+    ui.append(b);
+  }
+  setPose('apose');
+
+  const resize = () => {
+    renderer.setSize(innerWidth, innerHeight);
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+  };
+  addEventListener('resize', resize);
+  resize();
+  renderer.setAnimationLoop(() => {
+    controls.update();
+    renderer.render(scene, camera);
+  });
+</script>
+</body>
+</html>
