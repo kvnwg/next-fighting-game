@@ -4,21 +4,24 @@
  * Every fighter is framed to its own silhouette: a first pass renders the upper body and finds the
  * top of the head (hat, hood or helm) and where the face sits, then the portrait is cropped from
  * just over the head down to the upper chest, so the fighter fills the frame whatever they wear.
- * It's rendered at 4x and folded down to a small pixel-art sprite with a hard alpha edge and a dark
- * ink outline, to sit on a flat colour like the rest of the pixel UI.
+ *
+ * The look is a woodblock poster, all hard edges and no gradients: a dark ground in the fighter's
+ * colour, a sun disc behind the head cut by bands, their name in kanji faint down the side, and the
+ * fighter lit from the side with a rim of their colour, inked round with a hard drop shadow.
  */
 import * as THREE from 'three';
-import { CharacterId } from '../../shared/characters';
+import { CHARACTERS, CharacterId } from '../../shared/characters';
 import { CharacterModel } from './character';
+import { G } from './gfx/globals';
 
 const cache = new Map<CharacterId, string>();
-/** the sprite's size in pixels (shown with image-rendering: pixelated) */
-const OUT = 64;
-const SS = 4;
+/** the portrait's size in pixels, and how much bigger it's drawn before being scaled down */
+const OUT = 192;
+const SS = 2;
 /** the framing pass: resolution, and its half-extent around the head in body scales */
 const PROBE = 160;
 const PROBE_HALF = 0.85;
-const INK: [number, number, number] = [18, 14, 22];
+const INK = '#120e16';
 
 function renderRGBA(renderer: THREE.WebGLRenderer, scene: THREE.Scene, cam: THREE.Camera, size: number): Uint8Array {
   const rt = new THREE.WebGLRenderTarget(size, size);
@@ -51,24 +54,36 @@ function ortho(cx: number, cy: number, half: number): THREE.OrthographicCamera {
 export function portraitURL(renderer: THREE.WebGLRenderer, id: CharacterId): string {
   const hit = cache.get(id);
   if (hit) return hit;
+  const def = CHARACTERS[id];
+  const accent = new THREE.Color(def.palette.accent);
 
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight('#e6ecff', '#3a3040', 1.6));
-  const key = new THREE.DirectionalLight('#fff0dc', 2.6);
-  key.position.set(1.6, 2.4, 3);
+  scene.add(new THREE.HemisphereLight('#c8d0e8', '#2a2030', 0.9));
+  // warm key from the front-left, a cool fill, and the fighter's colour raking in from behind
+  const key = new THREE.DirectionalLight('#ffe8cc', 3.2);
+  key.position.set(-2.2, 2.2, 2.6);
   scene.add(key);
-  // frontal fill so hooded and masked faces don't vanish into the frame
-  const fill = new THREE.DirectionalLight('#dfe6ff', 1.4);
-  fill.position.set(-0.5, 0.3, 3);
+  const fill = new THREE.DirectionalLight('#b8c8ff', 0.9);
+  fill.position.set(1.5, 0.4, 3);
   scene.add(fill);
+  const back = new THREE.DirectionalLight(accent, 3.5);
+  back.position.set(2.5, 1.6, -3);
+  scene.add(back);
   const model = new CharacterModel(id);
   for (let i = 0; i < 12; i++) {
     model.update({ state: 'idle', elapsed: 0, dur: 0, attack: null, windup: 0, speed: 0, moveForward: 1, moveSide: 0, airborne: false, blockHeld: false, buff: false }, 0.05);
   }
-  model.root.rotation.y = 0.35;
+  model.root.rotation.y = 0.5;
   scene.add(model.root);
   const s = model.scale;
   const headY = 1.74 * s;
+
+  // the world shaders' rim light and fog are shared uniforms: the fighter's colour for the rim,
+  // and no haze, just for this
+  const rim = G.uRim.value.clone();
+  const fog = G.uFog.value.x;
+  G.uRim.value.set(accent.r, accent.g, accent.b, 1.1);
+  G.uFog.value.x = 0;
 
   // 1. framing: where are the top of the head and the face?
   const half = PROBE_HALF * s;
@@ -94,60 +109,79 @@ export function portraitURL(renderer: THREE.WebGLRenderer, id: CharacterId): str
   }
   const faceX = nX ? sumX / nX : 0;
   // tall crests, horns and spear tips may run off the top rather than shrink the face
-  const yTop = Math.min(top, headY + 0.36 * s) + 0.03 * s;
-  const yBot = headY - 0.4 * s;
+  const yTop = Math.min(top, headY + 0.36 * s) + 0.1 * s;
+  const yBot = headY - 0.52 * s;
   const size = yTop - yBot;
-  const cam = ortho(faceX, (yTop + yBot) / 2, size / 2);
+  // the face a little left of centre, looking across at the sun
+  const cam = ortho(faceX + size * 0.06, (yTop + yBot) / 2, size / 2);
 
-  // 2. the portrait, at 4x
+  // 2. the fighter
   const big = OUT * SS;
   const px = renderRGBA(renderer, scene, cam, big);
   model.dispose();
+  G.uRim.value.copy(rim);
+  G.uFog.value.x = fog;
+  const fig = document.createElement('canvas');
+  fig.width = fig.height = big;
+  fig.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(px), big, big), 0, 0);
+  const silhouette = (color: string) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = big;
+    const g = c.getContext('2d')!;
+    g.drawImage(fig, 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, big, big);
+    return c;
+  };
 
-  // 3. fold down: average the opaque samples, hard alpha edge, then a 1px ink outline
-  const rgba = new Uint8ClampedArray(OUT * OUT * 4);
-  const solid = new Uint8Array(OUT * OUT);
-  for (let y = 0; y < OUT; y++) {
-    for (let x = 0; x < OUT; x++) {
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      let n = 0;
-      for (let sy = 0; sy < SS; sy++) {
-        for (let sx = 0; sx < SS; sx++) {
-          const i = ((y * SS + sy) * big + x * SS + sx) * 4;
-          if (px[i + 3] < 128) continue;
-          r += px[i];
-          g += px[i + 1];
-          b += px[i + 2];
-          n++;
-        }
-      }
-      if (n * 2 < SS * SS) continue;
-      const o = (y * OUT + x) * 4;
-      rgba[o] = r / n;
-      rgba[o + 1] = g / n;
-      rgba[o + 2] = b / n;
-      rgba[o + 3] = 255;
-      solid[y * OUT + x] = 1;
-    }
-  }
-  const near = (x: number, y: number) => x >= 0 && y >= 0 && x < OUT && y < OUT && solid[y * OUT + x] === 1;
-  for (let y = 0; y < OUT; y++) {
-    for (let x = 0; x < OUT; x++) {
-      if (solid[y * OUT + x] || !(near(x + 1, y) || near(x - 1, y) || near(x, y + 1) || near(x, y - 1))) continue;
-      const o = (y * OUT + x) * 4;
-      rgba[o] = INK[0];
-      rgba[o + 1] = INK[1];
-      rgba[o + 2] = INK[2];
-      rgba[o + 3] = 255;
-    }
-  }
-
+  // 3. the poster
+  const hexOf = (c: THREE.Color) => `#${c.getHexString()}`;
+  const ground = hexOf(accent.clone().lerp(new THREE.Color(INK), 0.93));
+  const sun = hexOf(accent.clone().lerp(new THREE.Color('#fff4e0'), 0.12));
+  const shade = hexOf(accent.clone().lerp(new THREE.Color(INK), 0.78));
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = OUT;
-  canvas.getContext('2d')!.putImageData(new ImageData(rgba, OUT, OUT), 0, 0);
-  const url = canvas.toDataURL();
+  canvas.width = canvas.height = big;
+  const g = canvas.getContext('2d')!;
+  g.fillStyle = ground;
+  g.fillRect(0, 0, big, big);
+  // the sun behind the head, cut by bands that thicken toward the bottom
+  const cx = big * 0.6;
+  const cy = big * 0.4;
+  const r = big * 0.3;
+  g.fillStyle = sun;
+  g.beginPath();
+  g.arc(cx, cy, r, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = ground;
+  for (let i = 0, y = cy + r * 0.18; i < 4; i++) {
+    const h = big * (0.012 + i * 0.012);
+    g.fillRect(0, y, big, h);
+    y += h + big * (0.05 - i * 0.008);
+  }
+  // the name in kanji, faint, down the left edge
+  g.fillStyle = shade;
+  g.font = `900 ${Math.round(big * 0.17)}px "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'top';
+  [...def.jp].forEach((ch, i) => g.fillText(ch, big * 0.12, big * 0.05 + i * big * 0.18));
+  // the fighter: a hard drop shadow, an ink outline, then the figure
+  const o = Math.round(big * 0.018);
+  g.drawImage(silhouette(shade), o * 2.2, o * 2.2);
+  const ink = silhouette(INK);
+  for (let a = 0; a < 8; a++) g.drawImage(ink, Math.round(Math.cos((a * Math.PI) / 4) * o), Math.round(Math.sin((a * Math.PI) / 4) * o));
+  g.drawImage(fig, 0, 0);
+  // a thin inner keyline in the fighter's colour
+  g.strokeStyle = sun;
+  g.lineWidth = Math.max(2, big * 0.012);
+  g.strokeRect(big * 0.03, big * 0.03, big * 0.94, big * 0.94);
+
+  const out = document.createElement('canvas');
+  out.width = out.height = OUT;
+  const og = out.getContext('2d')!;
+  og.imageSmoothingQuality = 'high';
+  og.drawImage(canvas, 0, 0, OUT, OUT);
+  const url = out.toDataURL();
   cache.set(id, url);
   return url;
 }
