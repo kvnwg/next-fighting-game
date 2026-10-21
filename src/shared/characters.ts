@@ -219,11 +219,12 @@ const duelist: CharacterDef = {
   ratings: { power: 2, speed: 4, reach: 4, defense: 2, difficulty: 4 },
   lights: [
     { name: 'Lunge', anim: 'thrust', windup: 240, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.8, feintable: true },
-    { name: 'Prick', anim: 'thrust', windup: 220, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.5, feintable: true },
-    { name: 'Flurry', anim: 'thrust', windup: 220, active: 70, recovery: 300, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.5, feintable: true },
-    { name: 'Pierce', anim: 'thrust', windup: 300, active: 80, recovery: 420, damage: 10, posture: 12, blockPosture: 14, range: 3.3, arc: 30, lunge: 0.9, feintable: true },
+    { name: 'Disengage', anim: 'thrust', windup: 220, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.1, arc: 30, lunge: 0.5, feintable: true },
+    // a cut, not a thrust: it covers a wider angle
+    { name: 'Whip Cut', anim: 'slashL', windup: 220, active: 70, recovery: 300, damage: 7, posture: 9, blockPosture: 10, range: 3.0, arc: 45, lunge: 0.5, feintable: true },
+    { name: 'Balestra', anim: 'thrust', windup: 300, active: 80, recovery: 420, damage: 10, posture: 12, blockPosture: 14, range: 3.3, arc: 30, lunge: 0.9, feintable: true },
   ],
-  heavy: { name: 'Skewer', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.4, arc: 30, lunge: 1.5, feintable: true },
+  heavy: { name: 'Pirouette', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.4, arc: 30, lunge: 1.5, feintable: true },
   special: { name: 'Coup de Grace', anim: 'thrust', windup: 620, active: 140, recovery: 600, damage: 20, posture: 30, blockPosture: 30, range: 4.4, arc: 20, lunge: 3.5, perilous: 'thrust', cooldown: 6500 },
   ability: {
     kind: 'attack',

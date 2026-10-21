@@ -8,6 +8,7 @@ import { MoveDef, Style } from './author';
 import { greathammer } from './moves/greathammer';
 import { katana } from './moves/katana';
 import { LEGACY } from './moves/legacy';
+import { rapier } from './moves/rapier';
 
 export { KATANA_SHEATH, KATANA_SHEATH_MOUTH } from './moves/katana';
 export type { BodyPose, Motion, MoveDef, Pose, Style, WeaponXf } from './author';
@@ -16,7 +17,7 @@ export { bodyToTorso } from './author';
 export const STYLES: Record<WeaponKind, Style> = {
   katana,
   greathammer,
-  rapier: LEGACY.rapier,
+  rapier,
   spear: LEGACY.spear,
   daggers: LEGACY.daggers,
   scythe: LEGACY.scythe,

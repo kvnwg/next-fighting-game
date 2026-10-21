@@ -75,7 +75,24 @@ export type Motion =
       roll: number;
     }
   | { kind: 'seq'; parts: { from: number; to: number; m: Motion }[]; blend: number }
+  | { kind: 'baked'; clip: BakedClip; hand: 'main' | 'free' | 'shield'; grip2: number }
   | { kind: 'hold' };
+
+/**
+ * A clip baked from motion data (see moves/baked): per sample, the body channels and both fists'
+ * transforms in torso space. A baked motion's s is the clip's own time in seconds.
+ */
+export interface BakedClip {
+  fps: number;
+  /** clip time of the first sample */
+  t0: number;
+  n: number;
+  /** per sample: crouch lean twist side hipTwist headPitch step back width lift front(+1 L, -1 R) spin(turns) */
+  body: number[];
+  /** per sample: fist position, blade direction (out of the thumb side), edge direction (along the knuckles) */
+  main: number[];
+  free: number[];
+}
 
 /** Whole-body motion keyed along s: spin (yaw), flip (forward somersault), roll (cartwheel) in turns, hop in meters. */
 export interface Rot {
@@ -166,6 +183,12 @@ export interface MoveDef {
    */
   flow: number;
   fx: FxCue[];
+  /**
+   * Linear timing (baked clips): s runs straight from sStart to the first hit over the windup, then
+   * on to sEnd and sRest, so the clip keeps its own anticipation and follow-through. The trail
+   * shows while s is between sChamber and sEnd.
+   */
+  linear: boolean;
   /** afterimages are left behind while s is in this range */
   ghosts: [number, number] | null;
   trail: TrailStyle | null;
@@ -320,6 +343,7 @@ export interface MoveOpts {
   settle?: number;
   lead?: number;
   flow?: number;
+  linear?: boolean;
   fx?: FxCue[];
   ghosts?: [number, number];
   trail?: TrailStyle;
@@ -354,6 +378,7 @@ export function mv(o: MoveOpts): MoveDef {
     settle: o.settle ?? 0.3,
     bodyLead: o.lead ?? 0.1,
     flow: o.flow ?? 0,
+    linear: o.linear ?? false,
     fx: o.fx ?? [],
     ghosts: o.ghosts ?? null,
     trail: o.trail ?? null,
@@ -372,4 +397,83 @@ export function circle(u: V3, v: V3, turns: number, startDeg = 0, steps = 0): V3
     out.push([d.x, d.y, d.z]);
   }
   return out;
+}
+
+/**
+ * Directions on a cone around `axis` (disengages, twirls of the point): `halfDeg` from the axis,
+ * walked from `fromDeg` to `toDeg` around it (0 = toward the fighter's left, 90 = up, 180 = right,
+ * 270 = down, for an axis pointing forward).
+ */
+export function cone(axis: V3, halfDeg: number, fromDeg: number, toDeg: number, steps = 0): V3[] {
+  const f = N(axis);
+  const u = new THREE.Vector3(0, 1, 0).cross(f);
+  if (u.lengthSq() < 1e-6) u.set(1, 0, 0);
+  u.normalize();
+  const v = f.clone().cross(u).normalize();
+  const a = (halfDeg * Math.PI) / 180;
+  const n = steps || Math.max(2, Math.ceil(Math.abs(toDeg - fromDeg) / 40));
+  const out: V3[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = ((fromDeg + ((toDeg - fromDeg) * i) / n) * Math.PI) / 180;
+    const d = f.clone().multiplyScalar(Math.cos(a)).addScaledVector(u, Math.cos(t) * Math.sin(a)).addScaledVector(v, Math.sin(t) * Math.sin(a));
+    out.push([d.x, d.y, d.z]);
+  }
+  return out;
+}
+
+/**
+ * A position track keyed along the move's own s axis (free hands, off-hand items): straight lines
+ * between the keyed points, held before the first key and after the last.
+ */
+export function track(keys: [number, V3][], blend = 0.05): Motion {
+  const fwd: V3 = [0, 0, 1];
+  const up: V3 = [0, 1, 0];
+  const first = keys[0];
+  const last = keys[keys.length - 1];
+  const parts: [number, number, Motion][] = [[first[0] - 10, first[0], line(first[1], first[1], fwd, fwd, up)]];
+  for (let i = 0; i < keys.length - 1; i++) parts.push([keys[i][0], keys[i + 1][0], line(keys[i][1], keys[i + 1][1], fwd, fwd, up)]);
+  parts.push([last[0], last[0] + 10, line(last[1], last[1], fwd, fwd, up)]);
+  return seq(parts, blend);
+}
+
+/**
+ * A fist from a baked clip as a motion (s = clip seconds): the weapon in the right hand ('main'),
+ * the left fist ('free'), or a shield on the left arm, its face out of the back of the hand and its
+ * top edge kept upright ('shield').
+ */
+export function baked(clip: BakedClip, hand: 'main' | 'free' | 'shield' = 'main', grip2 = NaN): Motion {
+  return { kind: 'baked', clip, hand, grip2 };
+}
+
+/**
+ * Body keys from a baked clip between clip times `from` and `to` (every `every`-th sample), with
+ * `mod` applied to each pose (to lean a whole move further forward, widen a stance...).
+ */
+export function bakedKeys(clip: BakedClip, from = -Infinity, to = Infinity, every = 1, mod?: (b: BodyPose, t: number) => void): KeyIn[] {
+  const out: KeyIn[] = [];
+  for (let i = 0; i < clip.n; i += every) {
+    const t = clip.t0 + i / clip.fps;
+    if (t < from - 1e-6 || t > to + 1e-6) continue;
+    const c = clip.body.slice(i * 12, i * 12 + 12);
+    const b = B({ crouch: c[0], lean: c[1], twist: c[2], side: c[3], hipTwist: c[4], headPitch: c[5], step: c[6], back: c[7], width: c[8], lift: c[9], front: c[10] > 0 ? 'L' : 'R' });
+    mod?.(b, t);
+    out.push(K(t, b, { spin: c[11], hop: 0 }));
+  }
+  return out;
+}
+
+/** A still pose from a baked clip at clip time t (guards, blocks): the body, the weapon, and a shield or free hand. */
+export function bakedPose(clip: BakedClip, t: number, axis: EdgeAxis, opts: { grip2?: number; shield?: boolean; offAxis?: EdgeAxis; body?: Partial<BodyPose> } = {}): Pose {
+  const i = Math.min(clip.n - 1, Math.max(0, Math.round((t - clip.t0) * clip.fps)));
+  const c = clip.body.slice(i * 12, i * 12 + 12);
+  const body = B({ crouch: c[0], lean: c[1], twist: c[2], side: c[3], hipTwist: c[4], headPitch: c[5], step: c[6], back: c[7], width: c[8], lift: c[9], front: c[10] > 0 ? 'L' : 'R', ...opts.body });
+  const m = clip.main.slice(i * 9, i * 9 + 9);
+  const main = X([m[0], m[1], m[2]], [m[3], m[4], m[5]], [m[6], m[7], m[8]], axis, opts.grip2 ?? NaN);
+  const f = clip.free.slice(i * 9, i * 9 + 9);
+  if (opts.shield) {
+    // the shield faces out of the back of the left hand, top edge up
+    const face = V([f[3], f[4], f[5]]).cross(V([f[6], f[7], f[8]])).normalize();
+    return P(body, main, X([f[0], f[1], f[2]], [face.x, face.y, face.z], [0, 1, 0], opts.offAxis ?? 'y'));
+  }
+  return P(body, main, null, [f[0], f[1], f[2]]);
 }

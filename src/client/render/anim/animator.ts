@@ -239,6 +239,24 @@ function evalMotion(m: Motion, s: number, axis: Style['axis'], body: BodyPose, h
       }
       return cur;
     }
+    case 'baked': {
+      const c = m.clip;
+      const data = m.hand === 'main' ? c.main : c.free;
+      const x = Math.min(c.n - 1, Math.max(0, (s - c.t0) * c.fps));
+      const i = Math.min(c.n - 2, Math.floor(x));
+      const f = x - i;
+      const at = (k: number) => data[i * 9 + k] + (data[(i + 1) * 9 + k] - data[i * 9 + k]) * f;
+      _p.set(at(0), at(1), at(2));
+      _d.set(at(3), at(4), at(5)).normalize();
+      _e.set(at(6), at(7), at(8));
+      if (m.hand === 'shield') {
+        // the face looks out of the back of the left hand (knuckle line x punch), the top edge stays up
+        _d.cross(_e).normalize();
+        _e.set(0, 1, 0);
+      }
+      const two = Number.isFinite(m.grip2);
+      return { pos: _p.clone(), quat: orientWeapon(_d, _e, axis, new THREE.Quaternion()), grip2: two ? m.grip2 : 0, hold2: two ? 1 : 0 };
+    }
     case 'arc':
     case 'line': {
       let grip2: number;
@@ -425,6 +443,7 @@ export class Animator {
     const swingsMain = def.main.kind !== 'hold';
     const swingsOff = !!def.off && def.off.kind !== 'hold';
 
+    if (def.linear) return this.linearPose(a, def, e, hitT, t1, total, out, swingsMain, swingsOff);
     if (def.flow > 0 && e < hitT[0]) {
       // a continuous windup: one accelerating motion from the opening pose into the hit
       const k = e / Math.max(1, hitT[0]);
@@ -479,6 +498,34 @@ export class Animator {
     const rot = { ...f.rot };
     for (const c of ROT_CHANNELS) rot[c] = f.rot[c] + (settleTurn(f.rot[c], c) - f.rot[c]) * gw;
     return { pose: lerpResolved(f.pose, guard, gw), rot, kick: f.kick && { ...f.kick, w: f.kick.w * (1 - gw) } };
+  }
+
+  /** Baked clips: straight-line time from the start through each hit to the end, so the clip keeps its own rhythm. */
+  private linearPose(a: AnimInput, def: MoveDef, e: number, hitT: number[], t1: number, total: number, out: AnimFrame, swingsMain: boolean, swingsOff: boolean): MoveFrame {
+    const n = def.impacts.length;
+    let s: number;
+    if (e < hitT[0]) s = def.sStart + (def.impacts[0] - def.sStart) * (e / Math.max(1, hitT[0]));
+    else if (e < hitT[n - 1]) {
+      let i = 0;
+      while (i < n - 2 && e >= hitT[i + 1]) i++;
+      s = def.impacts[i] + ((def.impacts[i + 1] - def.impacts[i]) * (e - hitT[i])) / Math.max(1, hitT[i + 1] - hitT[i]);
+    } else if (e < t1) s = def.impacts[n - 1] + ((def.sEnd - def.impacts[n - 1]) * (e - hitT[n - 1])) / Math.max(1, t1 - hitT[n - 1]);
+    else s = def.sEnd + ((def.sRest - def.sEnd) * clamp01((e - t1) / Math.max(1, (total - t1) * def.settle)));
+    this.cues(def, s, out);
+    const f = this.movePose(def, s);
+    const swinging = s >= def.sChamber && s <= def.sEnd;
+    out.swingMain = swingsMain && swinging;
+    out.swingOff = swingsOff && swinging;
+    out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
+    // blend in from wherever we were, and back out to guard at the end of the recovery
+    const bw = easeOut(e / Math.max(1, hitT[0] * def.blendIn), 3);
+    const k = clamp01((e - t1) / Math.max(1, total - t1));
+    const guardFrom = Math.max(0.18, def.settle * 0.75);
+    const gw = e < t1 ? 0 : easeInOut((k - guardFrom) / (1 - guardFrom));
+    const pose = lerpResolved(lerpResolved(this.snapshot, f.pose, bw), this.guardPose(a), gw);
+    const rot = lerpRot(this.snapRot, f.rot, bw);
+    for (const c of ROT_CHANNELS) rot[c] += (settleTurn(rot[c], c) - rot[c]) * gw;
+    return { pose, rot, kick: f.kick && { ...f.kick, w: f.kick.w * (1 - gw) } };
   }
 
   /** Leap and vanish abilities: the dodge state plays a whole move over its duration. */
