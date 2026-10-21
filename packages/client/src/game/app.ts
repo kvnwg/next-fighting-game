@@ -27,6 +27,7 @@ import { detectDevice, pickQuality, qualityPreset, type DeviceKind } from '../pl
 import { camPose } from '../render/camera.ts';
 import type { FighterRenderState } from '../render/fighter-visual.ts';
 import { Hud, type HudMode } from '../ui/hud.ts';
+import { IntroScreen } from '../ui/intro-screen.ts';
 import { ScreenFx } from '../ui/overlay.ts';
 import {
   ControlsCard,
@@ -41,6 +42,7 @@ import {
   type Settings,
 } from '../ui/screens.ts';
 import { EntranceDirector, type EntranceHooks } from './entrance.ts';
+import { INTRO_CARDS } from './intros.ts';
 import { playEvent } from './feedback.ts';
 import { loadProfile, loadSettings, playerInfo, saveProfile, saveSettings, titleFor, type Profile } from './profile.ts';
 import { LocalSession, OnlineSession, type Session } from './session.ts';
@@ -132,6 +134,19 @@ export class App {
     this.director = new EntranceDirector(
       (shots) => this.world.cam.playShots(shots),
       () => this.world.cam.stopShots(),
+      {
+        vfx: this.world.vfx,
+        camera: this.world.cam.camera,
+        screen: new IntroScreen(this.canvas, this.ui, quality.cssFilters),
+        renderer: this.world.renderer,
+        scene: this.world.scene,
+        sfx: (name, x, y, z) => this.audio.play(name, { pan: this.world.pan(x, y, z) }),
+        project: (x, y, z) => this.world.project(x, y, z),
+        shake: (kind) => this.world.cam.shake(kind),
+        duckMusic: (db, seconds) => this.audio.duckMusic(db, seconds),
+        visual: (side) => this.world.visuals?.[side] ?? null,
+        weapon: (side) => this.weapons[side],
+      },
     );
     this.lobby = new LobbyBar(this.ui, {
       quick: () => void this.quickMatch(),
@@ -213,15 +228,20 @@ export class App {
     const winner = this.session?.match.winner ?? -1;
     for (const side of [0, 1] as Side[]) {
       let st = states[side];
+      let visible = this.arrived[side];
       if (ov && ov.side === side) {
         this.arrived[side] = true;
-        st = { ...st, x: st.x + ov.dx, y: st.y + ov.dy, z: st.z + ov.dz };
+        visible = ov.visible;
+        st = { ...st, x: st.x + ov.dx, y: st.y + ov.dy, z: st.z + ov.dz, facing: st.facing + ov.yaw };
+        if (ov.anim) st = { ...st, ...ov.anim };
         visuals[side].special = ov.special;
+        visuals[side].pose = ov.pose;
       } else {
         visuals[side].special = this.phase === 'results' && winner === side ? 'victory' : null;
+        visuals[side].pose = null;
       }
       states[side] = st;
-      visuals[side].setVisible(this.arrived[side]);
+      visuals[side].setVisible(visible);
       visuals[side].update(st, dt, frozen);
     }
     this.rs = states;
@@ -506,12 +526,6 @@ export class App {
 
   private entranceHooks(): EntranceHooks {
     return {
-      landed: (side) => {
-        const s = startPosition(side);
-        this.world.vfx.dustRing(s.x, s.z);
-        this.world.cam.shake('small');
-        this.audio.play('thump', { pan: this.world.pan(s.x, 0.5, s.z) });
-      },
       showCard: (side) => {
         const p = this.players[side];
         const bot = this.mode === 'local' && side !== this.you;
@@ -520,7 +534,8 @@ export class App {
           : side === this.you
             ? { tier: 'Unranked', rating: `${this.profile.wins} Wins`, mark: String(Math.min(9, Math.floor(this.profile.wins / 5) + 1)) }
             : { tier: 'Unranked', rating: p.title, mark: '?' };
-        this.nameCard.show(this.ui, p, rank, this.profile.seenEntrance);
+        const w = this.weapons[side];
+        this.nameCard.show(this.ui, p, rank, this.profile.seenEntrance, { id: w, name: WEAPONS[w].name, ...INTRO_CARDS[w] });
       },
       hideCard: () => this.nameCard.hide(),
     };
@@ -864,6 +879,13 @@ export class App {
   /** Test hook: jump straight into a bot match vote. */
   debugStartBotMatch(): void {
     this.startBotMatch();
+  }
+
+  /** Test hook: a bot match with these fighters, straight to loading and the entrances. */
+  debugStartEntrance(you: WeaponId, opponent: WeaponId, map: MapId = 'moon-shrine'): void {
+    this.startBotMatch();
+    this.voteScreen.hide();
+    this.startLoad(map, [you, opponent]);
   }
 
   /** Test hook: entrance duration is tied to the server's per-fighter entrance time. */

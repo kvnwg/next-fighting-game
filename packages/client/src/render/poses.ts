@@ -41,7 +41,9 @@ const STANCE_SPEC: Required<Spec> = {
   headPitch: 0.05, headYaw: 0.3, roll: 0,
 };
 
-function make(spec: Spec, base: Spec = STANCE_SPEC): Pose {
+export type PoseSpec = Spec;
+
+export function make(spec: Spec, base: Spec = STANCE_SPEC): Pose {
   const merged = { ...base, ...spec } as Required<Spec>;
   const out = new Float32Array(POSE_SIZE);
   for (const [k, i] of Object.entries(P)) out[i] = merged[k as keyof typeof P];
@@ -290,10 +292,15 @@ export interface FighterView {
   walkPhase: number;
   /** Overrides used by cinematics. */
   special?: 'landing' | 'victory' | 'kneel' | null;
+  pose?: Pose | null;
 }
 
 /** Computes the target pose for a fighter's current sim state. */
 export function computePose(v: FighterView, out: Pose): Pose {
+  if (v.pose) {
+    out.set(v.pose);
+    return out;
+  }
   if (v.special) {
     out.set(POSES[v.special]);
     return out;

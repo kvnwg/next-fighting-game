@@ -254,22 +254,41 @@ export class LoadingScreen {
   }
 }
 
+/** The fighter half of an entrance card: kanji and name, plus the voice line as a subtitle. */
+export interface NameCardFighter {
+  id: string;
+  name: string;
+  kanji: string;
+  line?: string;
+}
+
 /** Entrance name card: username, then title, then rank, revealed one step at a time. */
 export class NameCard {
   private root: HTMLElement | null = null;
 
-  show(ui: HTMLElement, p: PlayerInfo, rank: { tier: string; rating: string; mark: string }, skippable: boolean): void {
+  show(ui: HTMLElement, p: PlayerInfo, rank: { tier: string; rating: string; mark: string }, skippable: boolean, fighter?: NameCardFighter): void {
     this.hide();
+    // The fighter's own card treatment (ink, chiselled stone, lightning...) is keyed off its id in CSS.
+    const head = fighter
+      ? `<div class="nc-fighter nc-${fighter.id}"><span class="nc-kanji">${esc(fighter.kanji)}</span><span class="nc-fname">${esc(fighter.name)}</span></div>`
+      : '';
     this.root = el(
       'div',
       '',
-      `<div class="namecard"><div class="nc-title">${esc(p.title)}</div><div class="nc-name">${esc(p.name)}</div>
+      `<div class="namecard">${head}<div class="nc-title">${esc(p.title)}</div><div class="nc-name">${esc(p.name)}</div>
         <div class="nc-rank"><div class="nc-emblem"><span>${esc(rank.mark)}</span></div><div><div class="nc-tier">${esc(rank.tier)}</div><div class="nc-rating">${esc(rank.rating)}</div></div></div></div>
+        ${fighter?.line ? `<div class="nc-line nc-${fighter.id}">${esc(fighter.line)}</div>` : ''}
         ${skippable ? '<div class="skip-hint">Press any key or tap to skip</div>' : ''}`,
     );
     ui.appendChild(this.root);
     const card = this.root.querySelector('.namecard')!;
-    requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add('show')));
+    const line = this.root.querySelector('.nc-line');
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        card.classList.add('show');
+        line?.classList.add('show');
+      }),
+    );
   }
 
   hide(): void {

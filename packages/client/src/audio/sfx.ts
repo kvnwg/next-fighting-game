@@ -1,6 +1,7 @@
 // Sound effect recipes. Each one schedules its layers into a Sink at `p.at`;
 // targets come from the design doc's analysis of the reference game.
 import type { SfxName } from './engine.ts';
+import { INTRO_RECIPES, INTRO_SFX } from './intro-sfx.ts';
 import { gong, noise, partials, rand, taiko, tone, type Sink } from './synth.ts';
 
 export interface RecipeParams {
@@ -18,7 +19,7 @@ export interface RecipeParams {
 
 export type Recipe = (s: Sink, p: RecipeParams) => void;
 
-export type SfxCategory = 'impact' | 'motion' | 'cue' | 'ui';
+export type SfxCategory = 'impact' | 'motion' | 'cue' | 'ui' | 'intro';
 
 export const CATEGORY: Record<SfxName, SfxCategory> = {
   hit: 'impact',
@@ -41,6 +42,7 @@ export const CATEGORY: Record<SfxName, SfxCategory> = {
   confirm: 'ui',
   roundStart: 'ui',
   fight: 'ui',
+  ...(Object.fromEntries(INTRO_SFX.map((n) => [n, 'intro'])) as Record<(typeof INTRO_SFX)[number], 'intro'>),
 };
 
 /** Simultaneous voices allowed per category: [desktop, mobile]. */
@@ -49,6 +51,8 @@ export const VOICE_CAPS: Record<SfxCategory, [number, number]> = {
   motion: [6, 3],
   cue: [2, 2],
   ui: [4, 3],
+  // Entrance cinematics layer several long sounds at once, and nothing else is playing.
+  intro: [8, 5],
 };
 
 const isHeavy = (p: RecipeParams) => p.kind !== 'light';
@@ -288,4 +292,5 @@ export const RECIPES: Record<SfxName, Recipe> = {
     gong(s, p.at, 98 * p.pitch, 0.7 * p.gain, 2.2);
     taiko(s, p.at, 0.6 * p.gain, p.pitch * 0.9, 0.6);
   },
+  ...INTRO_RECIPES,
 };

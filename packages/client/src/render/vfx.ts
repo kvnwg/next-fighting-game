@@ -299,12 +299,16 @@ export class Vfx {
     slot.obj.material.color.setHex(color);
   }
 
-  dustRing(x: number, z: number): void {
+  /** A ring spreading over the floor: landing dust by default, or a ripple or shockwave in another colour and size. */
+  dustRing(x: number, z: number, color = 0xd8d2c4, size = 1, dur = 0.6): void {
     const slot = this.rings.find((r) => !r.active) ?? this.rings[0]!;
     slot.active = true;
     slot.t = 0;
+    slot.dur = dur;
     slot.obj.visible = true;
     slot.obj.position.set(x, 0.03, z);
+    slot.obj.userData.size = size;
+    (slot.obj.material as MeshBasicMaterial).color.setHex(color);
   }
 
   update(dt: number): void {
@@ -338,7 +342,7 @@ export class Vfx {
       if (!r.active) continue;
       r.t += dt;
       const k = r.t / r.dur;
-      r.obj.scale.setScalar(1 + k * 2.4);
+      r.obj.scale.setScalar((1 + k * 2.4) * ((r.obj.userData.size as number | undefined) ?? 1));
       (r.obj.material as MeshBasicMaterial).opacity = Math.max(0, 1 - k) * 0.6;
       if (k >= 1) {
         r.active = false;

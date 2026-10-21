@@ -860,6 +860,302 @@ button {
   font-weight: 800;
   color: #f1e3c6;
 }
+/* ---- fighter half of the entrance card: each fighter has its own reveal (characters/intros.js) ---- */
+.nc-fighter {
+  display: flex;
+  align-items: baseline;
+  gap: calc(1.2 * var(--u));
+  margin-bottom: calc(0.8 * var(--u));
+}
+.nc-kanji {
+  font-size: calc(6.5 * var(--u));
+  font-weight: 900;
+  line-height: 1;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+}
+.nc-fname {
+  font-size: calc(2.4 * var(--u));
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.namecard.show .nc-fighter {
+  transition-delay: 0s;
+}
+.namecard.show .nc-fighter .nc-kanji {
+  animation: nc-reveal 0.5s ease-out both;
+}
+.namecard.show .nc-fighter .nc-fname {
+  animation: nc-reveal 0.5s 0.15s ease-out both;
+}
+.nc-line {
+  position: absolute;
+  left: 50%;
+  bottom: 15vh;
+  width: min(90vw, calc(70 * var(--u)));
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: calc(2.4 * var(--u));
+  font-style: italic;
+  color: var(--ink);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95);
+  opacity: 0;
+  transition: opacity 0.4s 0.35s;
+}
+.nc-line.show {
+  opacity: 1;
+}
+@keyframes nc-reveal {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Ronin: black ink brushed left to right over a splatter. */
+.nc-ronin .nc-kanji {
+  position: relative;
+  color: #0b0b0b;
+  text-shadow:
+    0 0 calc(0.5 * var(--u)) rgba(244, 238, 222, 0.9),
+    0 0 calc(1.6 * var(--u)) rgba(244, 238, 222, 0.6);
+}
+.nc-ronin .nc-kanji::before {
+  content: '';
+  position: absolute;
+  inset: -30% -25%;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 18% 40%, rgba(200, 30, 40, 0.85) 0 4%, transparent 5%),
+    radial-gradient(circle at 74% 62%, rgba(10, 10, 10, 0.8) 0 6%, transparent 7%),
+    radial-gradient(circle at 88% 30%, rgba(10, 10, 10, 0.7) 0 2.5%, transparent 3.5%),
+    radial-gradient(ellipse at 50% 55%, rgba(244, 238, 222, 0.55) 0 38%, transparent 62%);
+}
+.nc-ronin .nc-fname {
+  color: #f4eede;
+}
+/* Warden: chiselled stone, gold edge lines lit last. */
+.nc-warden .nc-kanji,
+.nc-warden .nc-fname {
+  color: #9a968c;
+  -webkit-text-stroke: 1px #d8b25a;
+}
+.namecard.show .nc-warden .nc-kanji {
+  animation:
+    nc-reveal 0.25s ease-out both,
+    nc-chisel 0.4s steps(6) both;
+}
+@keyframes nc-chisel {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translate(2px, -1px);
+  }
+  50% {
+    transform: translate(-2px, 1px);
+  }
+  75% {
+    transform: translate(1px, 2px);
+  }
+}
+/* Wraith: fades up out of mist; a red slash cuts through. */
+.nc-wraith .nc-kanji,
+.nc-wraith .nc-fname {
+  color: #d3d6da;
+}
+.nc-wraith .nc-kanji {
+  position: relative;
+}
+.namecard.show .nc-wraith .nc-kanji,
+.namecard.show .nc-wraith .nc-fname {
+  animation: nc-mist 0.9s ease-out both;
+}
+.nc-wraith .nc-kanji::after {
+  content: '';
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: 48%;
+  height: 0.12em;
+  background: linear-gradient(90deg, transparent, #c4161c 15%, #8e0b10 85%, transparent);
+  transform: rotate(-12deg) scaleX(0);
+  transform-origin: left;
+}
+.namecard.show .nc-wraith .nc-kanji::after {
+  animation: nc-slash 0.25s 0.7s ease-out forwards;
+}
+@keyframes nc-mist {
+  from {
+    opacity: 0;
+    filter: blur(12px);
+    letter-spacing: 0.4em;
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+@keyframes nc-slash {
+  to {
+    transform: rotate(-12deg) scaleX(1);
+  }
+}
+/* Lancer: burned in by gold lightning. */
+.nc-lancer .nc-kanji,
+.nc-lancer .nc-fname {
+  color: #ffe08a;
+  text-shadow:
+    0 0 calc(0.8 * var(--u)) #ffbf2e,
+    0 0 calc(2.4 * var(--u)) rgba(255, 170, 30, 0.6);
+}
+.namecard.show .nc-lancer .nc-kanji,
+.namecard.show .nc-lancer .nc-fname {
+  animation: nc-strike 0.5s steps(1) both;
+}
+@keyframes nc-strike {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+    color: #fff;
+  }
+  30% {
+    opacity: 0.1;
+  }
+  45% {
+    opacity: 1;
+    color: #fff;
+  }
+  60% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+/* Assassin: two crossing cuts, teal smoke bleeding out. */
+.nc-assassin .nc-kanji,
+.nc-assassin .nc-fname {
+  color: #e6f2ef;
+  text-shadow:
+    0 0 calc(1 * var(--u)) rgba(56, 190, 168, 0.9),
+    0 0 calc(3 * var(--u)) rgba(56, 190, 168, 0.5);
+}
+.namecard.show .nc-assassin .nc-kanji {
+  animation: nc-cross 0.35s ease-out both;
+}
+@keyframes nc-cross {
+  0% {
+    clip-path: polygon(0 0, 0 0, 100% 100%, 100% 100%);
+  }
+  50% {
+    clip-path: polygon(0 0, 30% 0, 100% 70%, 100% 100%, 70% 100%, 0 30%);
+  }
+  100% {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  }
+}
+/* Duelist: traced in green light by the rapier's point. */
+.nc-duelist .nc-kanji,
+.nc-duelist .nc-fname {
+  color: #effbe9;
+  text-shadow:
+    0 0 calc(0.8 * var(--u)) #57d66b,
+    0 0 calc(2 * var(--u)) rgba(87, 214, 107, 0.55);
+  font-style: italic;
+}
+/* Monk: stamped like a red seal, the edge rippling outward. */
+.nc-monk .nc-kanji {
+  color: #f6ecd9;
+  background: #b0241e;
+  padding: 0.08em 0.14em;
+  border-radius: 0.1em;
+  box-shadow: 0 0 0 0.05em #f6ecd9 inset;
+}
+.nc-monk .nc-fname {
+  color: #f0d9c0;
+}
+.namecard.show .nc-monk .nc-kanji {
+  animation: nc-stamp 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+@keyframes nc-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.96);
+    box-shadow:
+      0 0 0 0.05em #f6ecd9 inset,
+      0 0 0 0 rgba(176, 36, 30, 0.8);
+  }
+  100% {
+    transform: none;
+    box-shadow:
+      0 0 0 0.05em #f6ecd9 inset,
+      0 0 0 0.6em rgba(176, 36, 30, 0);
+  }
+}
+/* Knight: engraved bronze, a light sweep across it like the shield's swirl. */
+.nc-knight .nc-kanji,
+.nc-knight .nc-fname {
+  color: #c98f45;
+  background: linear-gradient(100deg, #9b6430 0%, #e2b36a 35%, #fff3c9 50%, #e2b36a 65%, #9b6430 100%) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.namecard.show .nc-knight .nc-kanji,
+.namecard.show .nc-knight .nc-fname {
+  animation:
+    nc-reveal 0.4s ease-out both,
+    nc-sweep 1.4s 0.3s ease-in-out both;
+}
+@keyframes nc-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* ---- entrance screen effects: flashes, fades, wipes and letterbox bars ---- */
+.intro-fx,
+.intro-fx > div {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.intro-fx .ifx-fill {
+  opacity: 0;
+}
+.intro-fx .ifx-bar {
+  inset: auto 0;
+  height: 9vh;
+  background: #000;
+  transition: transform 0.5s ease-out;
+}
+.intro-fx .ifx-bar.top {
+  top: 0;
+  transform: translateY(-100%);
+}
+.intro-fx .ifx-bar.bottom {
+  bottom: 0;
+  transform: translateY(100%);
+}
+.intro-fx.bars .ifx-bar {
+  transform: none;
+}
+
 .skip-hint {
   position: absolute;
   bottom: calc(var(--safe-b) + 3 * var(--u));

@@ -1,6 +1,6 @@
 # Shrine Duel
 
-A 1v1 weapon duelling game for the web, built for [CrazyGames](https://www.crazygames.com) on desktop and mobile. It implements the design in *Combat Overhaul: Implementation Plan*: telegraphed attacks, light strings, posture and guard breaks, parries, unblockable criticals, a lock-on camera with punch-ins and shakes, a map and weapon vote, and drop-in ring entrances.
+A 1v1 weapon duelling game for the web, built for [CrazyGames](https://www.crazygames.com) on desktop and mobile. It implements the design in *Combat Overhaul: Implementation Plan*: telegraphed attacks, light strings, posture and guard breaks, parries, unblockable criticals, a lock-on camera with punch-ins and shakes, a map and weapon vote, and a scripted ring entrance for every fighter.
 
 Everything is procedural (low-poly fighters, arenas, effects, and audio synthesized with Web Audio), so the whole game is about 170 KB gzipped.
 
@@ -43,7 +43,7 @@ New players land straight in a practice arena with a training dummy. The dummy b
 1. **Quick Match** queues for an online opponent. **Play vs Bot** starts right away, and the bot's difficulty follows your win count. **Invite a Friend** opens a private room and copies an invite link.
 2. **Vote** (10 s): one shared map vote and a personal weapon pick (naginata, bo staff or katana), with picks shown live.
 3. **Loading**: an establishing shot with the map name and each player's load progress.
-4. **Entrances**: the opponent leaps off the pagoda roof, then you, each with a name card. After your first match, any key or tap skips them (online, once both players press).
+4. **Entrances**: the opponent's full ring entrance (about 10 s of shots, sound and effects), then the closing beat of yours, each with the fighter's name card and voice line. After your first match, any key or tap skips them (online, once both players press).
 5. **Rounds**: first to two. The HUD slides in on "Fight".
 6. **Results**: rematch or back to practice. This is the only place a midgame ad can play.
 
@@ -88,7 +88,7 @@ Each character lives in `characters/<name>/`:
 
 Characters: `ronin`, `warden`, `wraith`, `lancer`, `assassin`, `duelist`, `monk`, `knight`.
 
-Ring entrance cinematics (shot lists with camera, sound and visual effects) live in `characters/intros.js`, with a readable copy in `docs/ring-intros.md`.
+Ring entrance cinematics (shot lists with camera, sound and visual effects) live in `characters/intros.js`, with a readable copy in `docs/ring-intros.md`. The game plays them from `packages/client/src/game/intros.ts`: one script per fighter with its camera shots, timed sounds (synthesized in `audio/intro-sfx.ts`) and effects, and the fighter's movement.
 
 Shared tooling is in `tools/voxel/`. To regenerate:
 

@@ -70,6 +70,8 @@ export class FighterVisual {
   special: FighterView['special'] = null;
   /** Keeps charged weapon effects lit regardless of state, for cinematics. */
   charged = false;
+  /** A cinematic's own pose, used in place of the state's. */
+  pose: Pose | null = null;
   readonly bladeTip = new Vector3();
   private readonly bladeBase = new Vector3();
 
@@ -138,6 +140,7 @@ export class FighterVisual {
       time: this.time,
       walkPhase: this.walkPhase,
       special: this.special,
+      pose: this.pose,
     };
     computePose(view, this.target);
 

@@ -124,6 +124,8 @@ export class VoxelRig {
   private readonly gripLeft: number | null;
   private readonly offhand: 'hand' | 'forearm' | null;
   private readonly charged: Mesh[] = [];
+  /** Body bones hidden in a fight (a sheathed blade), shown again by `setSheathed`. */
+  private readonly sheathed: Mesh[] = [];
   private readonly pelvisRest: Vector3;
 
   constructor(
@@ -148,10 +150,14 @@ export class VoxelRig {
       const g = new Group();
       g.name = bone.name;
       const geo = body.geoms.get(bone.name);
-      if (geo && !hidden.has(bone.name)) {
+      if (geo && !(hidden.has(bone.name) && opts.ghost)) {
         const mesh = new Mesh(geo, matFor(bone));
         mesh.frustumCulled = false;
         if ((bone.opacity ?? 1) < 1) mesh.renderOrder = 1;
+        if (hidden.has(bone.name)) {
+          mesh.visible = false;
+          this.sheathed.push(mesh);
+        }
         g.add(mesh);
       }
       this.groups.set(bone.name, g);
@@ -337,6 +343,14 @@ export class VoxelRig {
     aim(limb.upper.quaternion, limb.restUpper, v1.subVectors(joint, start), parentQ);
     q2.copy(parentQ).multiply(limb.upper.quaternion);
     aim(limb.lower.quaternion, limb.restLower, v1.subVectors(tip, joint), q2);
+  }
+
+  /** Puts a drawn blade back in its sheath (entrances): the body's sheathed bones show and the held props hide. */
+  setSheathed(on: boolean): void {
+    if (this.sheathed.length === 0) return;
+    for (const m of this.sheathed) m.visible = on;
+    this.weaponPivot.visible = !on;
+    this.offhandPivot.visible = !on;
   }
 
   /** Shows charged prop parts (lightning), flickering; `on` false hides them. */

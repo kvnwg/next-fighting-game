@@ -9,7 +9,8 @@ export const SNAPSHOT_EVERY = 2;
 export const VOTE_MS = 10_000;
 export const LOAD_TIMEOUT_MS = 20_000;
 export const REMATCH_WAIT_MS = 30_000;
-export const ENTRANCE_MS = 4_200;
+/** Per fighter; the server allows twice this for both: the opponent's full ring entrance and the closing beat of yours. */
+export const ENTRANCE_MS = 8_000;
 
 export interface PlayerInfo {
   name: string;

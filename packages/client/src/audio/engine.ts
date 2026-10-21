@@ -1,3 +1,4 @@
+import type { IntroSfx } from './intro-sfx.ts';
 import { MusicDirector } from './music.ts';
 import { CATEGORY, RECIPES, VOICE_CAPS, type SfxCategory } from './sfx.ts';
 import { createNoiseBuffer, type Sink } from './synth.ts';
@@ -22,7 +23,8 @@ export type SfxName =
   | 'fight'
   | 'ko'
   | 'whoosh'
-  | 'thump';
+  | 'thump'
+  | IntroSfx;
 
 export interface SfxOptions {
   /** Stereo position, -1 (left) to 1 (right). */
