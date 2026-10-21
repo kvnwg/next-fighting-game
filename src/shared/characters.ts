@@ -188,8 +188,9 @@ const juggernaut: CharacterDef = {
   stats: { hp: 130, posture: 130, speed: 5.2, postureRegen: 0.9 },
   ratings: { power: 5, speed: 1, reach: 3, defense: 3, difficulty: 2 },
   lights: [
-    { name: 'Crush', anim: 'slashR', windup: 440, active: 120, recovery: 420, damage: 14, posture: 16, blockPosture: 22, range: 3.0, arc: 75, lunge: 0.5 },
-    { name: 'Pulverize', anim: 'slam', windup: 520, active: 130, recovery: 560, damage: 18, posture: 20, blockPosture: 28, range: 3.1, arc: 45, lunge: 0.6 },
+    { name: 'Skullcrusher', anim: 'slashR', windup: 440, active: 120, recovery: 420, damage: 14, posture: 16, blockPosture: 22, range: 3.0, arc: 75, lunge: 0.5 },
+    // a full turn with the hammer dragged behind: slower to come out, but it sweeps a wide arc
+    { name: 'Cyclone', anim: 'spin', windup: 640, active: 130, recovery: 560, damage: 18, posture: 20, blockPosture: 28, range: 3.1, arc: 100, lunge: 0.6 },
   ],
   heavy: { name: 'Meteor', anim: 'slam', windup: 780, active: 140, recovery: 650, damage: 26, posture: 34, blockPosture: 46, range: 3.2, arc: 50, lunge: 1.0, feintable: true, knockback: 1.2 },
   special: { name: 'Earthshaker', anim: 'sweep', windup: 800, active: 180, recovery: 700, damage: 24, posture: 30, blockPosture: 30, range: 3.8, arc: 110, perilous: 'sweep', cooldown: 7500 },

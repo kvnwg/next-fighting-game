@@ -593,6 +593,8 @@ class App {
           this.shakeNear(f, 0.05 * sc, 0.1);
           break;
         case 'shockwave':
+          // on the ground under the impact, wherever the head ended up
+          pos.y = Math.max(0, f.pos.y);
           fx.shockwave(pos, sc, color);
           this.shakeNear(f, 0.24 * sc, 0.32);
           break;

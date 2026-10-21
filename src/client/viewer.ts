@@ -138,14 +138,14 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
 
   // the timeline: each attack in the chain starts when the previous one's active frames end + gap;
   // non-attack entries (block, stagger, stance...) hold that state for a typical duration
-  const STATE_MS: Partial<Record<FighterState, number>> = { idle: 600, block: 800, blockstun: 300, stagger: 400, deflected: 600, broken: 1500, dodge: 380, stance: 900, dead: 1200, knockdown: 1400 };
+  const STATE_MS: Partial<Record<FighterState | 'roar', number>> = { idle: 600, roar: 1100, block: 800, blockstun: 300, stagger: 400, deflected: 600, broken: 1500, dodge: 380, stance: 900, dead: 1200, knockdown: 1400 };
   const probe = new CharacterModel(id);
   const steps: { key: string; start: number; dur: number; atk: ReturnType<typeof getAttack> }[] = [];
   let t = 0;
   for (const k of chain) {
     const atk = k in STATE_MS ? null : getAttack(probe.char, k as AttackKey);
     if (!atk && !(k in STATE_MS)) continue;
-    const dur = atk ? atk.windup + atk.active + atk.recovery : STATE_MS[k as FighterState]!;
+    const dur = atk ? atk.windup + atk.active + atk.recovery : STATE_MS[k as FighterState | 'roar']!;
     steps.push({ key: k, start: t, dur, atk });
     t += atk && chain.length > 1 ? atk.windup + atk.active + Math.min(atk.recovery, 120) : dur;
   }
@@ -167,18 +167,33 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
   const cy = Number(params.get('cy') ?? 1.9);
   cam.position.set(Number(params.get('cx') ?? 0), cy, dist);
   cam.lookAt(Number(params.get('cx') ?? 0), 0.95, 0);
+  // `top`: straight down, every fighter facing the bottom of the screen
+  const top = params.has('top');
+  if (top) {
+    cam.position.set(0, ((n * gap) / 2 + 0.6) / (Math.tan((cam.fov * Math.PI) / 360) * cam.aspect), 0.001);
+    cam.up.set(0, 0, -1);
+    cam.lookAt(0, 0, 0);
+  }
   const label = document.createElement('div');
   label.style.cssText = 'position:fixed;left:8px;top:8px;color:#fff;font:14px monospace;text-shadow:0 1px 0 #000;white-space:pre';
   document.body.appendChild(label);
   const times: number[] = [];
+  // `at=` freezes the frames at exact moments (ms), e.g. at=440,500 to check where a hit lands
+  const at = params.get('at')?.split(',').map(Number);
   for (let i = 0; i < n; i++) {
-    const target = from + ((to - from) * i) / (n - 1);
+    const target = at ? (at[i] ?? at[at.length - 1]) : from + ((to - from) * i) / (n - 1);
     times.push(target);
     const m = new CharacterModel(id);
     m.ghostsEnabled = params.has('ghosts');
+    if (params.has('target')) {
+      // a stand-in for the opponent's chest, where every hit should land
+      const mark = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.08), new THREE.MeshBasicMaterial({ color: '#ff3355' }));
+      mark.position.set(0, 0.65, Number(params.get('target') || 2.2));
+      m.root.add(mark);
+    }
     m.root.position.set((i - (n - 1) / 2) * gap, 0, 0);
     // every frame seen from the same angle despite the perspective
-    m.root.rotation.y = yaw + Math.atan2(-m.root.position.x, dist);
+    m.root.rotation.y = top ? 0 : yaw + Math.atan2(-m.root.position.x, dist);
     scene.add(m.root);
     for (let j = 0; j < 30; j++) m.update(IDLE, 0.05);
     // play the timeline up to this moment in 10ms steps (the animator is stateful)
@@ -190,7 +205,11 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
       let input: AnimInput;
       if (e >= cur.dur) input = { ...IDLE, elapsed: e - cur.dur };
       else if (cur.atk) input = { ...IDLE, state: 'attack', elapsed: e, dur: cur.dur, attack: cur.atk, windup: cur.atk.windup, key: cur.key, serial };
-      else input = { ...IDLE, state: cur.key as FighterState, elapsed: e, dur: cur.dur, serial };
+      else if (cur.key === 'roar') {
+        // the War Cry plays over idle
+        if (e < 10) m.react('roar');
+        input = { ...IDLE, elapsed: e };
+      } else input = { ...IDLE, state: cur.key as FighterState, elapsed: e, dur: cur.dur, serial };
       if (walk) Object.assign(input, { speed: walk, moveForward: 1, moveSide: 0 });
       m.update(input, 0.01);
     }

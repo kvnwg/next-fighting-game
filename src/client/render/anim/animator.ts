@@ -79,11 +79,15 @@ export interface AnimFrame {
   ghost: boolean;
   /** trail look for the current move */
   trail: TrailStyle | null;
+  /** where the current move is along its s axis (NaN outside moves; for tools) */
+  s: number;
 }
 
 export type Reaction = 'deflect' | 'blocked' | 'hit' | 'roar';
 
 const REST_LEFT = new THREE.Vector3(0.3, 0.12, 0.08);
+/** seconds a style's roar takes */
+const ROAR_TIME = 1.05;
 const ZERO_ROT: Rot = { spin: 0, flip: 0, roll: 0, hop: 0 };
 
 // ------------------------------------------------------------------------------------ pose ops
@@ -289,6 +293,9 @@ export class Animator {
   private feet = { L: new THREE.Vector3(0.13, 0.05, 0.2), R: new THREE.Vector3(-0.13, 0.05, -0.18) };
   /** effect cues: the furthest s this move has reached, so each cue fires once */
   private fxMaxS = -Infinity;
+  /** seconds into the style's roar (-1: not roaring), and how far its cues have fired */
+  private roarT = -1;
+  private roarFxS = -Infinity;
 
   constructor(readonly char: CharacterDef) {
     this.style = STYLES[char.weaponKind];
@@ -297,6 +304,11 @@ export class Animator {
   }
 
   react(kind: Reaction): void {
+    if (kind === 'roar' && this.style.roar) {
+      this.roarT = 0;
+      this.roarFxS = -Infinity;
+      return;
+    }
     this.reactions.push({ kind, t: 0 });
     if (this.reactions.length > 6) this.reactions.shift();
   }
@@ -325,6 +337,7 @@ export class Animator {
       fx: [],
       ghost: false,
       trail: null,
+      s: NaN,
     };
     let rot: Rot = { ...ZERO_ROT };
 
@@ -350,6 +363,8 @@ export class Animator {
         if (a.state === 'knockdown' && a.dur - a.elapsed < 380) out.lying = Math.min(out.lying, smooth((a.dur - a.elapsed) / 380));
       }
     }
+
+    if (this.roarT >= 0) rot = this.roarOverlay(a, out, rot, dt);
 
     this.current = cloneResolved(out.pose);
     this.curRot = { ...rot };
@@ -386,6 +401,7 @@ export class Animator {
 
   /** Fire the cues between the furthest s reached so far and s. */
   private cues(def: MoveDef, s: number, out: AnimFrame): void {
+    out.s = s;
     if (this.fxMaxS === -Infinity) this.fxMaxS = Math.min(def.sStart, def.sChamber) - 1e-3;
     if (s <= this.fxMaxS) return;
     for (const c of def.fx) if (c.s > this.fxMaxS && c.s <= s) out.fx.push(c);
@@ -409,6 +425,18 @@ export class Animator {
     const swingsMain = def.main.kind !== 'hold';
     const swingsOff = !!def.off && def.off.kind !== 'hold';
 
+    if (def.flow > 0 && e < hitT[0]) {
+      // a continuous windup: one accelerating motion from the opening pose into the hit
+      const k = e / Math.max(1, hitT[0]);
+      const s = def.sStart + (def.impacts[0] - def.sStart) * Math.pow(k, def.flow);
+      this.cues(def, s, out);
+      const f = this.movePose(def, s);
+      const bw = easeOut(e / Math.max(1, t0) / def.blendIn, 3);
+      out.swingMain = swingsMain && s >= def.sChamber;
+      out.swingOff = swingsOff && s >= def.sChamber;
+      out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
+      return { pose: lerpResolved(this.snapshot, f.pose, bw), rot: lerpRot(this.snapRot, f.rot, bw), kick: f.kick };
+    }
     if (e < t0) {
       // windup: blend in to the opening pose, then travel (or coil) to the chamber
       const k = e / Math.max(1, t0);
@@ -469,6 +497,25 @@ export class Animator {
     const rot = lerpRot(this.snapRot, f.rot, bin);
     for (const c of ROT_CHANNELS) rot[c] += (settleTurn(rot[c], c) - rot[c]) * bout;
     return { pose, rot, kick: null };
+  }
+
+  /** The style's roar plays over the neutral pose (it never interrupts a move). */
+  private roarOverlay(a: AnimInput, out: AnimFrame, rot: Rot, dt: number): Rot {
+    const def = this.style.roar!;
+    this.roarT += dt;
+    const k = this.roarT / ROAR_TIME;
+    if (k >= 1 || a.state !== 'idle') {
+      this.roarT = -1;
+      return rot;
+    }
+    const s = def.sStart + (def.sRest - def.sStart) * k;
+    if (this.roarFxS === -Infinity) this.roarFxS = def.sStart - 1e-3;
+    for (const c of def.fx) if (c.s > this.roarFxS && c.s <= s) out.fx.push(c);
+    this.roarFxS = s;
+    const f = this.movePose(def, s);
+    const w = easeOut(k / 0.15, 2) * (1 - easeInOut((k - 0.75) / 0.25));
+    out.pose = lerpResolved(out.pose, f.pose, w);
+    return lerpRot(rot, f.rot, w);
   }
 
   // ---------------------------------------------------------------- other states

@@ -159,6 +159,12 @@ export interface MoveDef {
   settle: number;
   /** the body leads the weapon by this much s (hips and shoulders open before the arms whip) */
   bodyLead: number;
+  /**
+   * Continuous windup (spins, wind-ups that never stop moving): instead of coiling to a chamber and
+   * pausing, s accelerates from sStart straight into the first hit as (t / hit)^flow. The trail
+   * lights up once s passes sChamber.
+   */
+  flow: number;
   fx: FxCue[];
   /** afterimages are left behind while s is in this range */
   ghosts: [number, number] | null;
@@ -313,6 +319,7 @@ export interface MoveOpts {
   rest?: number;
   settle?: number;
   lead?: number;
+  flow?: number;
   fx?: FxCue[];
   ghosts?: [number, number];
   trail?: TrailStyle;
@@ -346,6 +353,7 @@ export function mv(o: MoveOpts): MoveDef {
     sRest: o.rest ?? 1,
     settle: o.settle ?? 0.3,
     bodyLead: o.lead ?? 0.1,
+    flow: o.flow ?? 0,
     fx: o.fx ?? [],
     ghosts: o.ghosts ?? null,
     trail: o.trail ?? null,
