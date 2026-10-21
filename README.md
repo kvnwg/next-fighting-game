@@ -224,3 +224,25 @@ All combat timings live in `COMBAT` and `MATCH` in `src/shared/config.ts` (defle
 - Movement is client-reported. The server caps speed by state (no walking away while staggered or broken), limits height to real jumps, and measures latency itself. That stops the obvious cheats, but it isn't a fully server-simulated movement model.
 - One server process holds everyone. Scaling out would need sharded lobbies and a shared store such as SQLite or Postgres.
 - No gamepad support yet (keyboard + mouse, or touch).
+
+## Voxel characters
+
+Eight voxel fighters designed from reference art, ready to bring into the game. Each lives in `characters/<name>/`:
+
+- `model.js`: the voxel model, authored in code on a bone rig (T-pose rest), plus named poses and any held weapon as its own model
+- `sheet.html`: character sheet (T-pose, A-pose, side, back)
+- `viewer.html` (ronin only): orbit viewer; serve the repo root (`npx http-server .`) and open it
+- `renders/`: PNG output of the sheet, plus `portrait.png` (head and shoulders)
+- `export/`: MagicaVoxel `.vox` of each model's T-pose and a `_rig.json` (bones, pivots, per-bone voxels)
+
+Characters: `ronin`, `warden`, `wraith`, `lancer`, `assassin`, `duelist`, `monk`, `knight`.
+
+Ring entrance cinematics (shot lists with camera, sound and visual effects) live in `characters/intros.js`, with a readable copy in `docs/ring-intros.md`.
+
+Shared tooling is in `tools/voxel/`. To regenerate:
+
+```sh
+npm run render:voxel -- characters/ronin   # behind a proxy: NODE_USE_ENV_PROXY=1 npm run render:voxel -- characters/ronin
+npm run export:voxel -- characters/ronin
+npm run render:portraits
+```
