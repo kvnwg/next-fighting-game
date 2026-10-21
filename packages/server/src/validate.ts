@@ -1,4 +1,4 @@
-import { MAP_IDS, WEAPON_IDS, type ClientMessage, type MapId, type PlayerInfo, type WeaponId } from '@nfg/shared';
+import { BUTTON_COUNT, BUTTON_MASK, MAP_IDS, WEAPON_IDS, type ClientMessage, type MapId, type PlayerInfo, type WeaponId } from '@nfg/shared';
 
 /** Soft cap on a single message; anything larger is ignored. */
 export const MAX_MESSAGE_BYTES = 2048;
@@ -35,8 +35,8 @@ export function parsePlayer(v: unknown): PlayerInfo | null {
 }
 
 function parseCounts(v: unknown): number[] | null {
-  if (!Array.isArray(v) || v.length > 5) return null;
-  const out = [0, 0, 0, 0, 0];
+  if (!Array.isArray(v) || v.length > BUTTON_COUNT) return null;
+  const out = new Array<number>(BUTTON_COUNT).fill(0);
   for (let i = 0; i < v.length; i++) {
     const n = v[i];
     if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > MAX_COUNT) return null;
@@ -100,7 +100,7 @@ export function parseClientMessage(text: string): ClientMessage | null {
       const counts = parseCounts(raw.counts);
       if (seq === null || mx === null || my === null || held === null || !counts) return null;
       if (!Number.isInteger(seq) || seq < 0 || seq > 2 ** 31) return null;
-      return { t: 'input', seq, mx: clamp(mx, -1, 1), my: clamp(my, -1, 1), held: Math.trunc(held) & 31, counts };
+      return { t: 'input', seq, mx: clamp(mx, -1, 1), my: clamp(my, -1, 1), held: Math.trunc(held) & BUTTON_MASK, counts };
     }
     case 'ping': {
       const ts = finite(raw.ts);

@@ -1,4 +1,4 @@
-import { BTN, clampMove, type InputFrame } from '@nfg/shared';
+import { BTN, BUTTON_COUNT, clampMove, type InputFrame } from '@nfg/shared';
 
 export type UiAction = 'menu' | 'confirm' | 'any';
 export type InputDevice = 'keyboard' | 'touch';
@@ -12,6 +12,8 @@ const KEY_BUTTONS: Record<string, number> = {
   ShiftLeft: BTN.DODGE,
   ShiftRight: BTN.DODGE,
   Space: BTN.JUMP,
+  KeyE: BTN.SPECIAL,
+  KeyR: BTN.ABILITY,
 };
 
 const MOVE_KEYS: Record<string, [number, number]> = {
@@ -33,7 +35,7 @@ function bitIndex(btn: number): number {
 
 export class InputManager {
   /** Cumulative presses per button, sent to the server so no tap is lost between ticks. */
-  readonly counts = [0, 0, 0, 0, 0];
+  readonly counts = new Array<number>(BUTTON_COUNT).fill(0);
   lastDevice: InputDevice = 'keyboard';
   /** Horizontal camera drag accumulated since the last read (touch "look around"). */
   look = 0;

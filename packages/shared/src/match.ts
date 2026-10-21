@@ -57,7 +57,7 @@ export interface MatchConfig {
 }
 
 /** Button priority when several go down on the same tick. */
-const PRIORITY = [BTN.DODGE, BTN.PARRY, BTN.HEAVY, BTN.LIGHT, BTN.JUMP];
+const PRIORITY = [BTN.DODGE, BTN.PARRY, BTN.SPECIAL, BTN.ABILITY, BTN.HEAVY, BTN.LIGHT, BTN.JUMP];
 const MAX_ROUNDS = 5;
 const KNOCKBACK_DECAY = 0.85;
 const KNOCKBACK_SPEED = 9;

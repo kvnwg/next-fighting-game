@@ -4,7 +4,14 @@ export const BTN = {
   PARRY: 4,
   DODGE: 8,
   JUMP: 16,
+  /** The character's perilous special. */
+  SPECIAL: 32,
+  /** The character's ability (stance, buff, dash, vault...). */
+  ABILITY: 64,
 } as const;
+
+export const BUTTON_COUNT = 7;
+export const BUTTON_MASK = (1 << BUTTON_COUNT) - 1;
 
 export type ButtonName = keyof typeof BTN;
 
@@ -39,11 +46,11 @@ export function clampMove(x: number, y: number): [number, number] {
  * tap that starts and ends between two server ticks is never lost.
  */
 export class PressCounter {
-  private last = [0, 0, 0, 0, 0];
+  private last = new Array<number>(BUTTON_COUNT).fill(0);
 
   consume(counts: readonly number[]): number {
     let pressed = 0;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < BUTTON_COUNT; i++) {
       const c = counts[i] ?? 0;
       if (c !== this.last[i]) {
         pressed |= 1 << i;
@@ -54,6 +61,6 @@ export class PressCounter {
   }
 
   reset(): void {
-    this.last = [0, 0, 0, 0, 0];
+    this.last.fill(0);
   }
 }

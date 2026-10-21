@@ -1,4 +1,5 @@
 import {
+  BUTTON_COUNT,
   Bot,
   Match,
   NO_INPUT,
@@ -117,7 +118,7 @@ export class OnlineSession implements Session {
   private acc = 0;
   private seq = 0;
   /** Presses made while gameplay input was live; menus never touch these. */
-  private readonly counts = [0, 0, 0, 0, 0];
+  private readonly counts = new Array<number>(BUTTON_COUNT).fill(0);
   private prev: [Pos, Pos];
   private snapAt = performance.now();
   private pending: SimEvent[] = [];
@@ -155,7 +156,7 @@ export class OnlineSession implements Session {
       let i: InputFrame = NO_INPUT;
       if (this.inputEnabled()) i = this.input.sample();
       else this.input.flush();
-      for (let b = 0; b < 5; b++) if (i.pressed & (1 << b)) this.counts[b]!++;
+      for (let b = 0; b < BUTTON_COUNT; b++) if (i.pressed & (1 << b)) this.counts[b]!++;
       this.net.send({ t: 'input', seq: ++this.seq, mx: i.moveX, my: i.moveY, held: i.held, counts: [...this.counts] });
     }
     const events = this.pending;
