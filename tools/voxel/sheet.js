@@ -6,7 +6,7 @@ import { buildRig } from './mesher.js';
 
 // Ink-wash splatter. Every mark (with its radius) stays inside the canvas so
 // nothing gets clipped at the panel edge.
-export function splatter(ctx, w, h, seed, ink = [18, 18, 20], scale = 1) {
+export function splatter(ctx, w, h, seed, ink = [18, 18, 20], scale = 1, density = 1) {
   let s = seed;
   const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
   const dot = (x, y, r, a) => {
@@ -18,7 +18,7 @@ export function splatter(ctx, w, h, seed, ink = [18, 18, 20], scale = 1) {
   };
   const cx = w * (0.6 + rnd() * 0.08), cy = h * 0.6;
   // washes: clusters of overlapping translucent blots give soft, irregular edges
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < Math.round(9 * density); i++) {
     const bx = cx + (rnd() - 0.4) * w * 0.55, by = cy + (rnd() - 0.5) * h * 0.45;
     const br = (30 + rnd() * 70) * scale;
     for (let j = 0; j < 40; j++) {
@@ -27,7 +27,7 @@ export function splatter(ctx, w, h, seed, ink = [18, 18, 20], scale = 1) {
     }
   }
   // spray: sharp droplets thrown outward from the washes
-  for (let i = 0; i < 260; i++) {
+  for (let i = 0; i < Math.round(260 * density); i++) {
     const a = rnd() * 7, d = Math.pow(rnd(), 0.7) * w * 0.48;
     dot(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.95, (0.8 + Math.pow(rnd(), 3) * 9) * scale, 0.35 + rnd() * 0.5);
   }
@@ -35,7 +35,8 @@ export function splatter(ctx, w, h, seed, ink = [18, 18, 20], scale = 1) {
 
 // rows: [[view, ...], ...]; view = { id, title, sub, model, poses, pose, dir, x: [l, r], y?: [b, t] }
 // `x` is measured along the camera's right axis.
-export function renderSheet(container, { px, y = [-3, 91], rows, ink, splatterScale = 1 }) {
+// accent: optional second splatter colour (sparser), e.g. [200, 40, 58] for red ink.
+export function renderSheet(container, { px, y = [-3, 91], rows, ink, accent, splatterScale = 1 }) {
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8780, 2.1));
   const key = new THREE.DirectionalLight(0xffffff, 2.2);
@@ -88,7 +89,9 @@ export function renderSheet(container, { px, y = [-3, 91], rows, ink, splatterSc
       scene.remove(rig.root);
 
       const ctx = canvas.getContext('2d');
-      splatter(ctx, w, h, 1234 + n++ * 97, ink, splatterScale);
+      splatter(ctx, w, h, 1234 + n * 97, ink, splatterScale);
+      if (accent) splatter(ctx, w, h, 4321 + n * 31, accent, splatterScale * 0.8, 0.25);
+      n++;
       // soft ground shadow
       const gy = y1 * px;
       const rx = Math.min(w * 0.45, 22 * px);

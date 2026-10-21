@@ -71,7 +71,10 @@ export function buildRig(model) {
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geo.setIndex(idx);
-    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    const opacity = bone.opacity ?? 1;
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 });
+    const mesh = new THREE.Mesh(geo, material);
+    if (opacity < 1) mesh.renderOrder = 1;
     const group = new THREE.Group();
     group.name = bone.name;
     group.add(mesh);

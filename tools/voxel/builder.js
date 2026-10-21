@@ -38,8 +38,9 @@ export class VoxelBuilder {
     this.current = null;
   }
 
-  bone(name, parent, pivot) {
-    this.bones.push({ name, parent, pivot });
+  // extra: optional render hints, e.g. { opacity: 0.5 } for wisps and mist.
+  bone(name, parent, pivot, extra = {}) {
+    this.bones.push({ name, parent, pivot, ...extra });
     this.current = name;
     return this;
   }
