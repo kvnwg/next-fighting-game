@@ -41,7 +41,7 @@ interface Shake {
 
 /** Punch-in: in fast, hold on the moment, ease back out. */
 const PUNCH_IN = 0.08;
-const PUNCH_HOLD = 0.35;
+const PUNCH_HOLD = 0.22;
 const PUNCH_OUT = 0.3;
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 
@@ -65,6 +65,7 @@ export class CameraRig {
   private roll = 0;
   private punchT = -1;
   private punchTarget = new THREE.Vector3();
+  private punchS = 1;
   private kickOffset = new THREE.Vector3();
   private kickVel = new THREE.Vector3();
   private shots: Shot[] = [];
@@ -95,9 +96,16 @@ export class CameraRig {
     this.shakes.push({ amp: amount * 0.55, roll: amount * 0.12, dur: Math.max(0.05, time * 1.2), t: 0, seed: Math.random() * 100 });
   }
 
-  /** Swoop halfway in on a big moment (a deathblow, a broken guard), narrowing and tilting the view. */
-  punchIn(at: THREE.Vector3): void {
+  /**
+   * Nudge in on a big moment, narrowing and tilting the view a touch. `strength` 1 is the most
+   * it ever does (a deathblow); a deflect or a broken guard is a small fraction of that, so the
+   * duel stays framed.
+   */
+  punchIn(at: THREE.Vector3, strength = 0.3): void {
     if (this.shakeScale < 0.5) return;
+    // a bigger punch already running isn't cut short by a smaller one
+    if (this.punchT >= 0 && this.punchT < PUNCH_IN + PUNCH_HOLD && this.punchS > strength) return;
+    this.punchS = strength;
     this.punchT = 0;
     this.punchTarget.set(at.x, at.y + 1.2, at.z);
   }
@@ -231,13 +239,13 @@ export class CameraRig {
       const t = this.punchT;
       const p = t < PUNCH_IN ? t / PUNCH_IN : t < PUNCH_IN + PUNCH_HOLD ? 1 : Math.max(0, 1 - (t - PUNCH_IN - PUNCH_HOLD) / PUNCH_OUT);
       if (t > PUNCH_IN + PUNCH_HOLD + PUNCH_OUT) this.punchT = -1;
-      const k = easeInOut(p);
-      // halve the boom toward the moment, narrow the view and tilt it a touch
-      _to.subVectors(this.pos, this.punchTarget).multiplyScalar(0.5).add(this.punchTarget);
+      const k = easeInOut(p) * this.punchS;
+      // at full strength: a third off the boom toward the moment, the view narrowed and tilted
+      _to.subVectors(this.pos, this.punchTarget).multiplyScalar(0.67).add(this.punchTarget);
       cam.lerp(_to, k);
-      look.lerp(this.punchTarget, k * 0.8);
-      fovTarget -= 12 * k;
-      roll += 0.06 * k;
+      look.lerp(this.punchTarget, k * 0.5);
+      fovTarget -= 7 * k;
+      roll += 0.04 * k;
     }
 
     // kick: a spring offset along the hit

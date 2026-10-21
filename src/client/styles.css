@@ -941,3 +941,6 @@ h3 { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.03
 
 /* lost health shows as a bright white chunk that then drains */
 .fc-hp .fc-trail { background: linear-gradient(180deg, #ffffff, #ffe0e4 55%, #ffb0b8); }
+
+/* no changing fighters mid-match */
+body.chars-locked #btn-chars, body.chars-locked #lb-fighters { display: none !important; }

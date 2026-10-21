@@ -113,13 +113,13 @@ interface ClothSpec {
 
 const CLOTH: Record<string, ClothSpec> = {
   // heavy: about 20 degrees back at a run, flaring out in spins and leaps
-  cape: { k: 55, zeta: 0.32, gravity: 1, drag: 0.25, inertia: 0.6, lift: 1.0, side: 0.5, flutter: 0.05 },
-  cloak: { k: 60, zeta: 0.34, gravity: 1, drag: 0.28, inertia: 0.6, lift: 0.9, side: 0.45, flutter: 0.06 },
+  cape: { k: 55, zeta: 0.6, gravity: 1, drag: 0.25, inertia: 0.6, lift: 1.0, side: 0.5, flutter: 0.05 },
+  cloak: { k: 60, zeta: 0.6, gravity: 1, drag: 0.28, inertia: 0.6, lift: 0.9, side: 0.45, flutter: 0.06 },
   // light: streams out behind at a run
   scarf: { k: 30, zeta: 0.28, gravity: 0.8, drag: 0.9, inertia: 0.9, lift: 1.5, side: 0.8, flutter: 0.14 },
   ribbons: { k: 22, zeta: 0.25, gravity: 0.7, drag: 1, inertia: 1, lift: 1.4, side: 0.9, flutter: 0.2 },
-  hair: { k: 110, zeta: 0.45, gravity: 0.5, drag: 0.25, inertia: 0.5, lift: 0.5, side: 0.35, flutter: 0.04 },
-  beard: { k: 90, zeta: 0.4, gravity: 0.8, drag: 0.2, inertia: 0.6, lift: 0.6, side: 0.3, flutter: 0.02 },
+  hair: { k: 110, zeta: 0.75, gravity: 0.5, drag: 0.25, inertia: 0.5, lift: 0.5, side: 0.35, flutter: 0.04 },
+  beard: { k: 90, zeta: 0.65, gravity: 0.8, drag: 0.2, inertia: 0.6, lift: 0.6, side: 0.3, flutter: 0.02 },
   beads: { k: 45, zeta: 0.22, gravity: 1, drag: 0.15, inertia: 1, lift: 0.9, side: 0.6, flutter: 0 },
   robeLower: { k: 70, zeta: 0.4, gravity: 0.6, drag: 0.35, inertia: 0.6, lift: 0.35, side: 0.3, flutter: 0.03, around: true },
 };
@@ -499,7 +499,9 @@ export class CharacterModel {
       c.vel.copy(_cv);
       // the force it hangs along, in the frame it hangs from
       const speed = c.vel.length();
-      _cf.set(0, -9.8 * s.gravity, 0).addScaledVector(c.acc, -s.inertia).addScaledVector(c.vel, -s.drag * speed);
+      // only the body's lurches and turns swing it, not the bob of each step: an up-and-down
+      // acceleration as big as gravity at every footfall made capes and hair bounce
+      _cf.set(-c.acc.x * s.inertia, -9.8 * s.gravity, -c.acc.z * s.inertia).addScaledVector(c.vel, -s.drag * speed);
       c.pivot.parent!.getWorldQuaternion(_cq).invert();
       _cf.applyQuaternion(_cq);
       const down = Math.max(1e-3, -_cf.y);

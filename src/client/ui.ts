@@ -106,6 +106,8 @@ export class UI {
   private preview: Preview | null = null;
   private challengeFrom: string | null = null;
   modalOpen: string | null = null;
+  /** in a match you fight with who you brought: the fighter picker stays shut */
+  private charsLocked = false;
   profile: ProfileView | null = null;
   chatOpen = false;
   private els: Record<string, HTMLElement> = {};
@@ -715,7 +717,15 @@ export class UI {
     this.modal.querySelector('.close')!.addEventListener('click', () => this.closeModal());
   }
 
+  /** Lock the fighter picker for the length of a match (and shut it if it's open). */
+  setCharsLocked(on: boolean): void {
+    this.charsLocked = on;
+    document.body.classList.toggle('chars-locked', on);
+    if (on && this.modalOpen === 'chars') this.closeModal();
+  }
+
   openModal(kind: 'chars' | 'ladder' | 'help', currentChar: CharacterId = settings.char): void {
+    if (kind === 'chars' && this.charsLocked) return;
     this.modalOpen = kind;
     this.handlers.onModalChange(true);
     if (kind === 'chars') this.renderChars(currentChar);

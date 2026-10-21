@@ -245,6 +245,7 @@ class App {
       this.clearFighters();
       this.local = null;
       this.kind = null;
+      this.ui.setCharsLocked(false);
       this.match = null;
       this.cam.stopShots();
       this.endEntrances();
@@ -361,6 +362,7 @@ class App {
     const map = Object.prototype.hasOwnProperty.call(MAPS, m.map) ? MAPS[m.map] : LOBBY_MAP;
     this.loadMap(map);
     this.kind = m.kind;
+    this.ui.setCharsLocked(m.kind === 'arena');
     this.local = null;
     for (const r of m.roster) this.addFighter(r);
     this.applySnaps(m.snap, this.net.serverNow(), true);
@@ -696,8 +698,8 @@ class App {
         stop(heavy ? 140 : 110, heavy ? 0.05 : 0.035);
         if (mine) {
           this.cam.shake(heavy ? 0.22 : 0.16, 0.2);
-          // a punch in on the clash
-          this.cam.punchIn(this.tmp.copy(pos).setY(pos.y - 1.2));
+          // a small nudge in on the clash
+          this.cam.punchIn(this.tmp.copy(pos).setY(pos.y - 1.2), 0.15);
           this.renderer.flash = (heavy ? 0.16 : 0.12) * Math.min(1.6, big);
           this.renderer.flashColor.set('#ffe7a0');
         }
@@ -726,7 +728,7 @@ class App {
         this.ui.floatText('GUARD BROKEN', head(d).x, head(d).y, head(d).z, 'warn big', '破');
         if (mine) {
           this.cam.shake(0.22, 0.28);
-          if (d) this.cam.punchIn(d.pos);
+          if (d) this.cam.punchIn(d.pos, 0.2);
           this.renderer.flash = meD ? 0.12 : 0.06;
           this.renderer.flashColor.set(meD ? '#ff3a1a' : '#fff4e0');
         }
@@ -771,7 +773,7 @@ class App {
         this.ui.floatText('DEATHBLOW', head(d).x, head(d).y + 0.3, head(d).z, 'bad huge', '止め');
         if (mine) {
           this.cam.shake(0.35, 0.4);
-          if (d) this.cam.punchIn(d.pos);
+          if (d) this.cam.punchIn(d.pos, 0.8);
           this.renderer.flash = 0.2;
           this.renderer.flashColor.set('#ff1a1a');
         }
@@ -783,7 +785,7 @@ class App {
         this.ui.floatText('MIKIRI COUNTER', head(d).x, head(d).y, head(d).z, 'good big', '見切り');
         if (mine) {
           this.cam.shake(0.2, 0.2);
-          this.cam.punchIn(pos.clone().setY(pos.y - 1.2));
+          this.cam.punchIn(pos.clone().setY(pos.y - 1.2), 0.2);
         }
         break;
       case 'evade':
@@ -827,7 +829,7 @@ class App {
       d.hitstop(160, 0.07);
       if (mine) {
         this.drama = 0.75;
-        this.cam.punchIn(d.pos);
+        this.cam.punchIn(d.pos, 0.25);
         this.cam.shake(0.3, 0.35);
         play('shatter', Math.min(1, vol * 1.2));
       }
