@@ -18,6 +18,7 @@ Practice and Play vs Bot work without the server. Online play looks for the serv
 npm test             # simulation, bot and server tests (vitest)
 npm run typecheck    # all three packages
 npm run build        # production client in packages/client/dist
+VITE_OFFLINE=1 npm run build   # demo build without online buttons (practice and bot matches only)
 npm run start:server # production server (PORT env var, default 2567)
 ```
 

@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --u: min(1vw, 1.78vh);
   --red: #e0283a;
   --red-dark: #7c0f1a;
@@ -535,6 +536,10 @@ button {
   font-size: max(12px, calc(1.6 * var(--u)));
   padding: calc(0.6 * var(--u)) calc(1.6 * var(--u));
   min-height: 40px;
+}
+.lobby-bar.offline {
+  grid-template-columns: auto;
+  justify-items: center;
 }
 .lobby-status {
   grid-column: 1 / -1;

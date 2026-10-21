@@ -51,6 +51,9 @@ type MapVote = MapId | 'random' | null;
 const BOT_NAMES: Record<BotLevel, string> = { dummy: 'Training Dummy', easy: 'Ronin (Easy)', normal: 'Ronin (Normal)', hard: 'Ronin (Hard)' };
 const BOT_TITLES: Record<BotLevel, string> = { dummy: 'Practice', easy: 'Wanderer', normal: 'Swordsman', hard: 'Sword Saint' };
 const SEARCH_BOT_OFFER_MS = 20_000;
+/** A build without a match server (VITE_OFFLINE=1, e.g. a hosted demo) offers practice and bot matches only. */
+const ONLINE = !import.meta.env.VITE_OFFLINE;
+const PRACTICE_STATUS = ONLINE ? 'Practice: hit the dummy, or start a match' : 'Practice: hit the dummy, or fight the bot';
 
 export class App {
   private readonly ui = document.getElementById('ui')!;
@@ -133,7 +136,7 @@ export class App {
       bot: () => this.startBotMatch(),
       invite: () => void this.invite(),
       cancel: () => this.cancelSearch(),
-    });
+    }, ONLINE);
     this.menuBtn = new MenuButton(this.ui, () => this.toggleMenu());
     this.applySettings(this.settings);
 
@@ -151,12 +154,14 @@ export class App {
     this.platform.loadingStop();
 
     // Invite links and "play with friends" go straight into a joinable room.
-    const invite = this.platform.inviteParams?.room ?? new URLSearchParams(window.location.search).get('room');
-    if (invite) void this.joinRoom(invite);
-    else if (this.platform.isInstantMultiplayer) void this.invite(false);
-    this.platform.onJoinRoom((params) => {
-      if (params.room) void this.joinRoom(params.room);
-    });
+    if (ONLINE) {
+      const invite = this.platform.inviteParams?.room ?? new URLSearchParams(window.location.search).get('room');
+      if (invite) void this.joinRoom(invite);
+      else if (this.platform.isInstantMultiplayer) void this.invite(false);
+      this.platform.onJoinRoom((params) => {
+        if (params.room) void this.joinRoom(params.room);
+      });
+    }
 
     requestAnimationFrame(this.frame);
   }
@@ -348,7 +353,7 @@ export class App {
     this.session = new LocalSession({ weapons: this.weapons, practice: true, bot: 'dummy', seed: 7 }, this.input, this.inputLive);
     this.hud.setPlayers(0, this.players);
     this.lobby.setVisible(true);
-    this.lobby.setStatus(this.searching ? 'Searching for an opponent...' : 'Practice: hit the dummy, or start a match', this.searching);
+    this.lobby.setStatus(this.searching ? 'Searching for an opponent...' : PRACTICE_STATUS, this.searching);
     this.world.cam.stopShots();
     this.world.cam.snapNext = true;
     this.audio.music.setState('lobby');
@@ -671,7 +676,7 @@ export class App {
     this.platform.leftRoom();
     this.room = null;
     this.serverPhase = null;
-    this.lobby.setStatus('Practice: hit the dummy, or start a match', false);
+    this.lobby.setStatus(PRACTICE_STATUS, false);
   }
 
   private async invite(copy = true): Promise<void> {

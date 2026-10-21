@@ -37,7 +37,10 @@ export interface LobbyHandlers {
   cancel(): void;
 }
 
-/** The practice-arena bar: quick match, bot match and invite are equally prominent. */
+/**
+ * The practice-arena bar: quick match, bot match and invite are equally prominent.
+ * Builds without a match server show only the bot match.
+ */
 export class LobbyBar {
   readonly root: HTMLElement;
   private status: HTMLElement;
@@ -45,9 +48,9 @@ export class LobbyBar {
   private cancelBtn: HTMLButtonElement;
   private logo: HTMLElement;
 
-  constructor(ui: HTMLElement, h: LobbyHandlers) {
+  constructor(ui: HTMLElement, h: LobbyHandlers, online: boolean) {
     this.logo = el('div', 'logo', 'SHRINE <span>DUEL</span>');
-    this.root = el('div', 'lobby-bar panel');
+    this.root = el('div', online ? 'lobby-bar panel' : 'lobby-bar panel offline');
     this.quickBtn = el('button', 'btn primary', 'Quick Match');
     const bot = el('button', 'btn', 'Play vs Bot');
     const invite = el('button', 'btn', 'Invite a Friend');
@@ -58,7 +61,7 @@ export class LobbyBar {
     invite.onclick = h.invite;
     this.cancelBtn.onclick = h.cancel;
     this.cancelBtn.style.display = 'none';
-    this.root.append(this.quickBtn, bot, invite, this.status, this.cancelBtn);
+    this.root.append(...(online ? [this.quickBtn, bot, invite] : [bot]), this.status, this.cancelBtn);
     ui.append(this.logo, this.root);
   }
 
