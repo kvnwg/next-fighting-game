@@ -124,6 +124,7 @@ export type FxKind =
   | 'chi' // an orange burst at the striking fist or foot
   | 'holy' // a golden flare and light shafts
   | 'roar' // a red pulse and shockwave from the fighter
+  | 'chain' // a spectral chain flung straight ahead (scale = metres)
   | 'shake'; // camera shake only
 
 export type FxAnchor = 'tip' | 'main' | 'off' | 'offTip' | 'kick' | 'feet' | 'root' | 'front';

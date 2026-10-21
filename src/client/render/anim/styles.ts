@@ -9,8 +9,8 @@ import { daggers } from './moves/daggers';
 import { gauntlets } from './moves/gauntlets';
 import { greathammer } from './moves/greathammer';
 import { katana } from './moves/katana';
-import { LEGACY } from './moves/legacy';
 import { rapier } from './moves/rapier';
+import { scythe } from './moves/scythe';
 import { spear } from './moves/spear';
 import { swordShield } from './moves/swordShield';
 
@@ -24,7 +24,7 @@ export const STYLES: Record<WeaponKind, Style> = {
   rapier,
   spear,
   daggers,
-  scythe: LEGACY.scythe,
+  scythe,
   gauntlets,
   swordShield,
 };

@@ -651,6 +651,15 @@ class App {
           fx.roar(pos, sc);
           this.shakeNear(f, 0.14 * sc, 0.3);
           break;
+        case 'chain': {
+          // a spectral chain from the blade straight out along the fighter's facing, wisps along it
+          const end = this.tmp2.copy(dir).multiplyScalar(sc).add(pos);
+          end.y = Math.max(0.6, pos.y);
+          fx.beam(pos, end, color, 0.07, 0.35);
+          fx.beam(pos, end, '#e8fff0', 0.025, 0.25);
+          for (let i = 1; i <= 4; i++) fx.wisps(this.tmp3.copy(pos).lerp(end, i / 4), color, 0.4);
+          break;
+        }
         case 'shake':
           this.shakeNear(f, 0.1 * sc, 0.15);
           break;
