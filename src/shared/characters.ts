@@ -252,9 +252,10 @@ const lancer: CharacterDef = {
   stats: { hp: 100, posture: 100, speed: 6.0, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 5, defense: 2, difficulty: 3 },
   lights: [
-    { name: 'Jab', anim: 'thrust', windup: 300, active: 80, recovery: 320, damage: 8, posture: 10, blockPosture: 12, range: 3.7, arc: 25, lunge: 0.4 },
-    { name: 'Twin Jab', anim: 'thrust', windup: 280, active: 80, recovery: 320, damage: 8, posture: 10, blockPosture: 12, range: 3.7, arc: 25, lunge: 0.4 },
-    { name: 'Crescent', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 3.5, arc: 80 },
+    { name: 'Viper Jab', anim: 'thrust', windup: 300, active: 80, recovery: 320, damage: 8, posture: 10, blockPosture: 12, range: 3.7, arc: 25, lunge: 0.4 },
+    // two jabs, in and in again: two hits to read and deflect
+    { name: 'Twin Fang', anim: 'thrust', windup: 260, active: 160, recovery: 320, damage: 5, posture: 6, blockPosture: 7, range: 3.7, arc: 25, lunge: 0.5, hits: 2 },
+    { name: 'Wheel Strike', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 3.5, arc: 80 },
   ],
   heavy: { name: 'Dragon Fang', anim: 'thrust', windup: 640, active: 110, recovery: 520, damage: 18, posture: 24, blockPosture: 30, range: 4.1, arc: 25, lunge: 1.4, feintable: true },
   special: { name: 'Whirlwind', anim: 'spin', windup: 760, active: 220, recovery: 650, damage: 20, posture: 26, blockPosture: 26, range: 3.8, arc: 180, perilous: 'sweep', cooldown: 7000 },

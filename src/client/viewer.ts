@@ -142,14 +142,14 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
 
   // the timeline: each attack in the chain starts when the previous one's active frames end + gap;
   // non-attack entries (block, stagger, stance...) hold that state for a typical duration
-  const STATE_MS: Partial<Record<FighterState | 'roar', number>> = { idle: 600, roar: 1100, block: 800, blockstun: 300, stagger: 400, deflected: 600, broken: 1500, dodge: 380, stance: 900, dead: 1200, knockdown: 1400 };
+  const STATE_MS: Partial<Record<FighterState | 'roar' | 'leap' | 'vanish', number>> = { idle: 600, roar: 1100, leap: 460, vanish: 300, block: 800, blockstun: 300, stagger: 400, deflected: 600, broken: 1500, dodge: 380, stance: 900, dead: 1200, knockdown: 1400 };
   const probe = new CharacterModel(id);
   const steps: { key: string; start: number; dur: number; atk: ReturnType<typeof getAttack> }[] = [];
   let t = 0;
   for (const k of chain) {
     const atk = k in STATE_MS ? null : getAttack(probe.char, k as AttackKey);
     if (!atk && !(k in STATE_MS)) continue;
-    const dur = atk ? atk.windup + atk.active + atk.recovery : STATE_MS[k as FighterState | 'roar']!;
+    const dur = atk ? atk.windup + atk.active + atk.recovery : STATE_MS[k as FighterState | 'roar' | 'leap' | 'vanish']!;
     steps.push({ key: k, start: t, dur, atk });
     t += atk && chain.length > 1 ? atk.windup + atk.active + Math.min(atk.recovery, 120) : dur;
   }
@@ -212,7 +212,10 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
       let input: AnimInput;
       if (e >= cur.dur) input = { ...IDLE, elapsed: e - cur.dur };
       else if (cur.atk) input = { ...IDLE, state: 'attack', elapsed: e, dur: cur.dur, attack: cur.atk, windup: cur.atk.windup, key: cur.key, serial };
-      else if (cur.key === 'roar') {
+      else if (cur.key === 'leap' || cur.key === 'vanish') {
+        // abilities that play through the dodge state
+        input = { ...IDLE, state: 'dodge', elapsed: e, dur: cur.dur, serial, dodgeKind: cur.key };
+      } else if (cur.key === 'roar') {
         // the War Cry plays over idle
         if (e < 10) m.react('roar');
         input = { ...IDLE, elapsed: e };
