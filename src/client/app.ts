@@ -58,6 +58,8 @@ class App {
   private kind: 'lobby' | 'arena' | null = null;
   private match: MatchMsg | null = null;
   private lastCountdown = -1;
+  /** seconds left of the red-and-black beat after a posture break */
+  private drama = 0;
   /** back-to-back deflects build up the spectacle */
   private deflectStreak = 0;
   private lastDeflectAt = -Infinity;
@@ -736,6 +738,8 @@ class App {
         this.effects.burst(pos, { count: heavy ? 8 : 5, color: ['#ffffff', '#fee761'], speed: 7, life: 0.2, size: 0.04, gravity: 4, drag: 4, stretch: 0.08 });
         this.effects.burst(pos, { count: 10, color: ['#e43b44', '#a22633', '#3e2731'], speed: 4, life: 0.45, size: 0.07 });
         this.effects.slash(pos, swing, heavy ? (style?.trail.heavy ?? '#ffd27a') : (style?.trail.light ?? '#ffffff'), heavy ? 1.7 : 1.15, heavy ? 0.09 : 0.06);
+        // the flare across the target, along the cut
+        this.effects.hitFlare(pos, swing, this.tmp3.subVectors(this.renderer.camera.position, pos).normalize(), heavy ? '#ff2a4a' : '#ff5a78', heavy ? 1.25 : 1);
         this.effects.flash(pos, '#ffffff', heavy ? 1.0 : 0.75, 0.1);
         d?.model.flash(heavy ? '#ff6a5a' : '#ffffff', 1.2);
         d?.model.react('hit');
@@ -815,6 +819,15 @@ class App {
       this.ui.floatText('POSTURE BROKEN', head(d).x, head(d).y + 0.4, head(d).z, 'warn big', '崩し');
       this.effects.ring(d.pos, '#ffb02a', 3.2);
       if (e.k !== 'guardBreak') play('guardBreak');
+      // the moment of the fight: the guard shatters, the world drops to red and black for a beat
+      this.effects.shatter(this.tmp.set(d.pos.x, d.pos.y + 1.2 * d.model.scale, d.pos.z), 1.2);
+      d.hitstop(160, 0.07);
+      if (mine) {
+        this.drama = 0.75;
+        this.cam.punchIn(d.pos);
+        this.cam.shake(0.3, 0.35);
+        play('shatter', Math.min(1, vol * 1.2));
+      }
     }
     if (e.tags?.includes('abroken') && a) {
       this.ui.floatText('POSTURE BROKEN', head(a).x, head(a).y + 0.4, head(a).z, 'warn big', '崩し');
@@ -981,6 +994,12 @@ class App {
     this.last = t;
     const now = this.net.serverNow();
     this.renderer.flash = Math.max(0, this.renderer.flash - dt * 3);
+    if (this.drama > 0) {
+      // the screen sinks to a deep red, holds and comes back
+      this.drama = Math.max(0, this.drama - dt);
+      this.renderer.flash = Math.max(this.renderer.flash, 0.62 * Math.min(1, this.drama / 0.35));
+      this.renderer.flashColor.set('#300008');
+    }
 
     const mouse = this.input.consumeMouse();
     this.cam.addMouse(mouse.dx, mouse.dy, settings.sensitivity, settings.invertY, !!this.lock);
@@ -1133,6 +1152,8 @@ class App {
     // the opponent's posture bar floats above their head (as in the reference fights)
     const foe = target && target.s !== 'dead' ? this.project(target.pos.x, target.pos.y + 2.25 * target.model.scale, target.pos.z) : null;
     this.ui.setFoePosture(foe, target ? target.po / target.char.stats.posture : 0, target?.s === 'broken');
+    // a red X marks them while their guard is broken: finish it
+    this.ui.setBrokenMark(target && target.s === 'broken' ? this.project(target.pos.x, target.pos.y + 1.25 * target.model.scale, target.pos.z) : null);
 
     // lock-on marker: a small diamond above the target's head
     if (this.lock) {

@@ -199,6 +199,7 @@ export class CharacterModel {
   frame: AnimFrame | null = null;
   /** afterimages on dashes and flips (the dev strip viewer turns them off) */
   ghostsEnabled = true;
+  private dodging = false;
 
   constructor(charId: CharacterId) {
     this.char = CHARACTERS[charId];
@@ -655,7 +656,9 @@ export class CharacterModel {
       }
     }
 
-    this.updateGhosts(f.ghost, dt);
+    // dodges leave a cold, glowing trail of afterimages
+    this.dodging = a.state === 'dodge' && a.elapsed < Math.max(160, a.dur * 0.8);
+    this.updateGhosts(f.ghost || this.dodging, dt);
     this.updateSmears(dt);
     this.stepCloth(dt);
     this.stepChain(dt);
@@ -800,7 +803,7 @@ export class CharacterModel {
 
   /** Colour of this fighter's afterimages. */
   get ghostColor(): string {
-    return this.animator.style.trail.heavy;
+    return this.dodging ? '#bfe6ff' : this.animator.style.trail.heavy;
   }
 
   /** World transform of a foot (for kick trails). */

@@ -450,6 +450,18 @@ export class UI {
   }
 
   /** The same bar above the opponent's head (null hides it). */
+  setBrokenMark(at: { x: number; y: number } | null): void {
+    let el = this.hud.querySelector<HTMLElement>('.broken-mark');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'broken-mark hidden';
+      el.innerHTML = '<i></i><i></i>';
+      this.hud.querySelector('.plates')!.after(el);
+    }
+    el.classList.toggle('hidden', !at);
+    if (at) el.style.transform = `translate(${at.x}px, ${at.y}px)`;
+  }
+
   setFoePosture(at: { x: number; y: number } | null, frac = 0, broken = false): void {
     const el = this.els.foePosture;
     el.classList.toggle('hidden', !at);

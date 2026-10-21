@@ -932,3 +932,12 @@ h3 { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.03
 .keys.cancels td { text-align: center; padding: 3px 8px; }
 .keys.cancels td:first-child { text-align: left; }
 .keys.cancels tr:first-child td { color: var(--gold); font-size: 12px; }
+
+/* the red X over a fighter whose guard is broken (after the reference): finish them */
+.broken-mark { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; z-index: 2; pointer-events: none; animation: bm-pulse 0.5s ease-in-out infinite alternate; }
+.broken-mark i { position: absolute; left: 50%; top: 50%; width: 58px; height: 9px; margin: -4.5px 0 0 -29px; background: #ff2a3a; box-shadow: 0 0 12px #ff2a3a, 0 0 26px rgba(255, 42, 58, 0.7), inset 0 0 0 2px rgba(255, 255, 255, 0.55); transform: rotate(45deg); }
+.broken-mark i + i { transform: rotate(-45deg); }
+@keyframes bm-pulse { from { opacity: 0.75; scale: 0.92; } to { opacity: 1; scale: 1.08; } }
+
+/* lost health shows as a bright white chunk that then drains */
+.fc-hp .fc-trail { background: linear-gradient(180deg, #ffffff, #ffe0e4 55%, #ffb0b8); }

@@ -9,6 +9,7 @@ type Sfx =
   | 'hit'
   | 'hitHeavy'
   | 'deflectRing'
+  | 'shatter'
   | 'guardBreak'
   | 'deathblow'
   | 'perilous'
@@ -161,6 +162,14 @@ class AudioEngine {
         this.tone('sine', 190, 55, 0.16, 0.85 * v);
         this.tone('square', 95, 40, 0.07, 0.18 * v);
         this.noiseBurst(0.14, 0.5 * v, 'bandpass', 1400, 380, 1.2, 0.01);
+        break;
+      case 'shatter':
+        // glass breaking over a deep boom
+        this.noiseBurst(0.06, 0.9 * v, 'highpass', 5000, 2500, 0.7);
+        this.noiseBurst(0.6, 0.4 * v, 'bandpass', 3500, 1800, 2.5, 0.03);
+        for (let i = 0; i < 5; i++) this.ring(2400 + Math.random() * 2600, 0.35 + Math.random() * 0.4, 0.06 * v);
+        this.tone('sine', 90, 30, 0.9, 0.9 * v);
+        this.tone('sawtooth', 60, 28, 0.7, 0.25 * v, 0.02);
         break;
       case 'deflectRing':
         // the bright tail under the clash: a long shimmering ring, a sub thump, a rising glint

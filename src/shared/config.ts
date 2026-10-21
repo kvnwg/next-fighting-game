@@ -24,7 +24,8 @@ export const FALL_DEATH_Y = -9;
 // ---- Combat --------------------------------------------------------------------
 export const COMBAT = {
   /** Base deflect (parry) window after pressing block. */
-  parryWindow: 200,
+  // a touch more forgiving than it was (200)
+  parryWindow: 230,
   /** Presses landing slightly after the hit still count (absorbs clock jitter). */
   parryLateTolerance: 30,
   /** A press within this long of a previous *whiffed* press counts as spamming. */

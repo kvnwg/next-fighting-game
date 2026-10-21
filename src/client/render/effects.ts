@@ -364,6 +364,36 @@ export class Effects {
     this.spray(new THREE.Vector3(pos.x, pos.y + 0.1, pos.z), new THREE.Vector3(0, 1, 0), [color, '#ffffff'], 26 * scale, 6, 1.2, { life: 0.5, size: 0.05, gravity: 9, stretch: 0.05 });
   }
 
+  /**
+   * The flare of a clean hit: one long thin glowing line across the target along the cut, a short
+   * cross-line, and a four-point star at the contact.
+   */
+  hitFlare(pos: THREE.Vector3, along: THREE.Vector3, toCam: THREE.Vector3, color = '#ff3a5a', scale = 1): void {
+    const a = new THREE.Vector3().copy(along).projectOnPlane(toCam);
+    if (a.lengthSq() < 1e-4) a.set(1, 0, 0);
+    a.normalize();
+    const b = new THREE.Vector3().crossVectors(toCam, a).normalize();
+    const L = 1.9 * scale;
+    this.beam(pos.clone().addScaledVector(a, -L), pos.clone().addScaledVector(a, L), color, 0.07 * scale, 0.22);
+    this.beam(pos.clone().addScaledVector(a, -L * 0.9), pos.clone().addScaledVector(a, L * 0.9), '#ffffff', 0.022 * scale, 0.16);
+    this.beam(pos.clone().addScaledVector(b, -0.45 * scale), pos.clone().addScaledVector(b, 0.45 * scale), '#ffe0e6', 0.03 * scale, 0.12);
+    this.flash(pos, '#ffffff', 0.9 * scale, 0.1);
+    this.flash(pos, color, 1.7 * scale, 0.2);
+  }
+
+  /** A shatter: white and red shards flung out in every direction. */
+  shatter(pos: THREE.Vector3, scale = 1): void {
+    for (let i = 0; i < 46 * scale; i++) {
+      const u = Math.random() * 2 - 1;
+      const t = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(1 - u * u);
+      const sp = 5 + Math.random() * 9;
+      this.emit(pos.x, pos.y, pos.z, r * Math.cos(t) * sp, u * sp + 2, r * Math.sin(t) * sp, i % 4 ? '#ffffff' : '#ff2a3a', { life: 0.55, size: 0.07, gravity: 7, drag: 2.5, stretch: 0.14 });
+    }
+    this.flash(pos, '#ffffff', 3 * scale, 0.18);
+    this.ring(pos, '#ffffff', 3.4 * scale, 0.4, undefined, true);
+  }
+
   /** Low mist rolling out across the ground. */
   fog(pos: THREE.Vector3, scale = 1, color = '#b8c0cc'): void {
     for (let i = 0; i < 34 * scale; i++) {
