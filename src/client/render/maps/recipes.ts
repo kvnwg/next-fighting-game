@@ -10,6 +10,7 @@ import { lobbyRecipe } from './lobby';
 import { ruinsRecipe } from './ruins';
 import { sakuraRecipe } from './sakura';
 import { summitRecipe } from './summit';
+import { titleRecipe } from './title';
 
 const GROUND: Record<string, number[]> = {
   grass: [hex('#6e9c3e'), hex('#78a646'), hex('#628f37')],
@@ -69,3 +70,4 @@ RECIPES.summit = summitRecipe;
 RECIPES.bamboo = bambooRecipe;
 RECIPES.forge = forgeRecipe;
 RECIPES.lobby = lobbyRecipe;
+RECIPES.title = titleRecipe;

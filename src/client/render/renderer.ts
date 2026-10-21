@@ -170,7 +170,23 @@ uniform float flash;
 uniform vec3 flashColor;
 uniform float time;
 uniform float aspect;
+uniform vec2 resolution;
+uniform float pixel;
+uniform float fade;
+uniform vec3 fadeColor;
 varying vec2 vUv;
+
+// 4x4 ordered dither, for fades that dissolve in blocky steps instead of a smooth ramp
+float bayer4(vec2 p) {
+  vec2 q = mod(floor(p), 4.0);
+  float i = q.x + q.y * 4.0;
+  float m = 0.0;
+  if (i < 1.0) m = 0.0; else if (i < 2.0) m = 8.0; else if (i < 3.0) m = 2.0; else if (i < 4.0) m = 10.0;
+  else if (i < 5.0) m = 12.0; else if (i < 6.0) m = 4.0; else if (i < 7.0) m = 14.0; else if (i < 8.0) m = 6.0;
+  else if (i < 9.0) m = 3.0; else if (i < 10.0) m = 11.0; else if (i < 11.0) m = 1.0; else if (i < 12.0) m = 9.0;
+  else if (i < 13.0) m = 15.0; else if (i < 14.0) m = 7.0; else if (i < 15.0) m = 13.0; else m = 5.0;
+  return (m + 0.5) / 16.0;
+}
 
 vec3 RRTAndODTFit(vec3 v) {
   vec3 a = v * (v + 0.0245786) - 0.000090537;
@@ -188,9 +204,16 @@ vec3 toSRGB(vec3 c) {
 float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 
 void main() {
-  vec3 c = texture2D(tColor, vUv).rgb;
-  c += texture2D(tBloom, vUv).rgb * bloom;
-  c += texture2D(tRays, vUv).r * rayColor * rays;
+  // pixelate: every block of pixel x pixel screen pixels shows the colour at its centre
+  vec2 uv = vUv;
+  vec2 cell = gl_FragCoord.xy;
+  if (pixel > 1.0) {
+    cell = floor(gl_FragCoord.xy / pixel);
+    uv = (cell + 0.5) * pixel / resolution;
+  }
+  vec3 c = texture2D(tColor, uv).rgb;
+  c += texture2D(tBloom, uv).rgb * bloom;
+  c += texture2D(tRays, uv).r * rayColor * rays;
   c *= exposure * gain;
   c = aces(c);
   c += lift * (1.0 - smoothstep(0.0, 0.5, luma(c)));
@@ -202,6 +225,7 @@ void main() {
   c = mix(c, flashColor, flash);
   float n = fract(sin(dot(gl_FragCoord.xy + fract(time) * 71.0, vec2(12.9898, 78.233))) * 43758.5453);
   c += (n - 0.5) / 160.0;
+  if (fade > 0.0) c = mix(c, fadeColor, step(bayer4(cell), fade));
   gl_FragColor = vec4(c, 1.0);
 }`;
 
@@ -225,6 +249,11 @@ export class GameRenderer {
   height = 1;
   flash = 0;
   flashColor = new THREE.Color('#ffffff');
+  /** pixelate the frame into blocks this many screen pixels across (1 = off) */
+  pixelate = 1;
+  /** 0..1: dissolve the frame to fadeColor through an ordered dither (1 = solid) */
+  fade = 0;
+  fadeColor = new THREE.Color('#000000');
   private hdr!: THREE.WebGLRenderTarget;
   private ldr: THREE.WebGLRenderTarget;
   private down: THREE.WebGLRenderTarget[] = [];
@@ -304,6 +333,10 @@ export class GameRenderer {
       flashColor: { value: this.flashColor },
       time: { value: 0 },
       aspect: { value: 1 },
+      resolution: { value: new THREE.Vector2(1, 1) },
+      pixel: { value: 1 },
+      fade: { value: 0 },
+      fadeColor: { value: this.fadeColor },
     });
     this.fxaa = new THREE.ShaderMaterial({
       uniforms: THREE.UniformsUtils.clone(FXAAShader.uniforms),
@@ -407,6 +440,7 @@ export class GameRenderer {
     this.rayB.setSize(Math.max(1, Math.round(lw * rs)), Math.max(1, Math.round(lh * rs)));
     (this.fxaa.uniforms.resolution.value as THREE.Vector2).set(1 / lw, 1 / lh);
     this.composite.uniforms.aspect.value = w / h;
+    (this.composite.uniforms.resolution.value as THREE.Vector2).set(lw, lh);
     this.rayMask.uniforms.aspect.value = w / h;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -536,6 +570,9 @@ export class GameRenderer {
     (cu.gain.value as THREE.Color).copy(g.gain);
     cu.vignette.value = g.vignette;
     cu.flash.value = this.flash;
+    // pixel blocks are given in CSS pixels, so they look the same at any resolution
+    cu.pixel.value = this.pixelate > 1 ? Math.max(1, Math.round(this.pixelate * this.renderer.getPixelRatio())) : 1;
+    cu.fade.value = this.fade;
     cu.time.value = this.clock;
     r.setClearColor(0x000000, 1);
     if (q.msaa > 0) {
