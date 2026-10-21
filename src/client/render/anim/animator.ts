@@ -727,6 +727,19 @@ export class Animator {
       // the weapon rides the bob and sways with the roll
       shiftHands(pose, UP, (Math.pow(land, G.heavy) * -0.6 + 0.2) * G.bob * 0.5 * w);
       shiftHands(pose, LEFT, -onL * G.roll * 0.25 * w);
+      // arms pump against the legs: the right hand comes forward with the left foot (only out of
+      // a move, which owns the hands)
+      if (G.arms > 0 && (a.state === 'idle' || a.state === 'block')) {
+        const swing = Math.cos(ph) * G.arms * w * Math.min(1, v / 2);
+        const lift = Math.abs(Math.cos(ph)) * G.arms * 0.3 * w;
+        pose.main.pos.z += swing;
+        pose.main.pos.y += lift;
+        if (pose.off) {
+          pose.off.pos.z -= swing;
+          pose.off.pos.y += lift;
+        }
+        pose.free.z -= swing;
+      }
     }
     // breathing
     this.breath += dt;
@@ -868,9 +881,12 @@ interface GaitStyle {
   crouch: number;
   /** the longest stride a planted foot covers (reference metres) before steps just come faster */
   reach: number;
+  /** how far the hands pump forward and back against the legs (reference metres): for light
+   * weapons in each hand, or a free hand; two-handed weapons stay in guard */
+  arms: number;
 }
 
-const GAIT: GaitStyle = { cadence: 1, width: 0.14, bob: 0.035, heavy: 1, roll: 0.035, hips: 0.12, lean: 0.14, lift: 0.1, crouch: -0.05, reach: 0.78 };
+const GAIT: GaitStyle = { cadence: 1, width: 0.14, bob: 0.035, heavy: 1, roll: 0.035, hips: 0.12, lean: 0.14, lift: 0.1, crouch: -0.05, reach: 0.78, arms: 0 };
 
 const GAITS: Partial<Record<WeaponKind, Partial<GaitStyle>>> = {
   // the Warden lumbers: wide-legged, slow heavy steps that drop onto each foot, the whole bulk
@@ -880,10 +896,11 @@ const GAITS: Partial<Record<WeaponKind, Partial<GaitStyle>>> = {
   swordShield: { cadence: 0.9, width: 0.16, bob: 0.045, heavy: 1.5, roll: 0.05, hips: 0.12, lift: 0.1 },
   spear: { cadence: 0.95, width: 0.15, bob: 0.04, heavy: 1.3, roll: 0.045 },
   // light on their feet
-  rapier: { cadence: 1.08, width: 0.12, bob: 0.03, roll: 0.025, hips: 0.14, lift: 0.09, crouch: -0.02 },
-  daggers: { cadence: 1.12, width: 0.13, bob: 0.028, roll: 0.03, hips: 0.1, lift: 0.08, crouch: -0.07, reach: 0.82 },
+  rapier: { cadence: 1.08, width: 0.12, bob: 0.03, roll: 0.025, hips: 0.14, lift: 0.09, crouch: -0.02, arms: 0.07 },
+  // runs low with the knives held down, arms pumping
+  daggers: { cadence: 1.12, width: 0.13, bob: 0.028, roll: 0.03, hips: 0.1, lift: 0.08, crouch: -0.07, reach: 0.82, arms: 0.16 },
   // the old monk: unhurried, grounded
-  gauntlets: { cadence: 0.92, width: 0.15, bob: 0.03, heavy: 1.2, roll: 0.04, hips: 0.1 },
+  gauntlets: { cadence: 0.92, width: 0.15, bob: 0.03, heavy: 1.2, roll: 0.04, hips: 0.1, arms: 0.1 },
   // the wraith floats: a slow glide, no footfalls
   scythe: { cadence: 0.7, bob: 0.025, heavy: 1, roll: 0.015, hips: 0.05, lean: 0.1 },
 };
