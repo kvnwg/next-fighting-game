@@ -210,13 +210,15 @@ export function buildAssassin() {
     const flare = p[1] < 64 ? (64 - p[1]) * 0.3 : 0;
     const q = (p[0] / (7.8 + flare)) ** 2 + ((p[1] - 66.8) / 7.6) ** 2 + ((p[2] + 0.6) / (7.8 + flare * 0.5)) ** 2;
     if (q <= 1) return true;
-    // tall peak trailing up and back, its tip drooping
+    // broad peak that slumps back and sags down behind the head; distances
+    // across x are squashed so the peak reads wider than it is deep
     const near = (a, c, r0, r1) => {
       const ab = vec.sub(c, a);
       const t = clamp01(vec.dot(vec.sub(p, a), ab) / vec.dot(ab, ab));
-      return vec.len(vec.sub(p, vec.lerp3(a, c, t))) < lerp(r0, r1, t);
+      const d = vec.sub(p, vec.lerp3(a, c, t));
+      return Math.hypot(d[0] * 0.8, d[1], d[2]) < lerp(r0, r1, t);
     };
-    return near([0, 71, -1.8], [0, 80, -7], 6.6, 0.9) || near([0, 80, -7], [0, 78.4, -9.6], 0.9, 0.6);
+    return near([0, 69, -1.5], [0, 73.2, -6.5], 6.6, 3.0) || near([0, 73.2, -6.5], [0, 70.6, -10.4], 3.0, 1.0);
   };
   b.fill([-11, 58.5, -12], [11, 82, 9], (p) => {
     if (!hoodIn(p)) return undefined;
