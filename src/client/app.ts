@@ -635,9 +635,9 @@ class App {
     const vol = this.volumeAt(e.x, e.z);
     const play = (s: Sfx, v = vol) => audio.play(s, v);
     const head = (f: ClientFighter | undefined) => (f ? new THREE.Vector3(f.pos.x, f.pos.y + 2.1 * f.model.scale, f.pos.z) : pos);
-    // impact freeze on both fighters
-    const stop = (ms: number) => {
-      d?.hitstop(ms);
+    // impact freeze on both fighters; the one struck shudders through it
+    const stop = (ms: number, shudder = 0) => {
+      d?.hitstop(ms, shudder);
       a?.hitstop(ms);
     };
     if (mine && e.a && e.d) this.lastHitTarget = { id: meA ? e.d : e.a, until: performance.now() + 5000 };
@@ -673,7 +673,7 @@ class App {
         this.effects.burst(pos, { count: 12, color: ['#ffb04a', '#ff8a2a', '#ffe0a0'], speed: 5, life: 0.35, size: 0.06 });
         play('block');
         a?.model.react('blocked');
-        stop(heavy ? 60 : 40);
+        stop(heavy ? 60 : 40, heavy ? 0.025 : 0.015);
         if (meD) this.cam.shake(heavy ? 0.1 : 0.06, 0.1);
         break;
       case 'guardBreak':
@@ -683,7 +683,7 @@ class App {
         this.effects.ring(d?.pos ?? pos, '#ff9a2a', 3);
         d?.model.flash('#ff7a2a', 1.1);
         play('guardBreak');
-        stop(110);
+        stop(110, 0.06);
         this.ui.floatText('GUARD BROKEN', head(d).x, head(d).y, head(d).z, 'warn big', '破');
         if (mine) {
           this.cam.shake(0.22, 0.28);
@@ -703,12 +703,12 @@ class App {
         this.effects.flash(pos, '#ffffff', heavy ? 1.0 : 0.75, 0.1);
         d?.model.flash(heavy ? '#ff6a5a' : '#ffffff', 1.2);
         d?.model.react('hit');
-        stop(heavy ? 120 : 75);
+        stop(heavy ? 120 : 80, heavy ? 0.07 : 0.04);
         if (heavy && mine && a && d) {
           const len = Math.hypot(d.pos.x - a.pos.x, d.pos.z - a.pos.z) || 1;
           this.cam.kick((d.pos.x - a.pos.x) / len, (d.pos.z - a.pos.z) / len, meD ? 0.22 : 0.12);
         }
-        play('hit');
+        play(heavy ? 'hitHeavy' : 'hit');
         if (e.dmg) this.ui.floatText(`-${e.dmg}`, pos.x, pos.y + 0.3, pos.z, meD ? 'dmg me' : 'dmg');
         if (e.k === 'armor') this.ui.floatText('ARMOR', head(d).x, head(d).y, head(d).z, 'warn');
         if (meD) {
@@ -723,7 +723,7 @@ class App {
         this.effects.flash(pos, '#ff4a4a', 1.4, 0.22);
         d?.model.flash('#ff2a2a', 1.4);
         d?.model.react('hit');
-        stop(150);
+        stop(150, 0.08);
         play('deathblow', Math.min(1, vol * 1.3));
         this.ui.floatText('DEATHBLOW', head(d).x, head(d).y + 0.3, head(d).z, 'bad huge', '止め');
         if (mine) {

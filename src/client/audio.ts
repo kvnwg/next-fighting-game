@@ -7,6 +7,7 @@ type Sfx =
   | 'deflect'
   | 'block'
   | 'hit'
+  | 'hitHeavy'
   | 'guardBreak'
   | 'deathblow'
   | 'perilous'
@@ -154,8 +155,19 @@ class AudioEngine {
         this.noiseBurst(0.08, 0.5 * v, 'bandpass', 1800, 900, 0.8);
         break;
       case 'hit':
-        this.tone('triangle', 160, 50, 0.18, 0.6 * v);
-        this.noiseBurst(0.12, 0.5 * v, 'lowpass', 2200, 300);
+        // a sharp crack on contact, the body thump under it, and a short crunch
+        this.noiseBurst(0.035, 0.7 * v, 'highpass', 3200, 1800, 0.9);
+        this.tone('sine', 190, 55, 0.16, 0.85 * v);
+        this.tone('square', 95, 40, 0.07, 0.18 * v);
+        this.noiseBurst(0.14, 0.5 * v, 'bandpass', 1400, 380, 1.2, 0.01);
+        break;
+      case 'hitHeavy':
+        // the same, bigger: a split-second crack, a deep boom with sub under it, and a long crunch
+        this.noiseBurst(0.05, 0.9 * v, 'highpass', 2600, 1200, 0.8);
+        this.tone('sine', 150, 32, 0.38, 1.0 * v);
+        this.tone('sine', 60, 28, 0.5, 0.7 * v, 0.01);
+        this.tone('sawtooth', 110, 38, 0.14, 0.22 * v);
+        this.noiseBurst(0.32, 0.65 * v, 'lowpass', 2600, 160, 0.9, 0.015);
         break;
       case 'guardBreak':
         this.ring(300, 0.9, 0.35 * v);

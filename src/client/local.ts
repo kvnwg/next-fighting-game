@@ -12,6 +12,9 @@ import { ClientFighter } from './entities';
 import { Bind } from './input';
 import { Net } from './net';
 
+/** About one light hit's hitstop (see App.onFx): knockback slides start once the freeze is over. */
+const PUSH_AFTER_HITSTOP = 80;
+
 export interface MoveContext {
   axes: { x: number; y: number };
   camYaw: number;
@@ -274,7 +277,8 @@ export class LocalController {
   }
 
   onPush(dx: number, dz: number): void {
-    this.push = { dx, dz, t0: this.net.serverNow(), dur: knockDuration(Math.hypot(dx, dz)), done: 0 };
+    // the shove lands as the hitstop lets go, not during it
+    this.push = { dx, dz, t0: this.net.serverNow() + PUSH_AFTER_HITSTOP, dur: knockDuration(Math.hypot(dx, dz)), done: 0 };
   }
 
   /** The server never applied press `q`: undo only what that press predicted, if it's still showing. */

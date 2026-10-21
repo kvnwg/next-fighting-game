@@ -96,6 +96,9 @@ export class ClientFighter {
   private tmpScale = new THREE.Vector3();
   /** hit-stop: the animation holds still for a moment on impact, then catches back up */
   private freezeMs = 0;
+  /** how hard the struck fighter shudders through the hitstop (m), and the hitstop's full length */
+  private shudder = 0;
+  private freezeTotal = 1;
   private lagMs = 0;
   private lagKey = '';
 
@@ -178,8 +181,11 @@ export class ClientFighter {
   }
 
   /** Freeze this fighter's animation briefly (impact feel). */
-  hitstop(ms: number): void {
+  /** Freeze on an impact; the one who took the blow shudders in place while time stands still. */
+  hitstop(ms: number, shudder = 0): void {
+    if (ms >= this.freezeMs) this.freezeTotal = Math.max(1, ms);
     this.freezeMs = Math.max(this.freezeMs, ms);
+    this.shudder = Math.max(this.freezeMs > 0 && this.shudder > 0 ? this.shudder : 0, shudder);
   }
 
   teleportTo(x: number, y: number, z: number, yaw?: number): void {
@@ -305,6 +311,14 @@ export class ClientFighter {
     const waiting = !!ent && serverNow < ent.start;
     this.model.root.position.copy(this.pos);
     this.model.root.rotation.y = this.yaw;
+    if (this.freezeMs > 0 && this.shudder > 0) {
+      // a sideways judder that dies away as the hitstop ends
+      const k = this.shudder * this.model.scale * Math.min(1, this.freezeMs / this.freezeTotal);
+      const f = forward(this.yaw);
+      const j = (Math.random() * 2 - 1) * k;
+      this.model.root.position.x += f.z * j + (Math.random() - 0.5) * k * 0.5;
+      this.model.root.position.z += -f.x * j + (Math.random() - 0.5) * k * 0.5;
+    } else if (this.freezeMs <= 0) this.shudder = 0;
     this.model.update(input, this.freezeMs > 0 ? dt * 0.1 : dt);
     // shadow step / dead fade
     this.model.setVisible(!waiting && !(v.state === 'dodge' && this.char.ability.kind === 'teleport' && v.elapsed < 250 && !v.attack && this.dodgeIsVanish()));
@@ -320,8 +334,9 @@ export class ClientFighter {
     const tc = m.animator.style.trail;
     const big = isHeavyKey(v.key) || v.key === 'ab' || v.key === 'ia' || v.key === 'ct' || !Number.isNaN(entS);
     const color = frame?.trail?.color ?? (atk?.perilous ? tc.special : big ? tc.heavy : tc.light);
-    const life = frame?.trail?.life ?? (atk?.perilous ? 0.2 : big ? 0.17 : 0.13);
-    const glow = frame?.trail?.glow ?? (atk?.perilous ? 0.8 : big ? 0.45 : 0.1);
+    // long enough to read as a ribbon through the whole arc of the swing
+    const life = frame?.trail?.life ?? (atk?.perilous ? 0.26 : big ? 0.24 : 0.19);
+    const glow = frame?.trail?.glow ?? (atk?.perilous ? 0.85 : big ? 0.55 : 0.25);
     for (const t of [this.trail, this.offTrail, this.kickTrail]) {
       t?.setColor(color);
       t?.setStyle(life, glow);
