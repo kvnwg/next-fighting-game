@@ -72,7 +72,9 @@ export const VOXEL_FIGHTERS: Record<CharacterId, VoxelFighterSpec> = {
   },
   juggernaut: {
     build: buildWarden,
-    main: { build: buildWardenHammer, grip: [0, 58, 0], axis: DOWN, edge: [0, 0, 1], scale: 1, base: [0, 16, 0], tip: [0, 0, 0] },
+    // held near the pommel like the animated hammer (head 1.07 m out, 0.36 m of haft behind the hand), so a
+    // shoulder carry doesn't run the haft down through his body
+    main: { build: buildWardenHammer, grip: [0, 66.5, 0], axis: DOWN, edge: [0, 0, 1], scale: 0.82, base: [0, 16, 0], tip: [0, 0, 0] },
   },
   duelist: {
     build: buildDuelist,
@@ -171,6 +173,9 @@ export interface RigDims {
   hasFeet: boolean;
   /** Standing height, headwear included, carried weapons not. */
   height: number;
+  /** the head itself (no hat brims) as an ellipsoid, torso-relative: weapons and hands are kept out of it */
+  headCenter: THREE.Vector3;
+  headHalf: THREE.Vector3;
 }
 
 /** The rig's joints and limb lengths, from the model's bone pivots (all in meters). */
@@ -206,6 +211,15 @@ export function rigDims(model: VoxelModel): RigDims {
   let top = 0;
   for (const v of model.voxels) if (onHead(v.bone) || v.bone === 'torso') top = Math.max(top, v.y + 1);
   const shoulderR = shoulder.clone().sub(torso);
+  const lo = new THREE.Vector3(Infinity, Infinity, Infinity);
+  const hi = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  for (const v of model.voxels) {
+    if (v.bone !== 'head') continue;
+    lo.min(_hv.set(v.x, v.y, v.z));
+    hi.max(_hv.set(v.x + 1, v.y + 1, v.z + 1));
+  }
+  const headSize = hi.clone().sub(lo).multiplyScalar(VOXEL);
+  const headCenter = lo.clone().add(hi).multiplyScalar(VOXEL / 2).sub(torso);
   return {
     hipsY: pelvis.y,
     torso: torso.clone().sub(pelvis),
@@ -222,8 +236,11 @@ export function rigDims(model: VoxelModel): RigDims {
     hasLegs,
     hasFeet,
     height: top * VOXEL,
+    headCenter,
+    headHalf: headSize.multiplyScalar(0.5),
   };
 }
+const _hv = new THREE.Vector3();
 
 /** Where each body bone hangs on the rig; bones not listed ride on their nearest listed ancestor. */
 export type RigSlot = 'hips' | 'torso' | 'head' | 'armR.upper' | 'armR.lower' | 'armR.end' | 'armL.upper' | 'armL.lower' | 'armL.end' | 'legR.upper' | 'legR.lower' | 'legR.end' | 'legL.upper' | 'legL.lower' | 'legL.end';

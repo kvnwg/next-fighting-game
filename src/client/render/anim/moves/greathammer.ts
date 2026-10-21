@@ -8,6 +8,9 @@ import { B, K, N, P, Style, X, arc, fx, hitAt, line, mv, seq, track } from '../a
 import type { V3 } from '../author';
 
 const G2 = -0.33; // the left hand rides down by the pommel
+// the guard: hands on the right of the chest, the haft out over the right shoulder beside the helm
+const GUARD_AT: V3 = [-0.1, 0.36, 0.22];
+const GUARD_DIR: V3 = [-0.42, 0.78, -0.46];
 const body = B({ front: 'L', step: 0.26, back: 0.26, width: 0.17, crouch: -0.11, lean: 0.1, twist: -0.22 });
 
 // Skullcrusher: off the right shoulder, diagonally down through the target, into the dirt on the left
@@ -92,8 +95,8 @@ const gripAt = (pivot: V3, r: number, dir: V3): V3 => {
   return [pivot[0] + d.x * r, pivot[1] + d.y * r, pivot[2] + d.z * r];
 };
 const ENT_DRAG: V3 = [-0.12, -0.64, -0.76];
-const ENT_GUARD_AT: V3 = [0.07, 0.41, 0.13];
-const ENT_GUARD_DIR: V3 = [-0.35, 0.85, -0.25];
+const ENT_GUARD_AT: V3 = GUARD_AT;
+const ENT_GUARD_DIR: V3 = GUARD_DIR;
 const ENT_PLANT: V3 = [-0.18, -0.98, 0.06];
 const ENT_PLANT_AT: V3 = [-0.45, 0.4, 0.15];
 const entDragAt: V3 = [-0.3, -0.04, 0.0];
@@ -117,7 +120,7 @@ export const greathammer: Style = {
   trail: { light: '#ffe2b0', heavy: '#ffb347', special: '#ff4a2a' },
   sparks: ['#ffb04a', '#ffffff', '#ff7a2a'],
   // resting over the right shoulder
-  guard: P(body, X([0.07, 0.41, 0.13], [-0.35, 0.85, -0.25], [-1, 0, 0.2], 'x', G2)),
+  guard: P(body, X(GUARD_AT, GUARD_DIR, [-1, 0, 0.2], 'x', G2)),
   block: P(B({ ...body, crouch: -0.16 }), X([0.15, 0.5, 0.32], [-1, 0.15, 0.05], [0, 1, 0.3], 'x', -0.3)),
   moves: {
     // Skullcrusher: the hips unwind right to left and drag the hammer through

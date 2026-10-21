@@ -59,6 +59,8 @@ const _mp = new THREE.Vector3();
 const _kick = new THREE.Vector3();
 const _dir = new THREE.Vector3();
 const _grip = new THREE.Vector3();
+const _hh = new THREE.Vector3();
+const _hg = new THREE.Vector3();
 const _sm = new THREE.Matrix4();
 const _sinv = new THREE.Matrix4();
 const _srel = new THREE.Matrix4();
@@ -368,6 +370,8 @@ export class CharacterModel {
 
     // arms: right hand to the grip, left to the off item, the free spot or its grip on the shaft;
     // if a hand can't quite reach, the weapon comes to the hand
+    this.keepOutOfHead(mainPos);
+    this.mainPivot.position.copy(mainPos);
     _rh.copy(mainPos);
     this.mapTorso(p.off ? p.off.pos : p.free, _lh);
     if (p.main.hold2 > 0.001) {
@@ -379,6 +383,16 @@ export class CharacterModel {
     if (_w.lengthSq() > 1e-8) {
       this.mainPivot.position.add(_w);
       _lh.addScaledVector(_w, p.main.hold2);
+    }
+    // and swing past the head rather than through it, from where the hand really holds it (an
+    // overhead grip out of reach brings the weapon down to the hand, often into the helm)
+    if (this.keepClearOfHead(this.mainPivot.position, p.main.quat)) {
+      this.mainPivot.quaternion.copy(p.main.quat);
+      if (p.main.hold2 > 0.001) {
+        this.mapTorso(p.off ? p.off.pos : p.free, _lh);
+        _dir.set(0, 0, 1).applyQuaternion(p.main.quat);
+        _lh.lerp(_grip.copy(this.mainPivot.position).addScaledVector(_dir, p.main.grip2), p.main.hold2);
+      }
     }
     this.handAlign(this.armR, this.mainPivot.quaternion, 1);
     this.reach(this.armL, d.shoulderL, _lh, ELBOW_POLE_L, _v);
@@ -579,6 +593,55 @@ export class CharacterModel {
    * If the weapon's head or tip would end up below the floor, pivot it up about the grip until it
    * rests on the ground (slams thud into the dirt, sweeps skim it).
    */
+  /**
+   * Turn the weapon about the grip, as little as it takes, so the line from its butt to its tip
+   * misses the head. Overhead raises are written for the reference body, and a big helm or a head
+   * set forward would otherwise have the haft run straight through it.
+   */
+  private keepClearOfHead(grip: THREE.Vector3, quat: THREE.Quaternion): boolean {
+    const c = this.d.headCenter;
+    // distances are measured in the head's own proportions: 1 is its surface (plus the haft's girth)
+    const h = _hh.copy(this.d.headHalf).addScalar(0.03);
+    _w.subVectors(c, grip);
+    const g = _hg.subVectors(grip, c).divide(h);
+    if (g.length() < 1) return false;
+    const z0 = -0.3;
+    const z1 = Math.max(this.trailMain.base.z, this.trailMain.tip.z);
+    const miss = (q: THREE.Quaternion) => {
+      const dd = _down.set(0, 0, 1).applyQuaternion(q).divide(h);
+      const t = Math.min(z1, Math.max(z0, -g.dot(dd) / dd.lengthSq()));
+      return _v.copy(g).addScaledVector(dd, t).length();
+    };
+    if (miss(quat) >= 1) return false;
+    _down.set(0, 0, 1).applyQuaternion(quat);
+    // turning the weapon about this axis carries it away from the head
+    const axis = _dir.crossVectors(_w, _down);
+    if (axis.lengthSq() < 1e-8) axis.set(1, 0, 0);
+    const ax = axis.normalize().clone();
+    let lo = 0;
+    let hi = 1.2;
+    for (let i = 0; i < 10; i++) {
+      const mid = (lo + hi) / 2;
+      _qc.setFromAxisAngle(ax, mid).multiply(quat);
+      if (miss(_qc) < 1) lo = mid;
+      else hi = mid;
+    }
+    quat.premultiply(_qc.setFromAxisAngle(ax, hi));
+    return true;
+  }
+
+  /** Move a torso-space hand target out of the head, if it's inside it. */
+  private keepOutOfHead(p: THREE.Vector3): void {
+    const h = _hh.copy(this.d.headHalf).addScalar(0.05);
+    const g = _hg.subVectors(p, this.d.headCenter).divide(h);
+    const l = g.length();
+    if (l >= 1) return;
+    // straight out the front if it's dead centre
+    if (l < 1e-4) g.set(0, 0, 1);
+    else g.divideScalar(l);
+    p.copy(g.multiply(h)).add(this.d.headCenter);
+  }
+
   private keepAboveGround(grip: THREE.Vector3, quat: THREE.Quaternion): void {
     this.hips.updateMatrix();
     this.torso.updateMatrix();
