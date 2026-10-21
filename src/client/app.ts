@@ -58,6 +58,9 @@ class App {
   private kind: 'lobby' | 'arena' | null = null;
   private match: MatchMsg | null = null;
   private lastCountdown = -1;
+  /** back-to-back deflects build up the spectacle */
+  private deflectStreak = 0;
+  private lastDeflectAt = -Infinity;
   /** the ring entrances playing in the match intro: whose, when, and which cues have fired */
   private intro: { start: number; turns: { f: ClientFighter; r: RosterEntry; mine: boolean; at: number }[]; fired: Set<string> } | null = null;
   private queue: { since: number; count: number } | null = null;
@@ -651,28 +654,55 @@ class App {
     const swing = a ? a.swingDir : new THREE.Vector3(0, 0, 1);
 
     switch (e.k) {
-      case 'deflect':
-        this.effects.burst(pos, { count: 28, color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 11, life: 0.3, size: 0.05, gravity: 6, drag: 3, stretch: 0.08 });
-        this.effects.flash(pos, '#fff1a0', 1.0, 0.16);
+      case 'deflect': {
+        // the clash: steel on steel, and the whole screen knows it. Back-to-back deflects build up.
+        const nowMs = performance.now();
+        const streak = (this.deflectStreak = nowMs - this.lastDeflectAt < 2500 ? this.deflectStreak + 1 : 1);
+        this.lastDeflectAt = nowMs;
+        const big = (heavy ? 1.3 : 1) * (1 + 0.18 * Math.min(3, streak - 1));
+        const camPos = this.renderer.camera.position;
+        const toCam = this.tmp3.subVectors(camPos, pos).normalize();
+        // a star of light at the contact: a hot core, rays flung out across the view, and rings
+        this.effects.flash(pos, '#ffffff', 1.6 * big, 0.12);
+        this.effects.flash(pos, '#ffd24a', 2.8 * big, 0.3);
+        const side = this.tmp2.set(0, 1, 0).cross(toCam).normalize();
+        const up = new THREE.Vector3().crossVectors(toCam, side);
+        for (let i = 0; i < 10; i++) {
+          const ang = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
+          const len = (i % 2 ? 0.9 : 1.6) * big * (0.8 + Math.random() * 0.4);
+          const end = pos.clone().addScaledVector(side, Math.cos(ang) * len).addScaledVector(up, Math.sin(ang) * len);
+          this.effects.beam(pos, end, i % 3 ? '#fff1a0' : '#ffffff', 0.035 * big, 0.14);
+        }
+        this.effects.ring(pos, '#fff1a0', 1.6 * big, 0.32, toCam, true);
+        this.effects.ring(pos, '#ffb02a', 2.8 * big, 0.5, toCam, true);
+        // a ground ring at their feet, and sparks: a hot burst, a stream kicked back the way the
+        // blade came, and a fountain that rains and bounces off the floor
+        if (d) this.effects.ring(this.tmp.set(d.pos.x, d.pos.y + 0.05, d.pos.z), '#ffd27a', 2.2 * big, 0.45);
+        this.effects.burst(pos, { count: Math.round(40 * big), color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 13, life: 0.35, size: 0.05, gravity: 6, drag: 3, stretch: 0.1 });
+        this.effects.spray(pos, swing.clone().negate(), ['#ffffff', '#fff1a0', '#ffd24a'], Math.round((heavy ? 30 : 22) * big), 12, 0.6, { stretch: 0.08 });
+        this.effects.burst(pos, { count: Math.round(26 * big), color: ['#ffd24a', '#ff9a2a', '#fff6c0'], speed: 6, up: 5, life: 1.1, size: 0.04, gravity: 12, drag: 0.6, stretch: 0.05 });
         play('deflect');
-        // the deflected blade's sparks kick back the way it came
-        this.effects.spray(pos, swing.clone().negate(), ['#ffffff', '#fff1a0', '#ffd24a'], heavy ? 22 : 14, 10, 0.6);
+        play('deflectRing', vol * Math.min(1, 0.7 + 0.1 * streak));
         d?.model.react('deflect');
         a?.model.react('blocked');
-        // gold: the attacker was turned aside and is open
-        a?.model.flash('#ffc34a', 0.9);
-        stop(heavy ? 100 : 75);
+        // gold on both: the defender's perfect timing, and the attacker turned aside and open
+        a?.model.flash('#ffc34a', 1.2);
+        d?.model.flash('#fff6d0', 0.7);
+        stop(heavy ? 140 : 110, heavy ? 0.05 : 0.035);
         if (mine) {
-          this.cam.shake(heavy ? 0.16 : 0.12, 0.15);
-          this.renderer.flash = heavy ? 0.08 : 0.05;
-          this.renderer.flashColor.set('#ffc34a');
+          this.cam.shake(heavy ? 0.22 : 0.16, 0.2);
+          // a punch in on the clash
+          this.cam.punchIn(this.tmp.copy(pos).setY(pos.y - 1.2));
+          this.renderer.flash = (heavy ? 0.16 : 0.12) * Math.min(1.6, big);
+          this.renderer.flashColor.set('#ffe7a0');
         }
         if (meD) {
-          this.ui.floatText('DEFLECT', pos.x, pos.y + 0.4, pos.z, 'good big', '弾');
+          this.ui.floatText(streak > 1 ? `DEFLECT ×${streak}` : 'DEFLECT', pos.x, pos.y + 0.4, pos.z, streak > 2 ? 'good huge' : 'good big', '弾');
           this.local?.onDeflected();
         }
-        else if (meA) this.ui.floatText('DEFLECTED', pos.x, pos.y + 0.4, pos.z, 'bad');
+        else if (meA) this.ui.floatText('DEFLECTED', pos.x, pos.y + 0.4, pos.z, 'bad big', '弾');
         break;
+      }
       case 'block':
         this.effects.burst(pos, { count: 12, color: ['#ffb04a', '#ff8a2a', '#ffe0a0'], speed: 5, life: 0.35, size: 0.06 });
         play('block');
