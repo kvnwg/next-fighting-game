@@ -5,6 +5,7 @@
  */
 import { AttackAnim, WeaponKind } from '../../../shared/characters';
 import { MoveDef, Style } from './author';
+import { daggers } from './moves/daggers';
 import { gauntlets } from './moves/gauntlets';
 import { greathammer } from './moves/greathammer';
 import { katana } from './moves/katana';
@@ -22,7 +23,7 @@ export const STYLES: Record<WeaponKind, Style> = {
   greathammer,
   rapier,
   spear,
-  daggers: LEGACY.daggers,
+  daggers,
   scythe: LEGACY.scythe,
   gauntlets,
   swordShield,
