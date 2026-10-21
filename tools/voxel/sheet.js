@@ -33,7 +33,7 @@ export function splatter(ctx, w, h, seed, ink = [18, 18, 20], scale = 1, density
   }
 }
 
-// rows: [[view, ...], ...]; view = { id, title, sub, model, poses, pose, dir, x: [l, r], y?: [b, t] }
+// rows: [[view, ...], ...]; view = { id, title, sub, model, poses, pose, dir, x: [l, r], y?: [b, t], px? }
 // `x` is measured along the camera's right axis.
 // accent: optional second splatter colour (sparser), e.g. [200, 40, 58] for red ink.
 export function renderSheet(container, { px, y = [-3, 91], rows, ink, accent, splatterScale = 1 }) {
@@ -60,7 +60,8 @@ export function renderSheet(container, { px, y = [-3, 91], rows, ink, accent, sp
     container.append(rowEl);
     for (const v of row) {
       const [y0, y1] = v.y ?? y;
-      const w = Math.round((v.x[1] - v.x[0]) * px), h = Math.round((y1 - y0) * px);
+      const vpx = v.px ?? px; // per-view zoom, e.g. for small props
+      const w = Math.round((v.x[1] - v.x[0]) * vpx), h = Math.round((y1 - y0) * vpx);
       const fig = document.createElement('figure');
       fig.id = `panel-${v.id}`;
       const canvas = document.createElement('canvas');
@@ -93,8 +94,8 @@ export function renderSheet(container, { px, y = [-3, 91], rows, ink, accent, sp
       if (accent) splatter(ctx, w, h, 4321 + n * 31, accent, splatterScale * 0.8, 0.25);
       n++;
       // soft ground shadow
-      const gy = y1 * px;
-      const rx = Math.min(w * 0.45, 22 * px);
+      const gy = y1 * vpx;
+      const rx = Math.min(w * 0.45, 22 * vpx);
       ctx.save();
       ctx.scale(1, 0.18);
       const grad = ctx.createRadialGradient(w / 2, gy / 0.18, 2, w / 2, gy / 0.18, rx);

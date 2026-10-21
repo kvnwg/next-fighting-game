@@ -11,7 +11,7 @@ Each character lives in `characters/<name>/`:
 - `renders/` — PNG output of the sheet
 - `export/` — MagicaVoxel `.vox` of each model's T-pose and a `_rig.json` (bones, pivots, per-bone voxels)
 
-Characters: `ronin`, `warden`, `wraith`, `lancer`.
+Characters: `ronin`, `warden`, `wraith`, `lancer`, `assassin`.
 
 Shared tooling is in `tools/voxel/`. To regenerate:
 
