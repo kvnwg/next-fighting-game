@@ -7,6 +7,7 @@
 import { CHARACTERS, CHARACTER_IDS, CharacterId } from '../shared/characters';
 import { MAPS } from '../shared/maps';
 import type { SelectView } from '../shared/protocol';
+import { icon } from './pixelicons';
 import bamboo from './assets/maps/bamboo.jpg';
 import bridge from './assets/maps/bridge.jpg';
 import forge from './assets/maps/forge.jpg';
@@ -72,16 +73,16 @@ export class SelectScreen {
       const art = THUMBS[id] ? `<img class="sel-art" src="${THUMBS[id]}" alt="" draggable="false">` : '';
       return `<button class="sel-tile" data-map="${id}">${art}<span class="sel-jp">${esc(m?.jp ?? '')}</span><span class="sel-label">${esc(m?.name ?? id)}</span><span class="sel-badges"></span></button>`;
     };
-    const random = `<button class="sel-tile random" data-map="random"><svg class="sel-random" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></svg><span class="sel-label">Random</span><span class="sel-badges"></span></button>`;
+    const random = `<button class="sel-tile random" data-map="random">${icon('dice', 'sel-random')}<span class="sel-label">Random</span><span class="sel-badges"></span></button>`;
     const charCard = (id: CharacterId) => {
       const c = CHARACTERS[id];
-      return `<button class="sel-card" data-char="${id}" title="${esc(`${c.name} · ${c.weapon}`)}"><img class="sel-art" src="${this.portrait(id)}" alt="" draggable="false"><span class="sel-jp">${c.jp}</span><span class="sel-label">${esc(c.name)}</span><span class="sel-badges"></span></button>`;
+      return `<button class="sel-card" data-char="${id}" style="--c2:${c.palette.accent}" title="${esc(`${c.name} · ${c.weapon}`)}"><img class="sel-art" src="${this.portrait(id)}" alt="" draggable="false"><span class="sel-jp">${c.jp}</span><span class="sel-label">${esc(c.name)}</span><span class="sel-badges"></span></button>`;
     };
     const el = document.createElement('div');
     el.className = 'select-screen';
     el.innerHTML = `
       <div class="sel-band">
-        <h2 class="sel-title"><span class="jp">選択</span>Select Map &amp; Fighter</h2>
+        <h2 class="sel-title">${icon('swords')}<span class="jp">選択</span>Select Map &amp; Fighter</h2>
         <div class="sel-count"></div>
         <div class="sel-maps">${random}${v.maps.map(mapTile).join('')}</div>
       </div>
@@ -104,7 +105,7 @@ export class SelectScreen {
       const s = v.sides[side];
       const char = v.votes.char[side] ?? s.char;
       const label = side === me ? '<b>You</b>' : '';
-      return `<span class="sel-badge ${side === me ? 'mine' : 'theirs'}" title="${esc(s.name)}"><img src="${this.portrait(char)}" alt="">${label}</span>`;
+      return `<span class="sel-badge ${side === me ? 'mine' : 'theirs'}" style="--c2:${CHARACTERS[char].palette.accent}" title="${esc(s.name)}"><img src="${this.portrait(char)}" alt="">${label}</span>`;
     };
     const mark = (tile: HTMLElement, mine: boolean, theirs: boolean) => {
       tile.classList.toggle('mine', mine);

@@ -4,6 +4,7 @@
  * appears once its meter has filled.
  */
 import { Bind, Input } from './input';
+import { icon } from './pixelicons';
 
 /** Touch-first device (or forced with ?touch / ?touch=0). */
 export function isTouchDevice(): boolean {
@@ -26,8 +27,8 @@ const STICK_R = 50;
 /** touch drag pixels -> mouse-equivalent pixels for the camera */
 const LOOK_GAIN = 2.4;
 
-const ICON_MENU = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>`;
-const ICON_CHAT = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H10l-5 4v-4H4z" /><path d="M8 9h8M8 12h5" /></svg>`;
+const ICON_MENU = icon('menu');
+const ICON_CHAT = icon('chat');
 
 export class TouchControls {
   readonly root: HTMLElement;

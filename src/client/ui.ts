@@ -5,6 +5,7 @@ import { BotDifficulty, LeaderboardEntry, MatchMode, ProfileView, RosterEntry, S
 import { PLACEMENT_MATCHES, RankInfo, TIERS, rankOf } from '../shared/ranks';
 import { CANCELS, CANCEL_NAMES, CancelInto, CancelWindow, MoveClass } from '../shared/cancels';
 import { LobbyBar } from './lobbybar';
+import { ICON, IconName, icon, pixelSVG, recolor } from './pixelicons';
 import { settings } from './settings';
 
 const h = (html: string): HTMLElement => {
@@ -16,8 +17,19 @@ const h = (html: string): HTMLElement => {
 export const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-/** A button label with its kanji tag in front. */
-const jpLabel = (kanji: string, text: string) => `<span class="bk">${kanji}</span>${text}`;
+/** A button label with its kanji tag (or a pixel icon) in front. */
+const jpLabel = (kanji: string, text: string, ico?: IconName) => `${ico ? icon(ico) : `<span class="bk">${kanji}</span>`}${text}`;
+
+/** A heading with its icon in front. */
+const iconHead = (ico: IconName, text: string) => `<h4 class="ih">${icon(ico)}<span>${text}</span></h4>`;
+
+// medals for the top three of the ladder: gold, silver, bronze
+const MEDALS = [pixelSVG(ICON.medal, { cls: 'medal' }), pixelSVG(recolor(ICON.medal, 'g', 's'), { cls: 'medal' }), pixelSVG(recolor(ICON.medal, 'g', 'n'), { cls: 'medal' })];
+
+const TOAST_ICON: Record<'info' | 'warn' | 'good', IconName> = { info: 'info', warn: 'peril', good: 'check' };
+
+/** The pixel shield of the posture bar, whole and cracked (the bar's state picks one). */
+const POSTURE_SHIELD = `<span class="pm-shield">${icon('shield', 'pm-whole')}${icon('shieldCracked', 'pm-cracked')}</span>`;
 
 export function rankBadge(r: RankInfo, small = false): string {
   const label = r.placed ? r.label : small ? 'Unranked' : r.label;
@@ -130,24 +142,24 @@ export class UI {
           <div class="fc-port"><img class="fc-portrait" alt="" /></div>
           <div class="fc-main">
             <div class="fc-top"><span class="fc-n"></span><span class="fc-title"></span><span class="fc-ping"></span></div>
-            <div class="fc-hp"><div class="fc-track"><i class="fc-trail"></i><i class="fc-fill"></i></div></div>
+            <div class="fc-hprow">${icon('heart', 'fc-heart')}<div class="fc-hp"><div class="fc-track"><i class="fc-trail"></i><i class="fc-fill"></i></div></div></div>
             <div class="fc-po"><div class="fc-track"><i class="fc-pofill"></i></div><b class="fc-brk">BROKEN</b></div>
-            <div class="fc-bot"><span class="fc-handle"></span><span class="fc-sp" title="Perilous art"><i class="fc-spfill"></i></span><span class="fc-pips"></span></div>
+            <div class="fc-bot"><span class="fc-handle"></span><span class="fc-spwrap">${icon('flame', 'fc-spico')}<span class="fc-sp" title="Perilous art"><i class="fc-spfill"></i></span></span><span class="fc-pips"></span></div>
           </div>
         </div>
         <div class="fcard opp hidden">
           <div class="fc-port"><img class="fc-portrait" alt="" /></div>
           <div class="fc-main">
             <div class="fc-top"><span class="fc-n"></span><span class="fc-title"></span><span class="fc-ping"></span></div>
-            <div class="fc-hp"><div class="fc-track"><i class="fc-trail"></i><i class="fc-fill"></i></div></div>
+            <div class="fc-hprow">${icon('heart', 'fc-heart')}<div class="fc-hp"><div class="fc-track"><i class="fc-trail"></i><i class="fc-fill"></i></div></div></div>
             <div class="fc-po"><div class="fc-track"><i class="fc-pofill"></i></div><b class="fc-brk">BROKEN</b></div>
-            <div class="fc-bot"><span class="fc-handle"></span><span class="fc-sp" title="Perilous art"><i class="fc-spfill"></i></span><span class="fc-pips"></span></div>
+            <div class="fc-bot"><span class="fc-handle"></span><span class="fc-spwrap">${icon('flame', 'fc-spico')}<span class="fc-sp" title="Perilous art"><i class="fc-spfill"></i></span></span><span class="fc-pips"></span></div>
           </div>
         </div>
         <div class="top-center">
           <div class="match-round hidden"></div>
-          <div class="match-timer hidden">0:00</div>
-          <div class="zone-indicator hidden"><span class="jp">安全地帯</span>Safe zone · PvP disabled</div>
+          <div class="match-timer hidden">${icon('hourglass', 'mt-ico')}<span class="mt-t">0:00</span></div>
+          <div class="zone-indicator hidden">${icon('torii')}<span class="jp">安全地帯</span>Safe zone · PvP disabled</div>
           <div class="net-info"><span id="online"></span><span id="fps"></span></div>
         </div>
         <div class="side-menu">
@@ -159,13 +171,13 @@ export class UI {
           <button class="btn small" id="btn-chars">${jpLabel('武者', 'Characters')}<span class="key"> [C]</span></button>
           <button class="btn small" id="btn-ladder">${jpLabel('番付', 'Ladder')}<span class="key"> [L]</span></button>
           <button class="btn small" id="btn-help">${jpLabel('心得', 'Help')}<span class="key"> [H]</span></button>
-          <button class="btn small danger hidden" id="btn-forfeit">${jpLabel('降参', 'Forfeit')}</button>
+          <button class="btn small danger hidden" id="btn-forfeit">${jpLabel('降参', 'Forfeit', 'broken')}</button>
           <div class="queue-panel hidden">
             <div class="queue-jp">対戦相手探索中</div>
-            <div class="queue-title">${offline ? 'Finding an opponent near your rating…' : 'Searching for a ranked duel…'}</div>
+            <div class="queue-title">${icon('hourglass')}${offline ? 'Finding an opponent near your rating…' : 'Searching for a ranked duel…'}</div>
             <div class="queue-time">0:00</div>
             <div class="queue-count"></div>
-            <button class="btn small" id="btn-cancel">${jpLabel('取消', 'Cancel')}</button>
+            <button class="btn small" id="btn-cancel">${jpLabel('取消', 'Cancel', 'close')}</button>
           </div>
           <div class="esc-hint hidden">Esc to free the cursor</div>
         </div>
@@ -180,36 +192,28 @@ export class UI {
         <div class="death-overlay hidden"><div class="death-kanji">死</div><div class="death-title">Slain</div><div class="death-sub"></div></div>
         <div class="chat">
           <div class="chat-log"></div>
-          <input class="chat-input hidden" maxlength="140" placeholder="Say something… (Enter to send, Esc to cancel)" />
+          <div class="chat-row">${icon('chat', 'chat-ico')}<input class="chat-input hidden" maxlength="140" placeholder="Say something… (Enter to send, Esc to cancel)" /></div>
         </div>
         <div class="posture-main">
           <div class="pm-bar left"><div class="pm-fill"></div></div>
-          <svg class="pm-shield" viewBox="0 0 32 38" aria-hidden="true">
-            <path class="pm-shield-body" d="M16 1 L30 6 V17 C30 27 23 33 16 37 C9 33 2 27 2 17 V6 Z" />
-            <path class="pm-shield-line" d="M16 6 V32" />
-            <path class="pm-crack" d="M9 7 L13 15 L8 21 L12 29 M23 9 L19 17 L24 24" />
-          </svg>
+          ${POSTURE_SHIELD}
           <div class="pm-bar right"><div class="pm-fill"></div></div>
         </div>
         <div class="posture-main foe hidden">
           <div class="pm-bar left"><div class="pm-fill"></div></div>
-          <svg class="pm-shield" viewBox="0 0 32 38" aria-hidden="true">
-            <path class="pm-shield-body" d="M16 1 L30 6 V17 C30 27 23 33 16 37 C9 33 2 27 2 17 V6 Z" />
-            <path class="pm-shield-line" d="M16 6 V32" />
-            <path class="pm-crack" d="M9 7 L13 15 L8 21 L12 29 M23 9 L19 17 L24 24" />
-          </svg>
+          ${POSTURE_SHIELD}
           <div class="pm-bar right"><div class="pm-fill"></div></div>
         </div>
         <div class="hints left">
-          <div class="hint" id="h-dodge"><kbd>Shift</kbd><span class="h-label">Dodge</span><span class="h-cd"></span></div>
-          <div class="hint" id="h-jump"><kbd>Space</kbd><span class="h-label">Jump</span></div>
-          <div class="hint" id="h-special"><kbd>E</kbd><span class="h-label"></span><span class="h-cd"></span></div>
-          <div class="hint" id="h-ability"><kbd>R</kbd><span class="h-label"></span><span class="h-cd"></span></div>
+          <div class="hint" id="h-dodge"><kbd>Shift</kbd>${icon('dash')}<span class="h-label">Dodge</span><span class="h-cd"></span></div>
+          <div class="hint" id="h-jump"><kbd>Space</kbd>${icon('jump')}<span class="h-label">Jump</span></div>
+          <div class="hint" id="h-special"><kbd>E</kbd>${icon('peril')}<span class="h-label"></span><span class="h-cd"></span></div>
+          <div class="hint" id="h-ability"><kbd>R</kbd>${icon('bolt')}<span class="h-label"></span><span class="h-cd"></span></div>
         </div>
         <div class="hints right">
-          <div class="hint"><span class="h-label">Parry / (Hold) Block</span><kbd>F</kbd></div>
-          <div class="hint"><span class="h-label">Light / Heavy</span><kbd>M1</kbd><kbd>M2</kbd></div>
-          <div class="hint"><span class="h-label">Lock on</span><kbd>Tab</kbd></div>
+          <div class="hint"><span class="h-label">Parry / (Hold) Block</span>${icon('shield')}<kbd>F</kbd></div>
+          <div class="hint"><span class="h-label">Light / Heavy</span>${icon('sword')}<kbd>M1</kbd><kbd>M2</kbd></div>
+          <div class="hint"><span class="h-label">Lock on</span>${icon('target')}<kbd>Tab</kbd></div>
         </div>
         <div class="click-hint hidden">Click the game to capture the mouse</div>
         <div class="rotate-hint">Turn your device sideways to play</div>
@@ -244,6 +248,7 @@ export class UI {
       fps: '#fps',
       zone: '.zone-indicator',
       timer: '.match-timer',
+      timerText: '.mt-t',
       round: '.match-round',
       selfCard: '.fcard.self',
       oppCard: '.fcard.opp',
@@ -289,14 +294,14 @@ export class UI {
     forfeit.addEventListener('click', () => {
       if (performance.now() < armedUntil) {
         armedUntil = 0;
-        forfeit.innerHTML = jpLabel('降参', 'Forfeit');
+        forfeit.innerHTML = jpLabel('降参', 'Forfeit', 'broken');
         this.handlers.onForfeit();
         return;
       }
       armedUntil = performance.now() + 3000;
-      forfeit.innerHTML = jpLabel('降参', this.touch ? 'Tap again to forfeit' : 'Click again to forfeit');
+      forfeit.innerHTML = jpLabel('降参', this.touch ? 'Tap again to forfeit' : 'Click again to forfeit', 'broken');
       setTimeout(() => {
-        if (performance.now() >= armedUntil) forfeit.innerHTML = jpLabel('降参', 'Forfeit');
+        if (performance.now() >= armedUntil) forfeit.innerHTML = jpLabel('降参', 'Forfeit', 'broken');
       }, 3100);
     });
     this.chatInput.addEventListener('keydown', (e) => {
@@ -505,7 +510,7 @@ export class UI {
     let secs = 0;
     if (m.phase === 'fight') secs = Math.max(0, Math.ceil((m.endsAt - serverNow) / 1000));
     this.setText(this.els.round, `Round ${m.round}`);
-    this.setText(this.els.timer, m.phase === 'fight' ? (secs >= 100 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : String(secs)) : '—');
+    this.setText(this.els.timerText, m.phase === 'fight' ? (secs >= 100 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : String(secs)) : '—');
     this.els.timer.classList.toggle('urgent', m.phase === 'fight' && secs <= 10);
   }
 
@@ -556,14 +561,14 @@ export class UI {
   }
 
   toast(text: string, kind: 'info' | 'warn' | 'good' = 'info'): void {
-    const el = h(`<div class="toast ${kind}">${esc(text)}</div>`);
+    const el = h(`<div class="toast ${kind}">${icon(TOAST_ICON[kind])}<span>${esc(text)}</span></div>`);
     this.toastBox.appendChild(el);
     setTimeout(() => el.classList.add('out'), 3200);
     setTimeout(() => el.remove(), 3700);
   }
 
   killFeed(killer: string, victim: string, how: string): void {
-    const el = h(`<div class="feed-row">${killer ? `<b>${esc(killer)}</b> ` : ''}<span class="muted">${esc(how)}</span> <b>${esc(victim)}</b></div>`);
+    const el = h(`<div class="feed-row">${killer ? `<b>${esc(killer)}</b> ` : ''}${icon('sword')}<span class="muted">${esc(how)}</span> <b>${esc(victim)}</b></div>`);
     this.feed.prepend(el);
     while (this.feed.children.length > 5) this.feed.lastElementChild!.remove();
     setTimeout(() => el.remove(), 7000);
@@ -668,9 +673,9 @@ export class UI {
   showChallenge(from: string, name: string, char: CharacterId): void {
     this.challengeFrom = from;
     const el = this.els.challenge;
-    el.innerHTML = `<div class="ch-seal" aria-hidden="true">挑</div><div class="ch-head">挑戦状 · A challenge</div>
+    el.innerHTML = `<div class="ch-seal" aria-hidden="true">挑</div><div class="ch-head">${icon('swords')}挑戦状 · A challenge</div>
       <div><b>${esc(name)}</b> (${CHARACTERS[char].name}) challenges you to a duel!</div>
-      <div class="row"><button class="btn small" data-a="1">${jpLabel('受', 'Accept')}<span class="key"> [Y]</span></button><button class="btn small danger" data-a="0">${jpLabel('断', 'Decline')}<span class="key"> [N]</span></button></div>`;
+      <div class="row"><button class="btn small" data-a="1">${jpLabel('受', 'Accept', 'check')}<span class="key"> [Y]</span></button><button class="btn small danger" data-a="0">${jpLabel('断', 'Decline', 'close')}<span class="key"> [N]</span></button></div>`;
     el.classList.remove('hidden');
     el.querySelectorAll('button').forEach((b) =>
       b.addEventListener('click', () => this.answerChallenge((b as HTMLElement).dataset.a === '1')),
@@ -709,10 +714,10 @@ export class UI {
     this.handlers.onModalChange(false);
   }
 
-  private frame(title: string, body: string, wide = false, kanji = ''): void {
+  private frame(title: string, body: string, wide = false, kanji = '', ico?: IconName): void {
     this.preview?.dispose();
     this.preview = null;
-    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''}"><div class="modal-head"><h2>${kanji ? `<span class="mk">${kanji}</span>` : ''}${title}</h2><button class="btn small close">✕<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
+    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''}"><div class="modal-head"><h2>${ico ? icon(ico, 'mh-ico') : ''}${kanji ? `<span class="mk">${kanji}</span>` : ''}${title}</h2><button class="btn small close" aria-label="Close">${icon('close')}<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
     this.modal.classList.remove('hidden');
     this.modal.querySelector('.close')!.addEventListener('click', () => this.closeModal());
   }
@@ -730,7 +735,7 @@ export class UI {
     this.handlers.onModalChange(true);
     if (kind === 'chars') this.renderChars(currentChar);
     else if (kind === 'ladder') {
-      this.frame('Ranked Ladder', `<div class="ladder">Loading…</div>`, false, '番付');
+      this.frame('Ranked Ladder', `<div class="ladder">Loading…</div>`, false, '番付', 'ladder');
       this.handlers.onLeaderboard();
     } else this.renderHelp();
   }
@@ -739,13 +744,13 @@ export class UI {
     const cards = CHARACTER_IDS.map((id) => {
       const c = CHARACTERS[id];
       return `<button class="char-card ${id === selected ? 'sel' : ''}" data-id="${id}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}">
-        <div class="cc-swatch"></div><span class="cc-jp" aria-hidden="true">${c.jp}</span><div class="cc-name">${c.name}</div><div class="cc-weapon">${c.weapon}</div></button>`;
+        <span class="cc-port"><img src="${this.handlers.portrait(id)}" alt="" draggable="false"></span><span class="cc-text"><span class="cc-jp" aria-hidden="true">${c.jp}</span><span class="cc-name">${c.name}</span><span class="cc-weapon">${c.weapon}</span></span></button>`;
     }).join('');
-    this.frame('Choose your fighter', `<div class="char-select"><div class="char-grid">${cards}</div><div class="char-detail"></div></div>`, true, '武者');
+    this.frame('Choose your fighter', `<div class="char-select"><div class="char-grid">${cards}</div><div class="char-detail"></div></div>`, true, '武者', 'fighters');
     const detail = this.modal.querySelector<HTMLElement>('.char-detail')!;
     const show = (id: CharacterId) => {
       const c = CHARACTERS[id];
-      const bar = (label: string, v: number) => `<div class="rating"><span>${label}</span><div>${'<i class="on"></i>'.repeat(v)}${'<i></i>'.repeat(5 - v)}</div></div>`;
+      const bar = (ico: IconName, label: string, v: number) => `<div class="rating">${icon(ico)}<span>${label}</span><div>${'<i class="on"></i>'.repeat(v)}${'<i></i>'.repeat(5 - v)}</div></div>`;
       const atkRow = (name: string, dmg: number, extra = '') => `<li><b>${esc(name)}</b> <span class="muted">${dmg} dmg${extra}</span></li>`;
       detail.innerHTML = `
         <div class="cd-top">
@@ -754,21 +759,21 @@ export class UI {
             <h3><span class="cd-jp">${c.jp}</span>${c.name} <span class="muted">· ${c.weapon}</span></h3>
             <div class="role">${c.role}</div>
             <p>${esc(c.description)}</p>
-            <div class="cd-stats">HP ${c.stats.hp} · Posture ${c.stats.posture} · Speed ${c.stats.speed}</div>
-            ${bar('Power', c.ratings.power)}${bar('Speed', c.ratings.speed)}${bar('Reach', c.ratings.reach)}${bar('Defense', c.ratings.defense)}${bar('Difficulty', c.ratings.difficulty)}
+            <div class="cd-stats"><span>${icon('heart')}HP ${c.stats.hp}</span><span>${icon('shield')}Posture ${c.stats.posture}</span><span>${icon('dash')}Speed ${c.stats.speed}</span></div>
+            ${bar('fist', 'Power', c.ratings.power)}${bar('bolt', 'Speed', c.ratings.speed)}${bar('target', 'Reach', c.ratings.reach)}${bar('shield', 'Defense', c.ratings.defense)}${bar('skull', 'Difficulty', c.ratings.difficulty)}
           </div>
         </div>
         <div class="moves">
-          <div><h4>Light chain [LMB ×3]</h4><ul>${c.lights.map((l) => atkRow(l.name, l.damage * (l.hits ?? 1))).join('')}</ul>
-            <h4>Heavy chain [RMB ×3]</h4><ul>${[c.heavy, c.extra.h1, c.extra.h2].map((h, i) => atkRow(h.name, h.damage * (h.hits ?? 1), i === 0 && h.feintable ? ' · feint with F' : '')).join('')}</ul></div>
-          <div><h4>Dash [dodge forward, then LMB / RMB]</h4><ul>${atkRow(c.extra.dl.name, c.extra.dl.damage * (c.extra.dl.hits ?? 1))}${atkRow(c.extra.dh.name, c.extra.dh.damage)}</ul>
-            <h4>Backstep [walk away + LMB / RMB]</h4><ul>${atkRow(c.extra.bl.name, c.extra.bl.damage)}${atkRow(c.extra.bh.name, c.extra.bh.damage)}</ul>
-            <h4>Air [jump, then LMB / RMB]</h4><ul>${atkRow(c.extra.jl.name, c.extra.jl.damage)}${atkRow(c.extra.jh.name, c.extra.jh.damage)}</ul>
-            <h4>Perilous [E]</h4><ul>${atkRow(c.special.name, c.special.damage, ` · ${c.special.cooldown / 1000}s`)}<li class="tip">${PERILOUS_TIP[c.special.perilous!]}</li></ul></div>
-          <div><h4>Ability [R] · ${c.ability.name}</h4><p>${esc(c.ability.description)} <span class="muted">(${c.ability.cooldown / 1000}s)</span></p>
-            <h4>Passive · ${c.passive.name}</h4><p>${esc(c.passive.description)}</p></div>
+          <div>${iconHead('sword', 'Light chain [LMB ×3]')}<ul>${c.lights.map((l) => atkRow(l.name, l.damage * (l.hits ?? 1))).join('')}</ul>
+            ${iconHead('hammer', 'Heavy chain [RMB ×3]')}<ul>${[c.heavy, c.extra.h1, c.extra.h2].map((h, i) => atkRow(h.name, h.damage * (h.hits ?? 1), i === 0 && h.feintable ? ' · feint with F' : '')).join('')}</ul></div>
+          <div>${iconHead('dash', 'Dash [dodge forward, then LMB / RMB]')}<ul>${atkRow(c.extra.dl.name, c.extra.dl.damage * (c.extra.dl.hits ?? 1))}${atkRow(c.extra.dh.name, c.extra.dh.damage)}</ul>
+            ${iconHead('back', 'Backstep [walk away + LMB / RMB]')}<ul>${atkRow(c.extra.bl.name, c.extra.bl.damage)}${atkRow(c.extra.bh.name, c.extra.bh.damage)}</ul>
+            ${iconHead('jump', 'Air [jump, then LMB / RMB]')}<ul>${atkRow(c.extra.jl.name, c.extra.jl.damage)}${atkRow(c.extra.jh.name, c.extra.jh.damage)}</ul>
+            ${iconHead('peril', 'Perilous [E]')}<ul>${atkRow(c.special.name, c.special.damage, ` · ${c.special.cooldown / 1000}s`)}<li class="tip">${PERILOUS_TIP[c.special.perilous!]}</li></ul></div>
+          <div>${iconHead('bolt', `Ability [R] · ${c.ability.name}`)}<p>${esc(c.ability.description)} <span class="muted">(${c.ability.cooldown / 1000}s)</span></p>
+            ${iconHead('eye', `Passive · ${c.passive.name}`)}<p>${esc(c.passive.description)}</p></div>
         </div>
-        <div class="cd-actions"><button class="btn big" id="pick-char">${jpLabel('選', `Play ${c.name}`)}</button><span class="muted">Switch characters inside the lobby safe zone.</span></div>`;
+        <div class="cd-actions"><button class="btn big" id="pick-char">${jpLabel('選', `Play ${c.name}`, 'swords')}</button><span class="muted">Switch characters inside the lobby safe zone.</span></div>`;
       detail.querySelector('#pick-char')!.addEventListener('click', () => {
         this.handlers.onSelectChar(id);
         this.closeModal();
@@ -796,14 +801,15 @@ export class UI {
       .map((e, i) => {
         const r = rankOf(e.mmr, e.placements);
         const mine = me && e.name === me.name && e.mmr === me.mmr;
-        return `<tr class="${mine ? 'mine' : ''}"><td>${i + 1}</td><td>${esc(e.name)}</td><td>${rankBadge(r, true)}</td><td>${e.mmr}</td><td>${e.wins}-${e.losses}</td></tr>`;
+        return `<tr class="${mine ? 'mine' : ''}"><td class="lp">${i < 3 ? MEDALS[i] : ''}${i + 1}</td><td>${esc(e.name)}</td><td>${rankBadge(r, true)}</td><td>${e.mmr}</td><td>${e.wins}-${e.losses}</td></tr>`;
       })
       .join('');
     const tiers = TIERS.map((t) => `<span class="rank-badge small" style="--rank:${t.color}"><i></i>${t.name} ${t.min}+</span>`).join(' ');
+    const th = (ico: IconName | null, label: string) => `<th>${ico ? icon(ico) : ''}${label}</th>`;
     const meRank = me ? rankOf(me.mmr, me.placements) : null;
     box.innerHTML = `
-      <div class="ladder-you">${me && meRank ? `You: ${rankBadge(meRank)} ${meRank.placed ? `${me.mmr} MMR · #${you ?? '?'} of ${total}` : `play ${PLACEMENT_MATCHES - me.placements} more ranked match(es) to place`}` : ''}</div>
-      ${entries.length ? `<table><thead><tr><th>#</th><th>Name</th><th>Rank</th><th>MMR</th><th>W-L</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted">Nobody has finished placements yet. Be the first!</p>'}
+      <div class="ladder-you">${me && meRank ? `${icon('crown')}You: ${rankBadge(meRank)} ${meRank.placed ? `${me.mmr} MMR · #${you ?? '?'} of ${total}` : `play ${PLACEMENT_MATCHES - me.placements} more ranked match(es) to place`}` : ''}</div>
+      ${entries.length ? `<table><thead><tr>${th(null, '#')}${th(null, 'Name')}${th('star', 'Rank')}${th('gauge', 'MMR')}${th('swords', 'W-L')}</tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted">Nobody has finished placements yet. Be the first!</p>'}
       <div class="tiers">${tiers}</div>
       <p class="muted">${
         this.offline
@@ -819,7 +825,7 @@ export class UI {
       `<div class="help">
         <div class="help-cols">
           <div>
-            <h4>Controls</h4>
+            ${iconHead('keys', 'Controls')}
             ${
               this.touch
                 ? `<table class="keys">
@@ -834,7 +840,7 @@ export class UI {
               <tr><td>Small button</td><td>Character ability</td></tr>
               <tr><td>Lock</td><td>Lock on</td></tr>
               <tr><td>Prompt</td><td>Tap it to challenge the player in front of you</td></tr>
-              <tr><td>☰</td><td>Menu: ranked, practice, characters, ladder</td></tr>
+              <tr><td>${icon('menu')}</td><td>Menu: ranked, practice, characters, ladder</td></tr>
             </table>`
                 : ''
             }
@@ -856,33 +862,34 @@ export class UI {
             </table>
           </div>
           <div>
-            <h4>Posture & deflects</h4>
+            ${iconHead('shield', 'Posture & deflects')}
             <p>Every fighter has <b>health</b> and <b>posture</b>. Blocking a hit costs posture. <b>Deflecting</b> (pressing guard just before the hit lands) costs almost nothing and instead hammers the attacker's posture, staggering them for a free counter.</p>
             <p>When posture fills up you are <b>posture broken</b>: helpless for a moment, and the next hit is a <b>Deathblow</b> for ${40} damage. Posture recovers slowly, and only once you stop: not while you attack, dodge or reel, and not until a while after the last posture damage (faster while guarding, slower when hurt). After a break, the guard comes back whole.</p>
             <p>Mashing guard shrinks your deflect window. Read the swing, then commit.</p>
-            <h4>Perilous attacks <span class="kanji">危</span></h4>
+            ${iconHead('peril', 'Perilous attacks <span class="kanji">危</span>')}
             <p>A red symbol means an unblockable attack: <b>Thrusts</b> must be deflected — or dodge <i>into</i> them for a Mikiri Counter. <b>Sweeps</b> must be jumped. <b>Grabs</b> must be dodged.</p>
           </div>
         </div>
-        <h4>Cancels</h4>
+        ${iconHead('chain', 'Cancels')}
         <p class="muted">What each attack can be cut short into, in its recovery. "On hit" needs the attack to connect (hit or blocked); "late" opens partway through.</p>
         ${cancelTable()}
-        <h4>The lobby</h4>
+        ${iconHead('torii', 'The lobby')}
         <p>You spawn in the shrine plaza (safe zone). Step outside and anyone can fight you. The training yard (east) has a passive dummy and a sparring dummy that swings at you — perfect for practising deflects.</p>
-        <h4>Arenas</h4><ul class="maps">${maps}</ul>
-        <h4>Settings</h4>
+        ${iconHead('mountain', 'Arenas')}<ul class="maps">${maps}</ul>
+        ${iconHead('settings', 'Settings')}
         <div class="settings">
-          <label>Graphics <select id="set-gfx">${(['auto', 'low', 'medium', 'high', 'ultra'] as const).map((q) => `<option value="${q}" ${settings.graphics === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}</select></label>
-          <label>${this.touch ? 'Look' : 'Mouse'} sensitivity <input type="range" min="0.2" max="3" step="0.1" id="set-sens" value="${settings.sensitivity}"><span id="set-sens-v">${settings.sensitivity}</span></label>
-          <label>Volume <input type="range" min="0" max="1" step="0.05" id="set-vol" value="${settings.volume}"></label>
-          <label><input type="checkbox" id="set-cue" ${settings.parryCue ? 'checked' : ''}> Weapon glint before a hit lands</label>
-          <label><input type="checkbox" id="set-inv" ${settings.invertY ? 'checked' : ''}> Invert ${this.touch ? 'look' : 'mouse'} Y</label>
-          <label><input type="checkbox" id="set-shake" ${settings.reduceShake ? 'checked' : ''}> Reduce camera shake</label>
-          <label><input type="checkbox" id="set-fps" ${settings.showFps ? 'checked' : ''}> Show FPS</label>
+          <label>${icon('screen')}Graphics <select id="set-gfx">${(['auto', 'low', 'medium', 'high', 'ultra'] as const).map((q) => `<option value="${q}" ${settings.graphics === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}</select></label>
+          <label>${icon('mouse')}${this.touch ? 'Look' : 'Mouse'} sensitivity <input type="range" min="0.2" max="3" step="0.1" id="set-sens" value="${settings.sensitivity}"><span id="set-sens-v">${settings.sensitivity}</span></label>
+          <label>${icon('speaker')}Volume <input type="range" min="0" max="1" step="0.05" id="set-vol" value="${settings.volume}"></label>
+          <label>${icon('sparkle')}<input type="checkbox" id="set-cue" ${settings.parryCue ? 'checked' : ''}> Weapon glint before a hit lands</label>
+          <label>${icon('updown')}<input type="checkbox" id="set-inv" ${settings.invertY ? 'checked' : ''}> Invert ${this.touch ? 'look' : 'mouse'} Y</label>
+          <label>${icon('camera')}<input type="checkbox" id="set-shake" ${settings.reduceShake ? 'checked' : ''}> Reduce camera shake</label>
+          <label>${icon('gauge')}<input type="checkbox" id="set-fps" ${settings.showFps ? 'checked' : ''}> Show FPS</label>
         </div>
       </div>`,
       true,
       '心得',
+      'help',
     );
     const bind = <E extends HTMLInputElement | HTMLSelectElement = HTMLInputElement>(id: string, apply: (el: E) => void) => {
       const el = this.modal.querySelector<E>(id)!;
@@ -914,9 +921,10 @@ export class UI {
     const card = (r: RosterEntry, mine: boolean) => {
       const c = CHARACTERS[r.char];
       const rank = r.mmr !== undefined ? rankBadge(rankOf(r.mmr, r.placements ?? 0), true) : '<span class="muted">AI</span>';
-      return `<div class="vs-card ${mine ? 'mine' : ''}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}"><span class="vs-jp" aria-hidden="true">${c.jp}</span><div class="vs-char">${c.name}</div><div class="vs-weapon">${c.weapon}</div><div class="vs-name">${esc(r.name)}</div>${rank}</div>`;
+      return `<div class="vs-card ${mine ? 'mine' : ''}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}"><span class="vs-jp" aria-hidden="true">${c.jp}</span><span class="vs-port"><img src="${this.handlers.portrait(r.char)}" alt=""></span><div class="vs-char">${c.name}</div><div class="vs-weapon">${c.weapon}</div><div class="vs-name">${esc(r.name)}</div>${rank}</div>`;
     };
-    const el = h(`<div class="match-intro"><div class="mi-mode"><span class="jp">${titleJp}</span>${title}</div><div class="mi-jp">${map?.jp ?? ''}</div><div class="mi-map">${map?.name ?? ''}</div>
+    const modeIcon: IconName = mode === 'ranked' ? 'crown' : mode === 'practice' ? 'dummy' : 'swords';
+    const el = h(`<div class="match-intro"><div class="mi-mode">${icon(modeIcon)}<span class="jp">${titleJp}</span>${title}</div><div class="mi-jp">${map?.jp ?? ''}</div><div class="mi-map">${map?.name ?? ''}</div>
       <div class="mi-vs">${card(players[you], true)}<div class="vs">対</div>${card(players[you === 0 ? 1 : 0], false)}</div>
       <div class="mi-desc">${esc(map?.description ?? '')}</div></div>`);
     this.hud.appendChild(el);
@@ -953,7 +961,7 @@ export class UI {
       const changed = after.placed && before.label !== after.label;
       const promo = after.placed && (!before.placed || r.delta > 0);
       ratingHtml = `<div class="res-rating">
-        <div class="res-delta ${r.delta >= 0 ? 'up' : 'down'}">${r.delta >= 0 ? '+' : ''}${r.delta} MMR</div>
+        <div class="res-delta ${r.delta >= 0 ? 'up' : 'down'}">${icon(r.delta >= 0 ? 'up' : 'down')}${r.delta >= 0 ? '+' : ''}${r.delta} MMR</div>
         <div>${r.before.mmr} → <b>${r.after.mmr}</b></div>
         <div class="res-rank">${rankBadge(after)}</div>
         ${changed ? `<div class="res-promo ${promo ? 'up' : 'down'}">${!before.placed && after.placed ? 'PLACED!' : promo ? 'RANK UP!' : 'Demoted'}</div>` : ''}
@@ -963,6 +971,7 @@ export class UI {
     const reason = r.reason === 'forfeit' ? (r.won ? 'Opponent forfeited' : 'You forfeited') : r.reason === 'timeout' ? 'Time' : '';
     const el = h(`<div class="result ${r.won ? 'win' : 'lose'}">
       <div class="res-jp">${r.won ? '勝利' : '敗北'}</div>
+      <div class="res-icon">${icon(r.won ? 'crown' : 'skull')}</div>
       <div class="res-title">${r.won ? 'VICTORY' : 'DEFEAT'}</div>
       <div class="res-score">${r.scores.join(' - ')}${reason ? ` · ${reason}` : ''}</div>
       ${ratingHtml}
