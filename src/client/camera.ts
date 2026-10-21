@@ -10,15 +10,58 @@ export const CAMERA_FOV = 50;
 /** Sideways offset of the camera (and its aim) to the player's right, in metres. */
 const SHOULDER = 1.4;
 
+/** A camera pose for cinematic shots. */
+export interface CamPose {
+  pos: THREE.Vector3;
+  look: THREE.Vector3;
+  fov: number;
+  /** who must stay in view when that isn't what it looks at: the pose is pulled in front of props in between */
+  subject?: THREE.Vector3;
+}
+
+export interface Shot {
+  duration: number;
+  from: CamPose;
+  to: CamPose;
+  /** the camera's path bends toward this point (a quadratic Bezier), e.g. to swing round someone */
+  via?: THREE.Vector3;
+  /** the same for where it looks: at `from.look` here, the view lingers before panning on */
+  lookVia?: THREE.Vector3;
+}
+
+interface Shake {
+  amp: number;
+  roll: number;
+  dur: number;
+  t: number;
+  seed: number;
+}
+
+/** Punch-in: in fast, hold on the moment, ease back out. */
+const PUNCH_IN = 0.08;
+const PUNCH_HOLD = 0.35;
+const PUNCH_OUT = 0.3;
+const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
 export class CameraRig {
   yaw = 0;
   pitch = 0.4;
   distance = 6.6;
-  private shakeT = 0;
-  private shakeAmp = 0;
+  /** settings ("reduce camera shake") and device scaling for shake and punch-ins */
+  shakeScale = 1;
+  private shakes: Shake[] = [];
+  private time = 0;
   private pos = new THREE.Vector3();
   private look = new THREE.Vector3();
   private initialized = false;
+  private fov = CAMERA_FOV;
+  private roll = 0;
+  private punchT = -1;
+  private punchTarget = new THREE.Vector3();
+  private kickOffset = new THREE.Vector3();
+  private kickVel = new THREE.Vector3();
+  private shots: Shot[] = [];
+  private shotT = 0;
 
   constructor(readonly camera: THREE.PerspectiveCamera) {
     camera.fov = CAMERA_FOV;
@@ -35,9 +78,37 @@ export class CameraRig {
     this.distance = clamp(this.distance + dy * 0.004, 3.2, 11);
   }
 
+  /** Shakes add up (one never cuts another short); smooth noise with a little roll, fading out. */
   shake(amount: number, time = 0.25): void {
-    this.shakeAmp = Math.max(this.shakeAmp, amount);
-    this.shakeT = Math.max(this.shakeT, time);
+    if (this.shakes.length > 8) this.shakes.shift();
+    this.shakes.push({ amp: amount * 0.55, roll: amount * 0.12, dur: Math.max(0.05, time * 1.2), t: 0, seed: Math.random() * 100 });
+  }
+
+  /** Swoop halfway in on a big moment (a deathblow, a broken guard), narrowing and tilting the view. */
+  punchIn(at: THREE.Vector3): void {
+    if (this.shakeScale < 0.5) return;
+    this.punchT = 0;
+    this.punchTarget.set(at.x, at.y + 1.2, at.z);
+  }
+
+  /** Knock the camera along a hit's direction on a spring. */
+  kick(dirX: number, dirZ: number, amount = 0.2): void {
+    this.kickVel.x += dirX * amount * 14 * this.shakeScale;
+    this.kickVel.z += dirZ * amount * 14 * this.shakeScale;
+  }
+
+  /** Play cinematic shots (match intros); the follow camera resumes when they finish. */
+  playShots(shots: Shot[]): void {
+    // the poses the shots start and end on keep clear of props too, so every held frame is clear
+    for (const shot of shots) {
+      for (const p of [shot.from, shot.to]) this.constrain?.(p.subject ?? p.look, p.pos);
+    }
+    this.shots = shots;
+    this.shotT = 0;
+  }
+
+  stopShots(): void {
+    this.shots = [];
   }
 
   snapBehind(yaw: number): void {
@@ -45,35 +116,57 @@ export class CameraRig {
     this.initialized = false;
   }
 
-  /** Optional hook to pull the camera in front of obstacles. Mutates `to`. */
-  constrain: ((from: THREE.Vector3, to: THREE.Vector3) => void) | null = null;
+  /**
+   * Optional hook to pull the camera in front of obstacles. Mutates `to`. Moving shots only keep
+   * inside the walls: a prop crossing the foreground mid-swing is fine, a lurch toward the subject is not.
+   */
+  constrain: ((from: THREE.Vector3, to: THREE.Vector3, wallsOnly?: boolean) => void) | null = null;
 
-  update(dt: number, player: THREE.Vector3, target: THREE.Vector3 | null): void {
-    if (target) {
-      const want = yawTo(player.x, player.z, target.x, target.z);
-      this.yaw += angleDiff(this.yaw, want) * (1 - Math.exp(-dt * 8));
-    }
+  /**
+   * Turn the follow camera to face the target and say where it will rest: the end pose for a
+   * cinematic that hands back to it without a seam.
+   */
+  restPose(player: THREE.Vector3, target: THREE.Vector3): CamPose {
+    this.yaw = yawTo(player.x, player.z, target.x, target.z);
+    const { pos, look, subject } = this.aim(player, target);
+    return { pos, look, fov: CAMERA_FOV, subject };
+  }
+
+  /** Where the follow camera wants to be and to look, at the current yaw. */
+  private aim(player: THREE.Vector3, target: THREE.Vector3 | null) {
     const f = forward(this.yaw);
     const cosP = Math.cos(this.pitch);
-    const desired = new THREE.Vector3(
+    const pos = new THREE.Vector3(
       player.x - f.x * this.distance * cosP,
       player.y + 2.0 + Math.sin(this.pitch) * this.distance,
       player.z - f.z * this.distance * cosP,
     );
     // over the right shoulder so the player doesn't block the opponent
-    desired.x += -Math.cos(this.yaw) * SHOULDER;
-    desired.z += Math.sin(this.yaw) * SHOULDER;
-    if (desired.y < 0.4) desired.y = 0.4;
-    this.constrain?.(new THREE.Vector3(player.x, player.y + 1.6, player.z), desired);
+    pos.x += -Math.cos(this.yaw) * SHOULDER;
+    pos.z += Math.sin(this.yaw) * SHOULDER;
+    if (pos.y < 0.4) pos.y = 0.4;
+    const subject = new THREE.Vector3(player.x, player.y + 1.6, player.z);
+    this.constrain?.(subject, pos);
 
     // aim above the player's head so they sit low in frame; with a target, aim between the two
-    const lookAt = new THREE.Vector3(player.x, player.y + 1.9, player.z);
+    const look = new THREE.Vector3(player.x, player.y + 1.9, player.z);
     if (target) {
-      lookAt.lerp(new THREE.Vector3(target.x, target.y + 1.3, target.z), 0.45);
+      look.lerp(new THREE.Vector3(target.x, target.y + 1.3, target.z), 0.45);
     }
     // aim a little further right than the camera sits, pushing the player toward the left third
-    lookAt.x += -Math.cos(this.yaw) * SHOULDER * 1.3;
-    lookAt.z += Math.sin(this.yaw) * SHOULDER * 1.3;
+    look.x += -Math.cos(this.yaw) * SHOULDER * 1.3;
+    look.z += Math.sin(this.yaw) * SHOULDER * 1.3;
+    return { pos, look, subject };
+  }
+
+  update(dt: number, player: THREE.Vector3, target: THREE.Vector3 | null, opts: { dodging?: boolean } = {}): void {
+    this.time += dt;
+    if (this.shots.length > 0 && this.updateShots(dt)) return;
+    if (target) {
+      const want = yawTo(player.x, player.z, target.x, target.z);
+      this.yaw += angleDiff(this.yaw, want) * (1 - Math.exp(-dt * 8));
+    }
+    const { pos: desired, look: lookAt } = this.aim(player, target);
 
     if (!this.initialized) {
       this.pos.copy(desired);
@@ -84,15 +177,128 @@ export class CameraRig {
       this.pos.lerp(desired, k);
       this.look.lerp(lookAt, 1 - Math.exp(-dt * 20));
     }
-    this.camera.position.copy(this.pos);
-    if (this.shakeT > 0) {
-      this.shakeT -= dt;
-      const a = this.shakeAmp * Math.max(0, this.shakeT) * 4;
-      this.camera.position.x += (Math.random() - 0.5) * a;
-      this.camera.position.y += (Math.random() - 0.5) * a;
-      this.camera.position.z += (Math.random() - 0.5) * a;
-      if (this.shakeT <= 0) this.shakeAmp = 0;
+    const cam = this.camera.position.copy(this.pos);
+    const look = _look.copy(this.look);
+    let fovTarget = CAMERA_FOV + (opts.dodging ? 5 : 0);
+    let roll = 0;
+
+    if (this.punchT >= 0) {
+      this.punchT += dt;
+      const t = this.punchT;
+      const p = t < PUNCH_IN ? t / PUNCH_IN : t < PUNCH_IN + PUNCH_HOLD ? 1 : Math.max(0, 1 - (t - PUNCH_IN - PUNCH_HOLD) / PUNCH_OUT);
+      if (t > PUNCH_IN + PUNCH_HOLD + PUNCH_OUT) this.punchT = -1;
+      const k = easeInOut(p);
+      // halve the boom toward the moment, narrow the view and tilt it a touch
+      _to.subVectors(this.pos, this.punchTarget).multiplyScalar(0.5).add(this.punchTarget);
+      cam.lerp(_to, k);
+      look.lerp(this.punchTarget, k * 0.8);
+      fovTarget -= 12 * k;
+      roll += 0.06 * k;
     }
-    this.camera.lookAt(this.look);
+
+    // kick: a spring offset along the hit
+    this.kickVel.addScaledVector(this.kickOffset, -260 * dt);
+    this.kickVel.multiplyScalar(Math.exp(-18 * dt));
+    this.kickOffset.addScaledVector(this.kickVel, dt);
+    cam.add(this.kickOffset);
+
+    let sx = 0;
+    let sy = 0;
+    let sr = 0;
+    for (const s of this.shakes) {
+      s.t += dt;
+      const env = Math.max(0, 1 - s.t / s.dur) ** 2;
+      const n = (o: number) => Math.sin(this.time * 47 + s.seed + o) * 0.6 + Math.sin(this.time * 83 + s.seed * 1.7 + o) * 0.4;
+      sx += s.amp * env * n(0);
+      sy += s.amp * env * n(2.1);
+      sr += s.roll * env * n(4.2);
+    }
+    this.shakes = this.shakes.filter((s) => s.t < s.dur);
+    // shake sideways relative to the view
+    cam.x += Math.cos(this.yaw) * sx * this.shakeScale;
+    cam.z -= Math.sin(this.yaw) * sx * this.shakeScale;
+    cam.y += sy * this.shakeScale;
+    roll += sr * this.shakeScale;
+
+    this.fov += (fovTarget - this.fov) * (1 - Math.exp(-dt / 0.08));
+    this.roll += (roll - this.roll) * (1 - Math.exp(-dt / 0.05));
+    this.apply(look, this.fov, this.roll);
   }
+
+  private apply(look: THREE.Vector3, fov: number, roll: number): void {
+    this.camera.lookAt(look);
+    if (roll) this.camera.rotateZ(roll);
+    if (Math.abs(this.camera.fov - fov) > 0.01) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  /** Advance the cinematic; true while a shot is still playing. */
+  private updateShots(dt: number): boolean {
+    this.shotT += dt;
+    let shot = this.shots[0];
+    while (this.shotT >= shot.duration) {
+      this.shotT -= shot.duration;
+      this.shots.shift();
+      if (this.shots.length === 0) {
+        // hand back to the follow camera from where the last shot ended
+        this.pos.copy(shot.to.pos);
+        this.look.copy(shot.to.look);
+        this.fov = shot.to.fov;
+        return false;
+      }
+      shot = this.shots[0];
+    }
+    const pose = posed(shot, this.shotT);
+    this.pos.copy(pose.pos);
+    this.look.copy(pose.look);
+    this.constrain?.(this.look, this.pos, true);
+    this.fov = pose.fov;
+    this.camera.position.copy(this.pos);
+    this.apply(this.look, this.fov, 0);
+    return true;
+  }
+}
+
+const _look = new THREE.Vector3();
+const _to = new THREE.Vector3();
+
+const bezier = (a: THREE.Vector3, via: THREE.Vector3, b: THREE.Vector3, k: number) =>
+  new THREE.Vector3().addScaledVector(a, (1 - k) ** 2).addScaledVector(via, 2 * k * (1 - k)).addScaledVector(b, k * k);
+
+/** The camera `t` seconds into a shot. */
+function posed(shot: Shot, t: number): CamPose {
+  const k = easeInOut(clamp(t / shot.duration, 0, 1));
+  const pos = shot.via ? bezier(shot.from.pos, shot.via, shot.to.pos, k) : shot.from.pos.clone().lerp(shot.to.pos, k);
+  const look = shot.lookVia ? bezier(shot.from.look, shot.lookVia, shot.to.look, k) : shot.from.look.clone().lerp(shot.to.look, k);
+  return { pos, look, fov: shot.from.fov + (shot.to.fov - shot.from.fov) * k };
+}
+
+/** Who a cinematic shot frames: where they stand, which way they face and how big they are. */
+export interface ShotSubject {
+  pos: THREE.Vector3;
+  yaw: number;
+  scale: number;
+}
+
+/**
+ * The match intro's camera: a slow push in on the opponent, then on you, then a swing round behind
+ * your shoulder that ends on `end`, the follow camera's resting pose (see `CameraRig.restPose`).
+ */
+export function introShots(me: ShotSubject, op: ShotSubject, end: CamPose): Shot[] {
+  // in front of them, off to their right (side > 0) or left (side < 0)
+  const closeUp = (f: ShotSubject, dist: number, side: number, y: number): THREE.Vector3 => {
+    const fw = forward(f.yaw);
+    return new THREE.Vector3(f.pos.x + fw.x * dist - Math.cos(f.yaw) * side, f.pos.y + y * f.scale, f.pos.z + fw.z * dist + Math.sin(f.yaw) * side);
+  };
+  const chest = (f: ShotSubject) => new THREE.Vector3(f.pos.x, f.pos.y + 1.3 * f.scale, f.pos.z);
+  // both close-ups from the same side of the line between them, so the two face each other on screen;
+  // then the camera swings round your left (never through you) and settles over your right shoulder.
+  // A beat longer than the intro, so the lock-on is in place when the follow camera takes over.
+  return [
+    { duration: 1.2, from: { pos: closeUp(op, 3.2, 1.0, 1.6), look: chest(op), fov: 42 }, to: { pos: closeUp(op, 2.4, 0.7, 1.45), look: chest(op), fov: 40 } },
+    { duration: 1.1, from: { pos: closeUp(me, 3.2, -1.0, 1.6), look: chest(me), fov: 42 }, to: { pos: closeUp(me, 2.4, -0.7, 1.45), look: chest(me), fov: 40 } },
+    { duration: 1.3, from: { pos: closeUp(me, 2.4, -0.7, 1.45), look: chest(me), fov: 40 }, via: closeUp(me, -1.0, -4.0, 2.0), lookVia: chest(me), to: end },
+  ];
 }

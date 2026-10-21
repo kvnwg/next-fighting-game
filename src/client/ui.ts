@@ -328,6 +328,12 @@ export class UI {
     this.hud.classList.add('hidden');
   }
 
+  /** Fill in the name field (a signed-in platform account), unless the player already typed one. */
+  setTitleName(name: string): void {
+    const input = this.title.querySelector<HTMLInputElement>('#name-input');
+    if (input && !input.value) input.value = name.slice(0, 16);
+  }
+
   // ------------------------------------------------------------------ profile & lobby chrome
 
   setProfile(p: ProfileView): void {
@@ -806,6 +812,7 @@ export class UI {
           <label>Volume <input type="range" min="0" max="1" step="0.05" id="set-vol" value="${settings.volume}"></label>
           <label><input type="checkbox" id="set-cue" ${settings.parryCue ? 'checked' : ''}> Weapon glint before a hit lands</label>
           <label><input type="checkbox" id="set-inv" ${settings.invertY ? 'checked' : ''}> Invert ${this.touch ? 'look' : 'mouse'} Y</label>
+          <label><input type="checkbox" id="set-shake" ${settings.reduceShake ? 'checked' : ''}> Reduce camera shake</label>
           <label><input type="checkbox" id="set-fps" ${settings.showFps ? 'checked' : ''}> Show FPS</label>
         </div>
       </div>`,
@@ -834,6 +841,7 @@ export class UI {
     bind('#set-vol', (el) => (settings.volume = Number(el.value)));
     bind('#set-cue', (el) => (settings.parryCue = el.checked));
     bind('#set-inv', (el) => (settings.invertY = el.checked));
+    bind('#set-shake', (el) => (settings.reduceShake = el.checked));
     bind('#set-fps', (el) => (settings.showFps = el.checked));
   }
 

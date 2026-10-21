@@ -48,8 +48,19 @@ class AudioEngine {
     this.setVolume(settings.volume);
   }
 
+  private volume = settings.volume;
+  private mutedBy = new Set<string>();
+
   setVolume(v: number): void {
-    if (this.master) this.master.gain.value = v * 0.6;
+    this.volume = v;
+    if (this.master) this.master.gain.value = this.mutedBy.size ? 0 : v * 0.6;
+  }
+
+  /** Mute for a reason (the platform's setting, an ad playing) until every reason is lifted. */
+  setMuted(reason: string, on: boolean): void {
+    if (on) this.mutedBy.add(reason);
+    else this.mutedBy.delete(reason);
+    this.setVolume(this.volume);
   }
 
   private tone(type: OscillatorType, f0: number, f1: number, dur: number, gain: number, delay = 0, dest?: AudioNode): void {

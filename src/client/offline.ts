@@ -6,24 +6,21 @@ import { Game } from '../server/game';
 import { Profile, Store, StorePersistence } from '../server/store';
 import type { SocketLike } from '../server/entities';
 import type { SocketLike as ClientSocketLike } from './net';
+import { platform } from './platform';
 
 const PROFILES_KEY = 'deflect.offline.profiles.v1';
 
 const localPersistence: StorePersistence = {
   load() {
     try {
-      const raw = localStorage.getItem(PROFILES_KEY);
+      const raw = platform.getItem(PROFILES_KEY);
       return raw ? (JSON.parse(raw) as Profile[]) : [];
     } catch {
       return [];
     }
   },
   save(profiles) {
-    try {
-      localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
-    } catch {
-      // storage blocked (private window): progress just won't persist
-    }
+    platform.setItem(PROFILES_KEY, JSON.stringify(profiles));
   },
 };
 

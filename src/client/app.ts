@@ -7,7 +7,7 @@ import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
 import { audio, Sfx } from './audio';
-import { CameraRig } from './camera';
+import { CameraRig, introShots } from './camera';
 import { buildBlockers, constrainCamera } from './cameraClip';
 import { ClientFighter } from './entities';
 import { Bind, Input } from './input';
@@ -18,6 +18,7 @@ import { Effects } from './render/effects';
 import { PixelRenderer } from './render/renderer';
 import { portraitURL } from './render/portrait';
 import { MapView } from './render/world';
+import { platform } from './platform';
 import { saveSettings, settings } from './settings';
 import { TouchControls, isTouchDevice } from './touch';
 import { CardData, Preview, UI } from './ui';
@@ -97,7 +98,9 @@ class App {
           this.input.exitLock();
           this.touch?.cancel();
           this.ui.setTouchMenu(false);
-        }
+          // menus are breaks
+          platform.gameplayStop();
+        } else if (this.myId) platform.gameplayStart();
       },
       onPrompt: () => this.sendChallenge(),
       createPreview: (el) => createPreview(el),
@@ -115,6 +118,12 @@ class App {
     this.loadMap(LOBBY_MAP);
     this.bindNet();
     requestAnimationFrame((t) => this.frame(t));
+    // the title screen is up: loading is over
+    requestAnimationFrame(() => platform.loadingStop());
+    audio.setMuted('platform', platform.settings.muteAudio);
+    platform.onSettingsChange((p) => audio.setMuted('platform', p.muteAudio));
+    // a signed-in CrazyGames player gets their name filled in
+    if (!settings.name) void platform.username().then((name) => name && this.ui.setTitleName(name));
     // dev builds: reach the app from the console / screenshot scripts
     if (import.meta.env.DEV) (window as unknown as { __app: App }).__app = this;
   }
@@ -148,6 +157,8 @@ class App {
   private bindNet(): void {
     const n = this.net;
     n.onClose = (reason) => {
+      platform.gameplayStop();
+      this.myId = '';
       this.ui.showTitle();
       this.ui.setTitleStatus(`Disconnected: ${reason}. Press Enter to reconnect.`, true);
       this.input.exitLock();
@@ -166,6 +177,7 @@ class App {
       this.ui.setProfile(m.profile);
       this.ui.showGame();
       this.input.requestLock();
+      platform.gameplayStart();
     });
     n.on('enter', (m) => this.enterInstance(m));
     n.on('roster', (m) => {
@@ -185,6 +197,13 @@ class App {
     n.on('result', (m) => {
       this.ui.showResult(m, this.profile);
       audio.play(m.won ? 'victory' : 'defeat');
+      platform.gameplayStop();
+      // a ranked promotion is the rare moment CrazyGames' celebration is for
+      if (m.before && m.after && rankOf(m.after.mmr, m.after.placements).label !== rankOf(m.before.mmr, m.before.placements).label && (m.delta ?? 0) > 0) platform.happytime();
+      // after a match is the natural break for an ad: never mid-fight
+      setTimeout(() => {
+        void platform.requestMidgameAd(() => audio.setMuted('ad', true)).then(() => audio.setMuted('ad', false));
+      }, 1200);
     });
     n.on('profile', (m) => {
       this.profile = m.profile;
@@ -213,7 +232,7 @@ class App {
     this.renderer.sunDir.copy(this.mapView.sunDir);
     this.renderer.setRim(this.mapView.rimColor);
     const blockers = buildBlockers(map);
-    this.cam.constrain = (from, to) => constrainCamera(map, blockers, from, to);
+    this.cam.constrain = (from, to, wallsOnly) => constrainCamera(map, wallsOnly ? [] : blockers, from, to);
     this.effects.setWeather(map.theme.weather);
     if (this.local) this.local.map = map;
   }
@@ -226,6 +245,7 @@ class App {
   }
 
   private enterInstance(m: Extract<ServerMsg, { t: 'enter' }>): void {
+    this.cam.stopShots();
     this.clearFighters();
     const map = Object.prototype.hasOwnProperty.call(MAPS, m.map) ? MAPS[m.map] : LOBBY_MAP;
     this.loadMap(map);
@@ -306,15 +326,25 @@ class App {
     if (this.local) this.local.frozen = m.phase === 'intro' || m.phase === 'countdown';
     const oppId = m.players[m.you === 0 ? 1 : 0].id;
     switch (m.phase) {
-      case 'intro':
+      case 'intro': {
         this.ui.matchIntro(m.mode, m.map, m.players, m.you);
         audio.play('matchFound');
+        // a close-up on them, one on you, and back behind your shoulder for the countdown
+        const me = this.fighters.get(this.myId);
+        const op = this.fighters.get(oppId);
+        if (me && op) {
+          const end = this.cam.restPose(me.pos, op.pos);
+          this.cam.playShots(introShots({ pos: me.pos, yaw: me.yaw, scale: me.model.scale }, { pos: op.pos, yaw: op.yaw, scale: op.model.scale }, end));
+        }
         break;
+      }
       case 'countdown':
         this.lastCountdown = -1;
         this.lock = this.fighters.get(oppId) ?? null;
         break;
       case 'fight':
+        // a slow device can still be mid-intro: the fight always starts on the follow camera
+        this.cam.stopShots();
         this.ui.banner('Fight', '', 900, 'fight', '始め');
         audio.play('fight');
         this.lock = this.fighters.get(oppId) ?? null;
@@ -468,8 +498,14 @@ class App {
         this.effects.spray(pos, swing.clone().negate(), ['#ffffff', '#fff1a0', '#ffd24a'], heavy ? 22 : 14, 10, 0.6);
         d?.model.react('deflect');
         a?.model.react('blocked');
+        // gold: the attacker was turned aside and is open
+        a?.model.flash('#ffc34a', 0.9);
         stop(heavy ? 100 : 75);
-        if (mine) this.cam.shake(heavy ? 0.16 : 0.12, 0.15);
+        if (mine) {
+          this.cam.shake(heavy ? 0.16 : 0.12, 0.15);
+          this.renderer.flash = heavy ? 0.08 : 0.05;
+          this.renderer.flashColor.set('#ffc34a');
+        }
         if (meD) {
           this.ui.floatText('DEFLECT', pos.x, pos.y + 0.4, pos.z, 'good big', '弾');
           this.local?.onDeflected();
@@ -485,11 +521,19 @@ class App {
         break;
       case 'guardBreak':
         this.effects.burst(pos, { count: 40, color: ['#ff9a2a', '#ffd24a', '#ff5a2a'], speed: 8, life: 0.6, size: 0.09 });
+        // the guard shatters like glass
+        this.effects.shards(pos, swing, 40);
         this.effects.ring(d?.pos ?? pos, '#ff9a2a', 3);
+        d?.model.flash('#ff7a2a', 1.1);
         play('guardBreak');
-        stop(90);
+        stop(110);
         this.ui.floatText('GUARD BROKEN', head(d).x, head(d).y, head(d).z, 'warn big', '破');
-        if (mine) this.cam.shake(0.2, 0.25);
+        if (mine) {
+          this.cam.shake(0.22, 0.28);
+          if (d) this.cam.punchIn(d.pos);
+          this.renderer.flash = meD ? 0.12 : 0.06;
+          this.renderer.flashColor.set(meD ? '#ff3a1a' : '#fff4e0');
+        }
         break;
       case 'hit':
       case 'armor':
@@ -500,9 +544,13 @@ class App {
         this.effects.burst(pos, { count: 10, color: ['#e43b44', '#a22633', '#3e2731'], speed: 4, life: 0.45, size: 0.07 });
         this.effects.slash(pos, swing, heavy ? (style?.trail.heavy ?? '#ffd27a') : (style?.trail.light ?? '#ffffff'), heavy ? 1.7 : 1.15, heavy ? 0.09 : 0.06);
         this.effects.flash(pos, '#ffffff', heavy ? 1.0 : 0.75, 0.1);
-        d?.model.flash('#ffffff', 1.2);
+        d?.model.flash(heavy ? '#ff6a5a' : '#ffffff', 1.2);
         d?.model.react('hit');
         stop(heavy ? 120 : 75);
+        if (heavy && mine && a && d) {
+          const len = Math.hypot(d.pos.x - a.pos.x, d.pos.z - a.pos.z) || 1;
+          this.cam.kick((d.pos.x - a.pos.x) / len, (d.pos.z - a.pos.z) / len, meD ? 0.22 : 0.12);
+        }
         play('hit');
         if (e.dmg) this.ui.floatText(`-${e.dmg}`, pos.x, pos.y + 0.3, pos.z, meD ? 'dmg me' : 'dmg');
         if (e.k === 'armor') this.ui.floatText('ARMOR', head(d).x, head(d).y, head(d).z, 'warn');
@@ -523,6 +571,7 @@ class App {
         this.ui.floatText('DEATHBLOW', head(d).x, head(d).y + 0.3, head(d).z, 'bad huge', '止め');
         if (mine) {
           this.cam.shake(0.35, 0.4);
+          if (d) this.cam.punchIn(d.pos);
           this.renderer.flash = 0.2;
           this.renderer.flashColor.set('#ff1a1a');
         }
@@ -532,7 +581,10 @@ class App {
         play('mikiri');
         stop(100);
         this.ui.floatText('MIKIRI COUNTER', head(d).x, head(d).y, head(d).z, 'good big', '見切り');
-        if (mine) this.cam.shake(0.2, 0.2);
+        if (mine) {
+          this.cam.shake(0.2, 0.2);
+          this.cam.punchIn(pos.clone().setY(pos.y - 1.2));
+        }
         break;
       case 'evade':
         if (e.tags?.includes('blink')) {
@@ -748,7 +800,8 @@ class App {
     // camera
     if (this.local) {
       const p = this.local.cf.pos;
-      this.cam.update(dt, p, this.lock ? this.lock.pos : null);
+      this.cam.shakeScale = settings.reduceShake ? 0.35 : this.touch ? 0.8 : 1;
+      this.cam.update(dt, p, this.lock ? this.lock.pos : null, { dodging: this.local.sim.state === 'dodge' });
       this.mapView?.update(dt, p);
     } else {
       // title screen: slow orbit over the plaza

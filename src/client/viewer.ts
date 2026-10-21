@@ -10,6 +10,8 @@ import { FighterState } from '../shared/fighter';
 import { AnimInput, CharacterModel } from './render/character';
 import { MAPS } from '../shared/maps';
 import { Effects } from './render/effects';
+import { CameraRig, introShots } from './camera';
+import { buildBlockers, constrainCamera } from './cameraClip';
 import { PixelRenderer } from './render/renderer';
 import { groundTexture } from './render/textures';
 import { MapView } from './render/world';
@@ -241,14 +243,33 @@ function showMap(r: PixelRenderer, mapId: string, params: URLSearchParams): void
   const fx = new Effects(r.scene);
   fx.setWeather(map.theme.weather);
   const chars = ['ronin', 'reaper'] as const;
+  // `shot=1.8`: the two fighters stand on the real spawns and the camera is frozen 1.8s into the match intro
+  const shotT = params.get('shot');
+  const subjects: { pos: THREE.Vector3; yaw: number; scale: number }[] = [];
   map.spawns.slice(0, 2).forEach((s, i) => {
     const m = new CharacterModel(chars[i]);
-    const k = map.kind === 'lobby' ? 1 : 0.55;
+    const k = map.kind === 'lobby' || shotT !== null ? 1 : 0.55;
     m.root.position.set(s.x * k, 0, s.z * k);
     m.root.rotation.y = s.yaw;
     r.scene.add(m.root);
     for (let j = 0; j < 30; j++) m.update(IDLE, 0.05);
+    subjects.push({ pos: m.root.position.clone(), yaw: s.yaw, scale: m.scale });
   });
+  if (shotT !== null) {
+    // the game's own camera rig, run straight to that moment
+    const rig = new CameraRig(r.camera);
+    const blockers = buildBlockers(map);
+    rig.constrain = (from, to, wallsOnly) => constrainCamera(map, wallsOnly ? [] : blockers, from, to);
+    rig.playShots(introShots(subjects[0], subjects[1], rig.restPose(subjects[0].pos, subjects[1].pos)));
+    rig.update(Number(shotT), subjects[0].pos, subjects[1].pos);
+    const loopShot = () => {
+      view.update(0.016, r.camera.position);
+      r.render();
+      requestAnimationFrame(loopShot);
+    };
+    loopShot();
+    return;
+  }
   const angle = Number(params.get('a') ?? 0.7);
   const dist = Number(params.get('dist') ?? (map.kind === 'lobby' ? 34 : 24));
   const height = Number(params.get('h') ?? 11);

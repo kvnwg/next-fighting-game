@@ -32,6 +32,18 @@ The whole game server also runs inside the browser. Open <http://localhost:5173/
 
 Multiplayer and the shared ladder need the server.
 
+### CrazyGames
+
+`npm run build:crazygames` builds the single-player game for [CrazyGames](https://developer.crazygames.com) into `dist/crazygames` (zipped to `dist/crazygames.zip`, ready to upload). It uses relative paths and loads the CrazyGames SDK v3 in the page head. `src/client/platform.ts` wraps the SDK, and every call does nothing off CrazyGames:
+- loading and gameplay start/stop (menus, the title screen and results are breaks);
+- a midgame ad after a match, never during one, with the game muted while it plays;
+- `happytime` on a ranked promotion;
+- the platform's mute setting;
+- the signed-in player's name;
+- settings and progress saved with CrazyGames' data module.
+
+Touch controls switch on by themselves on phones and tablets.
+
 Other scripts: `npm test` (combat rules, server integration and bot-vs-bot match simulations), `npm run typecheck`.
 
 `tests/sim.ts` can simulate complete matches between server-side bots on a fake clock. It's handy for balance passes: run every matchup and compare win rates and how often each outcome (deflect, deathblow and so on) happens. The current numbers are a first pass tuned that way.
@@ -158,6 +170,10 @@ The UI is styled after ink-and-lacquer Japanese design: black lacquer panels wit
   - **DotGothic16** (a Japanese pixel font) for small numbers and key hints.
 - **Brushwork:** generated in code by `src/client/ink.ts` and exposed as CSS variables. This covers the enso circles on the touch buttons, the brush strokes behind banners, the paper grain and the seigaiha waves on the title screen.
 - **Where to restyle:** colors and type live at the top of `src/client/styles.css`. Each character and map has a `jp` kanji name in `characters.ts` / `maps.ts`.
+- **Camera** (`src/client/camera.ts`):
+  - A match opens on a close-up of your opponent, then of you, before the camera swings round behind your shoulder.
+  - Deathblows, broken guards and mikiri counters punch it in; heavy hits knock it along the blow.
+  - Shakes are smooth and add up. "Reduce camera shake" in the settings calms all of it.
 
 ### Designing characters
 
@@ -188,7 +204,7 @@ Dev viewer:
   - `&chain=l0,l1,l2` (or `stance,ia`, `roar`, or states like `block,stagger`) plays a sequence, and `&walk=6` adds running.
   - `&target` marks where the opponent stands, `&at=300,340` freezes exact moments (ms), `&top` looks straight down, and `&ghosts` shows afterimages and smears.
 - `/?viewer&fxtest` shows the impact effects side by side.
-- `/?viewer&map=forge` previews a map.
+- `/?viewer&map=forge` previews a map, and `&shot=1.8` freezes the match intro's camera 1.8s in, with the fighters on the real spawns.
 
 ### Tuning
 

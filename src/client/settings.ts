@@ -1,5 +1,6 @@
-/** Per-browser preferences and identity, kept in localStorage. */
+/** Per-browser preferences and identity, kept in localStorage (or CrazyGames' cloud data there). */
 import { CharacterId, isCharacterId } from '../shared/characters';
+import { platform } from './platform';
 
 export interface Settings {
   name: string;
@@ -14,6 +15,8 @@ export interface Settings {
   volume: number;
   /** flash on weapons just before an attack lands */
   parryCue: boolean;
+  /** calmer camera: smaller shakes, no punch-ins */
+  reduceShake: boolean;
   showFps: boolean;
 }
 
@@ -29,12 +32,13 @@ const DEFAULTS: Settings = {
   invertY: false,
   volume: 0.7,
   parryCue: true,
+  reduceShake: false,
   showFps: false,
 };
 
 function load(): Settings {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = platform.getItem(KEY);
     if (!raw) return { ...DEFAULTS };
     const s = { ...DEFAULTS, ...JSON.parse(raw) } as Settings;
     if (!isCharacterId(s.char)) s.char = 'ronin';
@@ -49,9 +53,5 @@ function load(): Settings {
 export const settings: Settings = load();
 
 export function saveSettings(): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(settings));
-  } catch {
-    // storage unavailable (private mode): settings just won't persist
-  }
+  platform.setItem(KEY, JSON.stringify(settings));
 }

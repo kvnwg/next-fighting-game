@@ -1,5 +1,6 @@
 import './styles.css';
 import { installInkArt } from './ink';
+import { platform } from './platform';
 
 installInkArt();
 // the brush font is also drawn into canvas textures (the 危 perilous glyph), so fetch it early
@@ -13,5 +14,10 @@ const offline = import.meta.env.VITE_OFFLINE === '1' || params.has('offline');
 if (params.has('viewer')) {
   void import('./viewer').then((m) => m.startViewer(root));
 } else {
-  void import('./app').then((m) => m.startApp(root, offline));
+  // the platform SDK first: settings and progress load from its storage on CrazyGames
+  void platform.init().then(async () => {
+    platform.loadingStart();
+    const m = await import('./app');
+    m.startApp(root, offline);
+  });
 }

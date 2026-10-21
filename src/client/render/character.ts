@@ -403,12 +403,17 @@ export class CharacterModel {
     this.updateGhosts(f.ghost, dt);
     this.updateSmears(dt);
 
-    // hit flash / buff glow
+    // hit flash / perilous telegraph / buff glow
     this.flashT = Math.max(0, this.flashT - dt * 8);
     const glow = a.buff ? 0.35 + Math.sin(performance.now() / 90) * 0.15 : 0;
+    // an unblockable attack: the whole body pulses red through the windup, brightest as it lands
+    const peril = a.state === 'attack' && !!a.attack?.perilous && a.elapsed < a.windup;
+    const pk = peril ? 0.12 + 0.32 * (a.elapsed / Math.max(1, a.windup)) + Math.sin(performance.now() / 45) * 0.08 : 0;
     for (const m of this.materials) {
       if (this.flashT > 0) {
         m.emissive.copy(this.flashColor).multiplyScalar(this.flashT);
+      } else if (pk > 0) {
+        m.emissive.setRGB(pk, pk * 0.1, pk * 0.06);
       } else if (glow > 0) {
         m.emissive.setRGB(glow, glow * 0.15, 0);
       } else {

@@ -227,6 +227,19 @@ export class Effects {
     }
   }
 
+  /** A guard shattering: big pale flakes flung mostly along the blow, tumbling down. */
+  shards(pos: THREE.Vector3, dir: THREE.Vector3, count = 36): void {
+    const cols = ['#ffffff', '#e8f0ff', '#cfe0ff', '#ffe6d6'];
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 4 + Math.random() * 7;
+      const vx = dir.x * sp * 0.6 + Math.cos(a) * sp * 0.6;
+      const vz = dir.z * sp * 0.6 + Math.sin(a) * sp * 0.6;
+      this.emit(pos.x, pos.y, pos.z, vx, 1 + Math.random() * 4, vz, cols[i % cols.length], { life: 0.75, size: 0.12 + Math.random() * 0.14, gravity: 9, drag: 1.5, stretch: 0.02 });
+    }
+    this.flash(pos, '#ffffff', 1.6, 0.16);
+  }
+
   /** A bright slash streak through an impact, along the swing: a coloured stroke with a white core. */
   slash(pos: THREE.Vector3, dir: THREE.Vector3, color: string, length = 1.2, width = 0.07): void {
     // fresh vectors: beam() uses the shared scratch ones
