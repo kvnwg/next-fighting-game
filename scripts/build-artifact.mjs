@@ -1,3 +1,4 @@
+import zlib from 'node:zlib';
 // Builds the single-player game into one self-contained HTML page (dist/artifact/deflect.html):
 // the game server runs in the page, three.js loads from jsDelivr, everything else is inlined.
 // Usage: node scripts/build-artifact.mjs
@@ -48,7 +49,14 @@ ${css}
 <div id="app"></div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/build/three.module.js"}}</script>
 <script type="module">
-${js.replace(/<\/script/gi, '<\\/script')}
+// the game ships gzipped (a third of the size: the publish size limit is under 800 KB); unpack it
+// and run it as an ordinary inline module, so the import map still applies
+const b = Uint8Array.from(atob('${zlib.gzipSync(js, { level: 9 }).toString('base64')}'), (c) => c.charCodeAt(0));
+const code = await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+const s = document.createElement('script');
+s.type = 'module';
+s.textContent = code;
+document.body.appendChild(s);
 </script>
 `;
 const out = path.join(outDir, 'deflect.html');
@@ -59,7 +67,6 @@ fs.writeFileSync(
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head><body>\n${page}</body></html>`,
 );
 console.log(`wrote ${out} (${(fs.statSync(out).size / 1024).toFixed(0)} KB, three@${THREE_VERSION} from jsDelivr)`);
-// pages of about 768 KB and up have been refused at publish (with a misleading "review page" error),
-// so flag it before that: shrink inlined images first
-const BUDGET = 760_000;
+// pages of about 770 KB and up have been refused at publish (with a misleading "review page" error)
+const BUDGET = 740_000;
 if (fs.statSync(out).size > BUDGET) console.warn(`warning: ${fs.statSync(out).size} bytes is over the ${BUDGET}-byte publish budget`);
