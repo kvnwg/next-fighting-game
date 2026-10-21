@@ -565,7 +565,13 @@ export class Animator {
   /** Push a pose further from guard by `amount` (0.3 = 30% further): the attack's tell. */
   private exaggerate(pose: ResolvedPose, a: AnimInput, amount: number): ResolvedPose {
     if (amount <= 0.005) return pose;
-    return lerpResolved(this.guardPose(a), pose, 1 + amount);
+    const guard = this.guardPose(a);
+    const out = lerpResolved(guard, pose, 1 + amount);
+    // the weapon's turn is pushed further only so far: a chamber already turned well away from
+    // guard (a blade laid back over the shoulder) would swing on past the half turn and flip
+    out.main.quat.copy(pushTurn(guard.main.quat, pose.main.quat, amount));
+    if (out.off && guard.off && pose.off) out.off.quat.copy(pushTurn(guard.off.quat, pose.off.quat, amount));
+    return out;
   }
 
   /** Baked clips: straight-line time from the start through each hit to the end, so the clip keeps its own rhythm. */
@@ -905,6 +911,16 @@ export class Animator {
     this.feet.R.lerp(stance.R, k);
     return this.feet;
   }
+}
+
+/** `to` turned further away from `from` by `amount` of the turn between them, capped. */
+function pushTurn(from: THREE.Quaternion, to: THREE.Quaternion, amount: number): THREE.Quaternion {
+  const angle = from.angleTo(to);
+  if (angle < 1e-3) return to.clone();
+  // fades out for chambers turned past ~115 degrees, and never more than ~25 degrees extra
+  const k = amount * clamp01((2.6 - angle) / 0.6);
+  const extra = Math.min(angle * k, 0.45);
+  return from.clone().slerp(to, 1 + extra / angle);
 }
 
 function lerpRot(a: Rot, b: Rot, t: number): Rot {
