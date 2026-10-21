@@ -20,7 +20,7 @@ export const palette = {
   buckle: '#8c9097',
   void: '#060607',
   eye: '#ff3b3b',
-  eyeHot: '#ffc2b4',
+  eyeHot: '#ff8a70',
   steel: '#aeb2b9',
   steelDark: '#4c4f56',
   blade: '#3b3e45',
@@ -205,27 +205,32 @@ export function buildAssassin() {
 
   // ---- hood: peaked, dark void with red eyes --------------------------------
   b.use('head');
+  // loose: well clear of the skull, flaring out over the shoulders at the bottom
   const hoodIn = (p) => {
-    const q = (p[0] / 6.2) ** 2 + ((p[1] - 66.4) / 6.6) ** 2 + ((p[2] + 0.2) / 6.6) ** 2;
+    const flare = p[1] < 64 ? (64 - p[1]) * 0.3 : 0;
+    const q = (p[0] / (7.8 + flare)) ** 2 + ((p[1] - 66.8) / 7.6) ** 2 + ((p[2] + 0.6) / (7.8 + flare * 0.5)) ** 2;
     if (q <= 1) return true;
-    // peak trailing up and back
-    const a = [0, 69, -0.8], c = [0, 76.5, -4];
-    const ab = vec.sub(c, a);
-    const t = clamp01(vec.dot(vec.sub(p, a), ab) / vec.dot(ab, ab));
-    return vec.len(vec.sub(p, vec.lerp3(a, c, t))) < 5.2 * (1 - t) + 0.3;
+    // tall peak trailing up and back, its tip drooping
+    const near = (a, c, r0, r1) => {
+      const ab = vec.sub(c, a);
+      const t = clamp01(vec.dot(vec.sub(p, a), ab) / vec.dot(ab, ab));
+      return vec.len(vec.sub(p, vec.lerp3(a, c, t))) < lerp(r0, r1, t);
+    };
+    return near([0, 71, -1.8], [0, 80, -7], 6.6, 0.9) || near([0, 80, -7], [0, 78.4, -9.6], 0.9, 0.6);
   };
-  b.fill([-7, 59, -9], [7, 78, 8], (p) => {
+  b.fill([-11, 58.5, -12], [11, 82, 9], (p) => {
     if (!hoodIn(p)) return undefined;
-    const open = (p[0] / 3.5) ** 2 + ((p[1] - 65.3) / 4.4) ** 2;
+    const open = (p[0] / 3.9) ** 2 + ((p[1] - 65.3) / 4.9) ** 2;
     if (p[2] > 1.4 && open < 1) {
       if (p[1] < 63.4) return p[2] > 4.4 ? null : 'leather'; // face wrap
       return p[2] > 3.2 ? null : 'void';
     }
-    if (p[2] > 1.4 && open < 1.55) return 'tealHi'; // lit rim of the opening
+    // the opening is a deep tunnel: shadowed inside, lit at the lip
+    if (p[2] > 1.4 && open < 1.6) return p[2] > 5.4 ? 'tealHi' : 'tealDark';
     return tealFold([p[0], p[1], p[2] + 1], 5);
   });
   b.use('eyes');
-  for (const [x, y, c] of [[1, 65, 'eye'], [2, 66, 'eyeHot'], [-2, 65, 'eye'], [-3, 66, 'eyeHot']]) b.set(x, y, 2, c);
+  for (const [x, y, c] of [[1, 65, 'eyeHot'], [2, 66, 'eye'], [-2, 65, 'eyeHot'], [-3, 66, 'eye']]) b.set(x, y, 2, c); // slanted slits, hot at the inner corner
 
   // ---- arms: woven sleeves, bandaged forearms, dark gloves -----------------
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
