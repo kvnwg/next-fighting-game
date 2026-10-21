@@ -46,7 +46,7 @@ export function buildWraith() {
   b.bone('ribbons', 'pelvis', [0, 55, 5.5]);
   b.bone('torso', 'pelvis', [0, 56, 0]);
   b.bone('head', 'torso', [0, 82, 0.5]);
-  b.bone('hair', 'head', [0, 92, -1]);
+  b.bone('hair', 'head', [0, 93.5, -2.6]);
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
     b.bone(`upperArm${side}`, 'torso', [9.5 * s, SHOULDER_Y, 0]);
     b.bone(`forearm${side}`, `upperArm${side}`, [21.5 * s, SHOULDER_Y, 0]);
@@ -150,7 +150,8 @@ export function buildWraith() {
   });
 
   // ---- hair: cap, topknot with pin, long tail, red ribbon ------------------
-  b.use('hair');
+  // the cap and topknot are part of the head; the tail and ribbon swing from the knot
+  b.use('head');
   b.fill([-5.5, 86, -6], [5.5, 94, 5], (p) => {
     const q = (p[0] / 4.9) ** 2 + ((p[1] - 87.8) / 6.0) ** 2 + ((p[2] - 0.1) / 5.2) ** 2;
     if (q > 1) return undefined;
@@ -159,6 +160,7 @@ export function buildWraith() {
   }, { mode: 'under' });
   b.ellipsoid([0, 95, -1], [2.7, 2.4, 2.7], (p) => (Math.floor(p[1]) % 2 ? 'hair' : 'hairHi'));
   b.segment([-4.8, 95.6, -0.6], [4.8, 94.6, -1.6], 0.45, (p) => (Math.abs(p[0]) > 3.8 ? 'redLight' : 'red'));
+  b.use('hair');
   b.polyline([[0, 93.5, -3], [0.4, 87, -5.2], [1.3, 78, -6.4], [2.6, 68, -6.8], [3.6, 61, -6.2]], (i) => [1.1, 1.0, 0.8, 0.6][i], 'hair');
   b.polyline([[1.5, 94, -2.6], [4.2, 90, -5], [7.2, 84, -6], [8.8, 77, -5.2], [9.6, 71, -4.2]], 0.5, (p, t) => (t > 0.6 ? 'redDark' : 'red'));
 

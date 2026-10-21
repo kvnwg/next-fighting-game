@@ -211,7 +211,8 @@ export function buildRonin() {
   for (const s of [1, -1]) b.segment([4.8 * s, 69.5, 1.4], [2.9 * s, 61.4, 2.8], 0.45, 'strap');
 
   // ---- hair ----------------------------------------------------------------
-  b.use('hair');
+  // the cap, fringe and side locks are part of the head; what hangs down the back swings
+  b.use('head');
   // cap over the skull, leaving the face open
   b.fill([-6.2, 62, -6.2], [6.2, 71.6, 6.2], (p) => {
     const X = headX(p[1]) + 1.1;
@@ -231,6 +232,7 @@ export function buildRonin() {
   for (const s of [1, -1])
     b.segment([4.9 * s, 69, 0.8], [5.3 * s, 58.6 + hash3(s, 4, 4) * 1.5, 0.4], 0.95, (p) => (Math.floor(p[1]) % 4 === 0 ? 'hairHi' : 'hair'));
   // long hair down the back
+  b.use('hair');
   b.fill([-6.5, 45, -9], [6.5, 70, -4], (p, v) => {
     const y = p[1];
     const zb = y > 60 ? -4.5 : Math.max(-6.7, -4.5 - (60 - y) * 0.35);

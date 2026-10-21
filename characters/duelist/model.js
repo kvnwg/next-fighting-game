@@ -82,7 +82,7 @@ export function buildDuelist() {
   b.bone('pelvis', null, [0, 40, 0]);
   b.bone('torso', 'pelvis', [0, 43, 0]);
   b.bone('head', 'torso', [0, 62.5, 0.3]);
-  b.bone('hair', 'head', [0, 68, -4]);
+  b.bone('hair', 'head', [0, 65.2, -5.2]);
   b.bone('cape', 'torso', [5, 59, -4]);
   b.bone('pauldronR', 'torso', [-9.5, 58.5, 0]);
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
@@ -244,7 +244,8 @@ export function buildDuelist() {
   b.box([-1, 64.6, 4.2], [1, 66.6, 5.1], (p) => (p[1] < 65.4 ? 'skinShadow' : 'skinShade')); // nose
 
   // ---- hair: swept back, tied, streaming to the left -----------------------
-  b.use('hair');
+  // the cap and the locks are part of the head; only the tail below the tie swings
+  b.use('head');
   b.fill([-5.4, 63, -5.6], [5.4, 72.6, 5.4], (p) => {
     const q = (p[0] / 4.9) ** 2 + ((p[1] - 67.2) / 5.5) ** 2 + ((p[2] - 0.1) / 5.1) ** 2;
     if (q > 1) return undefined;
@@ -255,6 +256,7 @@ export function buildDuelist() {
   // locks framing the face
   for (const s of [1, -1]) b.polyline([[0.8 * s, 71, 4.2], [3.6 * s, 69, 4.2], [4.6 * s, 65.5, 3], [4.4 * s, 62.5, 2]], 0.7, 'hairHi');
   // tail: tied low at the nape and blown out to the left
+  b.use('hair');
   b.box([-1.2, 64.5, -5.6], [1.2, 66, -4.4], 'leatherDark');
   b.polyline([[0, 65, -5], [2, 61, -7], [6, 57.5, -9], [11, 55, -10.2], [16, 53.8, -10.5], [20, 53.5, -10]], (i) => [1.7, 1.5, 1.3, 1.0, 0.7][i], (p) =>
     Math.floor(p[0] + p[1]) % 3 === 0 ? 'hairHi' : 'hair',
