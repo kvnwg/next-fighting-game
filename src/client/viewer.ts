@@ -268,8 +268,10 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
   const lock = params.get('lock');
   if (lock !== null) {
     const d = Number(lock) || 3;
+    // `lx=6`: stand them that far across, e.g. either side of a pillar
+    const lx = Number(params.get('lx') ?? 0);
     models.forEach((m, i) => {
-      m.root.position.set(0, 0, i === 0 ? -d / 2 : d / 2);
+      m.root.position.set(lx, 0, i === 0 ? -d / 2 : d / 2);
       m.root.rotation.y = i === 0 ? 0 : Math.PI;
     });
     const foeKey = params.get('foe');

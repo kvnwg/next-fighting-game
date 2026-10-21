@@ -22,6 +22,11 @@ export const G = {
   uPushers: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
   /** fighters' rim light: rgb = colour, a = strength */
   uRim: { value: new THREE.Vector4(1, 0.95, 0.85, 0.6) },
+  /**
+   * Two things the camera must always see (the duellists): xyz = point, w = radius (0 = unused).
+   * Scenery on the line of sight to them dissolves, rather than the camera jumping round it.
+   */
+  uSee: { value: [new THREE.Vector4(), new THREE.Vector4()] },
 };
 
 /** GLSL declarations matching G (include once per shader). */
@@ -35,6 +40,7 @@ uniform vec3 uFogSunColor;
 uniform vec4 uFog;
 uniform vec4 uPushers[4];
 uniform vec4 uRim;
+uniform vec4 uSee[2];
 `;
 
 /** Bind the shared uniforms into a compiled shader's uniform list. */
@@ -48,6 +54,7 @@ export function bindGlobals(uniforms: Record<string, THREE.IUniform>): void {
   uniforms.uFog = G.uFog;
   uniforms.uPushers = G.uPushers;
   uniforms.uRim = G.uRim;
+  uniforms.uSee = G.uSee;
 }
 
 /**

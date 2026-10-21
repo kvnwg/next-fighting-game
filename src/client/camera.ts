@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { angleDiff, clamp, forward, yawTo } from '../shared/math';
+import { G } from './render/gfx/globals';
 
 /** Narrower than a typical action camera so the opponent reads bigger. */
 export const CAMERA_FOV = 50;
@@ -204,8 +205,10 @@ export class CameraRig {
     const bz = -u.z * Math.cos(phi) + rz * Math.sin(phi);
     const pos = new THREE.Vector3(pivot.x + bx * boom, player.y + (1.7 + d * 0.08) * k, pivot.z + bz * boom);
     const subject = new THREE.Vector3(target.x, target.y + 1.2 * k, target.z);
-    // walls pull it in, but it keeps the opponent in sight rather than you
-    this.constrain?.(subject, pos);
+    // only what's behind you pulls it in (it mustn't end up inside a tree or a wall). Something
+    // between you and them doesn't move it at all: that used to swing the camera in and out as
+    // the line to them crossed a prop; now the prop dissolves instead (see G.uSee)
+    this.constrain?.(_chest.set(player.x, player.y + 1.4 * k, player.z), pos);
     // look a little past the middle, toward them, at chest height
     const look = new THREE.Vector3(player.x + u.x * d * 0.62, player.y + 1.15 * k, player.z + u.z * d * 0.62);
     return { pos, look, subject };
@@ -213,7 +216,18 @@ export class CameraRig {
 
   update(dt: number, player: THREE.Vector3, target: THREE.Vector3 | null, opts: { dodging?: boolean } = {}): void {
     this.time += dt;
-    if (this.shots.length > 0 && this.updateShots(dt)) return;
+    if (this.shots.length > 0 && this.updateShots(dt)) {
+      // cinematics are framed by hand
+      G.uSee.value[0].w = 0;
+      G.uSee.value[1].w = 0;
+      return;
+    }
+    {
+      const k = Math.max(1, this.subjectScale, this.targetScale);
+      G.uSee.value[0].set(player.x, player.y + 1.2 * k, player.z, 0.95 * k);
+      if (target) G.uSee.value[1].set(target.x, target.y + 1.2 * k, target.z, 1.05 * k);
+      else G.uSee.value[1].w = 0;
+    }
     if (target) {
       const want = yawTo(player.x, player.z, target.x, target.z);
       this.yaw += angleDiff(this.yaw, want) * (1 - Math.exp(-dt * 8));
@@ -314,6 +328,7 @@ export class CameraRig {
 }
 
 const _look = new THREE.Vector3();
+const _chest = new THREE.Vector3();
 const _to = new THREE.Vector3();
 
 const bezier = (a: THREE.Vector3, via: THREE.Vector3, b: THREE.Vector3, k: number) =>

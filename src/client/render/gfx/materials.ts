@@ -24,7 +24,38 @@ export interface PatchOpts {
   atlas?: number;
   /** clouds: sunlit faces, a glow where they cross the sun, and haze with distance */
   cloud?: boolean;
+  /** scenery: dissolves where it stands between the camera and a fighter (see G.uSee) */
+  see?: boolean;
 }
+
+/**
+ * The see-through: a dithered hole, a tube from the camera to each fighter, through anything in
+ * the way. Only what's nearer the camera than the fighter, so the ground and walls behind stay.
+ */
+const SEE_GLSL = /* glsl */ `
+#ifdef VOX_SEE
+  for (int i = 0; i < 2; i++) {
+    vec4 s = uSee[i];
+    if (s.w <= 0.0) continue;
+    vec3 ray = s.xyz - cameraPosition;
+    float len = length(ray);
+    vec3 rd = ray / max(len, 1e-3);
+    float t = dot(vWorldPos - cameraPosition, rd);
+    if (t < 0.3 || t > len - s.w * 0.7) continue;
+    float d = length(vWorldPos - cameraPosition - rd * t);
+    // the tube opens a little toward the fighter
+    float r = s.w * mix(0.75, 1.0, t / len);
+    float k = 1.0 - smoothstep(r * 0.55, r, d);
+    if (k <= 0.0) continue;
+    // 4x4 ordered dither, so the hole reads as a soft-edged screen door, not a hard cut
+    vec2 q = floor(gl_FragCoord.xy);
+    vec2 lo = mod(q, 2.0);
+    vec2 hi = mod(floor(q * 0.5), 2.0);
+    float bayer = (4.0 * mod(2.0 * lo.x + 3.0 * lo.y, 4.0) + mod(2.0 * hi.x + 3.0 * hi.y, 4.0) + 0.5) / 16.0;
+    if (k * 0.92 > bayer) discard;
+  }
+#endif
+`;
 
 const VERT_DECL = /* glsl */ `
 ${GLOBALS_GLSL}
@@ -155,6 +186,7 @@ function definesFor(o: PatchOpts): Record<string, string> {
   if (o.rim) d.VOX_RIM = '';
   if (o.push) d.VOX_PUSH = '';
   if (o.cloud) d.VOX_CLOUD = '';
+  if (o.see) d.VOX_SEE = '';
   if (o.atlas) d.VOX_ATLAS = `${o.atlas.toFixed(1)}`;
   return d;
 }
@@ -170,6 +202,7 @@ export function patchMaterial<T extends THREE.Material>(m: T, o: PatchOpts = {})
       .replace('#include <uv_vertex>', '#include <uv_vertex>\n#if defined(VOX_ATLAS) && defined(USE_MAP)\n  vMapUv.x = (vMapUv.x + aSprite) / VOX_ATLAS;\n#endif');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAG_DECL}`)
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>\n${SEE_GLSL}`)
       .replace('#include <aomap_fragment>', `#include <aomap_fragment>\n${LIGHT_MODS}`)
       .replace('#include <fog_fragment>', FOG);
   };
@@ -202,7 +235,7 @@ export function litMaterial(o: LitOpts = {}): THREE.MeshLambertMaterial {
     side: o.side ?? THREE.FrontSide,
     alphaTest: o.alphaTest ?? 0,
   });
-  return patchMaterial(m, o);
+  return patchMaterial(m, { see: true, ...o });
 }
 
 /** Shadow-pass material that moves with the wind like the mesh it stands in for. */
