@@ -226,12 +226,12 @@ const ronin: BaseDef = {
   ratings: { power: 3, speed: 3, reach: 3, defense: 4, difficulty: 2 },
   lights: [
     { name: 'Swallow Cut', anim: 'slashR', windup: 300, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 3, arc: 36, lunge: 0.6 },
-    { name: 'Falling Petal', anim: 'slashL', windup: 270, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 3, arc: 36, lunge: 0.5 },
+    { name: 'Rising Petal', anim: 'slashL', windup: 270, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 3, arc: 36, lunge: 0.5 },
     // tsubame-gaeshi: two cuts, there and back, a blink apart
     { name: 'Twin Swallow', anim: 'slashR', windup: 340, active: 150, recovery: 470, damage: 7, posture: 9, blockPosture: 11, range: 3.1, arc: 33, lunge: 0.8, hits: 2 },
   ],
   heavy: { name: 'Heaven Splitter', anim: 'overhead', windup: 620, active: 120, recovery: 520, damage: 18, posture: 26, blockPosture: 34, range: 3.2, arc: 30, lunge: 1.2, feintable: true },
-  special: { name: 'Flash Piercer', anim: 'thrust', windup: 720, active: 160, recovery: 650, damage: 22, posture: 30, blockPosture: 30, range: 4.3, arc: 15, lunge: 3.0, perilous: 'thrust', cooldown: 7000 },
+  special: { name: 'Gatotsu', anim: 'thrust', windup: 720, active: 160, recovery: 650, damage: 22, posture: 30, blockPosture: 30, range: 4.3, arc: 15, lunge: 3.0, perilous: 'thrust', cooldown: 7000 },
   ability: {
     kind: 'stance',
     name: 'Iai Stance',
@@ -321,12 +321,12 @@ const lancer: BaseDef = {
   stats: { hp: 200, posture: 100, speed: 3.8, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 5, defense: 2, difficulty: 3 },
   lights: [
-    { name: 'Viper Jab', anim: 'thrust', windup: 300, active: 80, recovery: 320, damage: 8, posture: 10, blockPosture: 12, range: 4.3, arc: 15, lunge: 0.4 },
+    { name: 'Piercing Step', anim: 'thrust', windup: 300, active: 80, recovery: 320, damage: 8, posture: 10, blockPosture: 12, range: 4.3, arc: 15, lunge: 0.4 },
     // two jabs, in and in again: two hits to read and deflect
-    { name: 'Twin Fang', anim: 'thrust', windup: 260, active: 160, recovery: 320, damage: 5, posture: 6, blockPosture: 7, range: 4.3, arc: 15, lunge: 0.5, hits: 2 },
-    { name: 'Wheel Strike', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 4.1, arc: 44 },
+    { name: 'Fang and Rise', anim: 'thrust', windup: 260, active: 160, recovery: 320, damage: 5, posture: 6, blockPosture: 7, range: 4.3, arc: 15, lunge: 0.5, hits: 2 },
+    { name: 'Horizon Sweep', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 4.1, arc: 44 },
   ],
-  heavy: { name: 'Dragon Fang', anim: 'thrust', windup: 640, active: 110, recovery: 520, damage: 18, posture: 24, blockPosture: 30, range: 4.7, arc: 15, lunge: 1.4, feintable: true },
+  heavy: { name: 'Crescent Cleave', anim: 'thrust', windup: 640, active: 110, recovery: 520, damage: 18, posture: 24, blockPosture: 30, range: 4.7, arc: 15, lunge: 1.4, feintable: true },
   special: { name: 'Whirlwind', anim: 'spin', windup: 760, active: 220, recovery: 650, damage: 20, posture: 26, blockPosture: 26, range: 4.4, arc: 55, perilous: 'sweep', cooldown: 7000 },
   ability: {
     kind: 'leap',
@@ -463,7 +463,7 @@ type BaseDef = Omit<CharacterDef, 'extra'>;
 /** What each character calls its extended moves and how each one swings (see `kit`). */
 const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
   ronin: {
-    h1: { name: 'Wind Splitter', anim: 'slashL' },
+    h1: { name: 'Ground Wheel', anim: 'slashL' },
     h2: { name: 'Crescent Moon', anim: 'spin' },
     dl: { name: 'Gale Step', anim: 'thrust' },
     dh: { name: 'Thunder Draw', anim: 'slashR' },
@@ -494,14 +494,14 @@ const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
     jh: { name: 'Sky Piercer', anim: 'thrust' },
   },
   lancer: {
-    h1: { name: 'Dragon Tail', anim: 'sweep' },
-    h2: { name: 'Thunder Spiral', anim: 'spin' },
-    dl: { name: 'Lightning Lunge', anim: 'thrust' },
-    dh: { name: 'Storm Charge', anim: 'thrust' },
-    bl: { name: 'Fending Jab', anim: 'thrust' },
-    bh: { name: 'Bolt Wheel', anim: 'slashR' },
-    jl: { name: 'Falcon Strike', anim: 'thrust' },
-    jh: { name: 'Thunderfall', anim: 'slam' },
+    h1: { name: 'Reaping Sweep', anim: 'sweep' },
+    h2: { name: 'Thunder Wheel', anim: 'spin' },
+    dl: { name: 'Serpent Lunge', anim: 'thrust' },
+    dh: { name: 'Ascending Dragon', anim: 'thrust' },
+    bl: { name: 'Parting Snap', anim: 'thrust' },
+    bh: { name: 'Wheel Retreat', anim: 'slashR' },
+    jl: { name: 'Swallow Spin', anim: 'thrust' },
+    jh: { name: 'Skyfall Cleave', anim: 'slam' },
   },
   shade: {
     h1: { name: 'Long Thorn', anim: 'thrust' },
