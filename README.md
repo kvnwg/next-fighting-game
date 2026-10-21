@@ -13,6 +13,8 @@ Each character lives in `characters/<name>/`:
 
 Characters: `ronin`, `warden`, `wraith`, `lancer`, `assassin`, `duelist`, `monk`, `knight`.
 
+Ring entrance cinematics (shot lists with camera, sound and visual effects) live in `characters/intros.js`, with a readable copy in `docs/ring-intros.md`.
+
 Shared tooling is in `tools/voxel/`. To regenerate:
 
 ```sh
