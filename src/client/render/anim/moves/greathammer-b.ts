@@ -7,8 +7,8 @@
  * lets the hammer's weight carry him through and down after it.
  */
 import { B, K, N, arc, fx, hitAt, line, mv, seq } from '../author';
-import type { MoveDef, V3 } from '../author';
-import { G2, GUARD_AT, GUARD_DIR, body } from './greathammer-base';
+import type { KeyIn, MoveDef, V3 } from '../author';
+import { G2, GUARD_AT, GUARD_DIR, body, swung } from './greathammer-base';
 
 /** Where an arc's grip sits for one of its directions. */
 const gripAt = (pivot: V3, r: number, dir: V3): V3 => {
@@ -152,18 +152,84 @@ const skyChamber = hitAt(sky, 1, 1);
 const skyHit = hitAt(sky, 3, 1);
 const skyGround = hitAt(sky, 4, 1) - 0.05;
 
+// The quiet bodies the hammer paths were drawn against: `swung` keeps each hammer on the world
+// path it has with these while the body that really throws it coils, unwinds and follows through.
+const oakDrawn: KeyIn[] = [
+  K(-0.2, B({ ...body, crouch: -0.2, lean: 0.28, twist: -0.25 })),
+  K(0.0, B({ ...body, crouch: -0.32, lean: 0.36, twist: -0.5, hipTwist: -0.15, headPitch: 0.1 })),
+  K(OAK_TOP_S, B({ ...body, crouch: 0.02, lean: -0.16, twist: -0.06, step: 0.24, back: 0.3, width: 0.2, headPitch: -0.35 })),
+  K(oakHit, B({ ...body, crouch: -0.3, lean: 0.55, twist: -0.02, step: 0.5, back: 0.42, width: 0.2, headPitch: -0.2 })),
+  K(oakGround + 0.06, B({ ...body, crouch: -0.45, lean: 0.85, twist: 0, step: 0.62, back: 0.5, width: 0.22, headPitch: -0.35 })),
+  K(1.12, B({ ...body, crouch: -0.47, lean: 0.88, twist: 0, step: 0.62, back: 0.5, width: 0.22, headPitch: -0.32 })),
+];
+const ripDrawn: KeyIn[] = [
+  K(-1, B({ ...body, crouch: -0.45, lean: 0.85, twist: 0, step: 0.62, back: 0.5, width: 0.22, headPitch: -0.35 })),
+  K(-0.5, B({ ...body, crouch: -0.36, lean: 0.55, twist: -0.5, hipTwist: -0.2, step: 0.5, back: 0.46, width: 0.22, headPitch: -0.1 })),
+  K(RIP_BACK_S, B({ ...body, crouch: -0.38, lean: 0.4, twist: -0.95, hipTwist: -0.35, step: 0.44, back: 0.46, width: 0.22, headPitch: 0.05 })),
+  K(ripHit, B({ ...body, crouch: -0.2, lean: 0.18, twist: -0.22, hipTwist: -0.05, step: 0.5, back: 0.4, width: 0.2 })),
+  K(1.05, B({ ...body, front: 'R', crouch: -0.04, lean: -0.14, twist: 0.8, hipTwist: 0.35, step: 0.42, back: 0.34, width: 0.2, headPitch: -0.18 })),
+];
+const heliDrawn: KeyIn[] = [
+  K(HELI_START, B({ ...body, front: 'R', crouch: -0.04, lean: -0.14, twist: 0.8, hipTwist: 0.35, step: 0.42, back: 0.34, width: 0.2, headPitch: -0.18 }), { spin: 0, hop: 0 }),
+  K(HELI_WHIRL, B({ ...body, crouch: -0.16, lean: -0.08, twist: 0.4, hipTwist: 0.1, step: 0.3, back: 0.3, width: 0.26, headPitch: -0.25 }), { spin: 0.04 }),
+  K(-0.95, B({ ...body, crouch: -0.14, lean: -0.12, twist: 0.25, step: 0.3, back: 0.3, width: 0.26, headPitch: -0.25 }), { spin: 0.38 }),
+  K(-0.5, B({ ...body, crouch: -0.08, lean: -0.14, twist: 0.1, step: 0.3, back: 0.3, width: 0.24, headPitch: -0.25 }), { spin: 0.72, hop: 0.06 }),
+  K(HELI_SLAM, B({ ...body, crouch: 0.02, lean: -0.24, twist: -0.3, hipTwist: -0.1, step: 0.32, back: 0.3, width: 0.22, headPitch: -0.3 }), { spin: 1, hop: 0.22 }),
+  K(0.2, B({ ...body, crouch: 0.0, lean: -0.2, twist: -0.12, step: 0.36, back: 0.3, width: 0.22, headPitch: -0.25 }), { hop: 0.3 }),
+  K(heliHit, B({ ...body, crouch: -0.24, lean: 0.3, twist: 0, step: 0.5, back: 0.4, width: 0.24, headPitch: -0.1 }), { hop: 0.08 }),
+  K(heliGround + 0.06, B({ ...body, crouch: -0.46, lean: 0.24, twist: 0, step: 0.36, back: 0.36, width: 0.34, headPitch: 0.05 }), { hop: 0 }),
+  K(1.12, B({ ...body, crouch: -0.48, lean: 0.24, twist: 0, step: 0.36, back: 0.36, width: 0.34, headPitch: 0.08 })),
+];
+const diveDrawn: KeyIn[] = [
+  K(-0.6, B({ ...body, crouch: -0.24, lean: 0.3, twist: -0.3, step: 0.4, back: 0.4 })),
+  K(DIVE_COCK_S, B({ ...body, crouch: -0.34, lean: 0.45, twist: -0.5, hipTwist: -0.12, step: 0.36, back: 0.44, headPitch: -0.1 }), { hop: 0, flip: 0 }),
+  K(diveHit - 0.12, B({ ...body, crouch: -0.16, lean: 0.72, twist: -0.12, step: 0.5, back: 0.56, headPitch: -0.35 }), { hop: 0.18, flip: 0.03 }),
+  K(diveHit, B({ ...body, crouch: -0.3, lean: 0.9, twist: -0.02, step: 0.58, back: 0.62, headPitch: -0.45 }), { hop: 0.1, flip: 0.04 }),
+  K(diveGround + 0.06, B({ ...body, crouch: -0.5, lean: 1.05, twist: 0, step: 0.66, back: 0.66, width: 0.2, headPitch: -0.5 }), { hop: 0, flip: 0 }),
+  K(1.12, B({ ...body, crouch: -0.5, lean: 1.05, twist: 0, step: 0.66, back: 0.66, width: 0.2, headPitch: -0.48 })),
+];
+const revDrawn: KeyIn[] = [
+  K(-0.6, B({ ...body, crouch: -0.14, lean: 0.14, twist: -0.2 })),
+  K(0, B({ ...body, crouch: -0.36, lean: 0.06, twist: -0.08, step: 0.22, back: 0.52, headPitch: 0.15 })),
+  K(revHit, B({ ...body, crouch: -0.22, lean: -0.08, twist: 0, step: 0.2, back: 0.58, headPitch: -0.15 })),
+  K(1.0, B({ ...body, crouch: -0.28, lean: -0.38, twist: 0.05, step: 0.18, back: 0.66, width: 0.2, headPitch: -0.3 })),
+];
+const somDrawn: KeyIn[] = [
+  K(-0.4, B({ ...body, crouch: -0.14, lean: 0.05, twist: -0.25 }), { flip: 0, hop: 0 }),
+  K(-0.06, B({ ...body, crouch: -0.06, lean: -0.22, twist: -0.1, headPitch: -0.2 }), { flip: -0.03 }),
+  K(somHit, B({ ...body, crouch: -0.18, lean: 0.22, twist: 0, headPitch: 0.1 }), { flip: 0.18, hop: 0.3 }),
+  K(0.8, B({ ...body, crouch: -0.32, lean: 0.4, twist: 0, headPitch: 0.2 }), { flip: 0.55, hop: 0.4 }),
+  K(1.07, B({ ...body, crouch: -0.3, lean: 0.35, twist: 0, headPitch: 0.15 }), { flip: 0.8, hop: 0.2 }),
+  K(1.3, B({ ...body, crouch: -0.2, lean: 0.2, twist: -0.1 }), { flip: 1, hop: 0 }),
+];
+const skyDrawn: KeyIn[] = [
+  K(-0.2, B({ ...body, crouch: -0.2, lean: 0.2, twist: -0.15 }), { flip: 0, hop: 0 }),
+  K(0.0, B({ ...body, crouch: -0.3, lean: 0.32, twist: 0, headPitch: 0.1 }), { flip: 0.15, hop: 0.1 }),
+  K(SKY_TOP_S, B({ ...body, crouch: 0.05, lean: 0.0, twist: 0, step: 0.1, back: 0.1, width: 0.12, headPitch: -0.1 }), { flip: 0.5, hop: 0.6 }),
+  K(skyChamber, B({ ...body, crouch: 0.02, lean: -0.08, twist: 0, step: 0.12, back: 0.12, width: 0.12, headPitch: -0.1 }), { flip: 0.62, hop: 0.5 }),
+  K(skyHit, B({ ...body, crouch: -0.22, lean: 0.35, twist: 0, step: 0.36, back: 0.3, width: 0.24, headPitch: -0.15 }), { flip: 1, hop: 0.06 }),
+  K(skyGround + 0.06, B({ ...body, crouch: -0.52, lean: 0.6, twist: 0, step: 0.3, back: 0.3, width: 0.32, headPitch: -0.2 }), { hop: 0 }),
+  K(1.12, B({ ...body, crouch: -0.54, lean: 0.62, twist: 0, step: 0.3, back: 0.3, width: 0.32, headPitch: -0.18 })),
+];
+
 export const WARDEN_B: Partial<Record<string, MoveDef>> = {
-  // Felled Oak: the hammer is ripped up out of the floor and stood on end in front of him like a
-  // tree, he rises onto his toes under it; then it topples through the target and he drops after
+  // Felled Oak: wound right and sunk low, he rips the hammer up out of the floor and stands it on
+  // end in front of him like a tree, rising onto his toes under it, chest open; then it topples
+  // through the target, the lead foot steps in, the hips drive through and he crunches down after
   // it, almost flat behind the haft as the head bursts into the ground
-  h: mv({
+  h: swung(mv({
     keys: [
-      K(-0.2, B({ ...body, crouch: -0.2, lean: 0.28, twist: -0.25 })),
-      K(0.0, B({ ...body, crouch: -0.32, lean: 0.36, twist: -0.5, hipTwist: -0.15, headPitch: 0.1 })),
-      K(OAK_TOP_S, B({ ...body, crouch: 0.02, lean: -0.16, twist: -0.06, step: 0.24, back: 0.3, width: 0.2, headPitch: -0.35 })),
-      K(oakHit, B({ ...body, crouch: -0.3, lean: 0.55, twist: -0.02, step: 0.5, back: 0.42, width: 0.2, headPitch: -0.2 })),
-      K(oakGround + 0.06, B({ ...body, crouch: -0.45, lean: 0.85, twist: 0, step: 0.62, back: 0.5, width: 0.22, headPitch: -0.35 })),
-      K(1.12, B({ ...body, crouch: -0.47, lean: 0.88, twist: 0, step: 0.62, back: 0.5, width: 0.22, headPitch: -0.32 })),
+      K(-0.2, B({ ...body, crouch: -0.25, lean: 0.3, twist: -0.5, hipTwist: -0.2 })),
+      // wound right and sunk low as it is ripped up round his right side
+      K(0.0, B({ ...body, crouch: -0.44, lean: 0.3, twist: -1.1, hipTwist: -0.55, step: 0.26, back: 0.4, width: 0.22, headPitch: 0.1 })),
+      // up on his toes under the standing hammer, the chest open
+      K(OAK_TOP_S, B({ ...body, crouch: 0.06, lean: -0.32, twist: -0.2, hipTwist: -0.05, step: 0.26, back: 0.34, width: 0.18, headPitch: -0.45 }), { hop: 0.08 }),
+      // the lead foot steps in and the hips drive through as it starts to fall
+      K(0.8, B({ ...body, crouch: -0.16, lean: 0.25, twist: 0.05, hipTwist: 0.22, step: 0.5, back: 0.4, width: 0.22, headPitch: -0.3 }), { hop: 0.03 }),
+      // crunched down after it, all the weight on the front leg
+      K(oakHit, B({ ...body, crouch: -0.42, lean: 0.72, twist: 0.3, hipTwist: 0.25, step: 0.62, back: 0.46, width: 0.26, headPitch: -0.25 }), { hop: 0 }),
+      K(oakGround + 0.06, B({ ...body, crouch: -0.5, lean: 0.92, twist: 0.35, hipTwist: 0.28, step: 0.66, back: 0.52, width: 0.28, headPitch: -0.35 })),
+      K(1.12, B({ ...body, crouch: -0.52, lean: 0.94, twist: 0.35, hipTwist: 0.28, step: 0.66, back: 0.52, width: 0.28, headPitch: -0.32 })),
     ],
     main: oak,
     impacts: [oakHit],
@@ -184,17 +250,22 @@ export const WARDEN_B: Partial<Record<string, MoveDef>> = {
       fx(oakGround + 0.03, 'stomp', 'feet', 1),
     ],
     trail: { life: 0.22, glow: 0.6 },
-  }),
-  // Rip-Up: he hauls himself up and round to the right, dragging the head back along the floor
-  // until it trails behind him; then the hips unwind and it is ripped up through the target from
-  // low on his right to high on his left, the right foot stepping through after it
-  h1: mv({
+  }), oakDrawn),
+  // Rip-Up: he hauls himself round to the right, winding up hard as the head drags back along the
+  // floor until it trails behind him; then the hips unwind first and it is ripped up through the
+  // target from low on his right to high on his left, the body turning on after it and the right
+  // foot stepping through
+  h1: swung(mv({
     keys: [
-      K(-1, B({ ...body, crouch: -0.45, lean: 0.85, twist: 0, step: 0.62, back: 0.5, width: 0.22, headPitch: -0.35 })),
-      K(-0.5, B({ ...body, crouch: -0.36, lean: 0.55, twist: -0.5, hipTwist: -0.2, step: 0.5, back: 0.46, width: 0.22, headPitch: -0.1 })),
-      K(RIP_BACK_S, B({ ...body, crouch: -0.38, lean: 0.4, twist: -0.95, hipTwist: -0.35, step: 0.44, back: 0.46, width: 0.22, headPitch: 0.05 })),
-      K(ripHit, B({ ...body, crouch: -0.2, lean: 0.18, twist: -0.22, hipTwist: -0.05, step: 0.5, back: 0.4, width: 0.2 })),
-      K(1.05, B({ ...body, front: 'R', crouch: -0.04, lean: -0.14, twist: 0.8, hipTwist: 0.35, step: 0.42, back: 0.34, width: 0.2, headPitch: -0.18 })),
+      K(-1, B({ ...body, crouch: -0.5, lean: 0.92, twist: 0.35, hipTwist: 0.28, step: 0.66, back: 0.52, width: 0.28, headPitch: -0.35 })),
+      K(-0.5, B({ ...body, crouch: -0.4, lean: 0.5, twist: -0.7, hipTwist: -0.35, step: 0.5, back: 0.5, width: 0.24, headPitch: -0.1 })),
+      // hauled round to the right as the head trails behind him: wound up, the weight on the rear leg
+      K(RIP_BACK_S, B({ ...body, crouch: -0.46, lean: 0.32, twist: -1.3, hipTwist: -0.7, step: 0.44, back: 0.52, width: 0.24, headPitch: 0.05 })),
+      // the hips unwind first
+      K(0.4, B({ ...body, crouch: -0.38, lean: 0.3, twist: -0.6, hipTwist: 0.05, step: 0.52, back: 0.46, width: 0.22 })),
+      K(ripHit, B({ ...body, crouch: -0.24, lean: 0.25, twist: 0.65, hipTwist: 0.45, step: 0.56, back: 0.4, width: 0.2 })),
+      // and he rises after it, turning on through, the right foot stepping through
+      K(1.05, B({ ...body, front: 'R', crouch: -0.02, lean: -0.2, twist: 1.2, hipTwist: 0.65, step: 0.44, back: 0.36, width: 0.22, headPitch: -0.2 })),
     ],
     main: rip,
     impacts: [ripHit],
@@ -211,21 +282,25 @@ export const WARDEN_B: Partial<Record<string, MoveDef>> = {
       fx(ripHit, 'stomp', 'feet', 0.9),
     ],
     trail: { life: 0.22, glow: 0.55 },
-  }),
+  }), ripDrawn),
   // Helicopter: the finisher. The hammer goes up into a flat whirl over his head and he turns a
-  // full circle under it, rising after it; at the top of the rise it comes over and down, and he
-  // drops into a deep squat behind it as the ground explodes
-  h2: mv({
+  // full circle under it, leaning out against its pull and rising after it; wound back right on
+  // his toes at the top, it comes over and down, and he crunches into a deep, wide squat behind it
+  // as the ground explodes
+  h2: swung(mv({
     keys: [
-      K(HELI_START, B({ ...body, front: 'R', crouch: -0.04, lean: -0.14, twist: 0.8, hipTwist: 0.35, step: 0.42, back: 0.34, width: 0.2, headPitch: -0.18 }), { spin: 0, hop: 0 }),
-      K(HELI_WHIRL, B({ ...body, crouch: -0.16, lean: -0.08, twist: 0.4, hipTwist: 0.1, step: 0.3, back: 0.3, width: 0.26, headPitch: -0.25 }), { spin: 0.04 }),
-      K(-0.95, B({ ...body, crouch: -0.14, lean: -0.12, twist: 0.25, step: 0.3, back: 0.3, width: 0.26, headPitch: -0.25 }), { spin: 0.38 }),
-      K(-0.5, B({ ...body, crouch: -0.08, lean: -0.14, twist: 0.1, step: 0.3, back: 0.3, width: 0.24, headPitch: -0.25 }), { spin: 0.72, hop: 0.06 }),
-      K(HELI_SLAM, B({ ...body, crouch: 0.02, lean: -0.24, twist: -0.3, hipTwist: -0.1, step: 0.32, back: 0.3, width: 0.22, headPitch: -0.3 }), { spin: 1, hop: 0.22 }),
-      K(0.2, B({ ...body, crouch: 0.0, lean: -0.2, twist: -0.12, step: 0.36, back: 0.3, width: 0.22, headPitch: -0.25 }), { hop: 0.3 }),
-      K(heliHit, B({ ...body, crouch: -0.24, lean: 0.3, twist: 0, step: 0.5, back: 0.4, width: 0.24, headPitch: -0.1 }), { hop: 0.08 }),
-      K(heliGround + 0.06, B({ ...body, crouch: -0.46, lean: 0.24, twist: 0, step: 0.36, back: 0.36, width: 0.34, headPitch: 0.05 }), { hop: 0 }),
-      K(1.12, B({ ...body, crouch: -0.48, lean: 0.24, twist: 0, step: 0.36, back: 0.36, width: 0.34, headPitch: 0.08 })),
+      K(HELI_START, B({ ...body, front: 'R', crouch: -0.02, lean: -0.2, twist: 1.2, hipTwist: 0.65, step: 0.44, back: 0.36, width: 0.22, headPitch: -0.2 }), { spin: 0, hop: 0 }),
+      // the whole body turns under the whirl, leaning out against its pull
+      K(HELI_WHIRL, B({ ...body, crouch: -0.2, lean: -0.1, twist: 0.4, hipTwist: 0.25, step: 0.3, back: 0.3, width: 0.28, side: -0.06, headPitch: -0.25 }), { spin: 0.04 }),
+      K(-0.95, B({ ...body, crouch: -0.18, lean: -0.16, twist: 0.1, hipTwist: 0.3, step: 0.3, back: 0.3, width: 0.28, side: 0.06, headPitch: -0.25 }), { spin: 0.4 }),
+      K(-0.5, B({ ...body, crouch: -0.1, lean: -0.18, twist: 0.0, hipTwist: 0.2, step: 0.3, back: 0.3, width: 0.26, side: -0.06, headPitch: -0.25 }), { spin: 0.72, hop: 0.06 }),
+      // risen onto his toes and wound back right under it at the top, the chest open
+      K(HELI_SLAM, B({ ...body, crouch: 0.04, lean: -0.32, twist: -0.75, hipTwist: -0.35, step: 0.32, back: 0.34, width: 0.22, headPitch: -0.35 }), { spin: 1, hop: 0.22 }),
+      K(0.2, B({ ...body, crouch: 0.06, lean: -0.3, twist: -0.5, hipTwist: -0.1, step: 0.4, back: 0.32, width: 0.22, headPitch: -0.3 }), { hop: 0.3 }),
+      // then crunched down into the blow
+      K(heliHit, B({ ...body, crouch: -0.3, lean: 0.45, twist: 0.3, hipTwist: 0.25, step: 0.56, back: 0.42, width: 0.3, headPitch: -0.15 }), { hop: 0.06 }),
+      K(heliGround + 0.06, B({ ...body, crouch: -0.5, lean: 0.78, twist: 0.35, hipTwist: 0.25, step: 0.5, back: 0.42, width: 0.38, headPitch: -0.05 }), { hop: 0 }),
+      K(1.12, B({ ...body, crouch: -0.52, lean: 0.78, twist: 0.35, hipTwist: 0.25, step: 0.5, back: 0.42, width: 0.38, headPitch: -0.02 })),
     ],
     main: heli,
     impacts: [heliHit],
@@ -247,18 +322,22 @@ export const WARDEN_B: Partial<Record<string, MoveDef>> = {
       fx(heliGround + 0.03, 'stomp', 'feet', 1.2),
     ],
     trail: { life: 0.26, glow: 0.7 },
-  }),
+  }), heliDrawn),
   // Prone Slam: out of the dash the hammer swings back along his right side and up behind the
-  // shoulder; then he dives after it, the body all but flat and the arms at full stretch as it
-  // comes over the top and lands far out ahead
-  dh: mv({
+  // shoulder as he winds up on the rear leg; then he launches off it, hips first, and dives after
+  // it, the body all but flat and the arms at full stretch as it comes over the top and lands far
+  // out ahead
+  dh: swung(mv({
     keys: [
-      K(-0.6, B({ ...body, crouch: -0.24, lean: 0.3, twist: -0.3, step: 0.4, back: 0.4 })),
-      K(DIVE_COCK_S, B({ ...body, crouch: -0.34, lean: 0.45, twist: -0.5, hipTwist: -0.12, step: 0.36, back: 0.44, headPitch: -0.1 }), { hop: 0, flip: 0 }),
-      K(diveHit - 0.12, B({ ...body, crouch: -0.16, lean: 0.72, twist: -0.12, step: 0.5, back: 0.56, headPitch: -0.35 }), { hop: 0.18, flip: 0.03 }),
-      K(diveHit, B({ ...body, crouch: -0.3, lean: 0.9, twist: -0.02, step: 0.58, back: 0.62, headPitch: -0.45 }), { hop: 0.1, flip: 0.04 }),
-      K(diveGround + 0.06, B({ ...body, crouch: -0.5, lean: 1.05, twist: 0, step: 0.66, back: 0.66, width: 0.2, headPitch: -0.5 }), { hop: 0, flip: 0 }),
-      K(1.12, B({ ...body, crouch: -0.5, lean: 1.05, twist: 0, step: 0.66, back: 0.66, width: 0.2, headPitch: -0.48 })),
+      K(-0.6, B({ ...body, crouch: -0.3, lean: 0.32, twist: -0.5, hipTwist: -0.2, step: 0.4, back: 0.44 })),
+      // wound right with the hammer cocked behind the shoulder, the weight back on the rear leg
+      K(DIVE_COCK_S, B({ ...body, crouch: -0.44, lean: 0.3, twist: -1.1, hipTwist: -0.55, step: 0.36, back: 0.52, width: 0.22, headPitch: -0.05 }), { hop: 0, flip: 0 }),
+      K(0.4, B({ ...body, crouch: -0.3, lean: 0.35, twist: -0.5, hipTwist: 0.0, step: 0.44, back: 0.54 }), { hop: 0.06 }),
+      // launched up off the rear foot, the hips through first, the chest still open
+      K(diveHit - 0.12, B({ ...body, crouch: -0.1, lean: 0.55, twist: -0.05, hipTwist: 0.25, step: 0.5, back: 0.58, headPitch: -0.4 }), { hop: 0.2, flip: 0.03 }),
+      K(diveHit, B({ ...body, crouch: -0.32, lean: 0.95, twist: 0.3, hipTwist: 0.3, step: 0.6, back: 0.62, width: 0.2, headPitch: -0.45 }), { hop: 0.1, flip: 0.04 }),
+      K(diveGround + 0.06, B({ ...body, crouch: -0.52, lean: 1.08, twist: 0.35, hipTwist: 0.3, step: 0.68, back: 0.66, width: 0.24, headPitch: -0.5 }), { hop: 0, flip: 0 }),
+      K(1.12, B({ ...body, crouch: -0.52, lean: 1.08, twist: 0.35, hipTwist: 0.3, step: 0.68, back: 0.66, width: 0.24, headPitch: -0.48 })),
     ],
     main: dive,
     impacts: [diveHit],
@@ -278,16 +357,20 @@ export const WARDEN_B: Partial<Record<string, MoveDef>> = {
       fx(diveGround + 0.04, 'stomp', 'feet', 1.1),
     ],
     trail: { life: 0.22, glow: 0.6 },
-  }),
-  // Reverse Launcher: the left foot reaches back and the hips sink onto it as the head is dug in
-  // under the target; then it is heaved up through it and on over his head as he leans away after
-  // it, the hammer ending hung back over his shoulders
-  bh: mv({
+  }), diveDrawn),
+  // Reverse Launcher: the left foot reaches back and the hips sink and wind onto it as the head is
+  // dug in under the target; then the hips heave round and it goes up through it and on over his
+  // head as he rises and leans away after it, the hammer ending hung back over his shoulders
+  bh: swung(mv({
     keys: [
-      K(-0.6, B({ ...body, crouch: -0.14, lean: 0.14, twist: -0.2 })),
-      K(0, B({ ...body, crouch: -0.36, lean: 0.06, twist: -0.08, step: 0.22, back: 0.52, headPitch: 0.15 })),
-      K(revHit, B({ ...body, crouch: -0.22, lean: -0.08, twist: 0, step: 0.2, back: 0.58, headPitch: -0.15 })),
-      K(1.0, B({ ...body, crouch: -0.28, lean: -0.38, twist: 0.05, step: 0.18, back: 0.66, width: 0.2, headPitch: -0.3 })),
+      K(-0.6, B({ ...body, crouch: -0.2, lean: 0.16, twist: -0.3, hipTwist: -0.15 }), { hop: 0 }),
+      // the hips sunk back onto the reaching rear leg, wound right over the dug-in head
+      K(0, B({ ...body, crouch: -0.46, lean: 0.2, twist: -0.5, hipTwist: -0.3, step: 0.24, back: 0.56, width: 0.22, headPitch: 0.15 })),
+      // the hips heave round and up first
+      K(revHit, B({ ...body, crouch: -0.25, lean: -0.05, twist: 0.25, hipTwist: 0.25, step: 0.22, back: 0.6, headPitch: -0.15 })),
+      // up on his toes as it goes over, leaning away after it
+      K(0.6, B({ ...body, crouch: -0.05, lean: -0.35, twist: 0.35, hipTwist: 0.2, step: 0.2, back: 0.64, width: 0.2, headPitch: -0.4 }), { hop: 0.06 }),
+      K(1.0, B({ ...body, crouch: -0.3, lean: -0.45, twist: 0.2, hipTwist: 0.1, step: 0.18, back: 0.72, width: 0.22, headPitch: -0.3 }), { hop: 0 }),
     ],
     main: rev,
     impacts: [revHit],
@@ -305,17 +388,20 @@ export const WARDEN_B: Partial<Record<string, MoveDef>> = {
       fx(revHit + 0.05, 'dust', 'feet', 0.9),
     ],
     trail: { life: 0.2, glow: 0.5 },
-  }),
-  // Somersault: in the air the hammer is drawn up behind his head and he throws himself into a
-  // forward flip with it held out at arm's length; it comes over the top and down through the
-  // target, then folds in along his chest for the rest of the turn
-  jl: mv({
+  }), revDrawn),
+  // Somersault: in the air the hammer is drawn up behind his head, his back arched and wound
+  // right, and he jack-knifes into a forward flip with it held out at arm's length; it comes over
+  // the top and down through the target, then folds in along his chest for the rest of the turn
+  jl: swung(mv({
     keys: [
-      K(-0.4, B({ ...body, crouch: -0.14, lean: 0.05, twist: -0.25 }), { flip: 0, hop: 0 }),
-      K(-0.06, B({ ...body, crouch: -0.06, lean: -0.22, twist: -0.1, headPitch: -0.2 }), { flip: -0.03 }),
-      K(somHit, B({ ...body, crouch: -0.18, lean: 0.22, twist: 0, headPitch: 0.1 }), { flip: 0.18, hop: 0.3 }),
-      K(0.8, B({ ...body, crouch: -0.32, lean: 0.4, twist: 0, headPitch: 0.2 }), { flip: 0.55, hop: 0.4 }),
-      K(1.07, B({ ...body, crouch: -0.3, lean: 0.35, twist: 0, headPitch: 0.15 }), { flip: 0.8, hop: 0.2 }),
+      K(-0.4, B({ ...body, crouch: -0.16, lean: 0.05, twist: -0.45, hipTwist: -0.2 }), { flip: 0, hop: 0 }),
+      // arched back and wound right as it is drawn up behind his head
+      K(-0.06, B({ ...body, crouch: 0.02, lean: -0.32, twist: -0.8, hipTwist: -0.4, headPitch: -0.25 }), { flip: -0.03 }),
+      K(0.3, B({ ...body, crouch: -0.08, lean: 0.0, twist: -0.2, hipTwist: 0.1, headPitch: -0.05 }), { flip: 0.07, hop: 0.15 }),
+      // then jack-knifed over it into the flip
+      K(somHit, B({ ...body, crouch: -0.3, lean: 0.45, twist: 0.3, hipTwist: 0.2, headPitch: 0.1 }), { flip: 0.18, hop: 0.3 }),
+      K(0.8, B({ ...body, crouch: -0.38, lean: 0.5, twist: 0.25, hipTwist: 0.15, headPitch: 0.2 }), { flip: 0.55, hop: 0.4 }),
+      K(1.07, B({ ...body, crouch: -0.32, lean: 0.38, twist: 0.1, headPitch: 0.15 }), { flip: 0.8, hop: 0.2 }),
       K(1.3, B({ ...body, crouch: -0.2, lean: 0.2, twist: -0.1 }), { flip: 1, hop: 0 }),
     ],
     main: somersault,
@@ -330,19 +416,22 @@ export const WARDEN_B: Partial<Record<string, MoveDef>> = {
     lead: 0.04,
     fx: [fx(somHit, 'sparkle', 'tip', 0.9, '#ffd27a'), fx(somHit, 'flashline', 'tip', 0.8)],
     trail: { life: 0.2, glow: 0.45 },
-  }),
+  }), somDrawn),
   // Skyfall: the hammer goes up overhead as he flips forward, so that upside down at the top of
-  // the jump he is standing on his hands on the haft; the flip rolls on, the hammer comes over the
-  // top from behind, and he lands in a wide squat behind it as it hits the floor
-  jh: mv({
+  // the jump he is standing on his hands on the haft, stretched straight; the flip rolls on, the
+  // hammer comes over the top from behind, and he crunches down into a wide squat behind it as it
+  // hits the floor
+  jh: swung(mv({
     keys: [
-      K(-0.2, B({ ...body, crouch: -0.2, lean: 0.2, twist: -0.15 }), { flip: 0, hop: 0 }),
-      K(0.0, B({ ...body, crouch: -0.3, lean: 0.32, twist: 0, headPitch: 0.1 }), { flip: 0.15, hop: 0.1 }),
-      K(SKY_TOP_S, B({ ...body, crouch: 0.05, lean: 0.0, twist: 0, step: 0.1, back: 0.1, width: 0.12, headPitch: -0.1 }), { flip: 0.5, hop: 0.6 }),
-      K(skyChamber, B({ ...body, crouch: 0.02, lean: -0.08, twist: 0, step: 0.12, back: 0.12, width: 0.12, headPitch: -0.1 }), { flip: 0.62, hop: 0.5 }),
-      K(skyHit, B({ ...body, crouch: -0.22, lean: 0.35, twist: 0, step: 0.36, back: 0.3, width: 0.24, headPitch: -0.15 }), { flip: 1, hop: 0.06 }),
-      K(skyGround + 0.06, B({ ...body, crouch: -0.52, lean: 0.6, twist: 0, step: 0.3, back: 0.3, width: 0.32, headPitch: -0.2 }), { hop: 0 }),
-      K(1.12, B({ ...body, crouch: -0.54, lean: 0.62, twist: 0, step: 0.3, back: 0.3, width: 0.32, headPitch: -0.18 })),
+      K(-0.2, B({ ...body, crouch: -0.24, lean: 0.22, twist: -0.45, hipTwist: -0.2 }), { flip: 0, hop: 0 }),
+      K(0.0, B({ ...body, crouch: -0.36, lean: 0.3, twist: -0.7, hipTwist: -0.35, headPitch: 0.1 }), { flip: 0.15, hop: 0.1 }),
+      // stretched out straight on the haft, upside down
+      K(SKY_TOP_S, B({ ...body, crouch: 0.1, lean: -0.05, twist: -0.1, hipTwist: -0.05, step: 0.1, back: 0.1, width: 0.12, headPitch: -0.15 }), { flip: 0.5, hop: 0.6 }),
+      K(skyChamber, B({ ...body, crouch: 0.04, lean: -0.2, twist: -0.2, hipTwist: -0.08, step: 0.12, back: 0.12, width: 0.12, headPitch: -0.2 }), { flip: 0.62, hop: 0.5 }),
+      // then crunched down into the slam as he lands, the stance wide
+      K(skyHit, B({ ...body, crouch: -0.3, lean: 0.6, twist: 0.25, hipTwist: 0.2, step: 0.4, back: 0.32, width: 0.28, headPitch: -0.2 }), { flip: 1, hop: 0.06 }),
+      K(skyGround + 0.06, B({ ...body, crouch: -0.55, lean: 0.75, twist: 0.3, hipTwist: 0.2, step: 0.34, back: 0.32, width: 0.36, headPitch: -0.25 }), { hop: 0 }),
+      K(1.12, B({ ...body, crouch: -0.56, lean: 0.76, twist: 0.3, hipTwist: 0.2, step: 0.34, back: 0.32, width: 0.36, headPitch: -0.22 })),
     ],
     main: sky,
     impacts: [skyHit],
@@ -361,5 +450,5 @@ export const WARDEN_B: Partial<Record<string, MoveDef>> = {
       fx(skyGround, 'shake', 'root', 1),
     ],
     trail: { life: 0.22, glow: 0.6 },
-  }),
+  }), skyDrawn),
 };
