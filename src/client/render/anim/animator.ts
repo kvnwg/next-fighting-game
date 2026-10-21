@@ -186,6 +186,15 @@ function shiftHands(p: ResolvedPose, d: THREE.Vector3, k = 1): void {
 const BODY_CHANNELS = ['crouch', 'lean', 'twist', 'side', 'hipTwist', 'headPitch', 'step', 'back', 'width', 'lift'] as const;
 const ROT_CHANNELS = ['spin', 'flip', 'roll', 'hop'] as const;
 
+/**
+ * Attack tells. The chamber is reached this far into the windup and then held, and pushed further
+ * from guard than authored: TELL_LIGHT for the quickest lights, up to TELL_LIGHT + TELL_HEAVY for
+ * slow heavies.
+ */
+const TELL_ARRIVE = 0.55;
+const TELL_LIGHT = 0.38;
+const TELL_HEAVY = 0.27;
+
 /** Cubic Hermite through the keys: smooth, and easing in and out at the first and last key. */
 function hermite(keys: BodyKey[], i: number, t: number, get: (k: BodyKey) => number): number {
   const k1 = keys[i];
@@ -486,6 +495,9 @@ export class Animator {
     const swingsOff = !!def.off && def.off.kind !== 'hold';
 
     if (def.linear) return this.linearPose(a, def, e, hitT, t1, total, out, swingsMain, swingsOff);
+    // the tell: how much further than authored the chamber is pushed from guard, so every attack
+    // is announced by an unmistakable pull. Small for quick lights, big for heavies and perilous
+    const tell = TELL_LIGHT + TELL_HEAVY * clamp01((w - 280) / 500) + (atk.perilous ? 0.1 : 0);
     if (def.flow > 0 && e < hitT[0]) {
       // a continuous windup: one accelerating motion from the opening pose into the hit
       const k = e / Math.max(1, hitT[0]);
@@ -496,22 +508,30 @@ export class Animator {
       out.swingMain = swingsMain && s >= def.sChamber;
       out.swingOff = swingsOff && s >= def.sChamber;
       out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
-      return { pose: lerpResolved(this.snapshot, f.pose, bw), rot: lerpRot(this.snapRot, f.rot, bw), kick: f.kick };
+      // the wind-up swells through the middle of the motion and lets go into the hit
+      const env = smooth(k / 0.45) * (1 - smooth((k - 0.7) / 0.3));
+      return { pose: lerpResolved(this.snapshot, this.exaggerate(f.pose, a, tell * env), bw), rot: lerpRot(this.snapRot, f.rot, bw), kick: f.kick };
     }
     if (e < t0) {
-      // windup: blend in to the opening pose, then travel (or coil) to the chamber
+      // windup: snap into the chamber over the first part of it and hold there, loaded, so the
+      // pose reads before the strike comes
       const k = e / Math.max(1, t0);
-      const s = def.sStart + (def.sChamber - def.sStart) * smooth((k - def.travel) / (1 - def.travel));
+      const kk = clamp01(k / TELL_ARRIVE);
+      const s = def.sStart + (def.sChamber - def.sStart) * easeOut(clamp01((kk - def.travel) / (1 - def.travel)), 2);
       this.cues(def, s, out);
       const f = this.movePose(def, s);
-      const bw = easeOut(k / def.blendIn, 3);
-      return { pose: lerpResolved(this.snapshot, f.pose, bw), rot: lerpRot(this.snapRot, f.rot, bw), kick: f.kick };
+      const bw = easeOut(kk / def.blendIn, 3);
+      const load = tell * easeOut(clamp01((k - TELL_ARRIVE * 0.5) / (1 - TELL_ARRIVE * 0.5)), 2);
+      return { pose: lerpResolved(this.snapshot, this.exaggerate(f.pose, a, load), bw), rot: lerpRot(this.snapRot, f.rot, bw), kick: f.kick };
     }
     if (e < t1) {
       let s: number;
+      // the loaded chamber lets go into the strike
+      let release = 0;
       if (e < hitT[0]) {
         const q = (e - t0) / Math.max(1, hitT[0] - t0);
         s = def.sChamber + (def.impacts[0] - def.sChamber) * q * q; // accelerating into the hit
+        release = tell * Math.pow(1 - q, 3);
       } else if (e < hitT[n - 1]) {
         let i = 0;
         while (i < n - 2 && e >= hitT[i + 1]) i++;
@@ -527,7 +547,7 @@ export class Animator {
       out.swingOff = swingsOff;
       out.swingKick = !!f.kick && f.kick.w > 0.5;
       out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
-      return f;
+      return release > 0.005 ? { ...f, pose: this.exaggerate(f.pose, a, release) } : f;
     }
     // recovery: settle out of the follow-through (or play the flourish), then flow back to guard
     const k = (e - t1) / Math.max(1, total - t1);
@@ -540,6 +560,12 @@ export class Animator {
     const rot = { ...f.rot };
     for (const c of ROT_CHANNELS) rot[c] = f.rot[c] + (settleTurn(f.rot[c], c) - f.rot[c]) * gw;
     return { pose: lerpResolved(f.pose, guard, gw), rot, kick: f.kick && { ...f.kick, w: f.kick.w * (1 - gw) } };
+  }
+
+  /** Push a pose further from guard by `amount` (0.3 = 30% further): the attack's tell. */
+  private exaggerate(pose: ResolvedPose, a: AnimInput, amount: number): ResolvedPose {
+    if (amount <= 0.005) return pose;
+    return lerpResolved(this.guardPose(a), pose, 1 + amount);
   }
 
   /** Baked clips: straight-line time from the start through each hit to the end, so the clip keeps its own rhythm. */
