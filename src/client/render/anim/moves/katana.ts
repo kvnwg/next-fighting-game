@@ -23,14 +23,14 @@ const swallow = arc([-0.04, 0.3, 0.16], 0.24, [[-0.58, -0.62, -0.1], [-0.6, -0.3
 const swallowHit = hitAt(swallow, 2);
 
 // Falling Petal: from high on the left down to low on the right
-const petal = arc([-0.02, 0.36, 0.16], 0.24, [[0.55, 0.8, -0.1], [0.4, 0.6, 0.7], [-0.05, 0.1, 1], [-0.6, -0.45, 0.62], [-0.65, -0.68, 0.15]], G2);
+const petal = arc([-0.02, 0.38, 0.16], 0.24, [[0.55, 0.8, -0.1], [0.4, 0.66, 0.7], [-0.05, 0.3, 1], [-0.6, -0.35, 0.68], [-0.65, -0.68, 0.15]], G2);
 const petalHit = hitAt(petal, 2);
 
 // Twin Swallow: flat right-to-left, turn over, flat left-to-right, then the chiburi flick
 const twin = seq([
-  [-0.1, 0.5, arc([-0.02, 0.3, 0.16], 0.26, [[-0.95, 0.02, 0.2], [-0.55, 0.06, 0.82], [0.05, 0.08, 1], [0.8, 0.1, 0.55], [0.95, 0.12, 0.05]], G2)],
-  [0.5, 1.1, arc([-0.02, 0.32, 0.16], 0.26, [[0.95, 0.18, 0.1], [0.55, 0.12, 0.82], [-0.05, 0.06, 1], [-0.8, 0.0, 0.55], [-0.9, -0.08, 0.15]], G2)],
-  [1.1, 1.38, arc([-0.12, 0.22, 0.12], 0.26, [[-0.9, -0.08, 0.15], [-0.55, -0.82, 0.2]], G2)],
+  [-0.1, 0.5, arc([-0.04, 0.32, 0.18], 0.22, [[-0.9, 0.12, 0.3], [-0.55, 0.18, 0.82], [0.05, 0.22, 1], [0.75, 0.24, 0.6], [0.88, 0.26, 0.15]], G2)],
+  [0.5, 1.1, arc([-0.04, 0.34, 0.18], 0.22, [[0.88, 0.28, 0.15], [0.55, 0.24, 0.82], [-0.05, 0.2, 1], [-0.75, 0.12, 0.6], [-0.85, 0.04, 0.25]], G2)],
+  [1.1, 1.38, arc([-0.1, 0.26, 0.16], 0.22, [[-0.85, 0.04, 0.25], [-0.5, -0.8, 0.3]], G2)],
 ], 0.07);
 const twinHits = [hitAt(twin, 2, 0), hitAt(twin, 2, 1)];
 
@@ -39,7 +39,7 @@ const heaven = arc([-0.02, 0.44, 0.1], 0.26, [[0.06, 0.7, -0.72], [0.02, 1, -0.0
 const heavenHit = hitAt(heaven, 2);
 
 // Iai Flash: out of the scabbard mouth, flat across the body
-const draw = arc([-0.167, 0.2, 0.421], 0.15, [[0.9, 0, -0.4], [0.7, 0.05, 0.7], [0, 0.08, 1], [-0.8, 0.12, 0.55], [-0.95, 0.16, -0.15]], NaN, { pivot1: [-0.32, 0.33, 0.22] });
+const draw = arc([-0.167, 0.2, 0.421], 0.15, [[0.9, 0, -0.4], [0.7, 0.14, 0.7], [0, 0.3, 1], [-0.8, 0.36, 0.55], [-0.95, 0.4, -0.15]], NaN, { pivot1: [-0.34, 0.4, 0.24] });
 const drawHit = hitAt(draw, 2);
 
 export const katana: Style = {
@@ -79,9 +79,9 @@ export const katana: Style = {
     l2: mv({
       keys: [
         K(-0.1, B({ ...body, twist: -0.75, crouch: -0.2, lean: 0.22, step: 0.3 })),
-        K(twinHits[0], B({ ...body, twist: 0.3, crouch: -0.22, lean: 0.3, step: 0.44, back: 0.26 })),
-        K(0.5, B({ ...body, twist: 0.62, crouch: -0.2, lean: 0.26, step: 0.44, back: 0.26 })),
-        K(twinHits[1], B({ ...body, twist: -0.2, crouch: -0.24, lean: 0.34, step: 0.5, back: 0.3 })),
+        K(twinHits[0] + 0.1, B({ ...body, twist: -0.05, crouch: -0.2, lean: 0.26, step: 0.44, back: 0.26 })),
+        K(0.55, B({ ...body, twist: 0.45, crouch: -0.2, lean: 0.24, step: 0.44, back: 0.26 })),
+        K(twinHits[1] + 0.1, B({ ...body, twist: 0.05, crouch: -0.22, lean: 0.3, step: 0.5, back: 0.3 })),
         K(1.08, B({ ...body, twist: -0.62, crouch: -0.22, lean: 0.28, step: 0.48, back: 0.3 })),
         K(1.38, B({ ...body, twist: -0.4, crouch: -0.16, lean: 0.12, step: 0.36, back: 0.24, headPitch: 0.1 })),
       ],
@@ -116,26 +116,34 @@ export const katana: Style = {
         K(0.8, B({ ...body, twist: -0.25, crouch: -0.32, lean: 0.42, step: 0.7, back: 0.54 })),
         K(1.0, B({ ...body, twist: -0.2, crouch: -0.3, lean: 0.42, step: 0.7, back: 0.54 })),
       ],
-      main: line([-0.2, 0.52, -0.08], [-0.04, 0.4, 0.62], [0.12, 0.02, 1], [0.02, 0.02, 1], [-1, 0.2, 0], G2, G2, { body: true }),
+      main: line([-0.12, 0.5, 0.02], [-0.04, 0.4, 0.62], [0.12, 0.02, 1], [0.02, 0.02, 1], [-1, 0.2, 0], G2, G2, { body: true }),
       impacts: [0.8],
       end: 1.0,
       ghosts: [0.0, 0.85],
       fx: [fx(0.0, 'dust', 'feet', 1.2), fx(0.8, 'flashline', 'tip', 1.4, '#ffffff'), fx(0.8, 'sparkle', 'tip', 1.2, '#ff8a6a')],
       trail: { life: 0.22, glow: 0.9 },
     }),
-    // Iai Flash: out of the scabbard in one horizontal stroke, one-handed, the body unwinding past
-    // the target; a streak of light and a gust of petals, then the blade comes home to guard.
+    // Iai Flash: out of the scabbard in one rising horizontal stroke, one-handed, the whole body
+    // driving through on a long step; a streak of light and a gust of petals, a chiburi, then guard.
     ia: mv({
       keys: [
         K(-0.1, stanceBody),
-        K(drawHit, B({ ...body, crouch: -0.28, lean: 0.4, twist: -0.45, step: 0.52, back: 0.36 })),
-        K(1.0, B({ ...body, crouch: -0.3, lean: 0.34, twist: -0.85, step: 0.54, back: 0.36, headPitch: 0.05 })),
+        K(drawHit * 0.5, B({ ...body, crouch: -0.26, lean: 0.42, twist: 0.35, step: 0.5, back: 0.4 })),
+        K(drawHit + 0.1, B({ ...body, crouch: -0.2, lean: 0.36, twist: 0.2, step: 0.68, back: 0.46 })),
+        K(1.0, B({ ...body, crouch: -0.24, lean: 0.3, twist: -0.6, step: 0.7, back: 0.46, headPitch: 0.05 })),
+        K(1.3, B({ ...body, crouch: -0.2, lean: 0.2, twist: -0.45, step: 0.6, back: 0.42, headPitch: 0.08 })),
       ],
-      main: draw,
+      main: seq([
+        [-0.2, 1.05, draw],
+        // chiburi: the blood flicked off with a snap of the wrist
+        [1.05, 1.3, arc([-0.34, 0.4, 0.24], 0.15, [[-0.95, 0.42, -0.1], [-0.7, -0.6, 0.35]])],
+      ], 0.06),
       free: line([0.08, 0.09, 0.16], [0.36, 0.22, -0.14], [0, 0, 1], [0, 0, 1], [0, 1, 0]),
       impacts: [drawHit],
+      rest: 1.3,
+      settle: 0.55,
       ghosts: [0.1, 0.8],
-      fx: [fx(drawHit, 'flashline', 'tip', 1.6, '#ffffff'), fx(drawHit + 0.05, 'petals', 'tip', 1.2)],
+      fx: [fx(0.0, 'dust', 'feet', 1.1), fx(drawHit, 'flashline', 'tip', 1.6, '#ffffff'), fx(drawHit + 0.05, 'petals', 'tip', 1.2), fx(1.25, 'sparkle', 'tip', 0.4, '#ffffff')],
       trail: { life: 0.28, glow: 1 },
     }),
   },
