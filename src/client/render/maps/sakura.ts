@@ -30,7 +30,8 @@ const POND = { x: 26, z: 8, hw: 7, hd: 2.6 };
  */
 function courtyardWall(r: number, gate: { at: number; width: number }): THREE.Group {
   const g = new THREE.Group();
-  const v = 0.1;
+  g.name = 'wall';
+  const v = 0.14;
   const plaster = [hex('#ece4d2'), hex('#e4dbc7'), hex('#f1eadb')];
   const stone = [hex('#8c877d'), hex('#97928a'), hex('#827d74')];
   const roof = [hex('#4f5664'), hex('#596070'), hex('#474d5a')];
@@ -42,7 +43,7 @@ function courtyardWall(r: number, gate: { at: number; width: number }): THREE.Gr
       const ox = -outer + cx * v - v;
       const oz = -outer + cz * v - v;
       const n = CH + 2;
-      const vol = new VoxelVolume(n, 22, n, [v, v, v], [ox, 0, oz]);
+      const vol = new VoxelVolume(n, Math.ceil(2.2 / v), n, [v, v, v], [ox, 0, oz]);
       let any = false;
       for (let z = 0; z < n; z++) {
         for (let x = 0; x < n; x++) {
@@ -55,11 +56,11 @@ function courtyardWall(r: number, gate: { at: number; width: number }): THREE.Gr
           if (off * r < gate.width / 2) continue;
           any = true;
           const ad = Math.abs(d);
-          for (let y = 0; y < 22; y++) {
+          for (let y = 0; y < Math.ceil(2.2 / v); y++) {
             const py = (y + 0.5) * v;
             let c: number | null = null;
             if (py < 0.3 && ad < 0.28) c = pick(stone, hash3(x + cx, y, z + cz, 2));
-            else if (py < 1.7 && ad < 0.22) c = y === 9 || y === 14 ? hex('#d8cdb6') : pick(plaster, hash3(x + cx, y, z + cz, 3));
+            else if (py < 1.7 && ad < 0.22) c = Math.abs(py - 0.95) < v / 2 || Math.abs(py - 1.45) < v / 2 ? hex('#d8cdb6') : pick(plaster, hash3(x + cx, y, z + cz, 3));
             else if (py >= 1.7 && py < 1.8 && ad < 0.26) c = hex('#3a2a20');
             else if (py >= 1.8 && py < 1.9 && ad < 0.5) c = pick(roof, hash3(x + cx, y, z + cz, 4));
             else if (py >= 1.9 && py < 2.0 && ad < 0.36) c = pick(roof, hash3(x + cx, y, z + cz, 5));

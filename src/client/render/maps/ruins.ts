@@ -113,7 +113,7 @@ export const ruinsRecipe: MapRecipe = {
         r: 17.5,
         halfWidth: 0.36,
         height: 3,
-        voxel: 0.12,
+        voxel: 0.16,
         gaps: [
           { at: 0.9, width: 3 },
           { at: 2.6, width: 4.5 },

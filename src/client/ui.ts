@@ -56,6 +56,8 @@ export interface CardData {
   /** 0..1 special meter: full = the special attack is ready */
   special: number;
   broken: boolean;
+  /** 0..1 posture: full means the guard breaks */
+  posture: number;
   /** rounds won (null outside matches) */
   pips: number | null;
   pipMax: number;
@@ -145,26 +147,25 @@ export class UI {
         <div class="floaters"></div>
         <div class="lock-reticle hidden"></div>
         <div class="fcard self">
-          <div class="fc-diamond"><img class="fc-portrait" alt="" /></div>
-          <div class="fc-body">
-            <div class="fc-title"></div>
-            <div class="fc-name"><b class="fc-n"></b> <span class="fc-handle"></span></div>
-            <div class="fc-hp"><div class="fc-trail"></div><div class="fc-fill"></div></div>
-            <div class="fc-sp"><div class="fc-fill"></div></div>
-            <div class="fc-meta"><span class="fc-pips"></span><span class="fc-ping"></span></div>
+          <div class="fc-port"><img class="fc-portrait" alt="" /></div>
+          <div class="fc-main">
+            <div class="fc-top"><span class="fc-n"></span><span class="fc-title"></span><span class="fc-ping"></span></div>
+            <div class="fc-hp"><div class="fc-track"><i class="fc-trail"></i><i class="fc-fill"></i></div></div>
+            <div class="fc-po"><div class="fc-track"><i class="fc-pofill"></i></div><b class="fc-brk">BROKEN</b></div>
+            <div class="fc-bot"><span class="fc-handle"></span><span class="fc-sp" title="Perilous art"><i class="fc-spfill"></i></span><span class="fc-pips"></span></div>
           </div>
         </div>
         <div class="fcard opp hidden">
-          <div class="fc-diamond"><img class="fc-portrait" alt="" /></div>
-          <div class="fc-body">
-            <div class="fc-title"></div>
-            <div class="fc-name"><b class="fc-n"></b> <span class="fc-handle"></span></div>
-            <div class="fc-hp"><div class="fc-trail"></div><div class="fc-fill"></div></div>
-            <div class="fc-sp"><div class="fc-fill"></div></div>
-            <div class="fc-meta"><span class="fc-pips"></span><span class="fc-ping"></span></div>
+          <div class="fc-port"><img class="fc-portrait" alt="" /></div>
+          <div class="fc-main">
+            <div class="fc-top"><span class="fc-n"></span><span class="fc-title"></span><span class="fc-ping"></span></div>
+            <div class="fc-hp"><div class="fc-track"><i class="fc-trail"></i><i class="fc-fill"></i></div></div>
+            <div class="fc-po"><div class="fc-track"><i class="fc-pofill"></i></div><b class="fc-brk">BROKEN</b></div>
+            <div class="fc-bot"><span class="fc-handle"></span><span class="fc-sp" title="Perilous art"><i class="fc-spfill"></i></span><span class="fc-pips"></span></div>
           </div>
         </div>
         <div class="top-center">
+          <div class="match-round hidden"></div>
           <div class="match-timer hidden">0:00</div>
           <div class="zone-indicator hidden"><span class="jp">安全地帯</span>Safe zone · PvP disabled</div>
           <div class="net-info"><span id="online"></span><span id="fps"></span></div>
@@ -239,6 +240,7 @@ export class UI {
       fps: '#fps',
       zone: '.zone-indicator',
       timer: '.match-timer',
+      round: '.match-round',
       selfCard: '.fcard.self',
       oppCard: '.fcard.opp',
       postureMain: '.posture-main',
@@ -397,13 +399,22 @@ export class UI {
     }
     this.setText(q('.fc-title'), d.title);
     this.setText(q('.fc-n'), d.name);
-    this.setText(q('.fc-handle'), `@${d.char.name}`);
-    const hp = `${Math.max(0, Math.min(1, d.hp / d.char.stats.hp)) * 100}%`;
+    this.setText(q('.fc-handle'), d.char.name);
+    const frac = Math.max(0, Math.min(1, d.hp / d.char.stats.hp));
+    const hp = `${frac * 100}%`;
     const fill = q('.fc-hp .fc-fill');
     if (fill.style.width !== hp) {
+      // a hit: flash the bar, and let the red trail catch up after a beat
+      if (parseFloat(fill.style.width || '100') > frac * 100 + 0.01) {
+        el.classList.remove('hit');
+        void el.offsetWidth;
+        el.classList.add('hit');
+      }
       fill.style.width = hp;
-      q('.fc-trail').style.width = hp; // trails behind on a delay, showing the chunk you lost
+      q('.fc-trail').style.width = hp;
     }
+    el.classList.toggle('low', frac < 0.3 && frac > 0);
+    this.setBar(q('.fc-pofill'), d.posture);
     const sp = q('.fc-sp');
     (sp.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(1, d.special)) * 100}%`;
     sp.classList.toggle('ready', d.special >= 1);
@@ -450,10 +461,12 @@ export class UI {
 
   setMatch(m: Extract<ServerMsg, { t: 'match' }> | null, serverNow: number): void {
     this.els.timer.classList.toggle('hidden', !m);
+    this.els.round.classList.toggle('hidden', !m);
     if (!m) return;
     let secs = 0;
     if (m.phase === 'fight') secs = Math.max(0, Math.ceil((m.endsAt - serverNow) / 1000));
-    this.setText(this.els.timer, m.phase === 'fight' ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : `Round ${m.round}`);
+    this.setText(this.els.round, `Round ${m.round}`);
+    this.setText(this.els.timer, m.phase === 'fight' ? (secs >= 100 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : String(secs)) : '—');
     this.els.timer.classList.toggle('urgent', m.phase === 'fight' && secs <= 10);
   }
 
@@ -848,7 +861,7 @@ export class UI {
     const card = (r: RosterEntry, mine: boolean) => {
       const c = CHARACTERS[r.char];
       const rank = r.mmr !== undefined ? rankBadge(rankOf(r.mmr, r.placements ?? 0), true) : '<span class="muted">AI</span>';
-      return `<div class="vs-card ${mine ? 'mine' : ''}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}"><span class="vs-jp" aria-hidden="true">${c.jp}</span><div class="vs-name">${esc(r.name)}</div><div class="vs-char">${c.name} · ${c.weapon}</div>${rank}</div>`;
+      return `<div class="vs-card ${mine ? 'mine' : ''}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}"><span class="vs-jp" aria-hidden="true">${c.jp}</span><div class="vs-char">${c.name}</div><div class="vs-weapon">${c.weapon}</div><div class="vs-name">${esc(r.name)}</div>${rank}</div>`;
     };
     const el = h(`<div class="match-intro"><div class="mi-mode"><span class="jp">${titleJp}</span>${title}</div><div class="mi-jp">${map?.jp ?? ''}</div><div class="mi-map">${map?.name ?? ''}</div>
       <div class="mi-vs">${card(players[you], true)}<div class="vs">対</div>${card(players[you === 0 ? 1 : 0], false)}</div>

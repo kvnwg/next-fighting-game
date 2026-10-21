@@ -109,15 +109,17 @@ export function heightfieldMesh(hf: Heightfield, range?: { i0: number; i1: numbe
         let hn = H(i + di, j + dj);
         if (Number.isNaN(hn)) hn = hf.floor ?? h - 2;
         if (hn >= h) continue;
-        for (let l = h - 1; l >= hn; l--) {
-          const ya = l * t;
-          const yb = (l + 1) * t;
-          const p = corners.map((c) => [c[0], c[1] ? yb : ya, c[2]]);
-          // darker toward the ground they stand on
-          const lo = l === hn ? 0.62 : 0.86;
-          const hi = l === h - 1 ? 1 : 0.9;
+        // a cliff face in up to three bands (the lip, the earth under it, the rock below), each one
+        // quad however tall, shading darker toward the ground it stands on
+        const bands: [number, number][] = [[h - 1, h]];
+        if (h - 1 > hn) bands.push([Math.max(hn, h - 4), h - 1]);
+        if (h - 4 > hn) bands.push([hn, h - 4]);
+        for (const [la, lb] of bands) {
+          const p = corners.map((c) => [c[0], (c[1] ? lb : la) * t, c[2]]);
+          const lo = la === hn ? 0.62 : 0.86;
+          const hi = lb === h ? 1 : 0.9;
           const a = corners.map((c) => (c[1] ? hi : lo));
-          quad(p, n, hf.side(i, j, l, h - 1 - l), a, jit);
+          quad(p, n, hf.side(i, j, lb - 1, h - lb), a, jit);
         }
       }
     }
@@ -135,6 +137,7 @@ export function heightfieldMesh(hf: Heightfield, range?: { i0: number; i1: numbe
 /** A heightfield split into chunks, so the camera only draws the ones in view. */
 export function terrain(hf: Heightfield, chunk = 24, opts: { shadows?: boolean } = {}): THREE.Group {
   const g = new THREE.Group();
+  g.name = 'terrain';
   for (let j = 0; j < hf.nz; j += chunk) {
     for (let i = 0; i < hf.nx; i += chunk) {
       const geo = heightfieldMesh(hf, { i0: i, i1: Math.min(hf.nx, i + chunk), j0: j, j1: Math.min(hf.nz, j + chunk) });
@@ -166,6 +169,13 @@ export interface FloorSpec {
 
 /** The fighting floor as voxels (flat on top at y = 0), chunked for culling. */
 export function voxelFloor(shapes: Shape[], spec: FloorSpec): THREE.Group {
+  const named = new THREE.Group();
+  named.name = 'floor';
+  named.add(voxelFloorInner(shapes, spec));
+  return named;
+}
+
+function voxelFloorInner(shapes: Shape[], spec: FloorSpec): THREE.Group {
   const pad = spec.pad ?? 0;
   let minX = Infinity;
   let maxX = -Infinity;
@@ -268,6 +278,13 @@ export interface IslandSpec {
 
 /** The rock under a floating floor: tapering down to a craggy point, with soil under the lip. */
 export function floatingIsland(shapes: Shape[], spec: IslandSpec): THREE.Group {
+  const named = new THREE.Group();
+  named.name = 'island';
+  named.add(floatingIslandInner(shapes, spec));
+  return named;
+}
+
+function floatingIslandInner(shapes: Shape[], spec: IslandSpec): THREE.Group {
   const pad = spec.pad ?? 0.6;
   let minX = Infinity;
   let maxX = -Infinity;
@@ -415,6 +432,7 @@ export function mountainRing(spec: MountainSpec): THREE.Group {
     floor: 0,
   };
   const g = terrain(hf, 32);
+  g.name = 'mountains';
   g.position.y = spec.base;
   return g;
 }
@@ -456,6 +474,7 @@ export interface RingWallSpec {
 /** A wall that follows a circle, voxelized for real (no facets), in chunks. */
 export function ringWall(spec: RingWallSpec): THREE.Group {
   const g = new THREE.Group();
+  g.name = 'wall';
   const v = spec.voxel ?? 0.1;
   const outer = spec.r + spec.halfWidth + v;
   const span = Math.ceil((outer * 2) / v);

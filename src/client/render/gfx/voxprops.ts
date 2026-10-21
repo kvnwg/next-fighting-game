@@ -379,8 +379,8 @@ function crate(seed: number): PropParts {
 }
 
 function fence(seed: number): PropParts {
-  const v = 0.06;
-  const vol = VoxelVolume.cubic(5, 20, 36, v);
+  const v = 0.12;
+  const vol = VoxelVolume.cubic(3, 10, 18, v);
   const w = (x: number, y: number, z: number) => pickH(WOOD, x, y, z, seed);
   vol.box([-0.08, 0, -1.04], [0.08, 1.12, -0.88], w);
   vol.box([-0.08, 0, 0.88], [0.08, 1.12, 1.04], w);

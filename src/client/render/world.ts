@@ -149,6 +149,7 @@ export class MapView {
     for (const [i, c] of (look.clouds ?? []).entries()) {
       const layer = new CloudLayer({ ...c, seed: 3 + i * 17, half: Math.round(c.half * (q.level === 'low' ? 0.7 : 1)) });
       this.clouds.push(layer);
+      layer.group.name = 'clouds';
       this.group.add(layer.group);
       this.disposables.push(layer);
     }
@@ -214,6 +215,7 @@ export class MapView {
       props: (list, into) => this.addProps(list, into),
       grass: (o) => {
         const g = buildGrass(o, q.grass);
+        g.name = 'grass';
         g.traverse((m) => m.layers.set(DETAIL_LAYER));
         this.group.add(g);
       },
@@ -249,7 +251,7 @@ export class MapView {
     for (const p of list) {
       const variants = SCENERY.has(p.kind) ? 1 : propVariants(p.kind as PropKind);
       const variant = p.variant ?? Math.floor(Math.abs(Math.sin(p.x * 12.9898 + p.z * 78.233) * 43758.5453) % 1 * variants);
-      const key = `${p.kind}|${p.style ?? this.recipe.propStyle}|${variant}`;
+      const key = `${p.kind}|${p.style ?? this.recipe.propStyle}|${variant}|${Math.floor(p.x / 30)},${Math.floor(p.z / 30)}`;
       const arr = groups.get(key) ?? [];
       arr.push(p);
       groups.set(key, arr);
@@ -269,6 +271,7 @@ export class MapView {
       const inst = (geo: THREE.BufferGeometry | undefined, mat: THREE.Material, shadows: boolean, depth?: THREE.Material) => {
         if (!geo) return;
         const mesh = new THREE.InstancedMesh(geo, mat, matrices.length);
+        mesh.name = `prop:${kind}`;
         matrices.forEach((mm, i) => mesh.setMatrixAt(i, mm));
         mesh.castShadow = shadows;
         mesh.receiveShadow = true;
@@ -428,6 +431,22 @@ export class MapView {
       if (p) G.uPushers.value[i].set(p.x, p.y, p.z, 0.9);
       else G.uPushers.value[i].set(0, 0, 0, 0);
     }
+  }
+
+  /** Triangles per scenery category (for profiling). */
+  breakdown(): Record<string, number> {
+    const out: Record<string, number> = {};
+    this.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.geometry) return;
+      let cat = '';
+      for (let p: THREE.Object3D | null = m; p && !cat; p = p.parent) cat = p.name;
+      cat ||= 'other';
+      const tris = (m.geometry.index ? m.geometry.index.count : (m.geometry.attributes.position?.count ?? 0)) / 3;
+      const n = (m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 1;
+      out[cat] = (out[cat] ?? 0) + Math.round(tris * n);
+    });
+    return out;
   }
 
   update(dt: number, focus: THREE.Vector3): void {

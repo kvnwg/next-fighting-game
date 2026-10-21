@@ -1,10 +1,8 @@
 import './styles.css';
-import { installInkArt } from './ink';
 import { platform } from './platform';
 
-installInkArt();
-// the brush font is also drawn into canvas textures (the 危 perilous glyph), so fetch it early
-void document.fonts?.load(`22px 'Yuji Mai'`, '危').catch(() => undefined);
+// the kanji font is also drawn into canvas textures (the 危 perilous glyph), so fetch it early
+void document.fonts?.load(`800 22px 'Shippori Mincho B1'`, '危').catch(() => undefined);
 
 const root = document.getElementById('app')!;
 const params = new URLSearchParams(location.search);

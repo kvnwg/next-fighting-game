@@ -96,8 +96,8 @@ export const bambooRecipe: MapRecipe = {
 
     // ---------------------------------------------------------- bamboo, deep and dense
     const outside = (x: number, z: number) => (Math.abs(x) > 17.6 || Math.abs(z) > 17.6) && !onPath(x, z) && Math.abs(z - STREAM_Z) > 3.4;
-    const wall = scatter(Math.round(46 * q.scenery + 10), { x0: -26, z0: -26, x1: 26, z1: 26 }, (x, z) => outside(x, z) && Math.max(Math.abs(x), Math.abs(z)) < 25, 2.1, 91, ctx.taken);
-    const deep = scatter(Math.round(70 * q.scenery), { x0: -58, z0: -58, x1: 58, z1: 58 }, (x, z) => outside(x, z) && Math.max(Math.abs(x), Math.abs(z)) >= 25, 3.2, 92, ctx.taken);
+    const wall = scatter(Math.round(34 * q.scenery + 8), { x0: -26, z0: -26, x1: 26, z1: 26 }, (x, z) => outside(x, z) && Math.max(Math.abs(x), Math.abs(z)) < 25, 2.3, 91, ctx.taken);
+    const deep = scatter(Math.round(52 * q.scenery), { x0: -58, z0: -58, x1: 58, z1: 58 }, (x, z) => outside(x, z) && Math.max(Math.abs(x), Math.abs(z)) >= 25, 3.6, 92, ctx.taken);
     ctx.trees(wall.map((p, i) => ({ kind: 'bamboo' as const, x: p.x, z: p.z, y: Math.round(ground(p.x, p.z) / 0.25) * 0.25, s: 0.9 + hash3(i, 0, 0, 5) * 0.4 })));
     ctx.trees(deep.map((p, i) => ({ kind: 'bamboo' as const, x: p.x, z: p.z, y: Math.round(ground(p.x, p.z) / 0.25) * 0.25, s: 1 + hash3(i, 1, 0, 5) * 0.4 })), { shadows: false, detail: 0.7 });
     const ferns = scatter(Math.round(30 * q.scenery), { x0: -40, z0: -40, x1: 40, z1: 40 }, (x, z) => outside(x, z), 2.5, 93, ctx.taken);

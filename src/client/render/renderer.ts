@@ -263,6 +263,8 @@ export class GameRenderer {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.className = 'game-canvas';
+    // count the whole frame (shadows, reflections, post), not just the last pass
+    this.renderer.info.autoReset = false;
     container.appendChild(this.renderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1400);
@@ -443,7 +445,13 @@ export class GameRenderer {
     }
   }
 
+  /** Draw calls and triangles in the last frame. */
+  get stats(): { calls: number; triangles: number } {
+    return { calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles };
+  }
+
   render(): void {
+    this.renderer.info.reset();
     this.adapt();
     const r = this.renderer;
     const g = this.grade;

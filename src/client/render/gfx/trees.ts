@@ -193,7 +193,7 @@ function pine(seed: number, v: number, snowy: boolean): THREE.BufferGeometry {
   return meshVoxels(vol, { jitter: 0.06, seed, sway: (px, py, pz) => (py / (H + 0.7)) ** 2 * 0.08 + Math.hypot(px, pz) * 0.012 });
 }
 
-function bamboo(seed: number, v: number): THREE.BufferGeometry {
+function bamboo(seed: number, v: number, lite = false): THREE.BufferGeometry {
   const R = rng(seed);
   const stalks = 5 + Math.floor(R() * 4);
   const maxH = 9.5;
@@ -213,12 +213,12 @@ function bamboo(seed: number, v: number): THREE.BufferGeometry {
     const nodeEvery = 0.5 + R() * 0.15;
     const r = v * 0.62;
     vol.tube([bx, 0, bz], [tx, h, tz], r, r * 0.8, (_px, py) => (py % nodeEvery < v * 1.1 ? mixHex(shade, 0x2f4f1c, 0.45) : shade));
-    // leaf sprays on the upper part
-    for (let y = h * 0.45; y < h; y += 0.32 + R() * 0.25) {
+    // leaf sprays on the upper part (far clumps keep only a crown of them)
+    for (let y = h * (lite ? 0.72 : 0.45); y < h; y += (lite ? 0.6 : 0.42) + R() * 0.25) {
       const t = y / h;
       const sx = bx + (tx - bx) * t;
       const sz = bz + (tz - bz) * t;
-      const sprays = 2 + Math.floor(R() * 3);
+      const sprays = lite ? 2 : 1 + Math.floor(R() * 3);
       for (let k = 0; k < sprays; k++) {
         const la = R() * Math.PI * 2;
         const len = 0.35 + R() * 0.45;
@@ -335,7 +335,7 @@ export function treeGeometry(kind: TreeKind, variant: number, detail = 1): THREE
       g = pine(seed, 0.2 * k, true);
       break;
     case 'bamboo':
-      g = bamboo(seed, 0.12 * Math.min(k, 1.4));
+      g = bamboo(seed, 0.12 * Math.min(k, 1.4), detail < 0.8);
       break;
     case 'deadTree':
       g = deadTree(seed, 0.14 * k);
@@ -385,7 +385,9 @@ export function buildTrees(list: TreePlacement[], detail = 1, opts: { shadows?: 
   const groups = new Map<string, TreePlacement[]>();
   for (const t of list) {
     const variant = t.variant ?? Math.floor(hash3(Math.round(t.x * 10), 0, Math.round(t.z * 10), 7) * 3);
-    const key = `${t.kind}:${variant}`;
+    // instances are grouped in 30 m chunks so the camera (and the sun's shadow camera) can skip
+    // whole chunks out of view
+    const key = `${t.kind}:${variant}:${Math.floor(t.x / 30)},${Math.floor(t.z / 30)}`;
     const arr = groups.get(key) ?? [];
     arr.push({ ...t, variant });
     groups.set(key, arr);
@@ -395,8 +397,11 @@ export function buildTrees(list: TreePlacement[], detail = 1, opts: { shadows?: 
   const up = new THREE.Vector3(0, 1, 0);
   for (const [key, arr] of groups) {
     const [kind, variant] = key.split(':');
-    const geo = treeGeometry(kind as TreeKind, Number(variant), detail);
+    // far chunks get the lighter build
+    const far = arr.every((t) => Math.hypot(t.x, t.z) > 48);
+    const geo = treeGeometry(kind as TreeKind, Number(variant), far ? Math.min(detail, 0.6) : detail);
     const mesh = new THREE.InstancedMesh(geo, treeMaterial(), arr.length);
+    mesh.name = `tree:${kind}`;
     arr.forEach((t, i) => {
       q.setFromAxisAngle(up, t.rot ?? hash3(Math.round(t.x * 10), 1, Math.round(t.z * 10), 3) * Math.PI * 2);
       const s = t.s ?? 1;

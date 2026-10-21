@@ -5,7 +5,7 @@
  * reflections (the low tier) it reflects a sky gradient instead.
  */
 import * as THREE from 'three';
-import { bindGlobals, FOG_GLSL, GLOBALS_GLSL } from './globals';
+import { bindGlobals, FOG_GLSL, G, GLOBALS_GLSL } from './globals';
 
 const VERT = /* glsl */ `
 uniform mat4 textureMatrix;
@@ -113,19 +113,44 @@ export interface WaterOptions {
 /** True while any water is rendering its reflection, so reflections don't nest. */
 let reflecting = false;
 
+/**
+ * Every water surface at the same height shares one reflection, rendered once a frame by whichever
+ * of them draws first (a lake and six puddles cost one extra scene render, not seven).
+ */
+interface Mirror {
+  target: THREE.WebGLRenderTarget;
+  cam: THREE.PerspectiveCamera;
+  /** the reflection camera's projection before the oblique clip, for texture lookups */
+  proj: THREE.Matrix4;
+  stamp: number;
+  users: number;
+}
+const mirrors = new Map<string, Mirror>();
+
 export class Water {
   readonly mesh: THREE.Mesh;
-  private readonly target: THREE.WebGLRenderTarget | null;
+  private readonly mirror: Mirror | null = null;
+  private readonly key: string;
   private readonly mat: THREE.ShaderMaterial;
-  private readonly cam = new THREE.PerspectiveCamera();
 
   constructor(o: WaterOptions) {
     const geo = o.shape.type === 'rect' ? new THREE.PlaneGeometry(o.shape.w, o.shape.d) : new THREE.CircleGeometry(o.shape.r, 48);
-    this.target = o.reflections > 0 ? new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true }) : null;
+    this.key = o.y.toFixed(2);
+    if (o.reflections > 0) {
+      let m = mirrors.get(this.key);
+      if (!m) {
+        m = { target: new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true }), cam: new THREE.PerspectiveCamera(), proj: new THREE.Matrix4(), stamp: -1, users: 0 };
+        // only the world and fighters: no particles, grass or combat effects in the reflection
+        m.cam.layers.set(0);
+        mirrors.set(this.key, m);
+      }
+      m.users++;
+      this.mirror = m;
+    }
     const textureMatrix = new THREE.Matrix4();
     const uniforms: Record<string, THREE.IUniform> = {
-      tRefl: { value: this.target?.texture ?? null },
-      hasRefl: { value: this.target ? 1 : 0 },
+      tRefl: { value: this.mirror?.target.texture ?? null },
+      hasRefl: { value: this.mirror ? 1 : 0 },
       textureMatrix: { value: textureMatrix },
       deep: { value: new THREE.Color(o.deep) },
       shallow: { value: new THREE.Color(o.shallow) },
@@ -143,7 +168,8 @@ export class Water {
     this.mesh.position.set(o.shape.x, o.y, o.shape.z);
     this.mesh.renderOrder = 1;
     this.mesh.receiveShadow = false;
-    if (!this.target) return;
+    const mirror = this.mirror;
+    if (!mirror) return;
 
     const scale = o.reflections;
     const plane = new THREE.Plane();
@@ -157,18 +183,25 @@ export class Water {
     const target = new THREE.Vector3();
     const q = new THREE.Vector4();
     const size = new THREE.Vector2();
-    const rc = this.cam;
-    // only the world and fighters: no particles, grass or combat effects in the reflection
-    rc.layers.set(0);
+    const rc = mirror.cam;
     this.mesh.onBeforeRender = (renderer, scene, camera) => {
       if (reflecting) return;
       const mesh = this.mesh;
+      const lookup = () => {
+        textureMatrix.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+        textureMatrix.multiply(mirror.proj).multiply(rc.matrixWorldInverse).multiply(mesh.matrixWorld);
+      };
+      if (mirror.stamp === G.uTime.value) {
+        lookup();
+        return;
+      }
       reflectorPos.setFromMatrixPosition(mesh.matrixWorld);
       camPos.setFromMatrixPosition(camera.matrixWorld);
       rotation.extractRotation(mesh.matrixWorld);
       normal.set(0, 0, 1).applyMatrix4(rotation);
       view.subVectors(reflectorPos, camPos);
       if (view.dot(normal) > 0) return;
+      mirror.stamp = G.uTime.value;
       view.reflect(normal).negate().add(reflectorPos);
       rotation.extractRotation(camera.matrixWorld);
       lookAt.set(0, 0, -1).applyMatrix4(rotation).add(camPos);
@@ -179,8 +212,8 @@ export class Water {
       rc.far = (camera as THREE.PerspectiveCamera).far;
       rc.updateMatrixWorld();
       rc.projectionMatrix.copy(camera.projectionMatrix);
-      textureMatrix.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
-      textureMatrix.multiply(rc.projectionMatrix).multiply(rc.matrixWorldInverse).multiply(mesh.matrixWorld);
+      mirror.proj.copy(camera.projectionMatrix);
+      lookup();
       // oblique near plane: clip everything below the water
       plane.setFromNormalAndCoplanarPoint(normal, reflectorPos).applyMatrix4(rc.matrixWorldInverse);
       clip.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
@@ -197,13 +230,13 @@ export class Water {
       renderer.getDrawingBufferSize(size);
       const w = Math.max(1, Math.round(size.x * scale));
       const h = Math.max(1, Math.round(size.y * scale));
-      if (this.target!.width !== w || this.target!.height !== h) this.target!.setSize(w, h);
+      if (mirror.target.width !== w || mirror.target.height !== h) mirror.target.setSize(w, h);
       mesh.visible = false;
       reflecting = true;
       const prevTarget = renderer.getRenderTarget();
       const prevShadow = renderer.shadowMap.autoUpdate;
       renderer.shadowMap.autoUpdate = false;
-      renderer.setRenderTarget(this.target);
+      renderer.setRenderTarget(mirror.target);
       renderer.state.buffers.depth.setMask(true);
       renderer.clear();
       renderer.render(scene, rc);
@@ -217,6 +250,9 @@ export class Water {
   dispose(): void {
     this.mesh.geometry.dispose();
     this.mat.dispose();
-    this.target?.dispose();
+    if (this.mirror && --this.mirror.users <= 0) {
+      this.mirror.target.dispose();
+      mirrors.delete(this.key);
+    }
   }
 }

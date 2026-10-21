@@ -290,6 +290,7 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
     else r.camera.position.set(Math.sin(angle) * dist, height, Math.cos(angle) * dist);
     r.camera.lookAt(lookAt);
     view.update(params.has('freeze') ? 0 : dt, camAt ?? new THREE.Vector3());
+    (window as unknown as { __stats: unknown }).__stats = { ...r.stats, quality: r.quality.level, parts: view.breakdown() };
     fx.update(dt, r.camera);
     r.render();
     requestAnimationFrame(loop);
