@@ -256,14 +256,14 @@ const juggernaut: BaseDef = {
   ratings: { power: 5, speed: 1, reach: 3, defense: 3, difficulty: 2 },
   lights: [
     // dragged back along the floor and whipped round at shin height, the body dropping almost flat
-    { name: 'Ground Sweep', anim: 'sweep', windup: 440, active: 120, recovery: 420, damage: 14, posture: 16, blockPosture: 22, range: 3.6, arc: 41, lunge: 0.5 },
+    { name: 'Drag Sweep', anim: 'sweep', windup: 440, active: 120, recovery: 420, damage: 14, posture: 16, blockPosture: 22, range: 3.6, arc: 41, lunge: 0.5 },
     // one flat helicopter whirl overhead: slower to come out, but it sweeps a wide arc
-    { name: 'Hurricane', anim: 'spin', windup: 640, active: 130, recovery: 560, damage: 18, posture: 20, blockPosture: 28, range: 3.7, arc: 55, lunge: 0.6 },
+    { name: 'Backhand', anim: 'spin', windup: 640, active: 130, recovery: 560, damage: 18, posture: 20, blockPosture: 28, range: 3.7, arc: 55, lunge: 0.6 },
     // up from the ground through them until the hammer stands straight up at full stretch
-    { name: 'Launcher', anim: 'uppercut', windup: 520, active: 120, recovery: 520, damage: 16, posture: 20, blockPosture: 26, range: 3.6, arc: 38, lunge: 0.7 },
+    { name: 'Shoulder Chop', anim: 'uppercut', windup: 520, active: 120, recovery: 520, damage: 16, posture: 20, blockPosture: 26, range: 3.6, arc: 38, lunge: 0.7 },
   ],
-  heavy: { name: 'Felled Oak', anim: 'slam', windup: 780, active: 140, recovery: 650, damage: 26, posture: 34, blockPosture: 46, range: 3.8, arc: 28, lunge: 1.0, feintable: true, knockback: 1.2 },
-  special: { name: 'Earthshaker', anim: 'sweep', windup: 800, active: 180, recovery: 700, damage: 24, posture: 30, blockPosture: 30, range: 4.4, arc: 55, perilous: 'sweep', cooldown: 7500 },
+  heavy: { name: 'Windmill Slam', anim: 'slam', windup: 780, active: 140, recovery: 650, damage: 26, posture: 34, blockPosture: 46, range: 3.8, arc: 28, lunge: 1.0, feintable: true, knockback: 1.2 },
+  special: { name: 'Cyclone', anim: 'sweep', windup: 800, active: 180, recovery: 700, damage: 24, posture: 30, blockPosture: 30, range: 4.4, arc: 55, perilous: 'sweep', cooldown: 7500 },
   ability: {
     kind: 'buff',
     name: 'War Cry',
@@ -473,14 +473,14 @@ const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
     jh: { name: 'Falling Star', anim: 'overhead' },
   },
   juggernaut: {
-    h1: { name: 'Rip-Up', anim: 'uppercut' },
-    h2: { name: 'Helicopter', anim: 'spin', knockback: 1.4 },
-    dl: { name: 'Pole Lunge', anim: 'thrust', lunge: 1.2 },
-    dh: { name: 'Prone Slam', anim: 'slam', lunge: 2.2 },
-    bl: { name: 'Pole Push', anim: 'thrust' },
-    bh: { name: 'Reverse Launcher', anim: 'uppercut' },
-    jl: { name: 'Somersault', anim: 'overhead' },
-    jh: { name: 'Skyfall', anim: 'slam', knockback: 1.2 },
+    h1: { name: 'Cross Cleave', anim: 'uppercut' },
+    h2: { name: 'Earthbreaker', anim: 'spin', knockback: 1.4 },
+    dl: { name: 'Charging Uppercut', anim: 'thrust', lunge: 1.2 },
+    dh: { name: 'Diving Smash', anim: 'slam', lunge: 2.2 },
+    bl: { name: 'Retreating Backhand', anim: 'thrust' },
+    bh: { name: 'Retreating Sweep', anim: 'uppercut' },
+    jl: { name: 'Air Whirl', anim: 'overhead' },
+    jh: { name: 'Meteor', anim: 'slam', knockback: 1.2 },
   },
   duelist: {
     h1: { name: 'Prise de Fer', anim: 'thrust' },
