@@ -468,8 +468,9 @@ export class GameRenderer {
       this.slowFor = Math.max(0, this.slowFor - 1);
       this.fastFor = Math.max(0, this.fastFor - 1);
     }
-    if (this.slowFor > 120 && this.dynScale > 0.55) {
-      this.dynScale = Math.max(0.55, this.dynScale * 0.85);
+    // never below 75%: lower than that the picture goes visibly blurry, which reads worse than a few fps
+    if (this.slowFor > 120 && this.dynScale > 0.75) {
+      this.dynScale = Math.max(0.75, this.dynScale * 0.88);
       this.slowFor = 0;
       this.resize();
     } else if (this.fastFor > 300 && this.dynScale < 1) {
