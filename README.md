@@ -77,14 +77,23 @@ Ranked profiles are stored in `data/profiles.json` (`DATA_DIR` overrides the fol
 - **Menu and chat:** use the two buttons at the top left.
 - **Challenge:** tap the on-screen prompt to challenge the player in front of you.
 
-## Art style
+## Graphics
 
-The game renders in one of two looks, picked under **Help → Settings → Art style**:
+Everything in the world is voxels, lit the way a Minecraft shader pack lights them:
 
-- **Clean** (default): full resolution with smooth texture filtering and cel shading. Fighters get a soft ink outline and a rim light from the sun's side. Distant mountains fade into the haze, there's a wide bloom on lanterns and the sun, and a colour grade with cool shadows and warm highlights. FXAA smooths the edges. On high-density phone screens the render resolution is capped so it stays smooth.
-- **Pixel**: the original chunky 3D pixel look, snapped to a fixed palette, with a pixel-size slider.
-
-Both share `src/client/render/renderer.ts`; the clean path is the `CLEAN` define in its composite shader. In the dev viewer, add `&style=pixel` to compare.
+- **Post pipeline** (`src/client/render/renderer.ts`): HDR rendering with MSAA, a soft bloom, screen-space god rays from the sun or moon, an ACES tone map and a per-map colour grade (lift, gain, saturation, vignette).
+- **Voxel lighting** (`render/gfx/materials.ts`): baked corner ambient occlusion on every voxel, soft sun shadows, leaves that glow when the sun is behind them, a rim light on fighters, and exponential height fog that glows toward the sun.
+- **Living world:**
+  - Trees, grass and cloth sway in gusting wind.
+  - Grass bends away from fighters walking through it.
+  - Thousands of voxel petals, leaves, snowflakes, embers and fireflies are animated on the GPU.
+  - Water is a planar mirror broken up by ripples, with sun glints and rain rings.
+  - Blocky clouds drift overhead, catching the sun on their edges and darkening underneath.
+- **Maps** (`render/maps/`): each map is a recipe with a lighting mood (sky, sun, fog, grade, wind) and a build step that places terrain, trees, props and effects from a shared kit.
+  - The Sakura Courtyard has a second gate on the sunset side, with a jetty out to a lake and an old cherry tree on an island. `/?viewer&map=sakura&q=high&cam=-14.8,1,12.2&look=-27.4,4.5,12.7` frames it.
+- **Quality:** **Help → Settings → Graphics** picks Low, Medium, High, Ultra or Auto. Auto picks a tier for the device and then adjusts the render resolution to hold the frame rate.
+  - Each tier sets shadow size, reflections, god-ray samples, grass and particle density, and scenery detail (`render/gfx/quality.ts`).
+  - Trees are instanced in chunks that the camera and the shadow pass can skip.
 
 ## Combat
 
@@ -153,7 +162,9 @@ src/server/      Node WebSocket server
   lobby.ts         safe zone, respawns, dummies     arena.ts   best-of-3 match flow
   bot.ts           AI opponents                     store.ts   profile persistence
 src/client/      three.js client
-  render/          renderer (clean cel-shaded or 3D pixel), character rig + animation, weapons, maps, effects
+  render/          HDR renderer + post pipeline, character rig + animation, weapons, effects
+    gfx/             voxel mesher, trees, props, sky + clouds, water, grass, GPU particles, shared shaders
+    maps/            one recipe per map (lighting mood + build) on a shared kit
   app.ts           main loop + networking glue      local.ts   local player prediction
   ui.ts            HUD, menus, character select, ladder, results
 tests/           vitest: combat rules + server integration
@@ -162,14 +173,10 @@ scripts/         headless-browser screenshot helpers used during development
 
 ### Look and feel
 
-The UI is styled after ink-and-lacquer Japanese design: black lacquer panels with gold trim, vermilion seals, washi-paper scrolls for menus and kanji accents (始め on FIGHT, 勝利 on a win, 死 on death).
-- **Fonts:** all from Google Fonts.
-  - **Yuji Mai** (brush calligraphy) for kanji and big callouts.
-  - **Zen Antique** for headings and names.
-  - **Shippori Mincho B1** for text.
-  - **DotGothic16** (a Japanese pixel font) for small numbers and key hints.
-- **Brushwork:** generated in code by `src/client/ink.ts` and exposed as CSS variables. This covers the enso circles on the touch buttons, the brush strokes behind banners, the paper grain and the seigaiha waves on the title screen.
-- **Where to restyle:** colors and type live at the top of `src/client/styles.css`. Each character and map has a `jp` kanji name in `characters.ts` / `maps.ts`.
+The UI keeps out of the way of the world: frosted-glass panels with thin borders, condensed type, and a few kanji accents (始め on FIGHT, 勝利 on a win).
+- **Fighter cards** have an angled gold health bar with a red damage trail that drains a beat after each hit. Under it, a posture gauge fills from the centre out and flashes BROKEN when it breaks. The round clock sits in a hexagon in the middle, with the round number under it.
+- **Fonts** (Google Fonts): **Barlow Condensed** for everything in Latin, and **Shippori Mincho B1** for the kanji.
+- **Where to restyle:** colours and type live at the top of `src/client/styles.css`. Each character and map has a `jp` kanji name in `characters.ts` / `maps.ts`.
 - **Camera** (`src/client/camera.ts`):
   - A match opens on a close-up of your opponent, then of you, before the camera swings round behind your shoulder.
   - Deathblows, broken guards and mikiri counters punch it in; heavy hits knock it along the blow.
@@ -205,6 +212,7 @@ Dev viewer:
   - `&target` marks where the opponent stands, `&at=300,340` freezes exact moments (ms), `&top` looks straight down, and `&ghosts` shows afterimages and smears.
 - `/?viewer&fxtest` shows the impact effects side by side.
 - `/?viewer&map=forge` previews a map, and `&shot=1.8` freezes the match intro's camera 1.8s in, with the fighters on the real spawns.
+  - `&q=high` picks a quality tier, `&cam=x,y,z&look=x,y,z&fov=60` places the camera, and `&time=8&freeze` stops the wind and particles at a moment.
 
 ### Tuning
 

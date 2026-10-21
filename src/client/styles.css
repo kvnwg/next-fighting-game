@@ -264,7 +264,8 @@ select { font-family: var(--ui); font-weight: 600; font-size: 14px; letter-spaci
 @keyframes inkin { from { opacity: 0; transform: scale(1.25); filter: blur(6px); } }
 
 /* nameplates & floating text */
-.plates, .floaters { position: absolute; inset: 0; overflow: hidden; }
+/* world-anchored labels sit under every HUD control (still above the 3D view) */
+.plates, .floaters { position: absolute; inset: 0; overflow: hidden; z-index: -1; }
 .plate { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; width: 160px; margin-left: -80px; margin-top: -26px; }
 .plate-name { font-weight: 600; font-size: 14px; letter-spacing: 0.06em; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0, 0, 0, 0.8); white-space: nowrap; }
 .plate-sub { color: rgba(255, 255, 255, 0.65); font-size: 12px; font-weight: 500; }
@@ -484,7 +485,9 @@ h3 { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.03
 .touch .fcard { top: calc(56px + env(safe-area-inset-top, 0px)); }
 .touch .side-menu { left: max(12px, env(safe-area-inset-left, 0px)); right: auto; top: calc(56px + env(safe-area-inset-top, 0px)); transform: none; align-items: stretch; }
 .touch .side-menu:not(.open) > .btn, .touch .side-menu:not(.open) > .practice-group { display: none; }
-.touch .side-menu.open { padding: 10px; background: var(--glass-hi); box-shadow: inset 0 0 0 1px var(--line), 0 10px 30px rgba(0, 0, 0, 0.5); }
+.touch .side-menu.open { z-index: 5; padding: 10px; background: rgba(12, 12, 18, 0.94); box-shadow: inset 0 0 0 1px var(--line), 0 10px 30px rgba(0, 0, 0, 0.5); }
+/* below your fighter card, clear of the stick and the buttons */
+.touch .challenge-popup { top: calc(128px + env(safe-area-inset-top, 0px)); }
 .touch .side-menu .btn { min-width: 220px; justify-content: flex-start; font-size: 16px; padding: 12px 14px; }
 .touch .practice-group select { font-size: 15px; }
 .touch .queue-panel { position: fixed; left: 50%; top: calc(60px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); }
