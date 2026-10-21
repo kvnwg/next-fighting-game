@@ -83,6 +83,11 @@ export class ClientFighter {
   lastCueSerial = -1;
   lastStateKey = '';
   private tmpBase = new THREE.Vector3();
+  /** which way the weapon tip was last travelling fast (impact sparks fly that way) */
+  readonly swingDir = new THREE.Vector3(0, 0, 1);
+  private lastTip = new THREE.Vector3();
+  private tipValid = false;
+  private tmpTip = new THREE.Vector3();
   private tmpPos = new THREE.Vector3();
   private tmpQuat = new THREE.Quaternion();
   private tmpScale = new THREE.Vector3();
@@ -315,6 +320,16 @@ export class ClientFighter {
     const kick = frame?.kick;
     m.footXf(kick?.foot ?? 'R', this.tmpPos, this.tmpQuat, this.tmpScale);
     this.kickTrail.update(dt, live && !!frame?.swingKick, this.tmpPos, this.tmpQuat, this.tmpScale.x, KICK_BASE, KICK_TIP);
+
+    // how the weapon is moving right now
+    this.weaponTip(this.tmpTip);
+    if (this.tipValid && dt > 0) {
+      const vel = this.tmpPos.subVectors(this.tmpTip, this.lastTip).divideScalar(dt);
+      const sp = vel.length();
+      if (sp > 2.5) this.swingDir.lerp(vel.divideScalar(sp), 0.6).normalize();
+    }
+    this.lastTip.copy(this.tmpTip);
+    this.tipValid = true;
 
     // effect cues from the move, resolved to where they happen
     if (frame) for (const cue of frame.fx) this.fxQueue.push({ cue, pos: this.anchor(cue.at, new THREE.Vector3()), dir: forward3(this.yaw), fighter: this });

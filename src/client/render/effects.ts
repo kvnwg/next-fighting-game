@@ -214,6 +214,29 @@ export class Effects {
     this.beams.push({ mesh, life, max: life, width });
   }
 
+  /** Sparks thrown in a cone along `dir` (impacts spray the way the weapon was travelling). */
+  spray(pos: THREE.Vector3, dir: THREE.Vector3, colors: string[], count: number, speed: number, cone = 0.55, o: { life?: number; size?: number; gravity?: number; stretch?: number } = {}): void {
+    const d = _a.copy(dir).normalize();
+    for (let i = 0; i < count; i++) {
+      const sp = speed * (0.45 + Math.random() * 0.8);
+      const vx = d.x + (Math.random() - 0.5) * 2 * cone;
+      const vy = d.y + (Math.random() - 0.35) * 2 * cone;
+      const vz = d.z + (Math.random() - 0.5) * 2 * cone;
+      const l = Math.hypot(vx, vy, vz) || 1;
+      this.emit(pos.x, pos.y, pos.z, (vx / l) * sp, (vy / l) * sp, (vz / l) * sp, colors[i % colors.length], { life: o.life ?? 0.26, size: o.size ?? 0.05, gravity: o.gravity ?? 5, drag: 3.5, stretch: o.stretch ?? 0.1 });
+    }
+  }
+
+  /** A bright slash streak through an impact, along the swing: a coloured stroke with a white core. */
+  slash(pos: THREE.Vector3, dir: THREE.Vector3, color: string, length = 1.2, width = 0.07): void {
+    // fresh vectors: beam() uses the shared scratch ones
+    const d = dir.clone().normalize().multiplyScalar(length / 2);
+    const a = pos.clone().sub(d);
+    const b = pos.clone().add(d);
+    this.beam(a, b, color, width, 0.14);
+    this.beam(a, b, '#ffffff', width * 0.38, 0.1);
+  }
+
   // ---------------------------------------------------------------- move effects
 
   /** A soft puff of dust at the feet. */

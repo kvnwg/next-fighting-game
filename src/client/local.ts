@@ -6,7 +6,7 @@ import { CLIENT_SEND_HZ, SPRINT_MULT } from '../shared/config';
 import { FORCED_STATES, Fighter, FighterState, InputAction } from '../shared/fighter';
 import { MapDef } from '../shared/maps';
 import { forward, turnToward, yawTo } from '../shared/math';
-import { stepBody } from '../shared/physics';
+import { knockDuration, knockProgress, stepBody } from '../shared/physics';
 import { FighterSnap } from '../shared/protocol';
 import { ClientFighter } from './entities';
 import { Bind } from './input';
@@ -48,7 +48,8 @@ export class LocalController {
   private bufferedPrev = new Map<number, Pick<Prediction, 'specialReadyAt' | 'abilityReadyAt' | 'dodgeReady'>>();
   frozen = false;
   private lastSend = 0;
-  private push = { x: 0, z: 0, until: 0 };
+  /** a server shove being replayed (see onPush) */
+  private push = { dx: 0, dz: 0, t0: 0, dur: 1, done: 1 };
   private lastForcedStart = -Infinity;
   private lastCounterSerial = -1;
   private fellSent = false;
@@ -185,9 +186,13 @@ export class LocalController {
     const dv = sim.dodgeVelocity(now);
     vx += dv.x;
     vz += dv.z;
-    if (now < this.push.until) {
-      vx += this.push.x;
-      vz += this.push.z;
+    const push = this.push;
+    if (push.done < 1 && dt > 0) {
+      // the server's shove, replayed as a slide that eases to a stop
+      const p = knockProgress(now - push.t0, push.dur);
+      vx += (push.dx * (p - push.done)) / dt;
+      vz += (push.dz * (p - push.done)) / dt;
+      push.done = p;
     }
 
     const obstacles = ctx.others.filter((o) => o.s !== 'dead').map((o) => ({ x: o.pos.x, z: o.pos.z }));
@@ -248,7 +253,7 @@ export class LocalController {
     if (yaw !== undefined) sim.yaw = yaw;
     this.epoch = epoch;
     this.fellSent = false;
-    this.push.until = 0;
+    this.push.done = 1;
     this.cf.teleportTo(x, 0, z, yaw);
     const now = this.net.serverNow();
     if (reason === 'shadowstep') {
@@ -266,8 +271,7 @@ export class LocalController {
   }
 
   onPush(dx: number, dz: number): void {
-    const dur = 150;
-    this.push = { x: dx / (dur / 1000), z: dz / (dur / 1000), until: this.net.serverNow() + dur };
+    this.push = { dx, dz, t0: this.net.serverNow(), dur: knockDuration(Math.hypot(dx, dz)), done: 0 };
   }
 
   /** The server never applied press `q`: undo only what that press predicted, if it's still showing. */

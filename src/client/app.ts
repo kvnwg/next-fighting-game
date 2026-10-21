@@ -454,16 +454,22 @@ class App {
       a?.hitstop(ms);
     };
     if (mine && e.a && e.d) this.lastHitTarget = { id: meA ? e.d : e.a, until: performance.now() + 5000 };
+    // heavies, specials and abilities hit harder: longer freeze, bigger shake, more sparks
+    const heavy = e.key === 'h' || e.key === 'sp' || e.key === 'ab' || e.key === 'ia' || e.key === 'ct';
+    const style = a?.model.animator.style;
+    const swing = a ? a.swingDir : new THREE.Vector3(0, 0, 1);
 
     switch (e.k) {
       case 'deflect':
         this.effects.burst(pos, { count: 28, color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 11, life: 0.3, size: 0.05, gravity: 6, drag: 3, stretch: 0.08 });
         this.effects.flash(pos, '#fff1a0', 1.0, 0.16);
         play('deflect');
+        // the deflected blade's sparks kick back the way it came
+        this.effects.spray(pos, swing.clone().negate(), ['#ffffff', '#fff1a0', '#ffd24a'], heavy ? 22 : 14, 10, 0.6);
         d?.model.react('deflect');
         a?.model.react('blocked');
-        stop(75);
-        if (mine) this.cam.shake(0.12, 0.15);
+        stop(heavy ? 100 : 75);
+        if (mine) this.cam.shake(heavy ? 0.16 : 0.12, 0.15);
         if (meD) {
           this.ui.floatText('DEFLECT', pos.x, pos.y + 0.4, pos.z, 'good big', '弾');
           this.local?.onDeflected();
@@ -474,8 +480,8 @@ class App {
         this.effects.burst(pos, { count: 12, color: ['#ffb04a', '#ff8a2a', '#ffe0a0'], speed: 5, life: 0.35, size: 0.06 });
         play('block');
         a?.model.react('blocked');
-        stop(40);
-        if (meD) this.cam.shake(0.06, 0.1);
+        stop(heavy ? 60 : 40);
+        if (meD) this.cam.shake(heavy ? 0.1 : 0.06, 0.1);
         break;
       case 'guardBreak':
         this.effects.burst(pos, { count: 40, color: ['#ff9a2a', '#ffd24a', '#ff5a2a'], speed: 8, life: 0.6, size: 0.09 });
@@ -487,21 +493,24 @@ class App {
         break;
       case 'hit':
       case 'armor':
-        // bright streaking sparks + an impact star, over a few darker chips
-        this.effects.burst(pos, { count: 16, color: ['#ffffff', '#fee761', '#feae34'], speed: 9, life: 0.22, size: 0.05, gravity: 4, drag: 4, stretch: 0.09 });
+        // the attacker's sparks sprayed the way the weapon was going, a slash streak through the
+        // contact, an impact star, and a few darker chips
+        this.effects.spray(pos, swing, style?.sparks ?? ['#ffffff', '#fee761', '#feae34'], heavy ? 26 : 16, heavy ? 12 : 9, 0.5);
+        this.effects.burst(pos, { count: heavy ? 8 : 5, color: ['#ffffff', '#fee761'], speed: 7, life: 0.2, size: 0.04, gravity: 4, drag: 4, stretch: 0.08 });
         this.effects.burst(pos, { count: 10, color: ['#e43b44', '#a22633', '#3e2731'], speed: 4, life: 0.45, size: 0.07 });
-        this.effects.flash(pos, '#ffffff', 0.75, 0.1);
+        this.effects.slash(pos, swing, heavy ? (style?.trail.heavy ?? '#ffd27a') : (style?.trail.light ?? '#ffffff'), heavy ? 1.7 : 1.15, heavy ? 0.09 : 0.06);
+        this.effects.flash(pos, '#ffffff', heavy ? 1.0 : 0.75, 0.1);
         d?.model.flash('#ffffff', 1.2);
         d?.model.react('hit');
-        stop(70);
+        stop(heavy ? 120 : 75);
         play('hit');
         if (e.dmg) this.ui.floatText(`-${e.dmg}`, pos.x, pos.y + 0.3, pos.z, meD ? 'dmg me' : 'dmg');
         if (e.k === 'armor') this.ui.floatText('ARMOR', head(d).x, head(d).y, head(d).z, 'warn');
         if (meD) {
-          this.cam.shake(0.15, 0.18);
-          this.renderer.flash = 0.07;
+          this.cam.shake(heavy ? 0.24 : 0.15, heavy ? 0.24 : 0.18);
+          this.renderer.flash = heavy ? 0.1 : 0.07;
           this.renderer.flashColor.set('#ff2a2a');
-        } else if (meA) this.cam.shake(0.07, 0.12);
+        } else if (meA) this.cam.shake(heavy ? 0.12 : 0.07, 0.12);
         break;
       case 'deathblow':
         this.effects.burst(pos, { count: 60, color: ['#ff2a2a', '#ffffff', '#7a0a0a'], speed: 9, life: 0.8, size: 0.1 });

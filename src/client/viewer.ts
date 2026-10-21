@@ -40,6 +40,10 @@ export function startViewer(root: HTMLElement): void {
   ground.receiveShadow = true;
   scene.add(ground);
 
+  if (params.has('fxtest')) {
+    showFxTest(r, params);
+    return;
+  }
   const strip = Number(params.get('strip') ?? 0);
   if (strip > 1) {
     showStrip(r, params, strip);
@@ -185,6 +189,7 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
     times.push(target);
     const m = new CharacterModel(id);
     m.ghostsEnabled = params.has('ghosts');
+    m.smearsEnabled = params.has('ghosts');
     if (params.has('target')) {
       // a stand-in for the opponent's chest, where every hit should land
       const mark = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.08), new THREE.MeshBasicMaterial({ color: '#ff3355' }));
@@ -196,8 +201,10 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
     m.root.rotation.y = top ? 0 : yaw + Math.atan2(-m.root.position.x, dist);
     scene.add(m.root);
     for (let j = 0; j < 30; j++) m.update(IDLE, 0.05);
-    // play the timeline up to this moment in 10ms steps (the animator is stateful)
-    for (let tt = 0; tt <= target; tt += 10) {
+    // play the timeline up to this moment in small steps (the animator is stateful); `step=16.7`
+    // steps at the game's frame time, for effects that depend on it (smears)
+    const stepMs = Number(params.get('step') ?? 10);
+    for (let tt = 0; tt <= target; tt += stepMs) {
       let cur = steps[0];
       for (const s of steps) if (tt >= s.start) cur = s;
       const e = tt - cur.start;
@@ -211,7 +218,7 @@ function showStrip(r: PixelRenderer, params: URLSearchParams, n: number): void {
         input = { ...IDLE, elapsed: e };
       } else input = { ...IDLE, state: cur.key as FighterState, elapsed: e, dur: cur.dur, serial };
       if (walk) Object.assign(input, { speed: walk, moveForward: 1, moveSide: 0 });
-      m.update(input, 0.01);
+      m.update(input, stepMs / 1000);
     }
   }
   label.textContent = `${id} ${chain.join(',')}  ` + times.map((x) => Math.round(x)).join(' / ') + ' ms';
@@ -251,6 +258,31 @@ function showMap(r: PixelRenderer, mapId: string, params: URLSearchParams): void
     r.camera.lookAt(0, 1, 0);
     view.update(dt, new THREE.Vector3());
     fx.update(dt, r.camera);
+    r.render();
+    requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+/** /?viewer&fxtest&t=0.05 — the impact effects (light hit, heavy hit, deflect) side by side, frozen `t` seconds in. */
+function showFxTest(r: PixelRenderer, params: URLSearchParams): void {
+  const fx = new Effects(r.scene);
+  const t = Number(params.get('t') ?? 0.04);
+  const style = new CharacterModel((params.get('char') ?? 'ronin') as CharacterId).animator.style;
+  const swing = new THREE.Vector3(1, -0.35, 0.2).normalize();
+  const spots = [-3, 0, 3].map((x) => new THREE.Vector3(x, 1.3, 0));
+  fx.spray(spots[0], swing, style.sparks, 16, 9, 0.5);
+  fx.slash(spots[0], swing, style.trail.light, 1.15, 0.06);
+  fx.flash(spots[0], '#ffffff', 0.75, 0.1);
+  fx.spray(spots[1], swing, style.sparks, 26, 12, 0.5);
+  fx.slash(spots[1], swing, style.trail.heavy, 1.7, 0.09);
+  fx.flash(spots[1], '#ffffff', 1.0, 0.1);
+  fx.spray(spots[2], swing.clone().negate(), ['#ffffff', '#fff1a0', '#ffd24a'], 22, 10, 0.6);
+  fx.flash(spots[2], '#fff1a0', 1.0, 0.16);
+  for (let k = 0; k < Math.round(t / 0.01); k++) fx.update(0.01, r.camera);
+  r.camera.position.set(0, 1.6, 9);
+  r.camera.lookAt(0, 1.2, 0);
+  const loop = () => {
     r.render();
     requestAnimationFrame(loop);
   };

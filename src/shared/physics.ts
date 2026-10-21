@@ -224,3 +224,18 @@ export function stepBody(
   }
   return { fell: b.y < FALL_DEATH_Y, landed };
 }
+
+/**
+ * Knockback is a slide, not a teleport: fast off the hit and easing to a stop (ease-out cubic),
+ * over a time that grows with the distance. Shared so the server's slide and a client's replay of
+ * its own push follow the same curve.
+ */
+export function knockDuration(dist: number): number {
+  return Math.min(320, Math.max(140, 110 + dist * 45));
+}
+
+/** How much of a knockback (0..1) has been covered `t` ms into it. */
+export function knockProgress(t: number, dur: number): number {
+  const k = Math.min(1, Math.max(0, t / Math.max(1, dur)));
+  return 1 - (1 - k) * (1 - k) * (1 - k);
+}

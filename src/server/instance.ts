@@ -8,7 +8,7 @@ import { HitResult, applyHit, decideOutcome, defenseAt, inAttackCone, pruneDefen
 import { FORCED_STATES, INPUT_ACTIONS, InputAction, InputOptions } from '../shared/fighter';
 import { MapDef, hazardAt, inSafeZone, onFloor } from '../shared/maps';
 import { clamp, forward, turnToward, yawTo } from '../shared/math';
-import { clampToFloor, getColliders, pushOut, stepBody } from '../shared/physics';
+import { clampToFloor, getColliders, knockDuration, knockProgress, pushOut, stepBody } from '../shared/physics';
 import { ClientMsg, CombatEvent, FighterSnap, ServerMsg, fighterSnap } from '../shared/protocol';
 import { Player, ServerFighter } from './entities';
 import type { Game } from './game';
@@ -150,6 +150,11 @@ export abstract class Instance {
   /** Knock a fighter along a vector. Humans move themselves, so they are told to. */
   shove(f: ServerFighter, dx: number, dz: number): void {
     if (!f.isAlive()) return;
+    if (!f.owner) {
+      // the server moves bots itself: a slide that eases to a stop (see moveBot)
+      f.knock = { dx, dz, t0: this.game.now(), dur: knockDuration(Math.hypot(dx, dz)), done: 0 };
+      return;
+    }
     const p = { x: f.x + dx, z: f.z + dz };
     pushOut(p, PLAYER_RADIUS, getColliders(this.map));
     if (this.map.edge === 'wall') clampToFloor(this.map, p);
@@ -373,6 +378,14 @@ export abstract class Instance {
     if (f.dummy) {
       vx = 0;
       vz = 0;
+    }
+    const k = f.knock;
+    if (k && dt > 0) {
+      const p = knockProgress(now - k.t0, k.dur);
+      vx += (k.dx * (p - k.done)) / dt;
+      vz += (k.dz * (p - k.done)) / dt;
+      k.done = p;
+      if (p >= 1) f.knock = null;
     }
     stepBody(f, vx, vz, dt, this.map, obstacles);
     if (f.wantYaw !== null) f.yaw = turnToward(f.yaw, f.wantYaw, f.turnRate(now) * dt);

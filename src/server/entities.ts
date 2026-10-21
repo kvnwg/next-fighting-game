@@ -42,6 +42,8 @@ export class ServerFighter extends Fighter {
   lastAirAt = -Infinity;
   /** Set when a hit interrupted this fighter's attack: later hits from that attack are void. */
   interrupt: { serial: number; t: number } | null = null;
+  /** A knockback slide in progress (server-moved fighters; players replay their own). */
+  knock: { dx: number; dz: number; t0: number; dur: number; done: number } | null = null;
 
   respawnAt = 0;
   spawnProtectedUntil = 0;

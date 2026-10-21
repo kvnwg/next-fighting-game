@@ -45,10 +45,24 @@ const _acro = new THREE.Quaternion();
 const _pivot = new THREE.Vector3();
 const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
 const _bodyInv = new THREE.Matrix4();
+const _sv = new THREE.Vector3();
+const _sp0 = new THREE.Vector3();
+const _sp1 = new THREE.Vector3();
+const _ss0 = new THREE.Vector3();
+const _ss1 = new THREE.Vector3();
+const _sq0 = new THREE.Quaternion();
+const _sq1 = new THREE.Quaternion();
+const _sm = new THREE.Matrix4();
+const _sinv = new THREE.Matrix4();
+const _srel = new THREE.Matrix4();
 // legs tucked to the chest while upside down (body frame)
 const TUCK_L = new THREE.Vector3(0.15, 0.55, 0.16);
 const TUCK_R = new THREE.Vector3(-0.15, 0.48, 0.02);
 const GHOST_LIFE = 0.28;
+/** Smear frames: how long a smear copy of the weapon lingers, and how far the tip must travel in one frame to leave them. */
+const SMEAR_LIFE = 0.05;
+const SMEAR_MIN = 0.24;
+const SMEAR_ALPHA = 0.16;
 
 interface Ghost {
   group: THREE.Group;
@@ -89,6 +103,10 @@ export class CharacterModel {
   private flashColor = new THREE.Color('#ffffff');
   private ghosts: Ghost[] = [];
   private ghostT = 0;
+  /** see-through copies of the weapon filling the gap a fast swing jumps across in one frame */
+  private smears: Ghost[] = [];
+  private smearPrev = { main: new THREE.Matrix4(), off: new THREE.Matrix4(), tipMain: new THREE.Vector3(), tipOff: new THREE.Vector3(), ok: false };
+  smearsEnabled = true;
   /** the last animation frame, for effects that need it (kick trails, cue anchors) */
   frame: AnimFrame | null = null;
   /** afterimages on dashes and flips (the dev strip viewer turns them off) */
@@ -383,6 +401,7 @@ export class CharacterModel {
     }
 
     this.updateGhosts(f.ghost, dt);
+    this.updateSmears(dt);
 
     // hit flash / buff glow
     this.flashT = Math.max(0, this.flashT - dt * 8);
@@ -417,6 +436,72 @@ export class CharacterModel {
     }
   }
 
+  /**
+   * Smear frames: when a swing moves the weapon further in one frame than the eye can follow, fill
+   * the gap with a few fading copies between where it was and where it is, like the stretched
+   * in-between of a hand-drawn swing.
+   */
+  private updateSmears(dt: number): void {
+    for (let i = this.smears.length - 1; i >= 0; i--) {
+      const g = this.smears[i];
+      g.life -= dt;
+      g.mat.opacity = Math.max(0, (g.life / SMEAR_LIFE) * this.smearAlpha);
+      if (g.life <= 0) {
+        g.group.parent?.remove(g.group);
+        g.mat.dispose();
+        this.smears.splice(i, 1);
+      }
+    }
+    if (!this.root.parent || !this.body.visible || !this.smearsEnabled) {
+      this.smearPrev.ok = false;
+      return;
+    }
+    const prev = this.smearPrev;
+    for (const which of ['main', 'off'] as const) {
+      const g = which === 'main' ? this.weapon.main : this.weapon.off;
+      const tipObj = which === 'main' ? this.weapon.tip : this.weapon.offTip;
+      if (!g || !tipObj) continue;
+      g.updateWorldMatrix(true, true);
+      const tip = tipObj.getWorldPosition(_sv);
+      const lastTip = which === 'main' ? prev.tipMain : prev.tipOff;
+      const lastM = which === 'main' ? prev.main : prev.off;
+      const swinging = which === 'main' ? this.swingMain : this.swingOff;
+      const moved = tip.distanceTo(lastTip);
+      if (prev.ok && swinging && moved > SMEAR_MIN && moved < 3) this.spawnSmear(g, lastM, Math.min(3, Math.ceil(moved / 0.22)));
+      lastTip.copy(tip);
+      lastM.copy(g.matrixWorld);
+    }
+    prev.ok = true;
+  }
+
+  private spawnSmear(g: THREE.Object3D, from: THREE.Matrix4, n: number): void {
+    while (this.smears.length > 6) {
+      const old = this.smears.shift()!;
+      old.group.parent?.remove(old.group);
+      old.mat.dispose();
+    }
+    const mat = new THREE.MeshBasicMaterial({ color: this.animator.style.trail.light, transparent: true, opacity: this.smearAlpha, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+    const group = new THREE.Group();
+    from.decompose(_sp0, _sq0, _ss0);
+    g.matrixWorld.decompose(_sp1, _sq1, _ss1);
+    _sinv.copy(g.matrixWorld).invert();
+    for (let k = 1; k <= n; k++) {
+      const t = k / (n + 1);
+      _sm.compose(_sp0.clone().lerp(_sp1, t), _sq0.clone().slerp(_sq1, t), _ss1);
+      g.traverse((o) => {
+        if (!(o instanceof THREE.Mesh) || !o.visible) return;
+        const m = new THREE.Mesh(o.geometry, mat);
+        m.matrixAutoUpdate = false;
+        // the mesh's place on the weapon, carried to the in-between weapon transform
+        m.matrix.multiplyMatrices(_sm, _srel.multiplyMatrices(_sinv, o.matrixWorld));
+        m.layers.set(FX_LAYER);
+        group.add(m);
+      });
+    }
+    this.root.parent!.add(group);
+    this.smears.push({ group, mat, life: SMEAR_LIFE });
+  }
+
   /** A frozen, translucent copy of the fighter as it is right now. */
   private spawnGhost(): void {
     if (this.ghosts.length >= 8) {
@@ -444,6 +529,11 @@ export class CharacterModel {
     });
     this.root.parent!.add(group);
     this.ghosts.push({ group, mat, life: GHOST_LIFE });
+  }
+
+  /** Smears of big weapons (the hammer head) cover a lot of screen: keep them fainter. */
+  private get smearAlpha(): number {
+    return this.char.weaponKind === 'greathammer' ? SMEAR_ALPHA * 0.5 : SMEAR_ALPHA;
   }
 
   /** Colour of this fighter's afterimages. */
@@ -529,11 +619,12 @@ export class CharacterModel {
   }
 
   dispose(): void {
-    for (const g of this.ghosts) {
+    for (const g of [...this.ghosts, ...this.smears]) {
       g.group.parent?.remove(g.group);
       g.mat.dispose();
     }
     this.ghosts = [];
+    this.smears = [];
     this.root.traverse((o) => {
       if (o instanceof THREE.Mesh) o.geometry.dispose();
     });
