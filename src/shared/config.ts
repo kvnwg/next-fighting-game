@@ -68,7 +68,9 @@ export const COMBAT = {
   inputBuffer: 180,
 
   dodgeTime: 380,
-  dodgeIframes: 240,
+  dodgeIframes: 300,
+  /** a forward dash ducks under everything for almost its whole length */
+  dashIframes: 360,
   dodgeDistance: 4.2,
   dodgeCooldown: 850,
   /** Minimum time between jumps (longer than a jump's airtime, so evasion can't be chained). */

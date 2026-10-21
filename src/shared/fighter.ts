@@ -594,9 +594,10 @@ export class Fighter {
       dz = -f.z;
       len = 1;
     }
-    this.beginDodge(now, dx / len, dz / len, COMBAT.dodgeDistance, COMBAT.dodgeTime, COMBAT.dodgeIframes, pressTime);
     const f = forward(this.yaw);
-    this.dodgeForward = (dx * f.x + dz * f.z) / len > COMBAT.dashDot;
+    const ahead = (dx * f.x + dz * f.z) / len > COMBAT.dashDot;
+    this.beginDodge(now, dx / len, dz / len, COMBAT.dodgeDistance, COMBAT.dodgeTime, ahead ? COMBAT.dashIframes : COMBAT.dodgeIframes, pressTime);
+    this.dodgeForward = ahead;
     return true;
   }
 

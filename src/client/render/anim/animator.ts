@@ -695,19 +695,29 @@ export class Animator {
         return { target: p, tau: 220 };
       }
       case 'dodge': {
+        // a duck dash: dropped low with the head down, chest over the front knee, the weapon
+        // swept back along the body, skimming the ground; strongest when dashing forward
         const p = this.guardPose(a);
-        const k = Math.sin(Math.PI * clamp01(t));
+        const k = Math.sin(Math.PI * Math.min(1, clamp01(t) * 1.25)) ** 0.6;
+        const fwd = Math.max(0, a.moveForward);
         const tuck = (v: THREE.Vector3) => {
-          v.z *= 1 - 0.35 * k;
-          v.y -= 0.05 * k;
+          v.z -= (0.22 + 0.12 * fwd) * k;
+          v.y -= 0.14 * k;
+          v.x *= 1 - 0.3 * k;
         };
         tuck(p.main.pos);
         tuck(p.free);
         if (p.off) tuck(p.off.pos);
-        p.body.crouch -= 0.24 * k;
-        p.body.lean += 0.32 * k * a.moveForward;
-        p.body.side -= 0.32 * k * a.moveSide;
-        return { target: p, tau: 50 };
+        const b = p.body;
+        b.crouch -= (0.36 + 0.12 * fwd) * k;
+        b.lean += (0.3 + 0.45 * fwd) * k;
+        b.side -= 0.4 * k * a.moveSide;
+        b.headPitch += 0.15 * k;
+        b.twist *= 1 - 0.6 * k;
+        b.step += 0.22 * k;
+        b.back += 0.26 * k;
+        b.width += 0.04 * k;
+        return { target: p, tau: 40 };
       }
       case 'stance': {
         const p = resolve(st.stance ?? st.guard);
