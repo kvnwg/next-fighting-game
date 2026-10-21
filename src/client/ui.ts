@@ -3,6 +3,7 @@ import { CHARACTERS, CHARACTER_IDS, CharacterDef, CharacterId, Perilous } from '
 import { ARENA_MAPS, MAPS } from '../shared/maps';
 import { BotDifficulty, LeaderboardEntry, MatchMode, ProfileView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { PLACEMENT_MATCHES, RankInfo, TIERS, rankOf } from '../shared/ranks';
+import { CANCELS, CANCEL_NAMES, CancelInto, CancelWindow, MoveClass } from '../shared/cancels';
 import { LobbyBar } from './lobbybar';
 import { settings } from './settings';
 
@@ -78,6 +79,14 @@ interface Floater {
   z: number;
   life: number;
   max: number;
+}
+
+/** The cancel table (shared/cancels.ts) as the help screen shows it. */
+function cancelTable(): string {
+  const cols: [CancelInto, string][] = [['light', 'Light'], ['heavy', 'Heavy'], ['special', 'Special'], ['dodge', 'Dodge'], ['guard', 'Guard'], ['jump', 'Jump']];
+  const cell = (w: CancelWindow | undefined) => (!w ? '<td class="muted">—</td>' : `<td>${w.onContact ? 'on hit' : (w.from ?? 0) > 0.05 ? 'late' : '✓'}</td>`);
+  const rows = (Object.keys(CANCELS) as MoveClass[]).map((k) => `<tr><td>${CANCEL_NAMES[k]}</td>${cols.map(([c]) => cell(CANCELS[k][c])).join('')}</tr>`).join('');
+  return `<table class="keys cancels"><tr><td></td>${cols.map(([, n]) => `<td>${n}</td>`).join('')}</tr>${rows}</table>`;
 }
 
 export class UI {
@@ -833,6 +842,9 @@ export class UI {
             <p>A red symbol means an unblockable attack: <b>Thrusts</b> must be deflected — or dodge <i>into</i> them for a Mikiri Counter. <b>Sweeps</b> must be jumped. <b>Grabs</b> must be dodged.</p>
           </div>
         </div>
+        <h4>Cancels</h4>
+        <p class="muted">What each attack can be cut short into, in its recovery. "On hit" needs the attack to connect (hit or blocked); "late" opens partway through.</p>
+        ${cancelTable()}
         <h4>The lobby</h4>
         <p>You spawn in the shrine plaza (safe zone). Step outside and anyone can fight you. The training yard (east) has a passive dummy and a sparring dummy that swings at you — perfect for practising deflects.</p>
         <h4>Arenas</h4><ul class="maps">${maps}</ul>

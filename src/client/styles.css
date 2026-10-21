@@ -929,3 +929,6 @@ h3 { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.03
   .touch .zone-indicator { font-size: 10px; padding: 2px 10px; }
   .touch .mode-panel { padding-bottom: 96px; }
 }
+.keys.cancels td { text-align: center; padding: 3px 8px; }
+.keys.cancels td:first-child { text-align: left; }
+.keys.cancels tr:first-child td { color: var(--gold); font-size: 12px; }

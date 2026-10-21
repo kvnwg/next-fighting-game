@@ -2,6 +2,7 @@
  * The fighter combat state machine. The server runs it authoritatively for every fighter; the
  * client runs a copy for the local player so inputs feel instant (server corrections win).
  */
+import { CANCELS, CancelInto, moveClass } from './cancels';
 import { AbilityDef, AttackDef, AttackKey, CHARACTERS, CharacterDef, CharacterId, getAttack, isHeavyKey, lightKey } from './characters';
 import { COMBAT, JUMP_VELOCITY } from './config';
 import { forward } from './math';
@@ -77,6 +78,8 @@ export class Fighter {
   comboIndex = -1;
   /** Increments for every attack started; lets the server track which targets an attack already hit. */
   attackSerial = 0;
+  /** the attackSerial of the last attack that made contact (hit, armour, block, guard break) */
+  contactSerial = -1;
 
   blockHeld = false;
   guardActive = false;
@@ -178,6 +181,27 @@ export class Fighter {
     if (e < this.atkWindup) return 'windup';
     if (e < this.atkWindup + this.attack.active) return 'active';
     return 'recovery';
+  }
+
+  /**
+   * May the current attack be cut short into `into` right now? See shared/cancels.ts. The feint
+   * (guard in a heavy's windup) is separate: canFeint.
+   */
+  canCancel(into: CancelInto, now: number): boolean {
+    const t = this.cancelOpensAt(into);
+    return t !== null && now >= t;
+  }
+
+  /** When the current attack's cancel window into `into` opens (null: it has none, or not yet earned). */
+  cancelOpensAt(into: CancelInto): number | null {
+    if (this.state !== 'attack' || !this.attack || !this.attackKey) return null;
+    const w = CANCELS[moveClass(this.attackKey, this.char)][into];
+    if (!w) return null;
+    if (w.onContact && this.contactSerial !== this.attackSerial) return null;
+    const a = this.attack;
+    const start = w.phase === 'windup' ? 0 : w.phase === 'active' ? this.atkWindup : this.atkWindup + a.active;
+    const len = w.phase === 'windup' ? this.atkWindup : w.phase === 'active' ? a.active : a.recovery;
+    return this.stateStart + start + len * (w.from ?? 0);
   }
 
   attackTotal(): number {
@@ -370,12 +394,8 @@ export class Fighter {
     }
   }
 
-  private inComboWindow(now: number): boolean {
-    return this.state === 'attack' && this.isLightKey(this.attackKey) && this.attackPhase(now) === 'recovery';
-  }
-
-  private canStartAttack(now: number): boolean {
-    return this.state === 'idle' || this.state === 'block' || this.inComboWindow(now);
+  private get neutral(): boolean {
+    return this.state === 'idle' || this.state === 'block';
   }
 
   pressLight(now: number, opts: InputOptions = {}): boolean {
@@ -388,12 +408,13 @@ export class Fighter {
       this.startAttack(v, now);
       return true;
     }
-    if (this.state === 'idle' || this.state === 'block') {
+    if (this.neutral) {
       this.startAttack('l0', now);
       return true;
     }
-    if (this.inComboWindow(now)) {
-      const next = this.comboIndex + 1;
+    if (this.canCancel('light', now)) {
+      // the string carries on; out of a dash light it picks up at the second hit
+      const next = this.attackKey === 'dl' || this.attackKey === 'dh' ? 1 : this.comboIndex + 1;
       if (next < this.char.lights.length) {
         this.startAttack(lightKey(next), now);
         return true;
@@ -409,12 +430,14 @@ export class Fighter {
       this.startAttack(v, now);
       return true;
     }
-    if (this.state === 'attack' && this.attackPhase(now) === 'recovery' && (this.attackKey === 'h' || this.attackKey === 'h1')) {
-      this.startAttack(this.attackKey === 'h' ? 'h1' : 'h2', now);
+    if (this.neutral) {
+      this.startAttack('h', now);
       return true;
     }
-    if (!this.canStartAttack(now)) return false;
-    this.startAttack('h', now);
+    if (!this.canCancel('heavy', now)) return false;
+    const k = this.attackKey;
+    // the heavy chain goes on, an air light drops into the plunge, anything else opens with a heavy
+    this.startAttack(k === 'h' ? 'h1' : k === 'h1' ? 'h2' : k === 'jl' ? 'jh' : 'h', now);
     return true;
   }
 
@@ -424,8 +447,8 @@ export class Fighter {
    * neutral like any attack; a dash attack may cut the end of the dodge short.
    */
   private variant(now: number, opts: InputOptions, air: AttackKey, dash: AttackKey, back: AttackKey): AttackKey | null {
-    const neutral = this.state === 'idle' || this.state === 'block';
-    if (!this.onGround) return neutral || this.inComboWindow(now) ? air : null;
+    const neutral = this.neutral;
+    if (!this.onGround) return neutral ? air : null;
     const dashing = this.state === 'dodge' && this.dodgeForward && now - this.stateStart >= this.dodgeDur * COMBAT.dashCancelFrom;
     if (dashing || (neutral && now <= this.dashUntil)) {
       this.dashUntil = -Infinity;
@@ -443,7 +466,7 @@ export class Fighter {
   }
 
   pressSpecial(now: number): boolean {
-    if (now < this.specialReadyAt || !this.canStartAttack(now)) return false;
+    if (now < this.specialReadyAt || !(this.neutral || this.canCancel('special', now))) return false;
     this.specialReadyAt = now + this.char.special.cooldown;
     this.startAttack('sp', now);
     return true;
@@ -469,9 +492,8 @@ export class Fighter {
         return this.stateStart + this.stateDur * COMBAT.deflectedDefendFrac;
       case 'attack': {
         if (!this.attack) return this.stateStart;
-        const recovery = this.stateStart + this.atkWindup + this.attack.active;
         if (kind === 'guard' && this.attackPhase(now) === 'windup') return this.stateStart; // feint
-        return kind === 'guard' ? recovery + this.attack.recovery * COMBAT.recoveryGuardCancel : recovery;
+        return this.cancelOpensAt(kind === 'guard' ? 'guard' : 'dodge') ?? now;
       }
       default:
         return this.stateStart;
@@ -511,12 +533,9 @@ export class Fighter {
           this.setState('block', now, 0, pressTime);
           return true;
         }
-        if (phase === 'recovery' && this.attack) {
-          const rec = e - this.atkWindup - this.attack.active;
-          if (rec >= this.attack.recovery * COMBAT.recoveryGuardCancel) {
-            this.setState('block', now, 0, pressTime);
-            return true;
-          }
+        if (this.canCancel('guard', now)) {
+          this.setState('block', now, 0, pressTime);
+          return true;
         }
         return false;
       }
@@ -552,7 +571,7 @@ export class Fighter {
       case 'stance':
         return true;
       case 'attack':
-        return this.attackPhase(now) === 'recovery';
+        return this.canCancel('dodge', now);
       case 'stagger':
         return e >= COMBAT.staggerDefendAfter;
       case 'deflected':
@@ -593,7 +612,7 @@ export class Fighter {
 
   pressJump(now: number, pressTime = now): boolean {
     if (!this.onGround || now - this.lastJump < COMBAT.jumpCooldown) return false;
-    if (this.state !== 'idle' && this.state !== 'block' && this.state !== 'stance') return false;
+    if (this.state !== 'idle' && this.state !== 'block' && this.state !== 'stance' && !this.canCancel('jump', now)) return false;
     pressTime = this.clampPress('evade', now, pressTime);
     this.lastJump = now;
     this.vy = JUMP_VELOCITY;
@@ -617,7 +636,8 @@ export class Fighter {
         this.buffUntil = now + ab.duration;
         break;
       case 'attack':
-        if (!this.canStartAttack(now)) return false;
+        // an attacking ability sits with the special in the cancel table
+        if (!this.neutral && !this.canCancel('special', now)) return false;
         this.startAttack('ab', now);
         break;
       case 'leap': {

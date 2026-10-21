@@ -200,9 +200,10 @@ function kit(light: AttackDef, heavy: AttackDef, n: Record<ExtraKey, Named>): Re
     // walking away: the attack gives ground as it lands
     bl: { ...scaled(light, { w: 1, rc: 1, d: 0.9, p: 0.9, ar: 1.1 }), lunge: -0.9 },
     bh: { ...scaled(heavy, { w: 0.9, rc: 1, d: 0.9, p: 0.9 }), lunge: -1.2 },
-    // in the air: a quick cut on the way down, or a plunge that lands hard
-    jl: { ...scaled(light, { w: 0.75, rc: 1.1, d: 1, p: 1, ar: 1.2 }), lunge: 0.6 },
-    jh: { ...scaled(heavy, { w: 0.6, rc: 1.05, d: 0.95, p: 1.1 }), lunge: 0.8, knockback: 0.6 },
+    // in the air: the jump commits you, so the blow carries your whole weight: more damage and
+    // much more posture than the same attack on the ground
+    jl: { ...scaled(light, { w: 0.75, rc: 1.1, d: 1.4, p: 1.6, bp: 1.5, ar: 1.2 }), lunge: 0.6 },
+    jh: { ...scaled(heavy, { w: 0.6, rc: 1.05, d: 1.35, p: 1.6, bp: 1.5 }), lunge: 0.8, knockback: 0.8 },
   };
   const out = {} as Record<ExtraKey, AttackDef>;
   for (const k of EXTRA_KEYS) {
@@ -221,7 +222,7 @@ const ronin: BaseDef = {
   weaponKind: 'katana',
   role: 'All-rounder',
   description: 'A wandering swordsman in a straw kasa. Honest timings, a generous deflect window and a lightning-fast draw cut.',
-  stats: { hp: 100, posture: 100, speed: 3.9, postureRegen: 1 },
+  stats: { hp: 200, posture: 100, speed: 3.9, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 3, defense: 4, difficulty: 2 },
   lights: [
     { name: 'Swallow Cut', anim: 'slashR', windup: 300, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 3, arc: 36, lunge: 0.6 },
@@ -251,7 +252,7 @@ const juggernaut: BaseDef = {
   weaponKind: 'greathammer',
   role: 'Heavy bruiser',
   description: 'A living fortress of stone and gold. Slow, huge and unstoppable: every swing crushes guards, and heavies shrug off interruptions.',
-  stats: { hp: 130, posture: 130, speed: 2.6, postureRegen: 0.9 },
+  stats: { hp: 260, posture: 130, speed: 2.6, postureRegen: 0.9 },
   ratings: { power: 5, speed: 1, reach: 3, defense: 3, difficulty: 2 },
   lights: [
     // dragged back along the floor and whipped round at shin height, the body dropping almost flat
@@ -284,7 +285,7 @@ const duelist: BaseDef = {
   weaponKind: 'rapier',
   role: 'Fencer / mind games',
   description: 'A dashing fencer in a green cape. Quick thrusts with long reach; feints everything and punishes deflects with blistering ripostes.',
-  stats: { hp: 90, posture: 90, speed: 4.2, postureRegen: 1.05 },
+  stats: { hp: 180, posture: 90, speed: 4.2, postureRegen: 1.05 },
   ratings: { power: 2, speed: 4, reach: 4, defense: 2, difficulty: 4 },
   lights: [
     { name: 'Lunge', anim: 'thrust', windup: 240, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.4, arc: 16, lunge: 0.8, feintable: true },
@@ -317,7 +318,7 @@ const lancer: BaseDef = {
   weaponKind: 'spear',
   role: 'Zoner',
   description: 'A horned knight with a lightning spear. Controls space with the longest reach in the game; tip hits hurt more, and he vaults out when crowded.',
-  stats: { hp: 100, posture: 100, speed: 3.8, postureRegen: 1 },
+  stats: { hp: 200, posture: 100, speed: 3.8, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 5, defense: 2, difficulty: 3 },
   lights: [
     { name: 'Viper Jab', anim: 'thrust', windup: 300, active: 80, recovery: 320, damage: 8, posture: 10, blockPosture: 12, range: 4.3, arc: 15, lunge: 0.4 },
@@ -348,7 +349,7 @@ const shade: BaseDef = {
   weaponKind: 'daggers',
   role: 'Assassin',
   description: 'A hooded killer with two knives. Fragile and relentless: two dodge charges, backstabs and a blink that puts you right behind them.',
-  stats: { hp: 90, posture: 90, speed: 4.4, postureRegen: 1.1 },
+  stats: { hp: 180, posture: 90, speed: 4.4, postureRegen: 1.1 },
   ratings: { power: 2, speed: 5, reach: 1, defense: 1, difficulty: 5 },
   lights: [
     { name: 'Scissor Cut', anim: 'dualSlash', windup: 210, active: 60, recovery: 240, damage: 6, posture: 7, blockPosture: 9, range: 2.65, arc: 38, lunge: 0.7 },
@@ -379,7 +380,7 @@ const reaper: BaseDef = {
   weaponKind: 'scythe',
   role: 'Sustain / control',
   description: 'A faceless spirit that drifts on mist. Wide sweeping arcs that are hard to step around; heals from every hit and hooks fleeing prey back in.',
-  stats: { hp: 105, posture: 100, speed: 3.6, postureRegen: 0.95 },
+  stats: { hp: 210, posture: 100, speed: 3.6, postureRegen: 0.95 },
   ratings: { power: 3, speed: 2, reach: 4, defense: 3, difficulty: 3 },
   lights: [
     { name: 'Harvest', anim: 'slashR', windup: 340, active: 110, recovery: 360, damage: 10, posture: 11, blockPosture: 15, range: 3.8, arc: 55, lunge: 0.4 },
@@ -407,7 +408,7 @@ const monk: BaseDef = {
   weaponKind: 'gauntlets',
   role: 'Posture breaker',
   description: 'An old master who has outlived braver men. Short range, rapid strikes that shred posture, plus a counter stance that turns their offense against them.',
-  stats: { hp: 100, posture: 110, speed: 4.0, postureRegen: 1.3 },
+  stats: { hp: 200, posture: 110, speed: 4.0, postureRegen: 1.3 },
   ratings: { power: 3, speed: 5, reach: 1, defense: 4, difficulty: 4 },
   lights: [
     { name: 'Jab', anim: 'punchR', windup: 240, active: 60, recovery: 260, damage: 5, posture: 8, blockPosture: 10, range: 2.2, arc: 33, lunge: 0.6 },
@@ -437,7 +438,7 @@ const paladin: BaseDef = {
   weaponKind: 'swordShield',
   role: 'Defender',
   description: 'A bronze-armoured knight behind a swirl shield. A walking wall: blocking barely dents your posture, and a shield charge punishes anyone who turtles.',
-  stats: { hp: 110, posture: 120, speed: 3.4, postureRegen: 1 },
+  stats: { hp: 220, posture: 120, speed: 3.4, postureRegen: 1 },
   ratings: { power: 3, speed: 2, reach: 2, defense: 5, difficulty: 1 },
   lights: [
     { name: 'Strike', anim: 'slashR', windup: 310, active: 90, recovery: 330, damage: 9, posture: 10, blockPosture: 13, range: 2.8, arc: 36, lunge: 0.5 },

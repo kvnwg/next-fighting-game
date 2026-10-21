@@ -426,10 +426,10 @@ const forge: MapDef = {
   ],
   decals: [{ shape: { type: 'rect', x: 0, z: 0, hw: 3, hd: 15 }, tex: 'stone' }],
   hazards: [
-    { type: 'lava', shape: { type: 'circle', x: 10.5, z: 10.5, r: 3.4 }, dps: 22 },
-    { type: 'lava', shape: { type: 'circle', x: -10.5, z: 10.5, r: 3.4 }, dps: 22 },
-    { type: 'lava', shape: { type: 'circle', x: 10.5, z: -10.5, r: 3.4 }, dps: 22 },
-    { type: 'lava', shape: { type: 'circle', x: -10.5, z: -10.5, r: 3.4 }, dps: 22 },
+    { type: 'lava', shape: { type: 'circle', x: 10.5, z: 10.5, r: 3.4 }, dps: 44 },
+    { type: 'lava', shape: { type: 'circle', x: -10.5, z: 10.5, r: 3.4 }, dps: 44 },
+    { type: 'lava', shape: { type: 'circle', x: 10.5, z: -10.5, r: 3.4 }, dps: 44 },
+    { type: 'lava', shape: { type: 'circle', x: -10.5, z: -10.5, r: 3.4 }, dps: 44 },
   ],
   theme: {
     skyTop: '#1a0a08',

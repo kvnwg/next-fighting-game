@@ -173,6 +173,9 @@ export function applyHit(
   now: number,
   geo: HitGeometry,
 ): HitResult {
+  // contact (it landed, was armoured through, blocked or broke the guard) opens the attack's
+  // on-contact cancels, the special above all (see shared/cancels.ts)
+  if (outcome === 'hit' || outcome === 'armor' || outcome === 'block' || outcome === 'guardBreak') attacker.contactSerial = attacker.attackSerial;
   const r: HitResult = {
     outcome,
     attackerId: attacker.id,

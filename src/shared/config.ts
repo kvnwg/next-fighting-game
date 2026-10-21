@@ -113,7 +113,8 @@ export const MATCH = {
   /** a wide shot, both ring entrances (see client/entrances.ts) and the swing behind you */
   introTime: 9800,
   countdownTime: 3000,
-  roundTime: 90_000,
+  // health doubled for longer, posture-driven fights: rounds have the time for it
+  roundTime: 120_000,
   roundEndTime: 3500,
   matchEndTime: 7000,
   challengeTimeout: 15_000,

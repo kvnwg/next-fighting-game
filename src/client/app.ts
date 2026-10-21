@@ -653,6 +653,8 @@ class App {
     const style = a?.model.animator.style;
     const swing = a ? a.swingDir : new THREE.Vector3(0, 0, 1);
 
+    // your attack connected: its on-contact cancels open on your side too (the server has its own)
+    if (meA && this.local && (e.k === 'hit' || e.k === 'armor' || e.k === 'block' || e.k === 'guardBreak')) this.local.sim.contactSerial = this.local.sim.attackSerial;
     switch (e.k) {
       case 'deflect': {
         // the clash: steel on steel, and the whole screen knows it. Back-to-back deflects build up.
