@@ -87,6 +87,63 @@ interface Limb {
   end: THREE.Group;
 }
 
+
+
+/**
+ * Cloth and hair that swing instead of riding rigidly on the body: each piece pivots where it
+ * hangs from and is pulled toward the way the forces on it point (gravity, the air it moves
+ * through, and the lag of its own inertia when the body lurches or turns), through a damped spring.
+ * `lift` is how far it may swing out from the body (rad), `side` sideways.
+ */
+interface ClothSpec {
+  /** spring stiffness (1/s^2) and damping ratio */
+  k: number;
+  zeta: number;
+  gravity: number;
+  /** how much the air pushes it back as it moves, and how much it lags when the body accelerates */
+  drag: number;
+  inertia: number;
+  lift: number;
+  side: number;
+  /** a ripple when moving fast (rad at full speed) */
+  flutter: number;
+  /** hangs all round (a skirt), so it swings as far forward as back */
+  around?: boolean;
+}
+
+const CLOTH: Record<string, ClothSpec> = {
+  // heavy: about 20 degrees back at a run, flaring out in spins and leaps
+  cape: { k: 55, zeta: 0.32, gravity: 1, drag: 0.25, inertia: 0.6, lift: 1.0, side: 0.5, flutter: 0.05 },
+  cloak: { k: 60, zeta: 0.34, gravity: 1, drag: 0.28, inertia: 0.6, lift: 0.9, side: 0.45, flutter: 0.06 },
+  // light: streams out behind at a run
+  scarf: { k: 30, zeta: 0.28, gravity: 0.8, drag: 0.9, inertia: 0.9, lift: 1.5, side: 0.8, flutter: 0.14 },
+  ribbons: { k: 22, zeta: 0.25, gravity: 0.7, drag: 1, inertia: 1, lift: 1.4, side: 0.9, flutter: 0.2 },
+  hair: { k: 110, zeta: 0.45, gravity: 0.5, drag: 0.25, inertia: 0.5, lift: 0.5, side: 0.35, flutter: 0.04 },
+  beard: { k: 90, zeta: 0.4, gravity: 0.8, drag: 0.2, inertia: 0.6, lift: 0.6, side: 0.3, flutter: 0.02 },
+  beads: { k: 45, zeta: 0.22, gravity: 1, drag: 0.15, inertia: 1, lift: 0.9, side: 0.6, flutter: 0 },
+  robeLower: { k: 70, zeta: 0.4, gravity: 0.6, drag: 0.35, inertia: 0.6, lift: 0.35, side: 0.3, flutter: 0.03, around: true },
+};
+
+interface Cloth {
+  pivot: THREE.Group;
+  spec: ClothSpec;
+  /** hangs in front of where it pivots (a beard, beads) rather than behind (a cape) */
+  front: boolean;
+  a: number;
+  b: number;
+  va: number;
+  vb: number;
+  prev: THREE.Vector3;
+  vel: THREE.Vector3;
+  acc: THREE.Vector3;
+  started: boolean;
+  phase: number;
+}
+
+const _cp = new THREE.Vector3();
+const _cv = new THREE.Vector3();
+const _cf = new THREE.Vector3();
+const _cq = new THREE.Quaternion();
 export class CharacterModel {
   readonly root = new THREE.Group();
   readonly char: CharacterDef;
@@ -119,6 +176,8 @@ export class CharacterModel {
   private readonly offPivot = new THREE.Group();
   private readonly materials: THREE.MeshLambertMaterial[] = [];
   private flashT = 0;
+  private readonly cloth: Cloth[] = [];
+  private clothTime = 0;
   private flashColor = new THREE.Color('#ffffff');
   private ghosts: Ghost[] = [];
   private ghostT = 0;
@@ -216,7 +275,18 @@ export class CharacterModel {
       if (slot.startsWith('arm') && slot.endsWith('.end')) mesh.position.y += 3 * VOXEL;
       mesh.castShadow = true;
       if ((bone.opacity ?? 1) < 1) mesh.renderOrder = 1;
-      slots[slot].add(mesh);
+      const cloth = CLOTH[bone.name];
+      if (cloth) {
+        // hung from a pivot of its own so it can swing about where it hangs
+        const pivot = new THREE.Group();
+        pivot.position.copy(mesh.position);
+        mesh.position.set(0, 0, 0);
+        pivot.add(mesh);
+        slots[slot].add(pivot);
+        geo.computeBoundingBox();
+        const centre = geo.boundingBox!.getCenter(new THREE.Vector3()).applyQuaternion(q);
+        this.cloth.push({ pivot, spec: cloth, front: centre.z > 0.02, a: 0, b: 0, va: 0, vb: 0, prev: new THREE.Vector3(), vel: new THREE.Vector3(), acc: new THREE.Vector3(), started: false, phase: Math.random() * 10 });
+      } else slots[slot].add(mesh);
     }
 
     // weapons are carried by the torso and the hands reach for them: the voxel props, with the
@@ -323,6 +393,62 @@ export class CharacterModel {
   /** A short additive reaction on top of whatever the fighter is doing. */
   react(kind: Reaction): void {
     this.animator.react(kind);
+  }
+
+  /** Swing the cloth toward where gravity, the air and its own inertia push it. */
+  private stepCloth(dt: number): void {
+    if (!this.cloth.length || dt <= 0) return;
+    this.clothTime += dt;
+    this.root.updateMatrixWorld(true);
+    for (const c of this.cloth) {
+      const s = c.spec;
+      c.pivot.getWorldPosition(_cp);
+      if (!c.started) {
+        c.prev.copy(_cp);
+        c.started = true;
+      }
+      _cv.subVectors(_cp, c.prev).divideScalar(dt);
+      c.prev.copy(_cp);
+      // a teleport or respawn is not a gust
+      if (_cv.lengthSq() > 30 * 30) _cv.copy(c.vel);
+      const acc = _cf.subVectors(_cv, c.vel).divideScalar(dt);
+      if (acc.length() > 60) acc.setLength(60);
+      c.acc.lerp(acc, Math.min(1, dt * 20));
+      c.vel.copy(_cv);
+      // the force it hangs along, in the frame it hangs from
+      const speed = c.vel.length();
+      _cf.set(0, -9.8 * s.gravity, 0).addScaledVector(c.acc, -s.inertia).addScaledVector(c.vel, -s.drag * speed);
+      c.pivot.parent!.getWorldQuaternion(_cq).invert();
+      _cf.applyQuaternion(_cq);
+      const down = Math.max(1e-3, -_cf.y);
+      // swinging out the back (+a for a cape) or the front, and to the side
+      let ta = Math.atan2(-_cf.z, down);
+      let tb = Math.atan2(_cf.x, down);
+      tb += Math.sin(this.clothTime * 11 + c.phase) * s.flutter * Math.min(1, speed / 4);
+      const lo = c.front || s.around ? -s.lift : -0.12;
+      const hi = c.front && !s.around ? 0.12 : s.lift;
+      ta = Math.min(hi, Math.max(lo, ta));
+      tb = Math.min(s.side, Math.max(-s.side, tb));
+      // a damped spring toward it, in small steps so a slow frame doesn't blow it up
+      const damp = 2 * s.zeta * Math.sqrt(s.k);
+      const steps = Math.ceil(dt / (1 / 120));
+      const h = dt / steps;
+      for (let i = 0; i < steps; i++) {
+        c.va += (s.k * (ta - c.a) - damp * c.va) * h;
+        c.vb += (s.k * (tb - c.b) - damp * c.vb) * h;
+        c.a += c.va * h;
+        c.b += c.vb * h;
+      }
+      if (c.a < lo || c.a > hi) {
+        c.a = Math.min(hi, Math.max(lo, c.a));
+        c.va = 0;
+      }
+      if (Math.abs(c.b) > s.side) {
+        c.b = Math.sign(c.b) * s.side;
+        c.vb = 0;
+      }
+      c.pivot.rotation.set(c.a, 0, c.b);
+    }
   }
 
   setVisible(v: boolean): void {
@@ -444,6 +570,7 @@ export class CharacterModel {
 
     this.updateGhosts(f.ghost, dt);
     this.updateSmears(dt);
+    this.stepCloth(dt);
 
     // hit flash / perilous telegraph / buff glow
     this.flashT = Math.max(0, this.flashT - dt * 8);
