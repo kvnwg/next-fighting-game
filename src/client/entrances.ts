@@ -70,16 +70,17 @@ export const ENTRANCES: Record<CharacterId, Entrance> = {
     shots: [
       // lens almost on the floor as the sabatons come down
       { from: [2.3, 1.5, 0.15], to: [2.0, 1.2, 0.18], look: [[0, 0.2, 0.5], [0, 0.1, 0.9]], fov: [48, 46] },
-      // tracking in, rising with the hammer onto the shoulder
-      { from: [2.8, -1.6, 1.1], to: [2.3, -0.7, 1.7], look: [[0, 0, 1.0], [0, 0, 1.7]], fov: [42, 36] },
-      // low hero shot, a little off centre
-      { from: [4.2, 1.1, 0.4], to: [3.6, 0.9, 0.5], look: [[0, 0, 1.4], [0, 0, 1.45]], fov: [46, 44] },
+      // wide and rising with him as he vaults over the planted hammer
+      { from: [3.8, -2.2, 1.3], to: [3.3, -1.7, 1.9], look: [[0, 0, 1.3], [0, 0, 1.9]], fov: [50, 50] },
+      // low hero shot, a little off centre, wide enough for the whirl overhead
+      { from: [4.6, 1.1, 0.5], to: [4.0, 0.9, 0.6], look: [[0, 0, 1.6], [0, 0, 1.5]], fov: [50, 48] },
     ],
     sfx: [
       { s: 0, sound: 'rumble' },
       { s: 0.1, sound: 'stomp' },
       { s: 0.24, sound: 'stomp' },
       { s: 0.45, sound: 'whoosh' },
+      { s: 0.7, sound: 'whoosh' },
       { s: 0.78, sound: 'gong' },
     ],
   },

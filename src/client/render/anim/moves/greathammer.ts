@@ -1,375 +1,284 @@
 /**
- * Warden, warhammer. Everything is weight: the hammer is thrown more than swung, the body
- * chases it, and whatever it meets (the ground included) gets hit hard. The lights chain from a
- * diagonal smash into a full-turn cyclone, the heavy leaps and cracks the earth, and the special
- * tears a trench through the ground at ankle height.
+ * Warden, warhammer. The hammer leads and he follows it: between blows its head rests on the
+ * floor, and every swing tears it up out of the ground, drags the whole body after it, and
+ * usually ends with it back in the dirt. He holds it by the very end for all the reach it has,
+ * and on the big blows drops almost flat behind it. The lights chain a shin-high ground sweep, a
+ * flat helicopter whirl overhead and an uppercut launch that ends with the hammer straight up;
+ * the special is a full turn with the head ripping along the floor at ankle height.
  */
 import { B, K, N, P, Style, X, arc, fx, hitAt, line, mv, seq, track } from '../author';
 import type { V3 } from '../author';
+import { G2, GUARD_AT, GUARD_DIR, GUARD_EDGE, GUARD_G2, body } from './greathammer-base';
+import { WARDEN_B } from './greathammer-b';
 
-const G2 = -0.33; // the left hand rides down by the pommel
-// the guard: hands on the right of the chest, the haft out over the right shoulder beside the helm
-const GUARD_AT: V3 = [-0.1, 0.36, 0.22];
-const GUARD_DIR: V3 = [-0.42, 0.78, -0.46];
-const body = B({ front: 'L', step: 0.26, back: 0.26, width: 0.17, crouch: -0.11, lean: 0.1, twist: -0.22 });
-
-// Skullcrusher: off the right shoulder, diagonally down through the target, into the dirt on the left
-const crush = arc([0, 0.36, 0.14], 0.2, [[-0.45, 0.85, -0.3], [-0.4, 0.8, 0.55], [-0.06, 0.48, 1], [0.32, -0.3, 0.85], [0.4, -0.85, 0.35]], G2);
-const crushHit = hitAt(crush, 2);
-
-// Cyclone: a low pendulum back to the right, a full turn with the hammer dragged behind, and the whip
-const cyclone = seq(
-  [
-    [-1.5, -0.95, arc([0, 0.3, 0.12], 0.2, [[0.4, -0.85, 0.35], [0, -0.75, 0.65], [-0.55, -0.55, 0.45], [-0.85, -0.3, -0.35]], G2)],
-    [-0.95, 0.2, arc([0, 0.32, 0.12], 0.2, [[-0.85, -0.3, -0.35], [-0.95, 0.0, 0.05], [-0.85, 0.12, 0.5]], G2)],
-    [0.2, 1.07, arc([0, 0.32, 0.14], 0.2, [[-0.85, 0.12, 0.5], [-0.45, 0.24, 0.9], [0, 0.3, 1], [0.4, 0.0, 0.9], [0.5, -0.55, 0.6]], G2)],
-  ],
-  0.08,
-);
-const cycloneHit = hitAt(cyclone, 2, 2);
-
-// Meteor: a windmill from low behind, up over the head at the top of the leap, and down
-const meteor = arc([0, 0.48, 0.08], 0.2, [[-0.3, -0.65, -0.7], [-0.12, 0.2, -1], [0, 1, -0.12], [0, 0.75, 0.66], [0, 0.35, 0.94], [0, -0.35, 0.94], [0, -0.75, 0.66]], G2);
-const meteorApex = hitAt(meteor, 2);
-const meteorHit = hitAt(meteor, 4);
-
-// Earthshaker: dragged low behind on the right, ripped around through the ankles, flung up on the left
-const quake = arc([-0.05, 0.24, 0.12], 0.17, [[-0.7, -0.35, -0.45], [-0.9, -0.16, 0.15], [-0.45, -0.14, 0.8], [0.05, -0.12, 1], [0.35, -0.08, 0.9], [0.42, 0.15, 0.75], [0.2, 0.45, 0.6]], G2);
-const quakeHit = hitAt(quake, 3);
-
-// Grave Bell: out of the Cyclone's low finish the head drops back beside the right foot, scrapes
-// forward along the ground and is heaved straight up the centre line, under the chin
-const bell = arc([0, 0.3, 0.14], 0.2, [[0.4, -0.7, 0.55], [-0.55, -0.72, -0.35], [-0.25, -0.88, 0.4], [-0.05, -0.3, 0.95], [0, 0.42, 0.9], [0.05, 0.88, 0.45], [0.1, 1, -0.08]], G2, { pivot1: [0, 0.5, 0.1] });
-const bellChamber = hitAt(bell, 1);
-const bellHit = hitAt(bell, 4);
-
-// Avalanche: heaved up out of the dirt onto the left shoulder, then down diagonally to the right
-const avalanche = arc([0.02, 0.36, 0.14], 0.2, [[0, -0.6, 0.8], [0.7, -0.45, 0.3], [0.75, 0.35, -0.3], [0.45, 0.85, -0.3], [0.4, 0.8, 0.55], [0.06, 0.5, 1], [-0.32, -0.25, 0.9], [-0.42, -0.7, 0.55]], G2);
-const avalancheChamber = hitAt(avalanche, 3);
-const avalancheHit = hitAt(avalanche, 5);
-
-// Worldbreaker: dragged round behind on the right through a full turn, rising, over the top and
-// straight down into the ground
-const breaker = arc([0, 0.4, 0.12], 0.2, [[-0.42, -0.7, 0.55], [-0.85, -0.45, -0.25], [-0.8, 0.25, -0.55], [-0.3, 0.85, -0.45], [0, 1, -0.08], [0, 0.6, 0.8], [0, 0.15, 1], [0, -0.35, 0.94]], G2);
-const breakerHit = hitAt(breaker, 6);
-const breakerGround = hitAt(breaker, 7);
-
-// Battering Ram: head first, from the right hip straight out
-const ram = line([-0.14, 0.12, 0.02], [0.0, 0.32, 0.4], [0.06, 0.1, 1], [0, 0.04, 1], [1, 0, 0], G2, G2, { body: true });
-const ramHit = 0.75;
-
-// Landslide: dragged head-down behind on the right, then ripped up through the target to high left
-const slide = arc([-0.04, 0.3, 0.12], 0.18, [[-0.3, -0.95, 0.05], [-0.6, -0.78, 0.3], [-0.35, -0.5, 0.8], [0.05, 0.35, 0.94], [0.42, 0.7, 0.58], [0.5, 0.85, 0.15]], G2);
-const slideHit = hitAt(slide, 3);
-
-// Rampart: flat from the right at head height, ending stood up on the left like a wall
-const rampartSweep = arc([0, 0.4, 0.14], 0.2, [[-0.6, 0.6, -0.4], [-0.85, 0.3, 0.3], [-0.3, 0.26, 0.92], [0.05, 0.24, 1], [0.6, 0.2, 0.76], [0.8, 0.14, 0.3]], G2);
-const rampart = seq([
-  [0, 1.07, rampartSweep],
-  [1.07, 1.36, arc([0.1, 0.32, 0.18], 0.2, [[0.8, 0.14, 0.3], [0.45, 0.75, 0.45], [0.15, 0.95, 0.25]], G2)],
-], 0.07);
-const rampartHit = hitAt(rampart, 3, 0);
-
-// Gravestone: hoisted straight up, then dropped head-first into the ground in front, haft upright
-const grave = arc([0, 0.42, 0.16], 0.18, [[-0.35, 0.85, -0.25], [0, 1, -0.15], [0, 0.6, 0.8], [0, 0.05, 1], [0, -0.6, 0.8], [0, -0.95, 0.3]], G2, { pivot1: [0, 0.52, 0.3] });
-const graveTop = hitAt(grave, 1);
-const graveHit = hitAt(grave, 3);
-
-// Boulder Drop: a short chop from the right shoulder, over and down
-const boulder = arc([0, 0.42, 0.12], 0.2, [[-0.35, 0.85, -0.25], [-0.15, 0.97, 0.15], [-0.06, 0.55, 0.83], [0, 0.0, 1], [0.06, -0.3, 0.95]], G2);
-const boulderHit = hitAt(boulder, 3);
-
-// Meteor Fall: cocked down behind the back, then over the top and down with a jackknife
-const fall = arc([0, 0.45, 0.1], 0.2, [[-0.35, 0.85, -0.25], [0, 0.3, -0.95], [0, 0.95, -0.3], [0, 0.6, 0.8], [0, 0.0, 1], [0, -0.5, 0.86]], G2);
-const fallCocked = hitAt(fall, 1);
-const fallHit = hitAt(fall, 4);
-
-
-// Ring entrance. The hammer drags one-handed behind on the right with its head in the dirt while
-// he stamps in; the right arm heaves it up behind him onto the right shoulder and the left hand
-// takes the haft; then it is brought over and down head-first to stand upright beside him, and
-// hoisted back into guard.
 /** Where an arc's grip sits for one of its directions (negative r: the pivot behind the grip). */
 const gripAt = (pivot: V3, r: number, dir: V3): V3 => {
   const d = N(dir);
   return [pivot[0] + d.x * r, pivot[1] + d.y * r, pivot[2] + d.z * r];
 };
-const ENT_DRAG: V3 = [-0.12, -0.64, -0.76];
-const ENT_GUARD_AT: V3 = GUARD_AT;
-const ENT_GUARD_DIR: V3 = GUARD_DIR;
-const ENT_PLANT: V3 = [-0.18, -0.98, 0.06];
-const ENT_PLANT_AT: V3 = [-0.45, 0.4, 0.15];
-const entDragAt: V3 = [-0.3, -0.04, 0.0];
-const entHeave = arc(gripAt(entDragAt, -0.2, ENT_DRAG), 0.2, [ENT_DRAG, [-0.2, -0.25, -0.95], [-0.3, 0.35, -0.9], [-0.36, 0.75, -0.55], ENT_GUARD_DIR], NaN, { pivot1: gripAt(ENT_GUARD_AT, -0.2, ENT_GUARD_DIR) });
-const entSlam = arc(gripAt(ENT_GUARD_AT, -0.12, ENT_GUARD_DIR), 0.12, [ENT_GUARD_DIR, [-0.15, 1, 0.15], [-0.3, 0.6, 0.75], [-0.35, -0.15, 0.93], ENT_PLANT], G2, { pivot1: gripAt(ENT_PLANT_AT, -0.12, ENT_PLANT) });
-const entHoist = arc(gripAt(ENT_PLANT_AT, -0.12, ENT_PLANT), 0.12, [ENT_PLANT, [-0.35, -0.15, 0.93], [-0.3, 0.6, 0.75], [-0.2, 0.98, 0.1], ENT_GUARD_DIR], G2, { pivot1: gripAt(ENT_GUARD_AT, -0.12, ENT_GUARD_DIR), edgeSign: -1, roll: -0.28 });
+
+// Ground Sweep: dragged back along the floor round to behind his right heel, then whipped flat
+// round the front at shin height and on out to the left, where it skids back down onto the ground
+const groundSweep = arc([-0.1, 0.24, 0.18], 0.2, [GUARD_DIR, [-0.55, -0.55, 0.6], [-0.85, -0.42, -0.1], [-0.68, -0.48, -0.5], [-0.95, -0.15, 0.2], [-0.66, 0.42, 0.62], [-0.25, 0.64, 0.73], [0.6, 0.5, 0.62], [0.88, 0.24, 0.42]], G2, { pivot1: [0.02, 0.2, 0.24] });
+const groundSweepBack = hitAt(groundSweep, 3);
+const groundSweepHit = hitAt(groundSweep, 6);
+
+// Hurricane: ripped up out of the floor on the right into both fists over the helm, then one flat
+// helicopter turn overhead (right, behind, left) that hits as it comes past the front
+const HURR_AT: V3 = [0, 0.92, 0.08];
+const hurricane = seq(
+  [
+    [-1.2, -0.45, arc([-0.2, 0.45, 0.2], 0.2, [GUARD_DIR, [-0.75, -0.35, 0.55], [-0.98, 0.15, 0.1], [-0.8, 0.25, -0.55]], G2, { pivot1: [-0.12, 0.9, 0.05] })],
+    [-0.45, 0.75, arc(HURR_AT, 0.06, [[-0.8, 0.25, -0.55], [0, 0.25, -1], [0.95, 0.08, -0.3], [0.85, -0.16, 0.52], [0, -0.38, 1], [-0.8, -0.4, 0.5]], G2)],
+    [0.75, 1.07, arc([-0.12, 0.7, 0.12], 0.2, [[-0.8, -0.4, 0.5], [-0.75, -0.55, 0.38], [-0.45, -0.7, 0.55]], G2, { pivot1: [-0.14, 0.32, 0.2] })],
+  ],
+  0.08,
+);
+const hurricaneHit = hitAt(hurricane, 4, 1);
+
+// Launcher: the head swung back low past his right heel, then under and up the centre line
+// through the target and on until the hammer stands straight up at full stretch above him; it
+// then topples over to his right and down onto the floor again
+const LAUNCH_TOP: V3 = [-0.1, 0.99, -0.06];
+const LAUNCH_PIVOT: V3 = [-0.08, 0.74, 0.24];
+const LAUNCH_LOW: V3 = [0, 0.32, 0.18];
+const launcher = seq(
+  [
+    [-0.4, 0, arc(gripAt(GUARD_AT, -0.2, GUARD_DIR), 0.2, [GUARD_DIR, [-0.7, -0.5, 0.3], [-0.3, -0.7, -0.62]], G2, { pivot1: LAUNCH_LOW })],
+    [0, 0.45, arc(LAUNCH_LOW, 0.2, [[-0.3, -0.7, -0.62], [-0.85, -0.38, 0.1], [-0.35, -0.06, 0.93], [0, 0.12, 1]], G2)],
+    [0.45, 1.07, arc(LAUNCH_LOW, 0.2, [[0, 0.12, 1], [-0.04, 0.72, 0.7], LAUNCH_TOP], G2, { pivot1: LAUNCH_PIVOT })],
+    [1.07, 1.45, arc(LAUNCH_PIVOT, 0.2, [LAUNCH_TOP, [-0.62, 0.72, 0.3], [-0.55, -0.05, 0.83], GUARD_DIR], G2, { pivot1: gripAt(GUARD_AT, -0.2, GUARD_DIR) })],
+  ],
+  0.05,
+);
+const launcherChamber = 0;
+const launcherHit = 0.45;
+
+// Earthshaker: torn out of the floor and dragged out behind on the right; one full turn of the
+// body with the head skimming the floor at the end of his arms, ripped across the front at the
+// ankles, tearing on out to the left
+const quake = seq(
+  [
+    [-1.3, -0.7, arc([-0.08, 0.3, 0.2], 0.18, [GUARD_DIR, [-0.6, -0.6, 0.5], [-0.92, -0.42, -0.1], [-0.7, -0.55, -0.45]], G2)],
+    [-0.7, 0.1, arc([-0.08, 0.26, 0.14], 0.18, [[-0.7, -0.55, -0.45], [-0.88, -0.45, -0.15], [-0.92, -0.38, 0.05]], G2)],
+    [0.1, 1.07, arc([-0.02, 0.22, 0.2], 0.2, [[-0.92, -0.38, 0.05], [-0.68, 0.02, 0.73], [-0.25, 0.32, 0.92], [0.5, 0.18, 0.85], [0.92, -0.1, 0.35]], G2)],
+  ],
+  0.07,
+);
+const quakeHit = hitAt(quake, 2, 2);
+
+// Pole Lunge: the head dragged back to his feet, then rammed straight out along the floor ahead of
+// the charge at full stretch, and let drop onto the ground
+const POLE_BACK: V3 = [-0.16, 0.12, 0.04];
+const POLE_OUT: V3 = [-0.04, 0.22, 0.42];
+const poleLunge = seq(
+  [
+    [-0.4, 0.0, line(GUARD_AT, POLE_BACK, [-0.1, -0.1, 0.99], [-0.08, 0.04, 1], GUARD_EDGE, G2)],
+    [0.0, 0.62, line(POLE_BACK, POLE_OUT, [-0.08, 0.04, 1], [0, 0.4, 0.92], [0, -1, 0.1], G2)],
+    [0.62, 1.07, line(POLE_OUT, [-0.04, 0.18, 0.44], [0, 0.4, 0.92], [0, 0.36, 0.93], [0, -1, 0.3], G2)],
+  ],
+  0.06,
+);
+const poleLungeHit = 0.62;
+
+// Pole Push: the head lifted off the floor and jabbed into them at the hips; then planted on the
+// ground ahead and leant on, the arms locked, as he pushes himself back off it
+const PUSH_IN: V3 = [-0.02, 0.24, 0.42];
+const PUSH_PLANT: V3 = [-0.02, 0.14, 0.4];
+const polePush = seq(
+  [
+    [-0.4, 0.05, arc([-0.1, 0.24, 0.12], 0.14, [GUARD_DIR, [-0.08, -0.15, 1], [-0.04, 0.3, 0.95]], G2, { pivot1: [-0.1, 0.22, 0.04] })],
+    [0.05, 0.45, line([-0.1, 0.26, 0.17], PUSH_IN, [-0.04, 0.3, 0.95], [0, 0.05, 1], [0, -1, 0.1], G2)],
+    [0.45, 1.07, line(PUSH_IN, PUSH_PLANT, [0, 0.05, 1], [0, -0.8, 0.6], [0, -0.6, -0.8], G2)],
+  ],
+  0.06,
+);
+const polePushHit = 0.45;
+
+// Ring entrance, played in place. Arrival: crouched beside the hammer planted head-down on his
+// right, one hand on the haft, he stamps twice and stands up, the hands sliding down the haft so
+// the hammer stays put in the dirt. Signature: he takes it in both hands, springs, and vaults
+// over it, the body tipping flat above the planted haft before it is ripped up and carried round
+// with him through the somersault. Challenge: he lands into one helicopter turn overhead and
+// slams it down in front, dropping flat behind it, then rises into guard.
+// (The grips while it is planted are worked out for each body key below so that the hammer stays
+// at one spot on the floor: grip at (-0.55, 1.1, 0.45) m, haft (-0.2, -0.7, 0.69).)
+const ENT_EDGE: V3 = [0.05, -0.7, -0.7];
+const ENT_PLANT: [number, V3, V3][] = [
+  [0.0, [-0.244, 0.435, 0.298], [0.013, -0.473, 0.881]],
+  [0.1, [-0.244, 0.325, 0.338], [0.013, -0.542, 0.84]],
+  [0.17, [-0.252, 0.21, 0.357], [-0.002, -0.607, 0.795]],
+  [0.24, [-0.259, 0.159, 0.358], [-0.016, -0.623, 0.782]],
+  [0.33, [-0.262, 0.094, 0.356], [-0.023, -0.698, 0.716]],
+  [0.4, [-0.297, 0.392, 0.261], [-0.094, -0.439, 0.893]],
+  [0.45, [-0.309, 0.071, 0.364], [-0.112, -0.266, 0.957]],
+  [0.52, [-0.314, 0.389, 0.553], [-0.164, 0.755, 0.635]],
+];
+const ENT_SLAM_AT: V3 = [-0.05, 0.25, 0.4];
+const ENT_SLAM_DIR: V3 = [-0.05, 0.58, 0.81];
 const entSlamHit = 0.785;
-const entrance = seq([
-  [-1, 0.36, line(entDragAt, entDragAt, ENT_DRAG, ENT_DRAG, [0, -0.76, 0.64])],
-  [0.36, 0.57, entHeave],
-  [0.57, 0.7, line(ENT_GUARD_AT, ENT_GUARD_AT, ENT_GUARD_DIR, ENT_GUARD_DIR, [0.05, 0.3, 0.95], G2)],
-  [0.7, entSlamHit, entSlam],
-  [entSlamHit, 0.885, line(ENT_PLANT_AT, ENT_PLANT_AT, ENT_PLANT, ENT_PLANT, [0, 0, -1])],
-  [0.885, 0.97, entHoist],
-  [0.97, 2, line(ENT_GUARD_AT, ENT_GUARD_AT, ENT_GUARD_DIR, ENT_GUARD_DIR, [-1, 0, 0.2], G2)],
-], 0.015);
+const entPlanted = (from: number, to: number, g2: number): [number, number, ReturnType<typeof line>][] => {
+  const out: [number, number, ReturnType<typeof line>][] = [];
+  for (let i = 0; i < ENT_PLANT.length - 1; i++) {
+    const [s0, p0, d0] = ENT_PLANT[i];
+    const [s1, p1, d1] = ENT_PLANT[i + 1];
+    if (s0 >= from - 1e-6 && s1 <= to + 1e-6) out.push([s0, s1, line(p0, p1, d0, d1, ENT_EDGE, g2)]);
+  }
+  return out;
+};
+const entrance = seq(
+  [
+    [-1, 0.0, line(ENT_PLANT[0][1], ENT_PLANT[0][1], ENT_PLANT[0][2], ENT_PLANT[0][2], ENT_EDGE)],
+    ...entPlanted(0, 0.33, NaN),
+    [0.33, 0.4, line(ENT_PLANT[4][1], ENT_PLANT[5][1], ENT_PLANT[4][2], ENT_PLANT[5][2], ENT_EDGE, G2)],
+    ...entPlanted(0.4, 0.52, G2),
+    // ripped up out of the floor and carried over with him through the somersault, held in close
+    [0.52, 0.6, arc([-0.22, 0.3, 0.25], 0.2, [ENT_PLANT[7][2], [-0.55, 0.15, 0.82], [-0.92, 0.1, 0.2]], G2)],
+    [0.6, 0.645, arc([-0.22, 0.3, 0.25], 0.2, [[-0.92, 0.1, 0.2], [-0.9, 0.2, -0.3], [-0.8, 0.25, -0.55]], G2, { pivot1: [-0.04, 0.9, 0.08] })],
+    // one helicopter turn overhead
+    [0.645, 0.765, arc(HURR_AT, 0.06, [[-0.8, 0.25, -0.55], [0, 0.25, -1], [0.95, 0.08, -0.3], [0.85, 0.1, 0.52], [0, 0.35, 1]], G2)],
+    // and down into the floor in front of him
+    [0.765, 0.776, line([0, 0.97, 0.14], [0, 0.66, 0.46], [0, 0.35, 1], [0, 0.42, 0.92], [0, -1, 0.3], G2)],
+    [0.776, entSlamHit, line([0, 0.66, 0.46], ENT_SLAM_AT, [0, 0.42, 0.92], ENT_SLAM_DIR, [0, -1, 0.3], G2)],
+    [entSlamHit, 0.88, line(ENT_SLAM_AT, ENT_SLAM_AT, ENT_SLAM_DIR, ENT_SLAM_DIR, [0, -1, 0.3], G2)],
+    [0.88, 0.96, line(ENT_SLAM_AT, GUARD_AT, ENT_SLAM_DIR, GUARD_DIR, GUARD_EDGE, G2, GUARD_G2)],
+    [0.96, 2, line(GUARD_AT, GUARD_AT, GUARD_DIR, GUARD_DIR, GUARD_EDGE, GUARD_G2)],
+  ],
+  0.015,
+);
 
 export const greathammer: Style = {
   axis: 'x',
   offAxis: 'x',
   trail: { light: '#ffe2b0', heavy: '#ffb347', special: '#ff4a2a' },
   sparks: ['#ffb04a', '#ffffff', '#ff7a2a'],
-  // resting over the right shoulder
-  guard: P(body, X(GUARD_AT, GUARD_DIR, [-1, 0, 0.2], 'x', G2)),
-  block: P(B({ ...body, crouch: -0.16 }), X([0.15, 0.5, 0.32], [-1, 0.15, 0.05], [0, 1, 0.3], 'x', -0.3)),
+  // planted: the head down on the floor ahead on the right, both hands low on the haft, waiting
+  guard: P(body, X(GUARD_AT, GUARD_DIR, GUARD_EDGE, 'x', GUARD_G2)),
+  // braced: the hammer hauled up off the floor and held across in front, head high on the right
+  block: P(B({ ...body, crouch: -0.2, lean: 0.16, twist: -0.1, width: 0.2 }), X([0.05, 0.3, 0.36], [-0.72, 0.62, 0.2], [0.15, 0.1, 1], 'x', G2)),
   moves: {
-    // Skullcrusher: the hips unwind right to left and drag the hammer through
+    // Ground Sweep: the body drops almost flat behind the hammer, the lead foot lunging long, the
+    // arms out at full stretch as it whips round the front at shin height
     l0: mv({
       keys: [
-        K(-0.2, B({ ...body, twist: -0.75, hipTwist: -0.25, lean: -0.05, crouch: -0.05, step: 0.22, headPitch: -0.05 })),
-        K(crushHit, B({ ...body, twist: 0.05, hipTwist: 0.05, lean: 0.38, crouch: -0.22, step: 0.46, back: 0.3 })),
-        K(1.0, B({ ...body, twist: 0.6, hipTwist: 0.25, lean: 0.52, crouch: -0.3, step: 0.5, back: 0.32, headPitch: 0.1 })),
+        K(0, B({ ...body, lean: 0.2, crouch: -0.18 })),
+        K(groundSweepBack, B({ ...body, twist: -0.7, hipTwist: -0.25, lean: 0.35, crouch: -0.3, step: 0.34, back: 0.3, width: 0.2 })),
+        K(groundSweepHit, B({ ...body, twist: 0.0, hipTwist: 0.0, lean: 0.8, crouch: -0.5, step: 0.66, back: 0.42, width: 0.2, headPitch: -0.35 })),
+        K(1.0, B({ ...body, twist: 0.6, hipTwist: 0.25, lean: 0.82, crouch: -0.54, step: 0.66, back: 0.44, width: 0.2, headPitch: -0.3 })),
       ],
-      main: crush,
-      impacts: [crushHit],
-      chamber: -0.15,
-      fx: [fx(0.64, 'dust', 'tip', 1.1)],
-      trail: { glow: 0.3 },
+      main: groundSweep,
+      impacts: [groundSweepHit],
+      chamber: groundSweepBack,
+      travel: 0.3,
+      fx: [fx(0.1, 'dust', 'tip', 0.9), fx(groundSweepHit, 'dust', 'tip', 1.1), fx(0.95, 'dust', 'tip', 1.2)],
+      trail: { life: 0.18, glow: 0.35 },
     }),
-    // Cyclone: the hammer swings back like a pendulum, the body whips through a full turn after it,
-    // and the head comes round flat at chest height
+    // Hurricane: he rips the hammer up out of the floor and whirls it once flat over his head like
+    // a rotor, leaning back against its pull, and it comes round the front at head height
     l1: mv({
       keys: [
-        K(-1.5, B({ ...body, twist: 0.4, hipTwist: 0.2, lean: 0.4, crouch: -0.26, step: 0.45, back: 0.3 })),
-        K(-0.95, B({ ...body, twist: -0.85, hipTwist: -0.3, lean: 0.22, crouch: -0.2, step: 0.32, back: 0.3, width: 0.2 }), { spin: 0 }),
-        K(-0.5, B({ ...body, twist: -0.65, hipTwist: -0.2, lean: 0.2, crouch: -0.22, step: 0.32, back: 0.3, width: 0.2 }), { spin: 0.3 }),
-        K(0.0, B({ ...body, twist: -0.4, hipTwist: -0.1, lean: 0.25, crouch: -0.24, step: 0.36, back: 0.3, width: 0.2 }), { spin: 0.62 }),
-        K(cycloneHit + 0.1, B({ ...body, twist: 0.0, hipTwist: 0.0, lean: 0.35, crouch: -0.26, step: 0.45, back: 0.32 }), { spin: 1 }),
-        K(1.1, B({ ...body, twist: 0.45, hipTwist: 0.2, lean: 0.45, crouch: -0.3, step: 0.46, back: 0.32, headPitch: 0.08 }), { spin: 1.08 }),
+        K(-1.2, B({ ...body })),
+        K(-0.45, B({ ...body, twist: -0.6, hipTwist: -0.2, lean: -0.08, crouch: -0.08, step: 0.3, back: 0.3, width: 0.24, headPitch: -0.1 })),
+        K(0.0, B({ ...body, twist: -0.2, hipTwist: -0.05, lean: -0.14, crouch: -0.06, step: 0.34, back: 0.3, width: 0.25, headPitch: -0.15 })),
+        K(hurricaneHit, B({ ...body, twist: 0.15, hipTwist: 0.05, lean: -0.06, crouch: -0.12, step: 0.4, back: 0.32, width: 0.25, headPitch: -0.1 })),
+        K(1.05, B({ ...body, twist: -0.35, hipTwist: -0.1, lean: 0.12, crouch: -0.26, step: 0.4, back: 0.32, width: 0.24 })),
       ],
-      main: cyclone,
-      impacts: [cycloneHit],
-      start: -1.5,
-      chamber: -0.9,
-      flow: 1.6,
-      blendIn: 0.4,
-      fx: [fx(-0.9, 'dust', 'feet', 0.8), fx(-0.2, 'whirl', 'root', 0.9, '#ffe2b0'), fx(0.85, 'dust', 'tip', 1)],
-      trail: { life: 0.22, glow: 0.45 },
+      main: hurricane,
+      impacts: [hurricaneHit],
+      start: -1.2,
+      chamber: -0.45,
+      flow: 1.5,
+      blendIn: 0.35,
+      fx: [fx(-1.1, 'dust', 'tip', 1), fx(-0.3, 'whirl', 'root', 1.2, '#ffe2b0'), fx(hurricaneHit, 'whirl', 'root', 0.9, '#ffe2b0')],
+      trail: { life: 0.26, glow: 0.5 },
     }),
-    // Meteor: crouch, leap, the hammer windmills up over the head at the top of the jump, hangs,
-    // and comes down with the whole body behind it. The ground cracks.
-    h: mv({
+    // Launcher: he sinks deep as the head swings back past his right heel, then drives up out of
+    // the crouch onto his toes, the hammer rising up the centre line and on to straight overhead
+    l2: mv({
       keys: [
-        K(0.0, B({ ...body, crouch: -0.3, lean: 0.28, twist: -0.25, hipTwist: -0.1, step: 0.3, back: 0.3, headPitch: 0.15 })),
-        K(0.2, B({ ...body, crouch: -0.42, lean: 0.34, twist: -0.2, hipTwist: -0.1, step: 0.32, back: 0.32, headPitch: 0.1 }), { hop: 0 }),
-        K(0.34, B({ ...body, crouch: -0.06, lean: -0.05, twist: -0.1, step: 0.3, back: 0.3 }), { hop: 0.25 }),
-        K(meteorApex + 0.1, B({ ...body, crouch: 0.0, lean: -0.32, twist: -0.05, step: 0.32, back: 0.3, headPitch: -0.2 }), { hop: 0.62 }),
-        K(meteorHit - 0.02, B({ ...body, crouch: -0.12, lean: 0.2, twist: 0.0, step: 0.42, back: 0.32 }), { hop: 0.3 }),
-        K(meteorHit + 0.1, B({ ...body, crouch: -0.22, lean: 0.38, twist: 0.02, step: 0.48, back: 0.34 }), { hop: 0.04 }),
-        K(meteorHit + 0.22, B({ ...body, crouch: -0.4, lean: 0.58, twist: 0.02, step: 0.5, back: 0.34, headPitch: 0.1 }), { hop: 0 }),
-        K(1.12, B({ ...body, crouch: -0.44, lean: 0.62, twist: 0.02, step: 0.5, back: 0.34, headPitch: 0.15 })),
+        K(-0.4, B({ ...body, lean: 0.2, crouch: -0.16 })),
+        K(launcherChamber, B({ ...body, twist: -0.45, hipTwist: -0.15, lean: 0.5, crouch: -0.46, step: 0.38, back: 0.34, width: 0.22, headPitch: 0.1 })),
+        K(hitAt(launcher, 2, 0), B({ ...body, twist: -0.2, hipTwist: -0.05, lean: 0.36, crouch: -0.36, step: 0.44, back: 0.34, width: 0.2 })),
+        K(launcherHit, B({ ...body, twist: -0.05, lean: 0.08, crouch: -0.16, step: 0.46, back: 0.32, width: 0.18, headPitch: -0.15 }), { hop: 0 }),
+        K(1.05, B({ ...body, twist: 0.0, lean: -0.2, crouch: 0.04, step: 0.46, back: 0.32, width: 0.17, headPitch: -0.4 }), { hop: 0.1 }),
+        K(1.25, B({ ...body, twist: -0.25, lean: 0.05, crouch: -0.1, step: 0.4, back: 0.3, headPitch: -0.1 }), { hop: 0 }),
+        K(1.45, B({ ...body })),
       ],
-      main: meteor,
-      impacts: [meteorHit],
-      start: 0,
-      chamber: meteorApex,
+      main: launcher,
+      impacts: [launcherHit],
+      start: -0.4,
+      chamber: launcherChamber,
       travel: 0.3,
-      end: 1.02,
-      rest: 0.98,
-      settle: 0.35,
-      fx: [fx(0.24, 'dust', 'feet', 1.2), fx(meteorHit + 0.07, 'shockwave', 'tip', 1.3), fx(meteorHit + 0.07, 'stomp', 'feet', 1)],
-      trail: { life: 0.2, glow: 0.6 },
+      rest: 1.45,
+      settle: 0.65,
+      fx: [fx(hitAt(launcher, 2, 0), 'dust', 'tip', 1.1), fx(launcherHit, 'flashline', 'tip', 1.2), fx(launcherHit, 'sparkle', 'tip', 1.2, '#ffffff')],
+      trail: { life: 0.2, glow: 0.5 },
     }),
-    // Earthshaker: coiled all the way round to the right with the head in the dirt, then ripped
-    // through everything at ankle height; the hammer's weight drags the body round after it
+    // Earthshaker: the perilous sweep. The hammer drags the Warden through one whole turn, low and
+    // leaning out over it, the head skimming the floor; it tears through the ankles as it comes
+    // round the front and ploughs on out to the left
     sp: mv({
       keys: [
-        K(-0.3, B({ ...body, twist: -1.0, hipTwist: -0.4, crouch: -0.3, lean: 0.3, step: 0.3, back: 0.34, width: 0.22, headPitch: 0.1 })),
-        K(quakeHit + 0.1, B({ ...body, twist: -0.12, hipTwist: -0.05, crouch: -0.4, lean: 0.42, step: 0.45, back: 0.36, width: 0.24 })),
-        K(0.8, B({ ...body, twist: 0.6, hipTwist: 0.3, crouch: -0.32, lean: 0.3, step: 0.45, back: 0.36, width: 0.24 }), { spin: 0.06 }),
-        K(1.1, B({ ...body, twist: 0.9, hipTwist: 0.4, crouch: -0.18, lean: 0.1, step: 0.4, back: 0.34, width: 0.2, headPitch: -0.05 }), { spin: 0.12 }),
+        K(-1.3, B({ ...body }), { spin: 0 }),
+        K(-0.7, B({ ...body, twist: -0.8, hipTwist: -0.3, crouch: -0.36, lean: 0.38, step: 0.3, back: 0.34, width: 0.24 }), { spin: 0 }),
+        K(-0.2, B({ ...body, twist: -0.55, hipTwist: -0.2, crouch: -0.46, lean: 0.45, step: 0.36, back: 0.34, width: 0.26 }), { spin: 0.5 }),
+        K(quakeHit, B({ ...body, twist: 0.0, hipTwist: 0.0, crouch: -0.5, lean: 0.55, step: 0.5, back: 0.36, width: 0.26, headPitch: -0.15 }), { spin: 1 }),
+        K(1.05, B({ ...body, twist: 0.6, hipTwist: 0.25, crouch: -0.46, lean: 0.5, step: 0.5, back: 0.36, width: 0.26 }), { spin: 1.08 }),
       ],
       main: quake,
       impacts: [quakeHit],
-      chamber: -0.08,
-      fx: [
-        fx(-0.06, 'dust', 'tip', 0.9),
-        fx(hitAt(quake, 2), 'quake', 'tip', 1),
-        fx(quakeHit, 'quake', 'tip', 1.3),
-        fx(quakeHit, 'stomp', 'feet', 1),
-        fx(hitAt(quake, 4), 'quake', 'tip', 1),
-      ],
-      trail: { life: 0.22, glow: 0.6 },
-    }),
-    // Grave Bell: the end of the light chain. The hips drop deep and wind right as the head falls
-    // back beside the right foot; then the legs drive the hammer up the centre line from the dirt,
-    // the whole body rising onto the toes after it.
-    l2: mv({
-      keys: [
-        K(0, B({ ...body, twist: 0.45, hipTwist: 0.2, lean: 0.42, crouch: -0.3, step: 0.46, back: 0.32 })),
-        K(bellChamber, B({ ...body, twist: -0.5, hipTwist: -0.2, lean: 0.42, crouch: -0.42, step: 0.4, back: 0.34, width: 0.22, headPitch: 0.15 })),
-        K(hitAt(bell, 3), B({ ...body, twist: -0.18, hipTwist: -0.05, lean: 0.24, crouch: -0.32, step: 0.44, back: 0.32, width: 0.2 })),
-        K(bellHit, B({ ...body, twist: 0.0, lean: -0.12, crouch: -0.06, step: 0.46, back: 0.32, headPitch: -0.2 }), { hop: 0.07 }),
-        K(1.05, B({ ...body, twist: 0.1, lean: -0.28, crouch: 0.0, step: 0.46, back: 0.32, headPitch: -0.3 }), { hop: 0 }),
-      ],
-      main: bell,
-      impacts: [bellHit],
-      start: 0,
-      chamber: bellChamber,
-      travel: 0.3,
-      fx: [fx(hitAt(bell, 2), 'dust', 'tip', 1.1), fx(bellHit, 'sparkle', 'tip', 1, '#ffd27a')],
-      trail: { life: 0.2, glow: 0.4 },
-    }),
-    // Avalanche: the second heavy. Out of the Meteor's crater the hammer is heaved up onto the left
-    // shoulder, and the hips unwind left to right as the right foot steps through and it comes down.
-    h1: mv({
-      keys: [
-        K(0, B({ ...body, crouch: -0.42, lean: 0.58, twist: 0.02, step: 0.5, back: 0.34 })),
-        K(avalancheChamber, B({ ...body, twist: 0.6, hipTwist: 0.25, lean: -0.06, crouch: -0.1, step: 0.28, back: 0.3, headPitch: -0.06 })),
-        K(avalancheHit, B({ ...body, front: 'R', twist: -0.05, hipTwist: -0.05, lean: 0.38, crouch: -0.26, step: 0.5, back: 0.32 })),
-        K(1.0, B({ ...body, front: 'R', twist: -0.6, hipTwist: -0.25, lean: 0.5, crouch: -0.32, step: 0.52, back: 0.34, headPitch: 0.1 })),
-      ],
-      main: avalanche,
-      impacts: [avalancheHit],
-      start: 0,
-      chamber: avalancheChamber,
-      travel: 0.25,
-      fx: [fx(avalancheHit, 'stomp', 'feet', 1), fx(1.0, 'dust', 'tip', 1.2)],
-      trail: { life: 0.2, glow: 0.55 },
-    }),
-    // Worldbreaker: the finisher. The hammer drags the Warden round through a full turn, climbing
-    // behind him as it goes, until it is over his head; then he drops onto his knee and brings it
-    // straight down. The ground breaks.
-    h2: mv({
-      keys: [
-        K(0, B({ ...body, front: 'R', twist: -0.6, lean: 0.48, crouch: -0.3, step: 0.5, back: 0.34 }), { spin: 0 }),
-        K(hitAt(breaker, 2), B({ ...body, front: 'R', twist: -0.5, hipTwist: -0.15, lean: 0.12, crouch: -0.16, step: 0.3, back: 0.3, width: 0.22 }), { spin: 0.45 }),
-        K(hitAt(breaker, 4), B({ ...body, twist: -0.1, lean: -0.3, crouch: 0.0, step: 0.36, back: 0.32, width: 0.22, headPitch: -0.2 }), { spin: 0.92 }),
-        K(breakerHit, B({ ...body, twist: 0.0, lean: 0.42, crouch: -0.32, step: 0.5, back: 0.36, width: 0.2 }), { spin: 1 }),
-        K(breakerGround + 0.05, B({ ...body, twist: 0.0, lean: 0.62, crouch: -0.56, step: 0.52, back: 0.38, width: 0.2, headPitch: 0.12 })),
-        K(1.12, B({ ...body, twist: 0.0, lean: 0.64, crouch: -0.58, step: 0.52, back: 0.38, width: 0.2, headPitch: 0.15 })),
-      ],
-      main: breaker,
-      impacts: [breakerHit],
-      start: 0,
-      chamber: 0.12,
-      flow: 1.5,
+      start: -1.3,
+      chamber: -0.7,
+      flow: 1.6,
       blendIn: 0.3,
-      end: 1.0,
-      rest: 1.0,
-      settle: 0.4,
       fx: [
-        fx(0.08, 'dust', 'feet', 1),
-        fx(hitAt(breaker, 3), 'whirl', 'root', 1.1, '#ffe2b0'),
-        fx(breakerGround, 'shockwave', 'tip', 1.8),
-        fx(breakerGround, 'quake', 'tip', 1.2),
-        fx(breakerGround, 'stomp', 'feet', 1.2),
+        fx(-1.2, 'dust', 'tip', 1),
+        fx(-0.5, 'quake', 'tip', 0.9),
+        fx(-0.1, 'quake', 'tip', 1.1),
+        fx(quakeHit, 'quake', 'tip', 1.4),
+        fx(quakeHit, 'stomp', 'feet', 1),
+        fx(0.8, 'quake', 'tip', 1),
       ],
-      trail: { life: 0.24, glow: 0.7 },
+      trail: { life: 0.24, glow: 0.65 },
     }),
-    // Battering Ram: out of the dash, shoulder dropped, the haft levelled at the hip and the head
-    // rammed straight out ahead of the charge
+    // Pole Lunge: out of the dash, bent double behind the haft, he runs the head along the floor
+    // into them like a battering ram, arms locked at full stretch
     dl: mv({
       keys: [
-        K(-0.1, B({ ...body, twist: -0.4, crouch: -0.26, lean: 0.42, step: 0.34, back: 0.36, width: 0.2 })),
-        K(ramHit, B({ ...body, twist: -0.12, crouch: -0.3, lean: 0.52, step: 0.66, back: 0.46, width: 0.18, headPitch: 0.1 })),
-        K(1.05, B({ ...body, twist: -0.08, crouch: -0.3, lean: 0.48, step: 0.66, back: 0.46, width: 0.18 })),
+        K(-0.3, B({ ...body, twist: -0.35, crouch: -0.3, lean: 0.45, step: 0.4, back: 0.4, width: 0.18 })),
+        K(0.0, B({ ...body, twist: -0.3, crouch: -0.36, lean: 0.52, step: 0.5, back: 0.46, width: 0.18 })),
+        K(poleLungeHit, B({ ...body, twist: -0.05, crouch: -0.4, lean: 0.6, step: 0.74, back: 0.5, width: 0.17, headPitch: -0.2 })),
+        K(1.05, B({ ...body, twist: -0.05, crouch: -0.42, lean: 0.58, step: 0.74, back: 0.5, width: 0.17, headPitch: -0.15 })),
       ],
-      main: ram,
-      impacts: [ramHit],
-      chamber: -0.06,
-      end: 1.0,
-      fx: [fx(0, 'dust', 'feet', 1.1), fx(ramHit, 'stomp', 'feet', 0.9), fx(ramHit, 'shake', 'tip', 0.6)],
+      main: poleLunge,
+      impacts: [poleLungeHit],
+      start: -0.4,
+      chamber: 0.0,
+      travel: 0.5,
+      ghosts: [0.0, 0.7],
+      fx: [fx(0.0, 'dust', 'feet', 1.1), fx(0.3, 'quake', 'tip', 0.7), fx(poleLungeHit, 'stomp', 'feet', 0.9), fx(poleLungeHit, 'shake', 'tip', 0.6), fx(1.0, 'dust', 'tip', 1)],
       trail: { life: 0.14, glow: 0.3 },
     }),
-    // Landslide: the dash heavy. The hammer dragged head-down behind on the right through the whole
-    // charge, ploughing the ground, then ripped up through the target to high on the left
-    dh: mv({
-      keys: [
-        K(-0.1, B({ ...body, twist: -0.55, hipTwist: -0.15, crouch: -0.3, lean: 0.55, step: 0.5, back: 0.44 })),
-        K(hitAt(slide, 2), B({ ...body, twist: -0.3, crouch: -0.34, lean: 0.5, step: 0.66, back: 0.48 })),
-        K(slideHit, B({ ...body, twist: 0.12, hipTwist: 0.05, crouch: -0.22, lean: 0.32, step: 0.72, back: 0.48 })),
-        K(1.05, B({ ...body, twist: 0.6, hipTwist: 0.2, crouch: -0.12, lean: 0.1, step: 0.7, back: 0.46, headPitch: -0.12 })),
-      ],
-      main: slide,
-      impacts: [slideHit],
-      chamber: -0.05,
-      travel: 0.7,
-      ghosts: [-0.05, 0.75],
-      fx: [fx(-0.04, 'quake', 'tip', 0.9), fx(hitAt(slide, 1), 'quake', 'tip', 1.1), fx(hitAt(slide, 2), 'quake', 'tip', 1.2), fx(slideHit, 'stomp', 'feet', 1)],
-      trail: { life: 0.22, glow: 0.6 },
-    }),
-    // Rampart: the left foot steps back and the weight sinks onto it as the hammer comes flat across
-    // from the right at head height; it ends stood up on the left, a wall between them
+    // Pole Push: the head jabbed into them, then planted on the floor ahead; he leans on the haft,
+    // arms locked, and shoves himself back off it, the rear foot reaching back and the hips sinking
     bl: mv({
       keys: [
-        K(-0.1, B({ ...body, twist: -0.55, hipTwist: -0.15, lean: -0.04, crouch: -0.12, step: 0.26, back: 0.3 })),
-        K(rampartHit, B({ ...body, twist: 0.05, hipTwist: 0.05, lean: -0.14, crouch: -0.26, step: 0.22, back: 0.62 })),
-        K(1.05, B({ ...body, twist: 0.5, hipTwist: 0.15, lean: -0.1, crouch: -0.3, step: 0.22, back: 0.6 })),
-        K(1.36, B({ ...body, twist: 0.2, lean: -0.04, crouch: -0.24, step: 0.24, back: 0.52, headPitch: 0.05 })),
+        K(-0.4, B({ ...body })),
+        K(0.05, B({ ...body, twist: -0.3, lean: 0.12, crouch: -0.14, step: 0.3, back: 0.28 })),
+        K(polePushHit, B({ ...body, twist: -0.05, lean: 0.32, crouch: -0.2, step: 0.42, back: 0.3, headPitch: -0.05 })),
+        K(0.75, B({ ...body, twist: -0.05, lean: 0.1, crouch: -0.3, step: 0.3, back: 0.6, width: 0.2 })),
+        K(1.05, B({ ...body, twist: -0.1, lean: -0.2, crouch: -0.34, step: 0.24, back: 0.7, width: 0.2, headPitch: 0.1 })),
       ],
-      main: rampart,
-      impacts: [rampartHit],
-      start: 0,
-      chamber: -0.06,
-      end: 1.07,
-      rest: 1.36,
-      settle: 0.55,
-      fx: [fx(rampartHit - 0.06, 'dust', 'feet', 1), fx(1.3, 'stomp', 'feet', 0.6)],
-      trail: { life: 0.18, glow: 0.4 },
+      main: polePush,
+      impacts: [polePushHit],
+      start: -0.4,
+      chamber: 0.05,
+      travel: 0.5,
+      fx: [fx(polePushHit, 'shake', 'tip', 0.6), fx(0.85, 'stomp', 'tip', 0.9), fx(0.9, 'dust', 'feet', 1)],
+      trail: { life: 0.16, glow: 0.35 },
     }),
-    // Gravestone: a long step back as the hammer is hoisted straight up; then it is dropped
-    // head-first into the ground in front and left standing there, both hands on the haft
-    bh: mv({
-      keys: [
-        K(-0.2, B({ ...body, twist: -0.2, lean: -0.08, crouch: -0.06 })),
-        K(graveTop, B({ ...body, twist: -0.05, lean: -0.3, crouch: -0.02, step: 0.2, back: 0.62, headPitch: -0.15 })),
-        K(graveHit, B({ ...body, twist: 0.0, lean: 0.04, crouch: -0.2, step: 0.2, back: 0.56 })),
-        K(1.0, B({ ...body, twist: 0.0, lean: 0.06, crouch: -0.16, step: 0.22, back: 0.52, headPitch: 0.12 })),
-      ],
-      main: grave,
-      impacts: [graveHit],
-      chamber: graveTop,
-      travel: 0.3,
-      end: 1.0,
-      rest: 1.0,
-      settle: 0.45,
-      fx: [fx(graveTop, 'stomp', 'feet', 0.8), fx(0.95, 'shockwave', 'tip', 1), fx(0.95, 'dust', 'tip', 1.2)],
-      trail: { life: 0.2, glow: 0.5 },
-    }),
-    // Boulder Drop: in the air the Warden hunches and tips forward, chopping the hammer short from
-    // the right shoulder down onto whatever is below
-    jl: mv({
-      keys: [
-        K(-0.1, B({ ...body, twist: -0.4, lean: -0.1, crouch: -0.1, headPitch: -0.05 }), { flip: 0 }),
-        K(boulderHit, B({ ...body, twist: -0.05, lean: 0.48, crouch: -0.2, headPitch: 0.12 }), { flip: 0.1 }),
-        K(1.05, B({ ...body, twist: 0.1, lean: 0.52, crouch: -0.22, headPitch: 0.15 }), { flip: 0.06 }),
-      ],
-      main: boulder,
-      impacts: [boulderHit],
-      chamber: -0.1,
-      fx: [fx(boulderHit, 'sparkle', 'tip', 0.8, '#ffd27a')],
-      trail: { life: 0.18, glow: 0.4 },
-    }),
-    // Meteor Fall: arched back in the air with the head hanging behind him, the Warden jackknifes
-    // and brings the hammer over the top, landing square in a wide squat behind it. The ground breaks.
-    jh: mv({
-      keys: [
-        K(0, B({ ...body, twist: -0.2, lean: 0.0, crouch: -0.08 }), { flip: 0 }),
-        K(fallCocked, B({ ...body, twist: 0.0, lean: -0.38, crouch: -0.04, headPitch: -0.2 }), { flip: -0.04 }),
-        K(fallHit, B({ ...body, twist: 0.0, lean: 0.5, crouch: -0.28, step: 0.2, back: 0.16, width: 0.26, headPitch: 0.1 }), { flip: 0.05 }),
-        K(1.0, B({ ...body, twist: 0.0, lean: 0.58, crouch: -0.5, step: 0.12, back: 0.12, width: 0.34, headPitch: 0.15 }), { flip: 0 }),
-      ],
-      main: fall,
-      impacts: [fallHit],
-      start: 0,
-      chamber: fallCocked,
-      travel: 0.3,
-      end: 1.0,
-      rest: 1.0,
-      fx: [fx(1.0, 'shockwave', 'tip', 1.4), fx(1.0, 'stomp', 'feet', 1.1)],
-      trail: { life: 0.22, glow: 0.6 },
-    }),
+    // the heavy chain, the dash and backstep heavies and the air attacks
+    ...WARDEN_B,
   },
   // War Cry: the hammer hoisted overhead in both hands, a wide stance, the head thrown back
   roar: mv({
@@ -387,64 +296,63 @@ export const greathammer: Style = {
     lead: 0,
     fx: [fx(0.32, 'roar', 'root', 1.2)],
   }),
-  // Ring entrance: two stamps that shake the ring with the hammer dragging behind, the hammer
-  // heaved onto the shoulder as the head comes up, then slammed down beside him to stand like a wall
+  // Ring entrance: crouched by the planted hammer, two stamps as he stands; the vault over it and
+  // the somersault that rips it out; a helicopter turn overhead and the slam
   entrance: mv({
     keys: [
-      K(0, B({ ...body, twist: -0.3, lean: 0.24, crouch: -0.12, side: 0, step: 0.24, back: 0.26, headPitch: 0.3 })),
-      K(0.08, B({ ...body, twist: -0.34, lean: 0.14, crouch: -0.02, side: 0.1, step: 0.26, back: 0.2, headPitch: 0.26 })),
-      K(0.15, B({ ...body, twist: -0.28, lean: 0.3, crouch: -0.22, side: -0.04, step: 0.24, back: 0.06, width: 0.22, headPitch: 0.3 })),
-      K(0.21, B({ ...body, twist: -0.28, lean: 0.22, crouch: -0.14, side: -0.02, step: 0.24, back: 0.06, width: 0.22, headPitch: 0.3 })),
-      K(0.26, B({ ...body, twist: -0.25, lean: 0.12, crouch: -0.03, side: 0, step: 0.24, back: 0.06, width: 0.22, headPitch: 0.24 }), { hop: 0.05 }),
-      K(0.3, B({ ...body, twist: -0.25, lean: 0.32, crouch: -0.32, side: 0, step: 0.28, back: 0.08, width: 0.27, headPitch: 0.3 }), { hop: 0 }),
-      K(0.36, B({ ...body, twist: -0.25, lean: 0.3, crouch: -0.3, step: 0.28, back: 0.08, width: 0.26, headPitch: 0.28 })),
-      K(0.45, B({ ...body, twist: -0.05, lean: 0.34, crouch: -0.3, step: 0.28, back: 0.1, width: 0.25, headPitch: 0.2 })),
-      K(0.57, B({ ...body, twist: -0.2, lean: -0.04, crouch: -0.08, step: 0.26, back: 0.14, width: 0.22, headPitch: -0.12 })),
-      K(0.69, B({ ...body, twist: -0.22, lean: -0.1, crouch: -0.07, step: 0.26, back: 0.14, width: 0.22, headPitch: -0.2 })),
-      K(0.74, B({ ...body, twist: -0.3, lean: -0.16, crouch: -0.04, step: 0.26, back: 0.16, width: 0.22, headPitch: -0.16 })),
-      K(entSlamHit, B({ ...body, twist: -0.1, lean: 0.12, crouch: -0.2, step: 0.26, back: 0.16, width: 0.24, headPitch: 0.0 })),
-      K(0.83, B({ ...body, twist: -0.06, lean: -0.04, crouch: -0.12, step: 0.26, back: 0.18, width: 0.24, headPitch: -0.06 })),
-      K(0.885, B({ ...body, twist: -0.06, lean: -0.04, crouch: -0.12, step: 0.26, back: 0.2, width: 0.22, headPitch: -0.04 })),
-      K(0.97, body),
+      K(0, B({ ...body, twist: -0.3, lean: 0.28, crouch: -0.42, step: 0.26, back: 0.26, width: 0.2, headPitch: 0.45 })),
+      K(0.06, B({ ...body, twist: -0.3, lean: 0.24, crouch: -0.38, step: 0.26, back: 0.26, width: 0.2, side: -0.06, headPitch: 0.4 })),
+      K(0.1, B({ ...body, twist: -0.3, lean: 0.2, crouch: -0.3, step: 0.3, back: 0.26, width: 0.22, headPitch: 0.35 })),
+      K(0.17, B({ ...body, twist: -0.28, lean: 0.12, crouch: -0.22, lift: 0.04, step: 0.3, back: 0.26, width: 0.22, side: 0.06, headPitch: 0.25 })),
+      K(0.24, B({ ...body, twist: -0.26, lean: 0.1, crouch: -0.12, step: 0.3, back: 0.28, width: 0.24, headPitch: 0.1 })),
+      K(0.33, B({ ...body, twist: -0.25, lean: 0.0, crouch: -0.08, step: 0.3, back: 0.28, width: 0.24, headPitch: -0.05 })),
+      K(0.4, B({ ...body, twist: -0.15, lean: 0.32, crouch: -0.36, step: 0.3, back: 0.3, width: 0.22, headPitch: 0.1 }), { flip: 0, hop: 0 }),
+      K(0.45, B({ ...body, twist: -0.1, lean: 0.2, crouch: -0.12, step: 0.3, back: 0.3, width: 0.2 }), { flip: 0.05, hop: 0.3 }),
+      K(0.52, B({ ...body, twist: -0.05, lean: 0.1, crouch: -0.2, step: 0.2, back: 0.2, width: 0.18 }), { flip: 0.25, hop: 0.95 }),
+      K(0.58, B({ ...body, twist: -0.05, lean: 0.2, crouch: -0.2, step: 0.2, back: 0.2, width: 0.18 }), { flip: 0.62, hop: 0.65 }),
+      K(0.645, B({ ...body, twist: -0.5, lean: 0.2, crouch: -0.32, step: 0.3, back: 0.3, width: 0.24 }), { flip: 1, hop: 0 }),
+      K(0.7, B({ ...body, twist: -0.3, lean: -0.1, crouch: -0.12, step: 0.32, back: 0.3, width: 0.24, headPitch: -0.15 })),
+      K(0.765, B({ ...body, twist: 0.1, lean: -0.05, crouch: -0.14, step: 0.36, back: 0.3, width: 0.24, headPitch: -0.1 })),
+      K(entSlamHit, B({ ...body, twist: -0.05, lean: 0.7, crouch: -0.45, step: 0.5, back: 0.4, width: 0.22, headPitch: -0.3 })),
+      K(0.88, B({ ...body, twist: -0.05, lean: 0.62, crouch: -0.42, step: 0.5, back: 0.4, width: 0.22, headPitch: -0.35 })),
+      K(0.96, body),
     ],
     main: entrance,
     free: track([
-      [0.0, [0.34, 0.02, 0.12]],
-      [0.08, [0.36, 0.06, 0.2]],
-      [0.15, [0.33, 0.0, 0.04]],
-      [0.26, [0.35, 0.05, 0.18]],
-      [0.3, [0.33, -0.02, 0.06]],
-      [0.36, [0.1, 0.05, 0.25]],
-      [entSlamHit, [0.26, 0.06, 0.18]],
-      [0.885, [0.26, 0.08, 0.2]],
+      [0.0, [0.3, 0.08, 0.26]],
+      [0.1, [0.32, 0.06, 0.24]],
+      [0.24, [0.34, 0.05, 0.16]],
+      [0.33, [0.33, 0.04, 0.1]],
     ]),
     kick: {
-      foot: 'R',
-      from: 0.04,
-      to: 0.15,
+      foot: 'L',
+      from: 0.02,
+      to: 0.1,
       path: seq([
-        [0, 0.6, line([-0.17, 0.05, -0.26], [-0.21, 0.6, 0.02], [0, 0, 1], [0, 0, 1], [0, 1, 0])],
-        [0.6, 0.75, line([-0.21, 0.6, 0.02], [-0.22, 0.62, 0.0], [0, 0, 1], [0, 0, 1], [0, 1, 0])],
-        [0.75, 1, line([-0.22, 0.62, 0.0], [-0.22, 0.05, -0.06], [0, 0, 1], [0, 0, 1], [0, 1, 0])],
+        [0, 0.6, line([0.17, 0.05, 0.22], [0.2, 0.5, 0.34], [0, 0, 1], [0, 0, 1], [0, 1, 0])],
+        [0.6, 0.75, line([0.2, 0.5, 0.34], [0.2, 0.52, 0.34], [0, 0, 1], [0, 0, 1], [0, 1, 0])],
+        [0.75, 1, line([0.2, 0.52, 0.34], [0.19, 0.05, 0.32], [0, 0, 1], [0, 0, 1], [0, 1, 0])],
       ], 0.04),
     },
     start: 0,
     rest: 1,
     lead: 0,
     fx: [
-      fx(0.15, 'stomp', 'feet', 1.2),
-      fx(0.15, 'shake', 'root', 0.8),
-      fx(0.16, 'sparkle', 'tip', 0.6, '#ffb04a'),
-      fx(0.3, 'stomp', 'feet', 1.5),
-      fx(0.3, 'shake', 'root', 1.2),
-      fx(0.31, 'sparkle', 'tip', 0.7, '#ffb04a'),
-      fx(0.38, 'dust', 'tip', 1),
-      fx(0.575, 'shake', 'root', 0.4),
+      fx(0.1, 'stomp', 'feet', 1.2),
+      fx(0.1, 'shake', 'root', 0.8),
+      fx(0.24, 'stomp', 'feet', 1.5),
+      fx(0.24, 'shake', 'root', 1.1),
+      fx(0.45, 'dust', 'feet', 1.2),
+      fx(0.45, 'dust', 'tip', 1),
+      fx(0.53, 'quake', 'tip', 0.8),
+      fx(0.645, 'stomp', 'feet', 1.2),
+      fx(0.66, 'whirl', 'root', 1.2, '#ffe2b0'),
       fx(entSlamHit, 'shockwave', 'tip', 1.6),
+      fx(entSlamHit, 'quake', 'tip', 1.2),
       fx(entSlamHit, 'shake', 'root', 1.2),
       fx(entSlamHit + 0.01, 'embers', 'root', 1.3),
-      fx(0.85, 'embers', 'root', 0.8),
+      fx(0.88, 'embers', 'root', 0.8),
     ],
-    trail: { life: 0.22, glow: 0.5 },
+    trail: { life: 0.24, glow: 0.5 },
   }),
 };
