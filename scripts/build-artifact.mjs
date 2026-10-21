@@ -59,3 +59,7 @@ fs.writeFileSync(
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head><body>\n${page}</body></html>`,
 );
 console.log(`wrote ${out} (${(fs.statSync(out).size / 1024).toFixed(0)} KB, three@${THREE_VERSION} from jsDelivr)`);
+// pages of about 768 KB and up have been refused at publish (with a misleading "review page" error),
+// so flag it before that: shrink inlined images first
+const BUDGET = 760_000;
+if (fs.statSync(out).size > BUDGET) console.warn(`warning: ${fs.statSync(out).size} bytes is over the ${BUDGET}-byte publish budget`);
