@@ -4,3 +4,4 @@ export declare const palette: Record<string, string>;
 export declare const poses: VoxelPoses;
 export declare function buildWraith(): VoxelModel;
 export declare function buildWraithScythe(): VoxelModel;
+export declare function buildWraithSickle(): VoxelModel;

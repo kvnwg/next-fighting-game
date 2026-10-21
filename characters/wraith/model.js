@@ -258,6 +258,33 @@ export function buildWraithScythe() {
   return b.build();
 }
 
+// The chain sickle (kusarigama) that replaced the scythe in the game: a short wrapped handle with
+// a ring at its end for the chain, and the same red crescent blade, smaller.
+export function buildWraithSickle() {
+  const b = new VoxelBuilder(palette);
+  b.bone('sickle', null, [0, 40, 0]);
+  // chain ring at the butt
+  b.disc([0, 41.2, 0], [0, 0, 1], 2.6, 1.1, (p) => (Math.hypot(p[0], p[1] - 41.2) < 1.4 ? undefined : 'steelDark'));
+  // handle, wrapped in red cord
+  b.segment([0, 13, 0], [0, 39, 0], 1.25, (p, t, d) => (Math.floor(d) % 3 === 0 ? 'redDark' : 'steelDark'));
+  b.disc([0, 13.5, 0], [0, 1, 0], 2, 1.2, 'steel');
+  // crescent blade off the head of the handle, sweeping to -X
+  b.fill([-38, 0, -1.5], [3, 15, 1.5], (p) => {
+    const t = -p[0] / 35;
+    if (t < -0.04 || t > 1) return undefined;
+    const tt = clamp01(t);
+    const spine = 13.5 - 11 * tt ** 0.7;
+    const w = 8 * (1 - tt) ** 0.9 * Math.min(1, (tt + 0.05) * 6);
+    if (p[1] > spine || p[1] < spine - w) return undefined;
+    const fromSpine = spine - p[1];
+    if (fromSpine > 2 && p[2] > 0) return undefined;
+    if (fromSpine < 1.1) return 'redDark';
+    if (p[1] < spine - w + 1.1) return 'redLight';
+    return noise3(p[0] * 0.22, p[1] * 0.6, 3) > 0.66 ? 'redDark' : 'red';
+  });
+  return b.build();
+}
+
 export const poses = {
   tpose: {},
   apose: {

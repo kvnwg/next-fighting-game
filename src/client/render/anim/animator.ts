@@ -75,6 +75,8 @@ export interface AnimFrame {
   feet: { L: THREE.Vector3; R: THREE.Vector3 };
   kick: KickTarget | null;
   swingMain: boolean;
+  /** 0..1: how far a chain weapon is thrown out, peaking at each impact (0 outside attacks) */
+  extend: number;
   swingOff: boolean;
   /** the kicking foot is mid-strike (drives a trail) */
   swingKick: boolean;
@@ -361,6 +363,7 @@ export class Animator {
       kick: null,
       swingMain: false,
       swingOff: false,
+      extend: 0,
       swingKick: false,
       fx: [],
       ghost: false,
@@ -382,7 +385,9 @@ export class Animator {
       out.pose = r.pose;
       rot = r.rot;
       out.kick = r.kick;
-      this.reachOut(out.pose, moveFor(this.style, a.attack.anim, a.key ?? ''), out.s);
+      const def = moveFor(this.style, a.attack.anim, a.key ?? '');
+      this.reachOut(out.pose, def, out.s);
+      out.extend = throwOut(def, out.s);
     } else if (a.state === 'dodge' && a.dodgeKind && a.dodgeKind !== 'roll' && (a.dodgeKind === 'leap' ? this.style.leap : this.style.vanish)) {
       const def = (a.dodgeKind === 'leap' ? this.style.leap : this.style.vanish)!;
       const r = this.abilityPose(a, def, out);
@@ -879,6 +884,18 @@ const UP = new THREE.Vector3(0, 1, 0);
 const BACK = new THREE.Vector3(0, 0, -1);
 const LEFT = new THREE.Vector3(1, 0, 0);
 const _ahead = new THREE.Vector3();
+
+/** A chain weapon's throw: out over the windup into each impact, held a beat, reeled back in. */
+function throwOut(def: MoveDef, s: number): number {
+  if (!Number.isFinite(s)) return 0;
+  let e = 0;
+  for (const at of def.impacts) {
+    const d = s - at;
+    const w = d < 0 ? 0.32 : d < 0.08 ? 1e9 : 0.42;
+    e = Math.max(e, d >= 0 && d < 0.08 ? 1 : Math.exp(-(((d < 0 ? d : d - 0.08) / w) ** 2)));
+  }
+  return e;
+}
 /** How far each weapon is driven out ahead at the moment of impact (reference metres). */
 const REACH: Partial<Record<WeaponKind, number>> = {
   spear: 0.3,

@@ -144,6 +144,12 @@ const _cp = new THREE.Vector3();
 const _cv = new THREE.Vector3();
 const _cf = new THREE.Vector3();
 const _cq = new THREE.Quaternion();
+const _chainM = new THREE.Matrix4();
+const _chainA = new THREE.Vector3();
+const _chainB = new THREE.Vector3();
+const _chainS = new THREE.Vector3(1, 1, 1);
+const Z_AXIS_C = new THREE.Vector3(0, 0, 1);
+const _chainTwist = new THREE.Quaternion().setFromAxisAngle(Z_AXIS_C, Math.PI / 2);
 export class CharacterModel {
   readonly root = new THREE.Group();
   readonly char: CharacterDef;
@@ -177,6 +183,10 @@ export class CharacterModel {
   private readonly materials: THREE.MeshLambertMaterial[] = [];
   private flashT = 0;
   private readonly cloth: Cloth[] = [];
+  /** a chain weapon: how far it reaches, how far out it is now (m), and the chain's links */
+  private readonly chainLen: number = 0;
+  private chainOut = 0;
+  private chain: { pts: THREE.Vector3[]; prev: THREE.Vector3[]; seg: number; links: THREE.InstancedMesh; started: boolean } | null = null;
   private clothTime = 0;
   private flashColor = new THREE.Color('#ffffff');
   private ghosts: Ghost[] = [];
@@ -314,6 +324,18 @@ export class CharacterModel {
       this.offPivot.add(this.weapon.off);
     }
     if (this.weapon.worn) torso.add(this.weapon.worn);
+    if (spec.main.chain) {
+      this.chainLen = spec.main.chain;
+      // a little longer than its full throw, so it always hangs a little
+      const n = 26;
+      const seg = (this.chainLen * 1.08 + 0.3) / (n - 1);
+      const geo = new THREE.BoxGeometry(0.035, 0.018, seg * 1.25);
+      const links = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: '#4a4c54', metalness: 0.7, roughness: 0.45 }), n - 1);
+      links.castShadow = true;
+      links.frustumCulled = false;
+      this.root.add(links);
+      this.chain = { pts: Array.from({ length: n }, () => new THREE.Vector3()), prev: Array.from({ length: n }, () => new THREE.Vector3()), seg, links, started: false };
+    }
 
     // models are built at their real size; `scale` tells the HUD and camera how tall this one is
     this.scale = d.height / POSE_HEIGHT;
@@ -395,6 +417,65 @@ export class CharacterModel {
     this.animator.react(kind);
   }
 
+  /** The chain hangs from the hand to the sickle's ring: a rope of links under gravity, both ends held. */
+  private stepChain(dt: number): void {
+    const c = this.chain;
+    if (!c || dt <= 0) return;
+    this.root.updateMatrixWorld(true);
+    const a = this.mainPivot.getWorldPosition(_cp);
+    const b = this.weapon.main.getWorldPosition(_cv);
+    const n = c.pts.length;
+    if (!c.started) {
+      for (let i = 0; i < n; i++) {
+        c.pts[i].lerpVectors(a, b, i / (n - 1)).y -= Math.sin((Math.PI * i) / (n - 1)) * 0.3;
+        c.prev[i].copy(c.pts[i]);
+      }
+      c.started = true;
+    }
+    const h = Math.min(dt, 1 / 30);
+    const g = -9.8 * h * h;
+    for (let i = 1; i < n - 1; i++) {
+      const p = c.pts[i];
+      const vx = (p.x - c.prev[i].x) * 0.985;
+      const vy = (p.y - c.prev[i].y) * 0.985;
+      const vz = (p.z - c.prev[i].z) * 0.985;
+      c.prev[i].copy(p);
+      p.set(p.x + vx, p.y + vy + g, p.z + vz);
+      // the floor
+      if (p.y < 0.02 + this.root.position.y) p.y = 0.02 + this.root.position.y;
+    }
+    c.pts[0].copy(a);
+    c.pts[n - 1].copy(b);
+    for (let it = 0; it < 14; it++) {
+      for (let i = 0; i < n - 1; i++) {
+        const p = c.pts[i];
+        const q = c.pts[i + 1];
+        _cf.subVectors(q, p);
+        const d = _cf.length();
+        if (d < 1e-6) continue;
+        const corr = (d - c.seg) / d;
+        // the ends are held; links between them share the correction
+        const wp = i === 0 ? 0 : i + 1 === n - 1 ? 1 : 0.5;
+        const wq = i + 1 === n - 1 ? 0 : i === 0 ? 1 : 0.5;
+        p.addScaledVector(_cf, corr * wp);
+        q.addScaledVector(_cf, -corr * wq);
+      }
+    }
+    // draw each link along its segment, alternate ones turned a quarter
+    const m = _chainM;
+    for (let i = 0; i < n - 1; i++) {
+      const p = this.root.worldToLocal(_chainA.copy(c.pts[i]));
+      const q = this.root.worldToLocal(_chainB.copy(c.pts[i + 1]));
+      _cf.subVectors(q, p);
+      const len = _cf.length();
+      _cq.setFromUnitVectors(Z_AXIS_C, len > 1e-6 ? _cf.divideScalar(len) : Z_AXIS_C);
+      if (i % 2) _cq.multiply(_chainTwist);
+      m.compose(p.add(q).multiplyScalar(0.5), _cq, _chainS);
+      c.links.setMatrixAt(i, m);
+    }
+    c.links.instanceMatrix.needsUpdate = true;
+  }
+
   /** Swing the cloth toward where gravity, the air and its own inertia push it. */
   private stepCloth(dt: number): void {
     if (!this.cloth.length || dt <= 0) return;
@@ -453,6 +534,7 @@ export class CharacterModel {
 
   setVisible(v: boolean): void {
     this.body.visible = v;
+    if (this.chain) this.chain.links.visible = v;
   }
 
   update(a: AnimInput, dt: number): void {
@@ -497,6 +579,11 @@ export class CharacterModel {
     }
 
     // weapons stop at the ground instead of sinking into it (not mid-flip, where "down" moves)
+    // a chain weapon flies out along its line as the blow lands, and is reeled back in after
+    if (this.chain) {
+      this.chainOut += (f.extend * this.chainLen - this.chainOut) * Math.min(1, dt * 22);
+      this.weapon.main.position.z = this.chainOut;
+    }
     if (lying < 0.5 && tuck < 0.2) this.keepAboveGround(mainPos, p.main.quat);
     this.mainPivot.quaternion.copy(p.main.quat);
 
@@ -518,7 +605,7 @@ export class CharacterModel {
     }
     // and swing past the head rather than through it, from where the hand really holds it (an
     // overhead grip out of reach brings the weapon down to the hand, often into the helm)
-    if (this.keepClearOfHead(this.mainPivot.position, p.main.quat)) {
+    if (!this.chain && this.keepClearOfHead(this.mainPivot.position, p.main.quat)) {
       this.mainPivot.quaternion.copy(p.main.quat);
       if (p.main.hold2 > 0.001) {
         this.mapTorso(p.off ? p.off.pos : p.free, _lh);
@@ -571,6 +658,7 @@ export class CharacterModel {
     this.updateGhosts(f.ghost, dt);
     this.updateSmears(dt);
     this.stepCloth(dt);
+    this.stepChain(dt);
 
     // hit flash / perilous telegraph / buff glow
     this.flashT = Math.max(0, this.flashT - dt * 8);
@@ -785,7 +873,7 @@ export class CharacterModel {
     const floor = this.char.weaponKind === 'greathammer' ? 0.22 : 0.05;
     const lowest = (q: THREE.Quaternion) => {
       let h = Infinity;
-      for (const pt of [this.trailMain.base, this.trailMain.tip]) h = Math.min(h, height(_v.copy(pt).applyQuaternion(q).add(grip)));
+      for (const pt of [this.trailMain.base, this.trailMain.tip]) h = Math.min(h, height(_v.copy(pt).setZ(pt.z + this.chainOut).applyQuaternion(q).add(grip)));
       return h;
     };
     if (lowest(quat) >= floor) return;

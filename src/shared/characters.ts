@@ -375,7 +375,7 @@ const reaper: BaseDef = {
   id: 'reaper',
   name: 'Wraith',
   jp: '鎌鬼',
-  weapon: 'Scythe',
+  weapon: 'Chain Sickle',
   weaponKind: 'scythe',
   role: 'Sustain / control',
   description: 'A faceless spirit that drifts on mist. Wide sweeping arcs that are hard to step around; heals from every hit and hooks fleeing prey back in.',

@@ -13,7 +13,7 @@ import { buildLancer, buildLancerSpear } from '../../../../characters/lancer/mod
 import { buildMonk } from '../../../../characters/monk/model.js';
 import { buildRonin, buildRoninKatana } from '../../../../characters/ronin/model.js';
 import { buildWarden, buildWardenHammer } from '../../../../characters/warden/model.js';
-import { buildWraith, buildWraithScythe } from '../../../../characters/wraith/model.js';
+import { buildWraith, buildWraithSickle } from '../../../../characters/wraith/model.js';
 import { VOXEL, meshBones } from './mesh';
 
 /**
@@ -36,6 +36,12 @@ export interface PropSpec {
   tip: Vec3;
   /** Prop bones shown only during heavy swings and specials (the spear's lightning). */
   charged?: string[];
+  /**
+   * A weapon thrown out on a chain (the kusarigama): it flies this far (m) out along the weapon's
+   * line from the hand at each blow, reeled back in between them, with a hanging chain drawn
+   * from the hand to it.
+   */
+  chain?: number;
 }
 
 export interface VoxelFighterSpec {
@@ -93,7 +99,8 @@ export const VOXEL_FIGHTERS: Record<CharacterId, VoxelFighterSpec> = {
   },
   reaper: {
     build: buildWraith,
-    main: { build: buildWraithScythe, grip: [0, 66, 0], axis: DOWN, edge: [0, 0, 1], scale: 0.7, base: [-4, 17, 0], tip: [-64, 3, 0] },
+    // a chain sickle: the grip is the chain ring at the butt, so the chain runs from the hand to it
+    main: { build: buildWraithSickle, grip: [0, 41, 0], axis: DOWN, edge: [0, 0, 1], scale: 0.85, base: [-3, 11, 0], tip: [-34, 2, 0], chain: 2.1 },
   },
   monk: {
     build: buildMonk,
