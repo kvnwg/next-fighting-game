@@ -34,7 +34,7 @@
     <h1>RONIN</h1><span class="kanji">浪人</span>
     <div class="meta" id="meta"></div>
   </header>
-  <div class="panels" id="panels"></div>
+  <div id="rows"></div>
   <footer>
     <span class="label">Palette</span>
     <div class="swatches" id="swatches"></div>
@@ -42,103 +42,27 @@
   </footer>
 </div>
 <script type="module">
-  import * as THREE from 'three';
   import { buildRonin, poses, palette } from './model.js';
-  import { buildRig } from '../../tools/voxel/mesher.js';
-
-  const PX = 9; // pixels per voxel on the sheet
-  const Y0 = -3, Y1 = 91;
+  import { renderSheet, swatches } from '../../tools/voxel/sheet.js';
 
   const model = buildRonin();
-  const rig = buildRig(model);
-  const scene = new THREE.Scene();
-  scene.add(rig.root);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8780, 2.1));
-  const key = new THREE.DirectionalLight(0xffffff, 2.2);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.6);
-  scene.add(key, key.target, fill, fill.target);
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-  renderer.setPixelRatio(1);
-  renderer.setClearColor(0x000000, 0);
-
-  const views = [
-    { id: 'tpose', title: 'T-Pose', sub: 'front', pose: 'tpose', dir: [0, 0, 1], x: [-40, 40] },
-    { id: 'apose', title: 'A-Pose', sub: 'front', pose: 'apose', dir: [0, 0, 1], x: [-33, 33] },
-    { id: 'side', title: 'Side', sub: 'left profile · A-pose', pose: 'apose', dir: [1, 0, 0], x: [-20, 26] },
-    { id: 'back', title: 'Back', sub: 'A-pose', pose: 'apose', dir: [0, 0, -1], x: [-33, 33] },
-  ];
-
-  // deterministic ink-wash splatter behind each figure, like the reference art
-  function splatter(ctx, w, h, seed) {
-    let s = seed;
-    const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-    // keep every mark (and its radius) inside the canvas so nothing is clipped
-    const dot = (x, y, r, a) => {
-      if (x - r < 4 || x + r > w - 4 || y - r < 4 || y + r > h - 4) return;
-      ctx.fillStyle = `rgba(18,18,20,${a})`; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
-    };
-    const cx = w * (0.6 + rnd() * 0.08), cy = h * 0.6;
-    // washes: clusters of overlapping translucent blots give soft, irregular edges
-    for (let i = 0; i < 9; i++) {
-      const bx = cx + (rnd() - 0.4) * w * 0.55, by = cy + (rnd() - 0.5) * h * 0.45;
-      const br = 30 + rnd() * 70;
-      for (let j = 0; j < 40; j++) {
-        const a = rnd() * 7, d = Math.sqrt(rnd()) * br;
-        dot(bx + Math.cos(a) * d, by + Math.sin(a) * d * 0.9, 4 + rnd() * br * 0.35, 0.012 + rnd() * 0.02);
-      }
-    }
-    // spray: sharp droplets thrown outward from the washes
-    for (let i = 0; i < 260; i++) {
-      const a = rnd() * 7, d = Math.pow(rnd(), 0.7) * w * 0.48;
-      const r = 0.8 + Math.pow(rnd(), 3) * 9;
-      dot(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.95, r, 0.35 + rnd() * 0.5);
-    }
-  }
-
-  const panels = document.getElementById('panels');
-  for (const [i, v] of views.entries()) {
-    const w = (v.x[1] - v.x[0]) * PX, h = (Y1 - Y0) * PX;
-    const fig = document.createElement('figure');
-    fig.id = `panel-${v.id}`;
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    canvas.id = `view-${v.id}`;
-    fig.append(canvas);
-    fig.insertAdjacentHTML('beforeend', `<figcaption>${v.title}<small>${v.sub}</small></figcaption>`);
-    panels.append(fig);
-
-    rig.setPose(poses[v.pose]);
-    const cam = new THREE.OrthographicCamera(v.x[0], v.x[1], Y1, Y0, 1, 1000);
-    const [dx, , dz] = v.dir;
-    // horizontal extent is measured in the camera's own right axis
-    cam.position.set(dx * 300, 0, dz * 300);
-    cam.lookAt(0, 0, 0);
-    cam.left = v.x[0]; cam.right = v.x[1]; cam.top = Y1; cam.bottom = Y0;
-    cam.updateProjectionMatrix();
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion);
-    key.position.set(dx * 60 - right.x * 45, 110, dz * 60 - right.z * 45);
-    fill.position.set(dx * 40 + right.x * 60, 20, dz * 40 + right.z * 60);
-
-    renderer.setSize(w, h, false);
-    renderer.render(scene, cam);
-
-    const ctx = canvas.getContext('2d');
-    splatter(ctx, w, h, 1234 + i * 97);
-    // ground shadow
-    const gy = (Y1 - 0) * PX;
-    const grad = ctx.createRadialGradient(w / 2, gy, 2, w / 2, gy, 150);
-    grad.addColorStop(0, 'rgba(0,0,0,0.28)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.save(); ctx.scale(1, 0.18); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(w / 2, gy / 0.18, 150, 0, 7); ctx.fill(); ctx.restore();
-    ctx.drawImage(renderer.domElement, 0, 0);
-  }
+  const view = (id, title, sub, pose, dir, x) => ({ id, title, sub, model, poses, pose, dir, x });
+  renderSheet(document.getElementById('rows'), {
+    px: 9,
+    y: [-3, 91],
+    rows: [[
+      view('tpose', 'T-Pose', 'front', 'tpose', [0, 0, 1], [-40, 40]),
+      view('apose', 'A-Pose', 'front', 'apose', [0, 0, 1], [-33, 33]),
+      view('side', 'Side', 'left profile · A-pose', 'apose', [1, 0, 0], [-20, 26]),
+      view('back', 'Back', 'A-pose', 'apose', [0, 0, -1], [-33, 33]),
+    ]],
+  });
 
   const height = model.bounds.max[1] - model.bounds.min[1] + 1;
   const dims = model.bounds.max.map((m, i) => m - model.bounds.min[i] + 1);
   document.getElementById('meta').innerHTML =
     `Voxel character sheet<br>${model.voxels.length.toLocaleString()} voxels · ${model.bones.length} bones · ${height} vx tall incl. polearm<br>1 voxel ≈ 2.25 cm · T-pose bounds ${dims.join(' × ')}`;
-  document.getElementById('swatches').innerHTML = Object.entries(palette)
-    .map(([k, c]) => `<div class="swatch" title="${k}" style="background:${c}"></div>`).join('');
+  swatches(document.getElementById('swatches'), palette);
 
   await document.fonts.ready;
   window.__ready = true;

@@ -9,6 +9,20 @@ export function hash3(x, y, z) {
   return (h >>> 0) / 4294967296;
 }
 
+// Smooth value noise in [0, 1), for rocky surfaces and colour breakup.
+export function noise3(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const f = (t) => t * t * (3 - 2 * t);
+  const u = f(x - xi), v = f(y - yi), w = f(z - zi);
+  const l = (a, b, t) => a + (b - a) * t;
+  const h = (dx, dy, dz) => hash3(xi + dx, yi + dy, zi + dz);
+  return l(
+    l(l(h(0, 0, 0), h(1, 0, 0), u), l(h(0, 1, 0), h(1, 1, 0), u), v),
+    l(l(h(0, 0, 1), h(1, 0, 1), u), l(h(0, 1, 1), h(1, 1, 1), u), v),
+    w,
+  );
+}
+
 const key = (x, y, z) => `${x},${y},${z}`;
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];

@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "render:ronin": "node tools/voxel/render-sheet.mjs characters/ronin",
-    "export:ronin": "node tools/voxel/export-vox.mjs characters/ronin"
+    "render": "node tools/voxel/render-sheet.mjs",
+    "export": "node tools/voxel/export-vox.mjs"
   },
   "dependencies": {
     "three": "0.170.0"
