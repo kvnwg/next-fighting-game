@@ -456,6 +456,7 @@ export class UI {
     for (const fill of el.querySelectorAll<HTMLElement>('.pm-fill')) if (fill.style.width !== left) fill.style.width = left;
     el.classList.toggle('broken', broken);
     el.classList.toggle('cracked', f > 0.6);
+    el.classList.toggle('calm', f < 0.01 && !broken);
     el.dataset.level = f > 0.8 ? 'high' : f > 0.5 ? 'mid' : 'low';
   }
 
