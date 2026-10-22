@@ -6,7 +6,7 @@
 import type { AttackAnim } from '../../shared/characters';
 import { MAT, Material } from './materials';
 import type { Edge, Profile } from './profiles';
-import { SHAPES, Out, at, chance, clamp, crackle, crunch, debris, filtered, jit, modal, noise, osc, rand, rattle, scaled, tear, thump, via } from './synth';
+import { SHAPES, Out, at, chance, clamp, crackle, crunch, debris, filtered, jit, modal, noise, osc, rand, rattle, scaled, spatter, squelch, tear, thump, via } from './synth';
 
 // ------------------------------------------------------------------ layers
 
@@ -219,6 +219,29 @@ function bodyLayer(o: Out, d: Profile, h: number): void {
   }
 }
 
+/**
+ * The wet half of a blade landing: the flesh giving under the edge (a thick squelch, lower and
+ * longer for a heavier blade), the hiss of blood flung off the cut, and the drops landing a beat
+ * later. `k` scales it all (armour and plate soak most of it).
+ */
+function gore(o: Out, st: Striker, h: number, k: number): void {
+  if (k <= 0) return;
+  const pt = st.edge === 'point';
+  // a knife opens a quick, high nick; a greatsword or glaive a deep, long one
+  const low = 1 / (0.7 + 0.55 * st.mass);
+  const len = (pt ? 0.075 : 0.12) * (0.75 + 0.5 * h) * (0.8 + 0.45 * st.mass);
+  squelch(o, len, (pt ? 1500 : 2300) * low, (pt ? 240 : 360) * low, { gain: (0.9 * h + 0.35) * k, delay: 0.003 }, pt ? 0.6 : 1);
+  // the meat of it: a short wet thwack under the squelch
+  thump(o, rand(170, 210) * low, 70, 0.08, (0.45 * h + 0.15) * k, 0.002);
+  noise(o, { color: 'pink', type: 'bandpass', f: 900 * low, q: 1.4, dur: 0.05, gain: (0.4 * h + 0.15) * k, a: 0.0008 });
+  if (!pt) {
+    // blood flung off the edge: a spray that swells and falls away along the follow-through
+    noise(o, { color: 'pink', type: 'bandpass', f: rand(3000, 3800) * low, f1: 1100 * low, q: 1.1, dur: 0.18 + 0.14 * h, gain: (0.22 + 0.25 * h) * k, delay: 0.012, shape: SHAPES.swing(0.22, 1.6) });
+  }
+  // and landing: drops spattering on the ground
+  spatter(o, Math.round((pt ? 3 : 5) + 9 * h), 0.22 + 0.18 * h, 450, 1500, { gain: (0.32 + 0.2 * h) * k, delay: rand(0.06, 0.1), type: 'highpass', f: 260 });
+}
+
 function onBody(o: Out, st: Striker, d: Profile, h: number, armor: boolean): void {
   // a cut has to read over the swing that carried it
   const cut = armor ? 0.8 : 1.6;
@@ -228,12 +251,14 @@ function onBody(o: Out, st: Striker, d: Profile, h: number, armor: boolean): voi
       noise(o, { type: 'bandpass', f: rand(4800, 6200), f1: rand(1400, 1900), q: 1.3, dur: rand(0.06, 0.09) * (0.8 + 0.4 * h), gain: (0.5 * h + 0.15) * cut, a: 0.001 });
       tear(o, rand(0.09, 0.15) * (0.8 + 0.4 * h), { gain: (0.55 * h + 0.2) * cut, type: 'bandpass', f: rand(2200, 3200), q: 0.7, delay: 0.004 });
       ring(o, st.mat, 0.08 * h, { pitch: st.pitch, decay: 0.28, hard: 0.6 });
+      gore(o, st, h, armor ? 0.35 : 1);
       break;
     case 'point':
       // a puncture: a short, tight "thk"
       noise(o, { type: 'bandpass', f: rand(1300, 1700), f1: 600, q: 2.2, dur: 0.04, gain: (0.6 * h + 0.2) * cut, a: 0.0006 });
       tear(o, 0.06, { gain: (0.3 * h + 0.1) * cut, type: 'bandpass', f: 1800, q: 1 }, 0.6);
       ring(o, st.mat, 0.06 * h, { pitch: st.pitch, decay: 0.3, hard: 0.7 });
+      gore(o, st, h, armor ? 0.35 : 1);
       break;
     case 'blunt':
       // the full weight landing: a deep thud, a crunch through it, the air knocked out
@@ -270,12 +295,15 @@ function onPlate(o: Out, st: Striker, d: Profile, h: number): void {
       ring(o, st.mat, 0.12 * h + 0.04, { pitch: st.pitch, decay: 0.45, hard: 0.8 });
       // the edge skating across it
       tear(o, rand(0.12, 0.2), { gain: 0.35 * h, type: 'bandpass', f: rand(3000, 4200), q: 2.5, delay: 0.006 }, 0.5);
+      // and finds the gaps between the plates
+      gore(at(o, 0.02), st, h, 0.4);
       break;
     case 'point':
       ring(o, MAT.plate, 0.45 * h + 0.12, { pitch: pp * 1.05, hard: 0.75, decay: 0.8 });
       ring(o, st.mat, 0.14 * h, { pitch: st.pitch, decay: 0.4 });
       click(o, 0.4, 6000, 0.006);
       noise(o, { type: 'bandpass', f: 4200, f1: 2500, q: 3, dur: 0.07, gain: 0.2 * h, delay: 0.005 });
+      gore(at(o, 0.015), st, h, 0.4);
       break;
     case 'blunt':
       // a hammer into plate: a huge dented clang, and the body inside it

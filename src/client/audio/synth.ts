@@ -486,6 +486,80 @@ export function tear(o: Out, dur: number, g: GrainOpts, coarse = 1): void {
   );
 }
 
+/**
+ * Flesh giving way under an edge: noise through a resonant filter that sweeps down from f0 to f1,
+ * its level bubbling in little wet clumps, so it reads as a thick "shlk" rather than a hiss.
+ * `wet` (0..1) is how many of those clumps there are.
+ */
+export function squelch(o: Out, dur: number, f0: number, f1: number, g: GrainOpts, wet = 1): void {
+  grains(
+    o,
+    dur,
+    (d, sr) => {
+      const n = d.length;
+      let lp = 0;
+      let bp = 0;
+      let gate = 1;
+      let gateLeft = 0;
+      let lvl = 1;
+      const wob = rand(28, 46);
+      const ph = Math.random() * 6.28;
+      for (let i = 0; i < n; i++) {
+        const x = i / n;
+        // the cutoff falls fast, then wobbles as the mass moves
+        const fc = (f1 + (f0 - f1) * Math.pow(1 - x, 2.4)) * (1 + 0.22 * Math.sin((i / sr) * wob * 6.283 + ph));
+        const F = 2 * Math.sin(Math.PI * Math.min(0.16, fc / sr));
+        const inp = Math.random() * 2 - 1;
+        lp += F * bp;
+        const hp = inp - lp - 0.24 * bp;
+        bp += F * hp;
+        if (--gateLeft <= 0) {
+          gate = Math.random() < 0.35 * wet ? rand(1.3, 2.1) : rand(0.25, 0.9);
+          gateLeft = Math.floor(rand(0.003, 0.011) * sr);
+        }
+        lvl += (gate - lvl) * 0.03;
+        const env = Math.min(1, i / (0.0015 * sr)) * Math.pow(1 - x, 1.5);
+        d[i] = bp * env * lvl * 0.55;
+      }
+    },
+    g,
+  );
+}
+
+/**
+ * Blood landing: a scatter of droplets, each a tiny rising "plip" (the pitch of a drop climbs as
+ * its bubble closes) with a tick of contact, clustered just after the cut and thinning out.
+ */
+export function spatter(o: Out, count: number, spread: number, fLo: number, fHi: number, g: GrainOpts): void {
+  grains(
+    o,
+    spread + 0.05,
+    (d, sr) => {
+      for (let k = 0; k < count; k++) {
+        const t0 = Math.pow(Math.random(), 1.5) * spread;
+        const i0 = Math.floor(t0 * sr);
+        const f = rand(fLo, fHi);
+        const n = Math.floor(rand(0.005, 0.02) * sr);
+        const amp = rand(0.3, 1) * Math.exp((-1.4 * t0) / spread);
+        let p = 0;
+        for (let j = 0; j < n && i0 + j < d.length; j++) {
+          const x = j / n;
+          p += (2 * Math.PI * f * (1 + 0.9 * x)) / sr;
+          // a millisecond's fade in, so a drop is a plip, not a click
+          d[i0 + j] += amp * Math.sin(p) * Math.exp(-4.5 * x) * Math.min(1, j / (0.001 * sr)) * 0.5;
+        }
+        // the soft wet tick of it landing
+        let y = 0;
+        for (let j = 0; j < 90 && i0 + j < d.length; j++) {
+          y += ((Math.random() * 2 - 1) - y) * 0.25;
+          d[i0 + j] += amp * 0.25 * y * Math.sin((Math.PI * j) / 90);
+        }
+      }
+    },
+    g,
+  );
+}
+
 /** Crunch: a dense run of short low clicks (wood splintering, a heavy blow landing). */
 export function crunch(o: Out, dur: number, g: GrainOpts): void {
   grains(
