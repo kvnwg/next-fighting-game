@@ -205,8 +205,8 @@ function kit(light: AttackDef, heavy: AttackDef, n: Record<ExtraKey, Named>): Re
     bh: { ...scaled(heavy, { w: 0.9, rc: 1, d: 0.9, p: 0.9 }), lunge: -1.2 },
     // in the air: the jump commits you, so the blow carries your whole weight: more damage and
     // much more posture than the same attack on the ground
-    jl: { ...scaled(light, { w: 0.75, rc: 1.1, d: 1.4, p: 1.6, bp: 1.5, ar: 1.2 }), lunge: 0.6 },
-    jh: { ...scaled(heavy, { w: 0.6, rc: 1.05, d: 1.35, p: 1.6, bp: 1.5 }), lunge: 0.8, knockback: 0.8 },
+    jl: { ...scaled(light, { w: 0.75, rc: 1.1, d: 1.4, p: 1.6, bp: 1.5, ar: 1.2 }), lunge: 1.4 },
+    jh: { ...scaled(heavy, { w: 0.6, rc: 1.05, d: 1.35, p: 1.6, bp: 1.5 }), lunge: 1.8, knockback: 0.8 },
   };
   const out = {} as Record<ExtraKey, AttackDef>;
   for (const k of EXTRA_KEYS) {

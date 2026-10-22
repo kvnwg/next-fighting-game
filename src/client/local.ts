@@ -204,6 +204,7 @@ export class LocalController {
     }
 
     const obstacles = ctx.others.filter((o) => o.s !== 'dead').map((o) => ({ x: o.pos.x, z: o.pos.z }));
+    sim.airControl(now, dt);
     const res = stepBody(sim, vx, vz, dt, this.map, sim.state === 'dodge' ? [] : obstacles);
     if (res.fell && !this.fellSent) {
       this.fellSent = true;

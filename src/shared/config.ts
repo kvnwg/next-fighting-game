@@ -17,8 +17,8 @@ export const HIT_CONFIRM_SLACK_MS = 35;
 // ---- Movement ------------------------------------------------------------------
 export const PLAYER_RADIUS = 0.45;
 export const GRAVITY = 30;
-// a high jump: ~2.2 m at the top, ~0.77 s in the air
-export const JUMP_VELOCITY = 11.5;
+// a high jump, as in Dueling Grounds: ~2.8 m at the top, ~0.87 s in the air
+export const JUMP_VELOCITY = 13;
 export const SPRINT_MULT = 1.45;
 export const FALL_DEATH_Y = -9;
 
@@ -95,7 +95,7 @@ export const COMBAT = {
   dodgeDistance: 2.4,
   dodgeCooldown: 850,
   /** Minimum time between jumps (longer than a jump's airtime, so evasion can't be chained). */
-  jumpCooldown: 1000,
+  jumpCooldown: 1100,
   /** A forward dodge (stick within ~45° of facing) turns light and heavy into dash attacks... */
   dashDot: 0.7,
   /** ...from this fraction of the dodge on, and for this long (ms) after it ends. */
@@ -105,13 +105,16 @@ export const COMBAT = {
   backstepDot: 0.65,
   /** Window after a jump press during which sweeps and grabs pass under you. */
   jumpEvadeStart: 50,
-  jumpEvadeEnd: 650,
+  jumpEvadeEnd: 760,
   /**
    * A jump is untouchable for a moment on the way up (this window after the press), and fully
    * open on the way down and as it lands.
    */
   jumpIframesStart: 40,
-  jumpIframesEnd: 340,
+  /** An air attack hangs at the top through its windup, then from this fraction of it slams down (m/s at least). */
+  airSlamFrom: 0.7,
+  airSlamSpeed: 14,
+  jumpIframesEnd: 380,
 
   /**
    * Posture recovers slowly, and only once you stop: not until this long (ms) after the last posture

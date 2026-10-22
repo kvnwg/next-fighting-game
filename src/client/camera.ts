@@ -221,13 +221,15 @@ export class CameraRig {
     // so a jump (yours or theirs) plays out in a steady frame instead of lurching it
     const ground = Math.min(player.y, this.baseY);
     const lift = Math.max(0, player.y - ground);
-    const pos = new THREE.Vector3(player.x + bx * boom + rx * sh, ground + 2.3 * k + lift * 0.3, player.z + bz * boom + rz * sh);
+    // and when they're in the air it sinks a little to look up at them
+    const above = Math.max(0, target.y - ground);
+    const pos = new THREE.Vector3(player.x + bx * boom + rx * sh, ground + 2.3 * k + lift * 0.3 - above * 0.2, player.z + bz * boom + rz * sh);
     const subject = new THREE.Vector3(target.x, target.y + 1.2 * k, target.z);
     // only what's behind you pulls it in (it mustn't end up inside a tree or a wall). Something
     // between you and them doesn't move it at all: the prop dissolves instead (see G.uSee)
     this.constrain?.(_chest.set(player.x, player.y + 1.4 * k, player.z), pos);
     // look at them, at chest height, tilting up after whoever is in the air
-    const air = Math.max(0, target.y - ground) * 0.75 + lift * 0.35;
+    const air = above + lift * 0.35;
     const look = new THREE.Vector3(player.x + u.x * d * 0.85 + rx * sh, ground + 1.35 * k + air, player.z + u.z * d * 0.85 + rz * sh);
     return { pos, look, subject };
   }

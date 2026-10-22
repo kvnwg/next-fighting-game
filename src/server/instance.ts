@@ -388,6 +388,7 @@ export abstract class Instance {
       k.done = p;
       if (p >= 1) f.knock = null;
     }
+    f.airControl(now, dt);
     stepBody(f, vx, vz, dt, this.map, obstacles);
     if (f.wantYaw !== null) f.yaw = turnToward(f.yaw, f.wantYaw, f.turnRate(now) * dt);
   }

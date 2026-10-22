@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyHit, decideOutcome, defenseAt, executeBlow, pushDefense } from '../src/shared/combat';
 import { CHARACTERS } from '../src/shared/characters';
-import { COMBAT } from '../src/shared/config';
+import { COMBAT, GRAVITY } from '../src/shared/config';
 import { DefenseEvent, Fighter } from '../src/shared/fighter';
 import { eloDelta, rankOf } from '../src/shared/ranks';
 
@@ -80,6 +80,35 @@ describe('fighter state machine', () => {
 });
 
 describe('hit resolution', () => {
+  it('an air attack hangs at the top, then slams down to land as the blow comes out', () => {
+    const f = new Fighter('x', 'monk');
+    const dt = 1 / 60;
+    let t = 1000;
+    f.input('jump', t);
+    const step = () => {
+      f.airControl(t, dt);
+      f.vy -= GRAVITY * dt;
+      f.y += f.vy * dt;
+      if (f.y <= 0) {
+        f.y = 0;
+        f.vy = 0;
+        f.onGround = true;
+      }
+      t += dt * 1000;
+      f.update(t);
+    };
+    while (t < 1250) step();
+    expect(f.input('light', t)).toBe(true);
+    expect(f.attackKey).toBe('jl');
+    const start = t;
+    const yAtPress = f.y;
+    while (t < start + f.atkWindup * 0.6) step();
+    // still up there, hanging
+    expect(f.y).toBeGreaterThan(yAtPress * 0.8);
+    while (t < start + f.atkWindup + 20) step();
+    expect(f.onGround).toBe(true);
+  });
+
   it('a jump is untouchable on the way up, and open on the way down and landing', () => {
     const log: DefenseEvent[] = [];
     pushDefense(log, { type: 'jump', t: 1000 });

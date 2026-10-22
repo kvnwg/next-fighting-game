@@ -4,7 +4,7 @@
  */
 import { CANCELS, CancelInto, moveClass } from './cancels';
 import { AbilityDef, AttackDef, AttackKey, CHARACTERS, CharacterDef, CharacterId, getAttack, isHeavyKey, lightKey } from './characters';
-import { COMBAT, JUMP_VELOCITY } from './config';
+import { COMBAT, GRAVITY, JUMP_VELOCITY } from './config';
 import { forward } from './math';
 
 /** States a deflect press cuts straight out of into guard. */
@@ -283,6 +283,25 @@ export class Fighter {
       }
       default:
         return 0;
+    }
+  }
+
+  /**
+   * An attack thrown in the air, as Dueling Grounds does it: the fighter hangs near the top of the
+   * jump through the windup, then slams straight down so they land as the blow comes out. Call it
+   * just before the physics step (which then applies gravity).
+   */
+  airControl(now: number, dt: number): void {
+    if (this.onGround || this.state !== 'attack' || (this.attackKey !== 'jl' && this.attackKey !== 'jh')) return;
+    const e = now - this.stateStart;
+    if (e < this.atkWindup * COMBAT.airSlamFrom) {
+      // the rise dies away and gravity is all but cancelled
+      this.vy *= Math.exp(-dt * 14);
+      this.vy += GRAVITY * dt * 0.92;
+    } else {
+      // down, fast enough to land by the end of the windup
+      const left = Math.max(0.04, (this.atkWindup - e) / 1000);
+      this.vy = Math.min(this.vy, -Math.max(COMBAT.airSlamSpeed, this.y / left));
     }
   }
 
