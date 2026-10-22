@@ -218,36 +218,8 @@ function block(o: Out, a: Profile, _d: Profile, s: GuardOpts): void {
 
 /** The perfect deflect: the game's clang off the glaive's head, sparks and all. */
 /** The reference clash's "tsing" (s, dB): 3-8 kHz, -4 dB at 60 ms, -10 dB at ~230 ms, gone by ~0.45 s. */
-const TSING = [[0, 0], [0.003, 0], [0.06, -4], [0.23, -10], [0.45, -40]] as const;
 
-function deflect(o0: Out, a: Profile, _d: Profile, s: GuardOpts): void {
-  const o = filtered(o0, 'lowpass', 11500, 0.5);
-  const st = striker(a, s.anim, !!s.heavy);
-  const streak = Math.max(1, s.streak ?? 1);
-  const h = s.heavy ? 1 : 0.8;
-  const up = 1 + 0.02 * Math.min(4, streak - 1);
-  clang(o, 0.62, up, 1, 1);
-  // the "tsing": 8-16 kHz for ~60 ms, and 3-8 kHz hanging on for ~230 ms
-  noise(o, { type: 'highpass', f: 7000, f1: 9000, q: 0.7, dur: 0.07, gain: 0.55, a: 0.0006 });
-  noise(o, { color: 'white', type: 'bandpass', f: rand(4500, 5500), q: 0.5, dur: 0.45, gain: 0.7, shape: curve(TSING, 0.45) });
-  click(o, 0.5, 5200, 0.01);
-  // the attacker's weapon, faintly, and the glaive's shaft taking the shock
-  // (a hammer's head carries more of the clash than a blade's edge)
-  strikerRing(scaled(o, st.edge === 'blunt' ? 0.7 : 0.38), st, 'deflect', 0.8, 1, up);
-  if (st.edge === 'blunt') thump(o, 95, 40, 0.32, 0.6 * h, 0.003);
-  ring(o, MAT.haft, 0.12, { pitch: rand(0.9, 1.1) });
-  // the blow's weight arriving: a short knock in the 400-800 Hz band
-  noise(o, { color: 'pink', type: 'bandpass', f: rand(520, 640), f1: rand(300, 380), q: 1.6, dur: 0.12, gain: 0.45 * h, a: 0.002 });
-  thump(o, 120 + 30 * (1 - st.mass), 55, 0.16 + 0.1 * st.mass, (0.2 + 0.35 * st.mass) * h);
-  // the sparks off the clash, and the charge in the glaive arcing through them
-  crackle(o, 0.12, 60, { gain: 0.22, type: 'highpass', f: 3500, delay: 0.004 });
-  attackerTell(o, a, h);
-  // a streak sings higher
-  if (streak >= 3) clang(o, 0.06, up * 1.5, 0.9, 0.8, 0.01);
-  // the ring hanging in the air
-  noise(o, { type: 'highpass', f: 7000, q: 0.5, dur: 0.8, gain: 0.06, delay: 0.02, a: 0.01 });
-}
 
-const voice: Voice = { swing, hit, block, deflect };
+const voice: Voice = { swing, hit, block };
 
 export default voice;

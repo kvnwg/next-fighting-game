@@ -6,6 +6,7 @@
 import type { AttackAnim } from '../../shared/characters';
 import { MAT, Material } from './materials';
 import type { Edge, Profile } from './profiles';
+import { deflectClang } from './clang';
 import { VOICES } from './voices';
 import { SHAPES, Out, at, chance, clamp, crackle, crunch, debris, filtered, jit, modal, noise, osc, rand, rattle, scaled, spatter, squelch, tear, thump, via } from './synth';
 
@@ -469,9 +470,10 @@ function blockBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
 
 /** The perfect deflect: the sound the game is named for. Bright, ringing, and long. */
 export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
-  const voice = VOICES[d.id]?.deflect;
-  if (voice) voice(o, a, d, s);
-  else BASE.deflect(o, a, d, s);
+  // one clang for everyone (see clang.ts)
+  void a;
+  void d;
+  deflectClang(o, s);
 }
 
 function deflectBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {

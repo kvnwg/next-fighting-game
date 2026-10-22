@@ -1,5 +1,5 @@
 /**
- * Per-fighter voices: a fighter's own swing, hit and clash sounds, matched to their reference
+ * Per-fighter voices: a fighter's own swing, hit and block sounds, matched to their reference
  * recording. A voice takes over whichever of these it defines; anything it leaves out falls back to
  * the shared recipes in recipes.ts. Each fighter's voice lives in voices/<id>.ts.
  */
@@ -20,8 +20,6 @@ export interface Voice {
   hit?(o: Out, a: Profile, d: Profile, s: HitOpts): void;
   /** `a`'s blow stopped on this fighter's held guard (`d` is this fighter) */
   block?(o: Out, a: Profile, d: Profile, s: GuardOpts): void;
-  /** this fighter (`d`) deflecting `a`'s blow */
-  deflect?(o: Out, a: Profile, d: Profile, s: GuardOpts): void;
 }
 
 export const VOICES: Partial<Record<CharacterId, Voice>> = { ronin, duelist, lancer, shade, reaper };

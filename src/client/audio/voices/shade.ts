@@ -193,28 +193,7 @@ function block(o0: Out, a: Profile, _d: Profile, s: GuardOpts = {}): void {
   tellOf(o, a, h);
 }
 
-function deflect(o0: Out, a: Profile, _d: Profile, s: GuardOpts = {}): void {
-  const o = scaled(o0, 2.9);
-  const st = striker(a, s.anim, !!s.heavy);
-  const streak = Math.max(1, s.streak ?? 1);
-  const h = s.heavy ? 1 : 0.8;
-  const up = 1 + 0.025 * Math.min(4, streak - 1);
-  // the bright burst: 2-12 kHz air, ~80 ms
-  burst(o, 1.3, jit(0.3, 0.1));
-  // the bright haze hanging after it
-  noise(o, { type: 'bandpass', f: jit(4800, 0.1), q: 0.45, type2: 'highpass', f2: 2000, dur: 0.7, gain: 0.85, delay: 0.015, a: 0.01 });
-  click(o, 0.5, 5200, 0.008);
-  // the ring: the reference's partials, ~1 s on the fundamental
-  ring(o, knifeRing(), 0.12, { pitch: jit(1.0, 0.06) * up, decay: 1.6, hard: 1 });
-  // the second knife touching a hair later, a little sharp
-  ring(o, knifeRing(), 0.05, { pitch: jit(1.32, 0.03) * up, decay: 0.5, hard: 0.8, delay: 0.006 });
-  // whatever hit them rings too, quieter (a hammer still dongs under it)
-  strikerRing(scaled(filtered(o, 'lowpass', 6000), st.edge === 'blunt' ? 1.8 : 0.2), st, 'deflect', 0.5, 0.8, up);
-  thump(o, 110, 48, 0.22, (0.35 + 0.3 * st.mass) * h);
-  if (streak >= 3) ring(o, RING_A, 0.08, { pitch: 1.5 * up, decay: 1 });
-  tellOf(o, a, h);
-}
 
-const voice: Voice = { swing, hit, block, deflect };
+const voice: Voice = { swing, hit, block };
 
 export default voice;

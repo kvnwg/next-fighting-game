@@ -175,21 +175,6 @@ function clash(o: Out, gain: number, bright: number): void {
   modal(o, { base: rand(2050, 2350), modes: crowd, gain: 0.17 * gain * bright, jitter: 0.004 });
 }
 
-function deflect(o0: Out, a: Profile, _d: Profile, s: GuardOpts): void {
-  const o = scaled(o0, TRIM.deflect);
-  const st = striker(a, s.anim, !!s.heavy);
-  const streak = Math.max(1, s.streak ?? 1);
-  const up = 1 + 0.02 * Math.min(4, streak - 1);
-  const h = s.heavy ? 1 : 0.8;
-  clash(o, 1, 1);
-  parryRing(o, up, 0.05, jit(1.8, 0.08), true);
-  // the attacker's weapon, under the parry
-  strikerRing(scaled(o, st.edge === 'blunt' ? 0.6 : 0.2), st, 'deflect', 0.8, 1, up);
-  // the chain snapped taut between the hands
-  rattle(o, { count: 12, spread: 0.16, fLo: 2600, fHi: 7000, decay: 0.04, fade: 1.6 }, { gain: 0.3, type: 'highpass', f: 2000, delay: 0.006 });
-  thump(o, 120 + 40 * (1 - st.mass), 52, 0.2, (0.3 + 0.45 * st.mass) * h);
-  if (streak >= 3) osc(o, { f: rand(3700, 3900) * up, dur: 0.7, gain: 0.03, shape: swell(0.2, 0.2), delay: 0.02 });
-}
 
 function block(o0: Out, a: Profile, _d: Profile, s: GuardOpts): void {
   const o = scaled(o0, TRIM.block);
@@ -207,6 +192,6 @@ function block(o0: Out, a: Profile, _d: Profile, s: GuardOpts): void {
   if (a.chain) chainIn(o, h);
 }
 
-const voice: Voice = { swing, hit, block, deflect };
+const voice: Voice = { swing, hit, block };
 
 export default voice;

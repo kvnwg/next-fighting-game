@@ -16,7 +16,7 @@ import type { Profile } from '../profiles';
 import type { GuardOpts, HitOpts, Striker, SwingOpts } from '../recipes';
 import { MAT } from '../materials';
 import { bodyLayer, click, gore, ring, striker, strikerRing } from '../recipes';
-import { Mode, Out, SHAPES, at, crackle, filtered, jit, modal, noise, osc, pick, rand, rattle, scaled, spatter, squelch, tear, thump } from '../synth';
+import { Mode, Out, SHAPES, at, crackle, filtered, jit, modal, noise, pick, rand, rattle, scaled, spatter, squelch, tear, thump } from '../synth';
 import type { Voice } from '../voices';
 
 // ------------------------------------------------------------------ the clash families (from the recording)
@@ -219,32 +219,7 @@ function block(o: Out, a: Profile, _d: Profile, s: GuardOpts): void {
  * The parry: the crack, then the bright family ringing out for most of a second, an airy "tsing" off
  * the top. Each back-to-back deflect rings a little higher.
  */
-function deflect(o0: Out, a: Profile, _d: Profile, s: GuardOpts): void {
-  const st = striker(a, s.anim, !!s.heavy);
-  const streak = Math.max(1, s.streak ?? 1);
-  const up = 1 + 0.02 * Math.min(4, streak - 1);
-  const h = s.heavy ? 1 : 0.8;
-  // knuckles turned aside barely set the blade ringing
-  const soft = st.edge === 'fist' || st.edge === 'grab';
-  const o = scaled(o0, soft ? 1.9 : 4.0);
-  crack(o, 3800, 0.7, 0.1, 0.3);
-  wash(o, 4800, 0.22, 0.36);
-  const fam = pick(DEFLECT);
-  clang(o, fam, 0.24, { pitch: up, decay: jit(soft ? 0.45 : 0.62, 0.1), hard: soft ? 0.7 : 1 });
-  // a little of the low family under it: both blades are ringing
-  clang(o, pick(BLOCK), 0.1, { pitch: up, decay: 0.5, hard: 0.8 });
-  if (!soft && Math.random() < 0.6) restrike(o, fam, 4500, 0.3, 0.08, up);
-  // the "tsing": bright air off the clash
-  noise(o, { type: 'highpass', f: 6000, f1: 9000, q: 0.7, dur: 0.07, gain: 0.35, a: 0.0006 });
-  noise(o, { type: 'bandpass', f: 12500, q: 2, dur: 0.35, gain: 0.05, delay: 0.01, a: 0.004 });
-  // a streak sings higher
-  if (streak >= 3) osc(o, { f: fam.base * up * 1.5, dur: 0.6, gain: 0.02, delay: 0.02 });
-  // the attacker's weapon and the weight of the blow, at the shared recipes' level
-  attackerRing(o0, st, true);
-  tell(o0, a, h);
-  thump(o0, 120, 50, 0.2, 0.9 * h);
-}
 
-const voice: Voice = { swing, hit, block, deflect };
+const voice: Voice = { swing, hit, block };
 
 export default voice;
