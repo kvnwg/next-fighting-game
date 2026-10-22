@@ -711,7 +711,7 @@ class App {
         if (e.k === 'hit') this.effects.blood(pos, swing, heavy ? 1.3 : 0.9);
         this.effects.hitStreak(pos, swing, this.tmp3.subVectors(this.renderer.camera.position, pos).normalize(), heavy ? 1.35 : 1);
         // a faint tint, not a white-out (Dueling Grounds flashes the health bar instead)
-        d?.model.flash('#ff8a7a', 0.3);
+        d?.model.flash('#ff8a7a', 0.12);
         // knocked the way the blade went: + travels toward the defender's left
         if (d) d.model.react('hit', { side: Math.max(-1, Math.min(1, swing.x * Math.cos(d.yaw) - swing.z * Math.sin(d.yaw))), heavy });
         if (meA) this.cam.shake(heavy ? 0.2 : 0.13, heavy ? 0.24 : 0.16);
