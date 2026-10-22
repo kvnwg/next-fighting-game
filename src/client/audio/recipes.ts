@@ -6,11 +6,12 @@
 import type { AttackAnim } from '../../shared/characters';
 import { MAT, Material } from './materials';
 import type { Edge, Profile } from './profiles';
+import { VOICES } from './voices';
 import { SHAPES, Out, at, chance, clamp, crackle, crunch, debris, filtered, jit, modal, noise, osc, rand, rattle, scaled, spatter, squelch, tear, thump, via } from './synth';
 
 // ------------------------------------------------------------------ layers
 
-interface RingOpts {
+export interface RingOpts {
   pitch?: number;
   decay?: number;
   hard?: number;
@@ -21,7 +22,7 @@ interface RingOpts {
 }
 
 /** Strike a material. */
-function ring(o: Out, m: Material, gain: number, r: RingOpts = {}): void {
+export function ring(o: Out, m: Material, gain: number, r: RingOpts = {}): void {
   modal(o, {
     base: m.base * (r.pitch ?? 1) * jit(1, 0.025),
     modes: m.modes,
@@ -36,14 +37,14 @@ function ring(o: Out, m: Material, gain: number, r: RingOpts = {}): void {
 }
 
 /** The hard front of a contact. */
-function click(o: Out, gain: number, f = 3500, dur = 0.012, delay = 0): void {
+export function click(o: Out, gain: number, f = 3500, dur = 0.012, delay = 0): void {
   noise(o, { type: 'highpass', f: jit(f, 0.1), q: 0.7, dur, gain, a: 0.0004, delay });
 }
 
-type Strike = Edge | 'grab';
+export type Strike = Edge | 'grab';
 
 /** What actually lands: the weapon, how it meets the target, and how much weight is behind it. */
-interface Striker {
+export interface Striker {
   mat: Material;
   pitch: number;
   edge: Strike;
@@ -52,7 +53,7 @@ interface Striker {
   shield?: boolean;
 }
 
-function striker(p: Profile, anim: AttackAnim | undefined, heavy: boolean): Striker {
+export function striker(p: Profile, anim: AttackAnim | undefined, heavy: boolean): Striker {
   const mass = Math.min(1.2, p.mass * (heavy ? 1.2 : 1));
   if (anim === 'bash' && p.guard === 'shield') return { mat: MAT.boss, pitch: 1, edge: 'blunt', mass: 0.8, shield: true };
   if (anim === 'grab') return { mat: p.metal, pitch: p.pitch, edge: 'grab', mass };
@@ -64,7 +65,7 @@ function striker(p: Profile, anim: AttackAnim | undefined, heavy: boolean): Stri
 }
 
 /** Swept-band whoosh shaped like a swing: the band climbs with the weapon's speed and falls away. */
-function whoosh(o: Out, f: number, len: number, q: number, gain: number, sweep: number, pk: number, color: 'pink' | 'white' = 'pink', delay = 0): void {
+export function whoosh(o: Out, f: number, len: number, q: number, gain: number, sweep: number, pk: number, color: 'pink' | 'white' = 'pink', delay = 0): void {
   const speed = (x: number) => Math.pow(Math.max(0, x < pk ? x / pk : 1 - (x - pk) / (1 - pk)), 1.5);
   noise(o, { color, type: 'bandpass', f, fShape: (x) => 0.55 + (sweep - 0.55) * speed(x), q, dur: len, gain, shape: SHAPES.swing(pk, 2), type2: 'highpass', f2: 140, delay });
 }
@@ -84,6 +85,12 @@ export interface SwingOpts {
  * if the blow lands, so a miss sounds like a miss: the whole whoosh carrying on through nothing.
  */
 export function swing(o0: Out, p: Profile, s: SwingOpts = {}): void {
+  const voice = VOICES[p.id]?.swing;
+  if (voice) voice(o0, p, s);
+  else BASE.swing(o0, p, s);
+}
+
+function swingBase(o0: Out, p: Profile, s: SwingOpts = {}): void {
   const sw = p.swing;
   const o = scaled(o0, sw.gain);
   const anim = s.anim;
@@ -181,6 +188,12 @@ function tell(o: Out, a: Profile, h: number): void {
 
 /** A clean hit: what the attacker's weapon does to what the defender is wearing. */
 export function hit(o: Out, a: Profile, d: Profile, s: HitOpts = {}): void {
+  const voice = VOICES[a.id]?.hit;
+  if (voice) voice(o, a, d, s);
+  else BASE.hit(o, a, d, s);
+}
+
+function hitBase(o: Out, a: Profile, d: Profile, s: HitOpts = {}): void {
   const st = striker(a, s.anim, !!s.heavy);
   const h = (s.heavy ? 1 : 0.7) * (s.backstab ? 1.15 : 1);
   click(o, 0.15 + 0.5 * h, st.edge === 'blunt' ? 1800 : 3200, 0.01);
@@ -196,7 +209,7 @@ export function hit(o: Out, a: Profile, d: Profile, s: HitOpts = {}): void {
   tell(o, a, h);
 }
 
-function bodyLayer(o: Out, d: Profile, h: number): void {
+export function bodyLayer(o: Out, d: Profile, h: number): void {
   switch (d.body) {
     case 'cloth':
       noise(o, { color: 'pink', type: 'bandpass', f: 1700, f1: 700, q: 0.9, dur: 0.09, gain: 0.25 * h });
@@ -224,7 +237,7 @@ function bodyLayer(o: Out, d: Profile, h: number): void {
  * longer for a heavier blade), the hiss of blood flung off the cut, and the drops landing a beat
  * later. `k` scales it all (armour and plate soak most of it).
  */
-function gore(o: Out, st: Striker, h: number, k: number): void {
+export function gore(o: Out, st: Striker, h: number, k: number): void {
   if (k <= 0) return;
   const pt = st.edge === 'point';
   // a knife opens a quick, high nick; a greatsword or glaive a deep, long one
@@ -242,7 +255,7 @@ function gore(o: Out, st: Striker, h: number, k: number): void {
   spatter(o, Math.round((pt ? 3 : 5) + 9 * h), 0.22 + 0.18 * h, 450, 1500, { gain: (0.32 + 0.2 * h) * k, delay: rand(0.06, 0.1), type: 'highpass', f: 260 });
 }
 
-function onBody(o: Out, st: Striker, d: Profile, h: number, armor: boolean): void {
+export function onBody(o: Out, st: Striker, d: Profile, h: number, armor: boolean): void {
   // a cut has to read over the swing that carried it
   const cut = armor ? 0.8 : 1.6;
   switch (st.edge) {
@@ -287,7 +300,7 @@ function onBody(o: Out, st: Striker, d: Profile, h: number, armor: boolean): voi
 }
 
 /** A blow on armour plate: the plate's clank, the weapon ringing off it, and the body inside. */
-function onPlate(o: Out, st: Striker, d: Profile, h: number): void {
+export function onPlate(o: Out, st: Striker, d: Profile, h: number): void {
   const pp = d.plate / MAT.plate.base;
   switch (st.edge) {
     case 'blade':
@@ -331,10 +344,10 @@ function onPlate(o: Out, st: Striker, d: Profile, h: number): void {
 
 // ------------------------------------------------------------------ guards: block, deflect, guard break
 
-type Contact = 'block' | 'deflect' | 'break';
+export type Contact = 'block' | 'deflect' | 'break';
 
 /** The striking weapon ringing as it meets a guard. */
-function strikerRing(o: Out, st: Striker, c: Contact, dec: number, hard: number, up: number): void {
+export function strikerRing(o: Out, st: Striker, c: Contact, dec: number, hard: number, up: number): void {
   const big = c === 'deflect';
   switch (st.edge) {
     case 'blade':
@@ -361,7 +374,7 @@ function strikerRing(o: Out, st: Striker, c: Contact, dec: number, hard: number,
   }
 }
 
-function onGuard(o: Out, d: Profile, st: Striker, c: Contact, h: number, anim: AttackAnim | undefined, streak: number, forceRim?: boolean): void {
+export function onGuard(o: Out, d: Profile, st: Striker, c: Contact, h: number, anim: AttackAnim | undefined, streak: number, forceRim?: boolean): void {
   const big = c === 'deflect';
   const dec = big ? 1 : c === 'break' ? 0.7 : 0.42;
   const hard = big ? 1 : 0.75;
@@ -440,6 +453,12 @@ export interface GuardOpts {
 
 /** A held block: a dull, damped clash and the weight of it. */
 export function block(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
+  const voice = VOICES[d.id]?.block;
+  if (voice) voice(o, a, d, s);
+  else BASE.block(o, a, d, s);
+}
+
+function blockBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
   const st = striker(a, s.anim, !!s.heavy);
   const h = s.heavy ? 1 : 0.75;
   onGuard(o, d, st, 'block', h, s.anim, 1, s.rim);
@@ -450,6 +469,12 @@ export function block(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
 
 /** The perfect deflect: the sound the game is named for. Bright, ringing, and long. */
 export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
+  const voice = VOICES[d.id]?.deflect;
+  if (voice) voice(o, a, d, s);
+  else BASE.deflect(o, a, d, s);
+}
+
+function deflectBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
   const st = striker(a, s.anim, !!s.heavy);
   const streak = Math.max(1, s.streak ?? 1);
   const h = s.heavy ? 1 : 0.8;
@@ -883,3 +908,6 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
   }
   return false;
 }
+
+/** The shared recipes behind each voice hook, for a voice that layers on top of them. */
+export const BASE = { swing: swingBase, hit: hitBase, block: blockBase, deflect: deflectBase };
