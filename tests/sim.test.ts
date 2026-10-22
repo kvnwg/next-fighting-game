@@ -7,6 +7,9 @@ describe('bot vs bot simulation', () => {
     expect(Math.max(...r.scores)).toBe(2);
     expect(r.outcomes.deflect ?? 0).toBeGreaterThan(0);
     expect(r.outcomes.hit ?? 0).toBeGreaterThan(0);
+    // posture breaks are cashed in by executions, and every one that starts lands its blow
+    expect(r.outcomes.deathblow ?? 0).toBeGreaterThan(0);
+    expect(r.outcomes.execute).toBe(r.outcomes.deathblow);
   });
 
   it('ring-outs and hazards resolve rounds on dangerous maps', () => {

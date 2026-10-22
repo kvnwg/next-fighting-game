@@ -72,7 +72,7 @@ export const COMBAT = {
    */
   executeTime: 3000,
   executeHitAt: 2150,
-  executeDamage: 0.38,
+  executeDamage: 0.45,
   /** how far apart the executioner and the victim stand, per unit of body scale */
   executeDistance: 1.55,
   /** Posture left after a posture break ends without a deathblow (0: the guard comes back whole). */
