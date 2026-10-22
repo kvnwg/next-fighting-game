@@ -50,9 +50,13 @@ export function buildLancer() {
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
     b.bone(`pauldron${side}`, 'torso', [11 * s, SHOULDER_Y + 2, 0]);
     b.bone(`upperArm${side}`, 'torso', [11 * s, SHOULDER_Y, 0]);
+    // the pauldron's lower lame is strapped round the top of the arm and rides it
+    b.bone(`lame${side}`, `upperArm${side}`, [11 * s, SHOULDER_Y, 0]);
     b.bone(`forearm${side}`, `upperArm${side}`, [25 * s, SHOULDER_Y, 0]);
     b.bone(`hand${side}`, `forearm${side}`, [36 * s, SHOULDER_Y, 0]);
     b.bone(`thigh${side}`, 'pelvis', [4.8 * s, 44, 0]);
+    // each half of the mail skirt and tassets hangs over its own thigh and swings with it
+    b.bone(`tasset${side}`, `thigh${side}`, [4.8 * s, 44, 0]);
     b.bone(`shin${side}`, `thigh${side}`, [4.9 * s, 26, 0]);
     b.bone(`foot${side}`, `shin${side}`, [5 * s, 3, 0.5]);
   }
@@ -123,6 +127,9 @@ export function buildLancer() {
     });
   });
 
+  // below the belt the skirt and tassets ride the thighs, split down the middle
+  for (const v of b.voxels.values()) if (v.bone === 'pelvis' && v.y < 43) v.bone = v.x + 0.5 >= 0 ? 'tassetL' : 'tassetR';
+
   // ---- torso: breastplate, chest boss, gorget ------------------------------
   b.use('torso');
   const torsoX = (y) => (y < 56 ? lerp(7.6, 9.6, clamp01((y - 46) / 10)) : y < 64 ? lerp(9.6, 10.6, clamp01((y - 56) / 6)) : 10.6 - (y - 64) * 1.6);
@@ -186,9 +193,10 @@ export function buildLancer() {
   b.fill([-22, 6, -16], [24, 66, 2], (p, v) => {
     const { t, a, outer, inner } = capeQ(p);
     if (outer > 1 || inner < 1) return undefined;
-    if (p[2] > -0.6 - (p[0] > 0 ? t * 3.5 : 0.8)) return undefined; // open at the front
+    // open at the front, its edges hung behind the arms so they swing clear of it
+    if (p[2] > -4.6 - (p[0] > 0 ? t * 3.5 : 0.8)) return undefined;
     if (p[1] < 6.5 + hash3(v[0], 4, v[2]) * 3) return undefined;
-    if (p[0] > 0 && p[2] > -0.6 - t * 3.5 - 2.2 && t > 0.35) return 'lining'; // left side turned back
+    if (p[0] > 0 && p[2] > -4.6 - t * 3.5 - 2.2 && t > 0.35) return 'lining'; // left side turned back
     return Math.sin(a * 9 + p[1] * 0.05) > 0.6 ? 'cloakFold' : 'cloak';
   });
   // a cape voxel covered on both outward sides (x and z) can't be seen from
@@ -234,11 +242,12 @@ export function buildLancer() {
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
     const span = (a, c) => (s > 0 ? [a, c] : [-c, -a]);
 
-    b.use(`pauldron${side}`);
+    // the spaulder cap stays on the shoulder; the lame under it rides the upper arm
     for (const [i, L] of [
-      { c: [15.6, 62, 0], r: [4.8, 4.2, 4.8], cut: 58.6 },
-      { c: [13.6, 64.6, 0], r: [5.6, 4.6, 5.4], cut: 61 },
+      { c: [15.6, 62, 0], r: [4.8, 4.2, 4.8], cut: 58.6, bone: `lame${side}` },
+      { c: [13.6, 64.6, 0], r: [5.6, 4.6, 5.4], cut: 61, bone: `pauldron${side}` },
     ].entries()) {
+      b.use(L.bone);
       const c = [L.c[0] * s, L.c[1], L.c[2]];
       b.ellipsoid(c, L.r, (p) => (p[1] < L.cut ? undefined : p[1] < L.cut + 0.9 ? 'plateEdge' : plate(p, 40 + i)));
     }

@@ -323,10 +323,10 @@ const lancer: BaseDef = {
   lights: [
     { name: 'Piercing Step', anim: 'thrust', windup: 300, active: 80, recovery: 320, damage: 8, posture: 10, blockPosture: 12, range: 4.3, arc: 15, lunge: 0.4 },
     // two jabs, in and in again: two hits to read and deflect
-    { name: 'Fang and Rise', anim: 'thrust', windup: 260, active: 160, recovery: 320, damage: 5, posture: 6, blockPosture: 7, range: 4.3, arc: 15, lunge: 0.5, hits: 2 },
-    { name: 'Horizon Sweep', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 4.1, arc: 44 },
+    { name: 'Rising Fang', anim: 'thrust', windup: 260, active: 160, recovery: 320, damage: 5, posture: 6, blockPosture: 7, range: 4.3, arc: 15, lunge: 0.5, hits: 2 },
+    { name: 'Flat Sweep', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 4.1, arc: 44 },
   ],
-  heavy: { name: 'Crescent Cleave', anim: 'thrust', windup: 640, active: 110, recovery: 520, damage: 18, posture: 24, blockPosture: 30, range: 4.7, arc: 15, lunge: 1.4, feintable: true },
+  heavy: { name: 'Lunging Cut', anim: 'thrust', windup: 640, active: 110, recovery: 520, damage: 18, posture: 24, blockPosture: 30, range: 4.7, arc: 15, lunge: 1.4, feintable: true },
   special: { name: 'Whirlwind', anim: 'spin', windup: 760, active: 220, recovery: 650, damage: 20, posture: 26, blockPosture: 26, range: 4.4, arc: 55, perilous: 'sweep', cooldown: 7000 },
   ability: {
     kind: 'leap',
@@ -494,14 +494,14 @@ const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
     jh: { name: 'Sky Piercer', anim: 'thrust' },
   },
   lancer: {
-    h1: { name: 'Reaping Sweep', anim: 'sweep' },
-    h2: { name: 'Thunder Wheel', anim: 'spin' },
+    h1: { name: 'Cross Cleave', anim: 'sweep' },
+    h2: { name: 'Thunderclap', anim: 'spin' },
     dl: { name: 'Serpent Lunge', anim: 'thrust' },
     dh: { name: 'Ascending Dragon', anim: 'thrust' },
-    bl: { name: 'Parting Snap', anim: 'thrust' },
+    bl: { name: 'Parting Sweep', anim: 'thrust' },
     bh: { name: 'Wheel Retreat', anim: 'slashR' },
-    jl: { name: 'Swallow Spin', anim: 'thrust' },
-    jh: { name: 'Skyfall Cleave', anim: 'slam' },
+    jl: { name: 'Skywheel', anim: 'thrust' },
+    jh: { name: 'Skyfall Plunge', anim: 'slam' },
   },
   shade: {
     h1: { name: 'Long Thorn', anim: 'thrust' },
