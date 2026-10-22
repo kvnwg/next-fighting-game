@@ -156,18 +156,22 @@ export const gauntlets: Style = {
     // driven out together with a long step; the air itself hits them
     h: mv({
       keys: [
-        K(-0.4, B({ ...body, twist: -0.9, hipTwist: -0.3, crouch: -0.3, lean: 0.14, step: 0.3, back: 0.3, width: 0.21 })),
-        K(-0.1, B({ ...body, twist: -0.95, hipTwist: -0.3, crouch: -0.32, lean: 0.12, step: 0.3, back: 0.3, width: 0.21 })),
-        K(0.85, B({ ...body, twist: 0.05, hipTwist: 0.1, crouch: -0.3, lean: 0.34, step: 0.62, back: 0.42, width: 0.2 })),
-        K(1.05, B({ ...body, twist: 0.05, hipTwist: 0.1, crouch: -0.3, lean: 0.34, step: 0.62, back: 0.42, width: 0.2 })),
+        // the coil: sunk deep, the hips and shoulders wound right away, the weight on the rear leg
+        K(-0.4, B({ ...body, twist: -1.0, hipTwist: -0.4, crouch: -0.38, lean: 0.04, side: 0.06, step: 0.34, back: 0.22, width: 0.21 })),
+        K(-0.1, B({ ...body, twist: -1.05, hipTwist: -0.42, crouch: -0.4, lean: 0.02, side: 0.07, step: 0.34, back: 0.22, width: 0.21 })),
+        K(0.85, B({ ...body, twist: 0.08, hipTwist: 0.12, crouch: -0.3, lean: 0.38, step: 0.62, back: 0.42, width: 0.2 })),
+        // the mass carried on through them, then the knees take it
+        K(1.02, B({ ...body, twist: 0.16, hipTwist: 0.16, crouch: -0.36, lean: 0.46, step: 0.62, back: 0.42, width: 0.2 })),
+        K(1.15, B({ ...body, twist: 0.1, hipTwist: 0.12, crouch: -0.4, lean: 0.32, step: 0.62, back: 0.42, width: 0.2 })),
       ],
-      main: strike([-0.2, 0.22, -0.04], [-0.07, 0.56, 0.74], [0.0, 0.4, 1], [0.0, 0.12, 1]),
-      off: strike([-0.06, 0.26, -0.02], [0.07, 0.56, 0.74], [0.0, 0.4, 1], [0.0, 0.12, 1]),
+      // both hands drawn right back past the hip
+      main: strike([-0.24, 0.2, -0.16], [-0.07, 0.56, 0.74], [0.0, 0.4, 1], [0.0, 0.12, 1]),
+      off: strike([-0.1, 0.24, -0.14], [0.07, 0.56, 0.74], [0.0, 0.4, 1], [0.0, 0.12, 1]),
       impacts: [0.85],
       start: -0.4,
       chamber: -0.1,
-      end: 1.0,
-      rest: 1.0,
+      end: 1.05,
+      rest: 1.15,
       settle: 0.5,
       fx: [
         fx(-0.35, 'wisps', 'main', 0.7, '#ff9a2a'),
@@ -183,13 +187,15 @@ export const gauntlets: Style = {
     // drives the heel of the palm into the chest, landing in a deep stance
     h1: mv({
       keys: [
-        K(-0.1, B({ ...body, twist: -0.8, hipTwist: -0.3, crouch: -0.2, lean: 0.06, step: 0.3, back: 0.3, width: 0.2 }), { hop: 0 }),
-        K(0.45, B({ ...body, twist: -0.2, hipTwist: -0.05, crouch: -0.14, lean: 0.22, step: 0.42, back: 0.32, width: 0.2 }), { hop: 0.1 }),
-        K(0.85, B({ ...body, twist: 0.5, hipTwist: 0.3, crouch: -0.26, lean: 0.3, step: 0.52, back: 0.36, width: 0.22 }), { hop: 0 }),
-        K(1.1, B({ ...body, twist: 0.5, hipTwist: 0.3, crouch: -0.28, lean: 0.3, step: 0.52, back: 0.36, width: 0.22 })),
+        // crouched to pounce, wound away with the palm drawn back behind the hip
+        K(-0.1, B({ ...body, twist: -1.0, hipTwist: -0.38, crouch: -0.3, lean: 0.02, step: 0.32, back: 0.24, width: 0.2 }), { hop: 0 }),
+        K(0.45, B({ ...body, twist: -0.25, hipTwist: -0.05, crouch: -0.14, lean: 0.24, step: 0.42, back: 0.32, width: 0.2 }), { hop: 0.1 }),
+        K(0.85, B({ ...body, twist: 0.5, hipTwist: 0.3, crouch: -0.28, lean: 0.34, step: 0.52, back: 0.36, width: 0.22 }), { hop: 0 }),
+        // landed: carried on round, sinking into the deep stance
+        K(1.1, B({ ...body, twist: 0.66, hipTwist: 0.34, crouch: -0.38, lean: 0.4, step: 0.52, back: 0.36, width: 0.22 })),
       ],
       // the heel of the palm, fingers up
-      main: strike([-0.22, 0.3, -0.04], [-0.03, 0.62, 0.78], [0.1, 0.4, 1], [0.0, 1, 0.2], [0, 0, -1]),
+      main: strike([-0.26, 0.28, -0.16], [-0.03, 0.62, 0.78], [0.1, 0.4, 1], [0.0, 1, 0.2], [0, 0, -1]),
       // the claw reaches out and drags down, back to the hip
       off: seq([
         [-0.2, 0.5, strike([0.14, 0.65, 0.36], [0.06, 0.72, 0.66], [-0.1, 0.4, 1], [0, 0.2, 1])],
@@ -197,6 +203,8 @@ export const gauntlets: Style = {
       ]),
       impacts: [0.85],
       end: 1.0,
+      rest: 1.1,
+      settle: 0.5,
       fx: [fx(0.85, 'stomp', 'feet', 0.8), fx(0.85, 'chi', 'main', 1.3), fx(0.86, 'shake', 'root', 0.5)],
       trail: { life: 0.18, glow: 0.6 },
     }),
@@ -206,18 +214,21 @@ export const gauntlets: Style = {
       keys: [
         K(-0.7, B({ ...body, twist: 0.3, crouch: -0.14, lean: 0.1, step: 0.24, back: 0.3 })),
         K(-0.45, B({ ...body, twist: 0.1, crouch: -0.06, lean: -0.02, step: 0.2, back: 0.3, width: 0.12, side: -0.08 })),
-        K(-0.2, B({ ...body, twist: -0.35, hipTwist: -0.1, crouch: -0.3, lean: 0.22, step: 0.26, back: 0.24, width: 0.32 })),
-        K(0.3, B({ ...body, twist: -0.5, hipTwist: -0.15, crouch: -0.32, lean: 0.3, step: 0.26, back: 0.24, width: 0.32 })),
-        K(0.85, B({ ...body, twist: 0.25, hipTwist: 0.15, crouch: -0.08, lean: -0.14, step: 0.26, back: 0.26, width: 0.28, headPitch: -0.25 })),
-        K(1.15, B({ ...body, twist: 0.3, hipTwist: 0.15, crouch: -0.12, lean: -0.1, step: 0.26, back: 0.26, width: 0.28, headPitch: -0.2 })),
+        // sunk right down into the horse stance, wound away, the fist down by the knee
+        K(-0.2, B({ ...body, twist: -0.45, hipTwist: -0.16, crouch: -0.38, lean: 0.26, step: 0.26, back: 0.24, width: 0.32 })),
+        K(0.3, B({ ...body, twist: -0.65, hipTwist: -0.24, crouch: -0.42, lean: 0.34, side: 0.08, step: 0.26, back: 0.24, width: 0.32 })),
+        K(0.85, B({ ...body, twist: 0.25, hipTwist: 0.15, crouch: -0.06, lean: -0.16, side: -0.04, step: 0.26, back: 0.26, width: 0.28, headPitch: -0.25 })),
+        // up onto the toes past it, then dropping back onto the heels
+        K(1.0, B({ ...body, twist: 0.36, hipTwist: 0.18, crouch: -0.02, lean: -0.22, side: -0.06, step: 0.26, back: 0.26, width: 0.28, headPitch: -0.32 })),
+        K(1.15, B({ ...body, twist: 0.3, hipTwist: 0.15, crouch: -0.2, lean: -0.06, step: 0.26, back: 0.26, width: 0.28, headPitch: -0.15 })),
       ],
       main: seq([
         [-0.7, 0.3, strike([-0.04, 0.6, 0.7], [-0.2, 0.45, 0.25], [0, 0.6, 1], [0.1, 0.3, 1])],
         [0.3, 1.1, strike([-0.2, 0.45, 0.25], [-0.26, 0.12, 0.0], [0.1, 0.3, 1], [0.2, -0.3, 1])],
       ]),
       off: seq([
-        [-0.7, 0.0, strike([0.14, 0.65, 0.36], [0.24, -0.08, 0.32], [-0.1, 0.3, 1], [0.0, -0.4, 1], [0, 0, 1])],
-        [0.0, 1.0, strike([0.24, -0.08, 0.32], [0.06, 0.98, 0.42], [0.0, -0.4, 1], [-0.05, 1, 0.2], [0, 0, 1])],
+        [-0.7, 0.0, strike([0.14, 0.65, 0.36], [0.26, -0.14, 0.22], [-0.1, 0.3, 1], [0.0, -0.5, 1], [0, 0, 1])],
+        [0.0, 1.0, strike([0.26, -0.14, 0.22], [0.06, 0.98, 0.42], [0.0, -0.5, 1], [-0.05, 1, 0.2], [0, 0, 1])],
       ]),
       kick: {
         foot: 'L',
@@ -251,18 +262,27 @@ export const gauntlets: Style = {
     // straight at the end of it
     dh: mv({
       keys: [
-        K(-0.3, B({ ...body, twist: -0.2, crouch: -0.22, lean: 0.5, step: 0.3, back: 0.34, headPitch: 0.2 })),
-        K(0.4, B({ ...body, twist: -0.35, crouch: -0.24, lean: 0.54, step: 0.42, back: 0.4, headPitch: 0.15 })),
-        K(0.85, B({ ...body, twist: -0.75, hipTwist: -0.2, crouch: -0.22, lean: 0.46, step: 0.66, back: 0.5, headPitch: -0.05 })),
-        K(1.1, B({ ...body, twist: -0.75, hipTwist: -0.2, crouch: -0.22, lean: 0.4, step: 0.66, back: 0.5 })),
+        K(-0.3, B({ ...body, twist: -0.1, crouch: -0.26, lean: 0.5, step: 0.3, back: 0.34, headPitch: 0.2 })),
+        // the left shoulder drawn back for the straight as the charge runs on
+        K(0.4, B({ ...body, twist: 0.2, hipTwist: 0.08, crouch: -0.3, lean: 0.5, step: 0.42, back: 0.4, headPitch: 0.15 })),
+        K(0.85, B({ ...body, twist: -0.8, hipTwist: -0.22, crouch: -0.24, lean: 0.5, step: 0.66, back: 0.5, headPitch: -0.05 })),
+        // the whole charge carried through it, the knees giving
+        K(1.1, B({ ...body, twist: -0.92, hipTwist: -0.26, crouch: -0.32, lean: 0.52, step: 0.66, back: 0.5 })),
       ],
       main: strike([-0.18, 0.78, 0.3], [-0.16, 0.74, 0.32], [0.3, 0.6, 1], [0.4, 0.6, 1]),
-      off: strike([0.18, 0.78, 0.3], [0.03, 0.64, 0.84], [-0.3, 0.6, 1], [0, 0.03, 1]),
+      off: seq([
+        // the horn drawn back to the shoulder...
+        [-0.3, 0.4, strike([0.18, 0.78, 0.3], [0.26, 0.62, -0.06], [-0.3, 0.6, 1], [-0.1, 0.2, 1])],
+        // ...and driven out
+        [0.4, 1.1, strike([0.26, 0.62, -0.06], [0.03, 0.64, 0.84], [-0.1, 0.2, 1], [0, 0.03, 1])],
+      ]),
       impacts: [0.85],
       start: -0.3,
       chamber: -0.1,
       travel: 0.4,
       end: 1.0,
+      rest: 1.1,
+      settle: 0.5,
       ghosts: [-0.3, 0.9],
       fx: [fx(-0.3, 'dust', 'feet', 1.1), fx(0.3, 'dust', 'feet', 0.8), fx(0.85, 'chi', 'off', 1.5), fx(0.85, 'stomp', 'feet', 0.8), fx(0.86, 'shake', 'root', 0.8)],
       trail: { life: 0.2, glow: 0.6 },
@@ -303,11 +323,11 @@ export const gauntlets: Style = {
     bh: mv({
       keys: [
         K(-0.6, B({ ...body, twist: -0.1, crouch: -0.14 }), { spin: 0 }),
-        K(-0.3, B({ ...body, twist: -0.3, crouch: -0.22, lean: 0.0, step: 0.16, back: 0.36, width: 0.14 }), { spin: 0.18 }),
+        K(-0.3, B({ ...body, twist: -0.4, crouch: -0.3, lean: 0.04, side: 0.06, step: 0.16, back: 0.36, width: 0.14 }), { spin: 0.18 }),
         K(0.1, B({ ...body, twist: -0.2, crouch: -0.28, lean: -0.1, side: -0.2, step: 0.12, back: 0.44, width: 0.16 }), { spin: 0.55 }),
         K(0.45, B({ ...body, twist: 0.0, crouch: -0.3, lean: -0.14, side: -0.3, step: 0.12, back: 0.48, width: 0.18 }), { spin: 0.74 }),
-        K(0.8, B({ ...body, twist: -0.1, crouch: -0.3, lean: -0.04, side: -0.1, step: 0.18, back: 0.46, width: 0.18 }), { spin: 0.92 }),
-        K(1.1, B({ ...body, twist: -0.25, crouch: -0.24, lean: 0.06, step: 0.2, back: 0.4 }), { spin: 1 }),
+        K(0.8, B({ ...body, twist: 0.05, crouch: -0.34, lean: -0.04, side: -0.14, step: 0.18, back: 0.46, width: 0.18 }), { spin: 0.95 }),
+        K(1.1, B({ ...body, twist: -0.2, crouch: -0.3, lean: 0.06, step: 0.2, back: 0.4 }), { spin: 1 }),
       ],
       main: track([
         [-0.6, [-0.12, 0.62, 0.26]],
@@ -316,8 +336,9 @@ export const gauntlets: Style = {
       ]),
       // the back of the fist leads round
       off: seq([
-        [-0.6, -0.1, line([0.14, 0.65, 0.36], [-0.05, 0.62, 0.24], [-0.1, 0.3, 1], [-1, 0.2, 0.2], [0, 1, 0])],
-        [-0.1, 0.5, line([-0.05, 0.62, 0.24], [0.86, 0.68, 0.06], [-1, 0.2, 0.2], [1, 0.05, 0.05], [0, 0, -1])],
+        // wound right across the chest...
+        [-0.6, -0.1, line([0.14, 0.65, 0.36], [-0.16, 0.6, 0.2], [-0.1, 0.3, 1], [-1, 0.2, 0.2], [0, 1, 0])],
+        [-0.1, 0.5, line([-0.16, 0.6, 0.2], [0.86, 0.68, 0.06], [-1, 0.2, 0.2], [1, 0.05, 0.05], [0, 0, -1])],
         [0.5, 1.1, line([0.86, 0.68, 0.06], [0.3, 0.6, 0.3], [1, 0.05, 0.05], [0.3, 0.3, 1], [0, 1, 0])],
       ]),
       impacts: [0.45],
@@ -374,10 +395,13 @@ export const gauntlets: Style = {
     jh: mv({
       keys: [
         K(-0.5, B({ ...body, front: 'R', twist: -0.2, crouch: -0.08, lean: 0.0, step: 0.1, back: 0.12 }), { hop: 0 }),
-        K(-0.1, B({ ...body, front: 'R', twist: 0.1, crouch: 0.0, lean: -0.28, step: 0.1, back: 0.14, headPitch: 0.2 }), { hop: 0.1 }),
+        // arched right back under the leg as it goes up
+        K(-0.1, B({ ...body, front: 'R', twist: 0.1, crouch: 0.02, lean: -0.38, step: 0.1, back: 0.14, headPitch: 0.24 }), { hop: 0.1 }),
         K(0.45, B({ ...body, front: 'R', twist: 0.05, crouch: -0.12, lean: 0.12, step: 0.3, back: 0.2 }), { hop: 0.05 }),
-        K(0.65, B({ ...body, front: 'R', twist: 0.0, crouch: -0.38, lean: 0.36, step: 0.5, back: 0.32, width: 0.2 }), { hop: 0 }),
-        K(1.1, B({ ...body, front: 'R', twist: 0.0, crouch: -0.36, lean: 0.3, step: 0.5, back: 0.32, width: 0.2 })),
+        K(0.65, B({ ...body, front: 'R', twist: 0.0, crouch: -0.42, lean: 0.42, step: 0.5, back: 0.32, width: 0.2 }), { hop: 0 }),
+        // the landing sinks on through the knees
+        K(0.85, B({ ...body, front: 'R', twist: 0.0, crouch: -0.46, lean: 0.4, step: 0.5, back: 0.32, width: 0.2 })),
+        K(1.1, B({ ...body, front: 'R', twist: 0.0, crouch: -0.4, lean: 0.3, step: 0.5, back: 0.32, width: 0.2 })),
       ],
       main: seq([
         [-0.5, 0.2, strike([-0.12, 0.62, 0.26], [-0.34, 0.66, 0.1], [0.1, 0.3, 1], [-0.4, 0.4, 1])],
@@ -414,24 +438,25 @@ export const gauntlets: Style = {
     // Iron Grapple: arms flung wide, a lunging two-handed seize, and a haul back to the chest
     sp: mv({
       keys: [
-        K(-0.6, B({ ...body, crouch: -0.2, lean: 0.06, twist: 0, width: 0.22 })),
-        K(0.0, B({ ...body, crouch: -0.26, lean: 0.18, twist: 0, step: 0.3, width: 0.22 })),
-        K(0.85, B({ ...body, crouch: -0.28, lean: 0.42, twist: 0, step: 0.55, back: 0.36 })),
+        // arms flung wide and back, the chest opened, sunk low to spring
+        K(-0.6, B({ ...body, crouch: -0.28, lean: -0.04, twist: 0, width: 0.24, headPitch: -0.05 })),
+        K(0.0, B({ ...body, crouch: -0.32, lean: 0.12, twist: 0, step: 0.3, back: 0.2, width: 0.24 })),
+        K(0.85, B({ ...body, crouch: -0.3, lean: 0.48, twist: 0, step: 0.55, back: 0.36 })),
         K(1.3, B({ ...body, crouch: -0.22, lean: -0.05, twist: -0.15, step: 0.36, back: 0.36, headPitch: -0.05 })),
         K(1.7, B({ ...body, crouch: -0.16, lean: 0.1, twist: -0.25, step: 0.26, back: 0.28 })),
       ],
       main: seq(
         [
-          [-0.6, 0.0, strike([-0.4, 0.55, 0.08], [-0.46, 0.5, 0.1], [-0.6, 0.2, 1], [-0.6, 0.2, 1])],
-          [0.0, 1.0, strike([-0.46, 0.5, 0.1], [-0.1, 0.56, 0.62], [-0.6, 0.2, 1], [0.3, 0.1, 1])],
+          [-0.6, 0.0, strike([-0.42, 0.55, 0.02], [-0.5, 0.52, -0.06], [-0.6, 0.2, 1], [-0.7, 0.2, 0.6])],
+          [0.0, 1.0, strike([-0.5, 0.52, -0.06], [-0.1, 0.56, 0.62], [-0.7, 0.2, 0.6], [0.3, 0.1, 1])],
           [1.0, 1.4, strike([-0.1, 0.56, 0.62], [-0.16, 0.5, 0.22], [0.3, 0.1, 1], [0.2, 0.3, 1])],
         ],
         0.06,
       ),
       off: seq(
         [
-          [-0.6, 0.0, strike([0.4, 0.55, 0.08], [0.46, 0.5, 0.1], [0.6, 0.2, 1], [0.6, 0.2, 1])],
-          [0.0, 1.0, strike([0.46, 0.5, 0.1], [0.1, 0.56, 0.62], [0.6, 0.2, 1], [-0.3, 0.1, 1])],
+          [-0.6, 0.0, strike([0.42, 0.55, 0.02], [0.5, 0.52, -0.06], [0.6, 0.2, 1], [0.7, 0.2, 0.6])],
+          [0.0, 1.0, strike([0.5, 0.52, -0.06], [0.1, 0.56, 0.62], [0.7, 0.2, 0.6], [-0.3, 0.1, 1])],
           [1.0, 1.4, strike([0.1, 0.56, 0.62], [0.16, 0.5, 0.22], [-0.3, 0.1, 1], [-0.2, 0.3, 1])],
         ],
         0.06,
@@ -503,20 +528,29 @@ export const gauntlets: Style = {
         K(0.0, B({ ...body, crouch: -0.1, lean: 0.06, twist: -0.2, headPitch: 0.1 })),
         K(0.3, B({ ...body, crouch: -0.16, lean: 0.04, twist: -0.45, hipTwist: -0.12, side: 0.05, width: 0.2, headPitch: 0.05 })),
         K(0.6, B({ ...body, crouch: -0.18, lean: 0.04, twist: 0.35, hipTwist: 0.1, side: -0.05, width: 0.22, back: 0.22, headPitch: 0.0 })),
-        // the knee comes up, the body tall over the standing leg
-        K(0.82, B({ ...body, crouch: -0.04, lean: 0.0, twist: 0.05, hipTwist: 0.0, side: -0.06, width: 0.24, step: 0.16, back: 0.2, headPitch: -0.05 })),
-        // and stamped down: the whole weight dropped into the floor
+        // the knee comes up high, the body rising tall over the standing leg: the stamp's pull-back
+        K(0.84, B({ ...body, crouch: 0.0, lean: -0.06, twist: 0.08, hipTwist: 0.0, side: -0.08, width: 0.24, step: 0.16, back: 0.2, headPitch: -0.08 })),
+        // and stamped down: the whole weight dropped into the floor, the knees giving under it
         K(T_STAMP, horse),
-        K(T_STAMP + 0.12, B({ ...horse, crouch: -0.38, lean: 0.14 })),
-        // the left palm, off the turn of the waist
-        K(T_LEFT, B({ ...horse, step: 0.3, back: 0.24, width: 0.22, crouch: -0.3, lean: 0.24, twist: -0.6, hipTwist: -0.18 })),
-        // the bow drawn: the right shoulder taken back, the weight sunk onto the rear leg, breathing
-        K(1.6, B({ ...horse, step: 0.32, back: 0.22, width: 0.2, crouch: -0.34, lean: 0.08, twist: -0.85, hipTwist: -0.28, headPitch: 0.0 })),
-        K(1.78, B({ ...horse, step: 0.32, back: 0.22, width: 0.2, crouch: -0.31, lean: 0.06, twist: -0.88, hipTwist: -0.3, headPitch: -0.03 })),
-        K(1.9, B({ ...horse, step: 0.32, back: 0.22, width: 0.2, crouch: -0.35, lean: 0.06, twist: -0.92, hipTwist: -0.32, headPitch: 0.0 })),
-        // fa jin: the rear leg drives, the hips snap, the spine whips, the lead foot slides in
-        K(T_BLOW, B({ ...horse, step: 0.52, back: 0.42, width: 0.2, crouch: -0.34, lean: 0.62, twist: 0.12, hipTwist: 0.14, headPitch: -0.2 })),
-        K(2.32, B({ ...horse, step: 0.52, back: 0.42, width: 0.2, crouch: -0.33, lean: 0.55, twist: 0.14, hipTwist: 0.14, headPitch: -0.12 })),
+        K(T_STAMP + 0.1, B({ ...horse, crouch: -0.42, lean: 0.16 })),
+        // the left palm's pull-back: the left shoulder and the hips turned away, sinking
+        K(1.2, B({ ...horse, step: 0.24, back: 0.22, width: 0.24, crouch: -0.4, lean: 0.06, twist: 0.3, hipTwist: 0.1 })),
+        // and shot out off the turn of the waist
+        K(T_LEFT, B({ ...horse, step: 0.3, back: 0.24, width: 0.22, crouch: -0.32, lean: 0.26, twist: -0.6, hipTwist: -0.18 })),
+        // the bow drawn to its end: everything wound away from them, sunk deep onto the rear leg (the
+        // lead foot light out in front), the trunk arched back over it; held there, breathing
+        K(1.62, B({ ...horse, step: 0.4, back: 0.14, width: 0.2, crouch: -0.44, lean: -0.08, side: 0.08, twist: -1.12, hipTwist: -0.42, headPitch: 0.02 })),
+        K(1.78, B({ ...horse, step: 0.4, back: 0.14, width: 0.2, crouch: -0.41, lean: -0.1, side: 0.08, twist: -1.15, hipTwist: -0.43, headPitch: -0.02 })),
+        K(1.9, B({ ...horse, step: 0.4, back: 0.14, width: 0.2, crouch: -0.45, lean: -0.08, side: 0.09, twist: -1.16, hipTwist: -0.44, headPitch: 0.0 })),
+        // fa jin, from the floor up: the rear leg drives and the hips start round while the shoulders
+        // still hang back...
+        K(2.02, B({ ...horse, step: 0.44, back: 0.26, width: 0.2, crouch: -0.42, lean: 0.12, side: 0.04, twist: -0.85, hipTwist: -0.05, headPitch: -0.08 })),
+        // ...then the spine whips, the lead foot slides in and the whole mass falls in behind the palm
+        K(T_BLOW, B({ ...horse, step: 0.54, back: 0.44, width: 0.2, crouch: -0.36, lean: 0.66, twist: 0.12, hipTwist: 0.18, headPitch: -0.2 })),
+        // carried on past them, the shoulders turning through
+        K(2.26, B({ ...horse, step: 0.54, back: 0.44, width: 0.2, crouch: -0.4, lean: 0.74, twist: 0.32, hipTwist: 0.22, side: -0.05, headPitch: -0.12 })),
+        // the knees take the stop
+        K(2.38, B({ ...horse, step: 0.52, back: 0.42, width: 0.2, crouch: -0.46, lean: 0.56, twist: 0.24, hipTwist: 0.16, side: -0.03, headPitch: 0.0 })),
         // withdrawn: up out of the stance, the head bowed over the salute
         K(2.62, B({ ...body, front: 'L', step: 0.24, back: 0.22, width: 0.16, crouch: -0.12, lean: 0.06, twist: 0.12, hipTwist: 0.05, headPitch: 0.3 })),
       ],
@@ -531,13 +565,17 @@ export const gauntlets: Style = {
         [0.84, [-0.46, 0.62, 0.12], [-0.5, 0, 1], UP],
         // and press the earth
         [T_STAMP, [-0.26, 0.06, 0.24], [0, -0.1, 1], UP, 'in'],
-        // drawn back beside the ear like a bow, and held
-        [T_LEFT, [-0.34, 0.66, -0.06], PALM, PALM_FWD, 'io', 'hips'],
-        [1.6, [-0.34, 0.78, -0.16], PALM, PALM_FWD, 'io', 'hips'],
-        [1.9, [-0.35, 0.76, -0.2], PALM, PALM_FWD, 'io', 'hips'],
-        // the palm
+        // drawn back beside the ear like a bow, then on to the end of its range, the elbow folded and
+        // the wrist cocked back; held there
+        [T_LEFT, [-0.36, 0.66, -0.1], PALM, PALM_FWD, 'io', 'hips'],
+        [1.62, [-0.42, 0.74, -0.36], [0, 1, -0.25], [0, 0.25, -1], 'io', 'hips'],
+        [1.9, [-0.43, 0.73, -0.4], [0, 1, -0.3], [0, 0.3, -1], 'io', 'hips'],
+        // still drawn while the hips go, then the palm, last and fastest
+        [2.02, [-0.4, 0.7, -0.3], [0, 1, -0.15], [0, 0.15, -1], 'in', 'hips'],
         [T_BLOW, [-0.02, 0.55, 1.2], [0, 1, 0.25], PALM_FWD, 'in', 'hips'],
-        [2.34, [-0.03, 0.6, 1.1], [0, 1, 0.2], PALM_FWD, 'out', 'hips'],
+        // driven on through them
+        [2.26, [0.0, 0.52, 1.3], [0, 1, 0.3], PALM_FWD, 'out', 'hips'],
+        [2.4, [-0.04, 0.5, 1.0], [0, 1, 0.2], PALM_FWD, 'io', 'hips'],
         // the one-handed salute before the chest, palm to the left
         [2.62, [-0.05, 0.58, 0.32], UP, [-1, 0, 0], 'io', 'hips'],
       ]),
@@ -550,14 +588,16 @@ export const gauntlets: Style = {
         [0.7, [0.42, 0.62, 0.24], [0.2, 1, 0.1], [-1, 0, 0.3]],
         [0.84, [0.46, 0.62, 0.12], [0.5, 0, 1], UP],
         [T_STAMP, [0.26, 0.06, 0.24], [0, -0.1, 1], UP, 'in'],
-        // chambered at the hip, then shot out at their face
-        [1.18, [0.22, 0.3, 0.06], [0, 0.6, 1], PALM_FWD, 'io', 'hips'],
+        // drawn back past the hip, then shot out at their face
+        [1.2, [0.24, 0.3, -0.1], [0, 0.6, 1], PALM_FWD, 'io', 'hips'],
         [T_LEFT, [0.06, 0.58, 0.92], PALM, PALM_FWD, 'in', 'hips'],
-        [1.6, [0.1, 0.58, 0.8], PALM, PALM_FWD, 'out', 'hips'],
-        [1.9, [0.1, 0.56, 0.76], PALM, PALM_FWD, 'io', 'hips'],
-        // pulled back to the hip as the right one goes, a fist
-        [T_BLOW, [0.24, 0.24, -0.04], [0, 0.1, 1], UP, 'in', 'hips'],
-        [2.34, [0.24, 0.22, -0.06], [0, 0.1, 1], UP, 'io', 'hips'],
+        // left reaching out at them as the counterweight while the right is drawn
+        [1.62, [0.12, 0.6, 0.84], PALM, PALM_FWD, 'out', 'hips'],
+        [1.9, [0.12, 0.58, 0.82], PALM, PALM_FWD, 'io', 'hips'],
+        [2.02, [0.12, 0.54, 0.7], PALM, PALM_FWD, 'io', 'hips'],
+        // yanked back to the hip as the right one goes, a fist
+        [T_BLOW, [0.26, 0.24, -0.12], [0, 0.1, 1], UP, 'in', 'hips'],
+        [2.34, [0.24, 0.22, -0.08], [0, 0.1, 1], UP, 'io', 'hips'],
         [2.62, [0.2, 0.14, -0.1], [0, 0.1, 1], UP, 'io', 'hips'],
       ]),
       // the lead knee lifted and stamped down wide
@@ -567,7 +607,7 @@ export const gauntlets: Style = {
         to: T_STAMP,
         path: kickPath(0.66, T_STAMP, [
           [0.66, [0.22, 0.05, 0.22]],
-          [0.84, [0.16, 0.5, 0.26]],
+          [0.84, [0.16, 0.6, 0.28]],
           [0.93, [0.24, 0.3, 0.2]],
           [T_STAMP, [0.27, 0.05, 0.16]],
         ]),
@@ -578,7 +618,7 @@ export const gauntlets: Style = {
       end: 2.4,
       rest: 2.7,
       lead: 0.04,
-      ghosts: [1.92, 2.22],
+      ghosts: [2.0, 2.26],
       fx: [
         fx(0.05, 'wisps', 'main', 0.6, '#ffb347'),
         fx(0.35, 'wisps', 'off', 0.6, '#ffb347'),
