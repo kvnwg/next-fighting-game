@@ -210,11 +210,14 @@ export function stepBody(
   }
 
   const wasGround = b.onGround;
+  const prevY = b.y;
   b.vy -= GRAVITY * dt;
   b.y += b.vy * dt;
   const supported = map.edge === 'wall' || onFloor(map, b.x, b.z, -0.05);
   let landed = false;
-  if (supported && b.y <= 0 && b.y > -0.75) {
+  // land on the floor whenever this step crossed it, however fast (an air attack's slam can
+  // drop a metre or more in one step); below it already, only within a hand's breadth
+  if (supported && b.y <= 0 && (b.y > -0.75 || prevY >= -0.05)) {
     b.y = 0;
     b.vy = 0;
     b.onGround = true;

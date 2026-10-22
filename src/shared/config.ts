@@ -116,8 +116,9 @@ export const COMBAT = {
    */
   jumpIframesStart: 40,
   /** An air attack hangs at the top through its windup, then from this fraction of it slams down (m/s at least). */
-  airSlamFrom: 0.7,
+  airSlamFrom: 0.6,
   airSlamSpeed: 14,
+  airSlamMax: 40,
   jumpIframesEnd: 380,
 
   /**

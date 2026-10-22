@@ -304,7 +304,7 @@ export class Fighter {
     } else {
       // down, fast enough to land by the end of the windup
       const left = Math.max(0.04, (this.atkWindup - e) / 1000);
-      this.vy = Math.min(this.vy, -Math.max(COMBAT.airSlamSpeed, this.y / left));
+      this.vy = Math.min(this.vy, -Math.min(COMBAT.airSlamMax, Math.max(COMBAT.airSlamSpeed, this.y / left)));
     }
   }
 
