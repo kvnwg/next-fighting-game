@@ -59,7 +59,7 @@ const chop = [
 // Cyclone (ref2 1.1-1.9 s): the head dragged out to his left along the floor, then whirled round
 // flat at chest height one whole turn and a quarter, the fists up in front of his chest and the
 // body upright over a wide base; the hit as it comes round the front, then he drops into a lunge
-const cyc: ReturnType<typeof H>[] = [H(-1.3, LOW, GUARD_DIR), H(-1.0, [0, 0.24, 0.32], aim(95, -28))];
+const cyc: ReturnType<typeof H>[] = [H(-1.3, LOW, GUARD_DIR), H(-1.0, [0.02, 0.24, 0.28], aim(118, -26))];
 for (let i = 1; i <= 10; i++) cyc.push(H(-1.0 + (1.45 * i) / 10, [0.0, 0.42 - 0.012 * i, 0.4 + 0.006 * i], aim(95 - 45.5 * i, Math.min(8, -20 + 6 * i))));
 cyc.push(H(0.62, [-0.05, 0.28, 0.46], aim(-410, -10)), H(0.82, REST, aim(-440, -28)), H(1.07, REST, aim(-450, -36)));
 
@@ -200,14 +200,15 @@ export const greathammer: Style = {
     sp: heave(mv({
       keys: [
         K(-1.3, body, { spin: 0 }),
-        K(-1.0, B({ ...body, twist: 1.0, hipTwist: 0.55, lean: 0.25, crouch: -0.29, step: 0.3, back: 0.44, width: 0.26, side: 0.06 }), { spin: 0 }),
+        // the pull-back: wound left to the end of the turn and sunk on the rear leg, the head dragged far back
+        K(-1.0, B({ ...body, twist: 1.15, hipTwist: 0.6, lean: 0.3, crouch: -0.34, step: 0.3, back: 0.5, width: 0.26, side: 0.1 }), { spin: 0 }),
         // up off the drag into the whirl, the chest up
         K(-0.6, B({ ...body, twist: 0.35, hipTwist: -0.2, lean: 0.1, crouch: -0.24, step: 0.32, back: 0.36, width: 0.32, side: 0.16, headPitch: -0.1 }), { spin: -0.25 }),
         K(-0.15, B({ ...body, twist: 0.3, hipTwist: -0.2, lean: 0.08, crouch: -0.24, step: 0.34, back: 0.36, width: 0.32, side: 0.18, headPitch: -0.1 }), { spin: -0.62 }),
         // through the target and down into the lunge behind it
         K(0.45, B({ ...body, twist: -0.3, hipTwist: -0.35, lean: 0.42, crouch: -0.32, step: 0.56, back: 0.42, width: 0.3, side: 0.06, headPitch: -0.2 }), { spin: -1.02 }),
-        K(0.8, B({ ...body, twist: -0.55, hipTwist: -0.45, lean: 0.6, crouch: -0.42, step: 0.57, back: 0.49, width: 0.3, headPitch: -0.22 }), { spin: -1.12 }),
-        K(1.07, B({ ...body, twist: -0.55, hipTwist: -0.45, lean: 0.58, crouch: -0.42, step: 0.57, back: 0.49, width: 0.3 }), { spin: -1.14 }),
+        K(0.8, B({ ...body, twist: -0.65, hipTwist: -0.5, lean: 0.64, crouch: -0.47, step: 0.57, back: 0.49, width: 0.3, headPitch: -0.22 }), { spin: -1.15 }),
+        K(1.07, B({ ...body, twist: -0.62, hipTwist: -0.48, lean: 0.6, crouch: -0.47, step: 0.57, back: 0.49, width: 0.3 }), { spin: -1.14 }),
       ],
       main: { kind: 'hold' },
       start: -1.3,
