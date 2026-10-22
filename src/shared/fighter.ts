@@ -18,6 +18,9 @@ export type FighterState =
   | 'broken'
   | 'knockdown'
   | 'stance'
+  /** executing a posture-broken opponent, and being executed (both locked, see COMBAT.executeTime) */
+  | 'execute'
+  | 'executed'
   | 'dead';
 
 /** States imposed by the server (being hit, deflected, broken...). Clients always adopt these. */
@@ -27,6 +30,8 @@ export const FORCED_STATES: ReadonlySet<FighterState> = new Set<FighterState>([
   'deflected',
   'broken',
   'knockdown',
+  'execute',
+  'executed',
   'dead',
 ]);
 
@@ -59,7 +64,7 @@ export interface InputOptions {
 }
 
 /** States that hold off posture recovery. */
-const POSTURE_BUSY: ReadonlySet<FighterState> = new Set<FighterState>(['attack', 'dodge', 'stagger', 'blockstun', 'deflected', 'knockdown']);
+const POSTURE_BUSY: ReadonlySet<FighterState> = new Set<FighterState>(['attack', 'dodge', 'stagger', 'blockstun', 'deflected', 'knockdown', 'execute', 'executed']);
 
 export class Fighter {
   readonly id: string;
@@ -374,6 +379,8 @@ export class Fighter {
   }
 
   private tryInput(action: InputAction, now: number, opts: InputOptions): boolean {
+    // an execution plays out to the end, for both of them
+    if (this.state === 'execute' || this.state === 'executed') return false;
     switch (action) {
       case 'light':
         return this.pressLight(now, opts);
@@ -687,6 +694,17 @@ export class Fighter {
       case 'deflected':
       case 'knockdown':
         if (e >= this.stateDur) this.toNeutral(now);
+        break;
+      case 'execute':
+        if (e >= this.stateDur) this.toNeutral(now);
+        break;
+      case 'executed':
+        // survived it: floored, with the guard back whole
+        if (e >= this.stateDur) {
+          this.posture = 0;
+          this.invulnUntil = now + COMBAT.knockdownTime;
+          this.setState('knockdown', now, COMBAT.knockdownTime);
+        }
         break;
       case 'broken':
         if (e >= this.stateDur) {

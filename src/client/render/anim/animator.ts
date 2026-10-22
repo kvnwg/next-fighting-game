@@ -10,9 +10,10 @@
  * Every new state blends from the current pose, so combos chain from where the last cut ended.
  */
 import * as THREE from 'three';
-import { AttackDef, CharacterDef, WeaponKind } from '../../../shared/characters';
+import { AttackDef, CHARACTERS, CharacterDef, CharacterId, WeaponKind } from '../../../shared/characters';
+import { COMBAT } from '../../../shared/config';
 import { FighterState } from '../../../shared/fighter';
-import { BodyKey, BodyPose, FxCue, Motion, MoveDef, Pose, Rot, Style, TrailStyle, WeaponXf, bodyToTorso } from './author';
+import { BodyKey, BodyPose, ExecuteReact, FxCue, Motion, MoveDef, Pose, Rot, Style, TrailStyle, WeaponXf, bodyToTorso } from './author';
 import { clamp01, easeIn, easeInOut, easeOut, kick, orientWeapon, smooth } from './math';
 import { STYLES, moveFor } from './styles';
 
@@ -41,6 +42,8 @@ export interface AnimInput {
   dodgeKind?: DodgeKind;
   /** the ring entrance is playing: elapsed and dur run over the whole entrance */
   entrance?: boolean;
+  /** being executed: who by (their style decides the strikes to flinch at and how the blow lands) */
+  execBy?: CharacterId;
 }
 
 /** How long each fighter's ring entrance lasts. */
@@ -337,6 +340,8 @@ export class Animator {
   private feet = { L: new THREE.Vector3(0.13, 0.05, 0.2), R: new THREE.Vector3(-0.13, 0.05, -0.18) };
   /** effect cues: the furthest s this move has reached, so each cue fires once */
   private fxMaxS = -Infinity;
+  private lastLying = 0;
+  private lyingCarry = 0;
   /** seconds into the style's roar (-1: not roaring), and how far its cues have fired */
   private roarT = -1;
   private roarFxS = -Infinity;
@@ -365,6 +370,8 @@ export class Animator {
       this.snapshot = cloneResolved(this.current);
       this.snapRot = { ...this.curRot };
       this.fxMaxS = -Infinity;
+      // already on the floor (the end of an execution): stay down rather than pop up and fall again
+      this.lyingCarry = this.lastLying;
     }
     this.lastElapsed = a.elapsed;
 
@@ -403,6 +410,17 @@ export class Animator {
       const def = moveFor(this.style, a.attack.anim, a.key ?? '');
       this.reachOut(out.pose, def, out.s);
       out.extend = throwOut(def, out.s);
+    } else if (a.state === 'execute') {
+      const def = this.style.execute ?? this.style.moves.h2 ?? this.style.moves.h!;
+      const r = this.executePose(a, def, out);
+      out.pose = r.pose;
+      rot = r.rot;
+      out.kick = r.kick;
+      out.extend = throwOut(def, out.s);
+    } else if (a.state === 'executed') {
+      const r = this.executedPose(a, out);
+      out.pose = r.pose;
+      rot = r.rot;
     } else if (a.state === 'dodge' && a.dodgeKind && a.dodgeKind !== 'roll' && (a.dodgeKind === 'leap' ? this.style.leap : this.style.vanish)) {
       const def = (a.dodgeKind === 'leap' ? this.style.leap : this.style.vanish)!;
       const r = this.abilityPose(a, def, out);
@@ -416,7 +434,7 @@ export class Animator {
       for (const c of ROT_CHANNELS) rot[c] = this.snapRot[c] + (settleTurn(this.snapRot[c], c) - this.snapRot[c]) * k;
       if (a.state === 'dead' || a.state === 'knockdown') {
         // a falling drop, and for knockdowns a push back up at the end
-        out.lying = easeIn(a.elapsed / 380, 2);
+        out.lying = Math.max(easeIn(a.elapsed / 380, 2), this.lyingCarry);
         if (a.state === 'knockdown' && a.dur - a.elapsed < 380) out.lying = Math.min(out.lying, smooth((a.dur - a.elapsed) / 380));
       }
     }
@@ -425,6 +443,7 @@ export class Animator {
 
     this.current = cloneResolved(out.pose);
     this.curRot = { ...rot };
+    this.lastLying = out.lying;
     out.pose.body.lift += rot.hop;
     out.spin = rot.spin * Math.PI * 2;
     out.flip = rot.flip * Math.PI * 2;
@@ -629,6 +648,92 @@ export class Animator {
     const rot = lerpRot(this.snapRot, f.rot, bw);
     for (const c of ROT_CHANNELS) rot[c] += (settleTurn(rot[c], c) - rot[c]) * gw;
     return { pose, rot, kick: f.kick && { ...f.kick, w: f.kick.w * (1 - gw) } };
+  }
+
+  /**
+   * The execution: s runs linearly in time, from sStart to the last impact at the finishing blow
+   * and on to sRest at the end. Blends in from wherever the strike that started it left off, and
+   * settles to guard over the last 450 ms.
+   */
+  private executePose(a: AnimInput, def: MoveDef, out: AnimFrame): MoveFrame {
+    const e = a.elapsed;
+    const hitAt = COMBAT.executeHitAt;
+    const dur = Math.max(hitAt + 1, a.dur || COMBAT.executeTime);
+    const last = def.impacts[def.impacts.length - 1];
+    const s = e < hitAt ? def.sStart + (last - def.sStart) * (e / hitAt) : last + (def.sRest - last) * clamp01((e - hitAt) / (dur - hitAt - 300));
+    this.cues(def, s, out);
+    out.trail = def.trail;
+    out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
+    const swinging = s >= def.sChamber && s <= def.sEnd;
+    out.swingMain = def.main.kind !== 'hold' && swinging;
+    out.swingOff = !!def.off && def.off.kind !== 'hold' && swinging;
+    const f = this.movePose(def, s);
+    const bin = easeOut(e / 160, 2);
+    const bout = easeInOut((e - (dur - 450)) / 450);
+    const pose = lerpResolved(lerpResolved(this.snapshot, f.pose, bin), this.guardPose(a), bout);
+    const rot = lerpRot(this.snapRot, f.rot, bin);
+    for (const c of ROT_CHANNELS) rot[c] += (settleTurn(rot[c], c) - rot[c]) * bout;
+    return { pose, rot, kick: f.kick && { ...f.kick, w: f.kick.w * (1 - bout) } };
+  }
+
+  /**
+   * Being executed: kneeling broken and swaying, flinching at each of the executioner's flourish
+   * strikes, then taking the finishing blow the way their style lands it, and down.
+   */
+  private executedPose(a: AnimInput, out: AnimFrame): { pose: ResolvedPose; rot: Rot } {
+    const e = a.elapsed;
+    const hitAt = COMBAT.executeHitAt;
+    const by = a.execBy ? STYLES[CHARACTERS[a.execBy].weaponKind] : null;
+    const def = by ? (by.execute ?? by.moves.h2 ?? null) : null;
+    const react: ExecuteReact = by?.executeReact ?? 'crumple';
+    const p = this.statePose({ ...a, state: 'broken' }).target;
+    const rot: Rot = { ...ZERO_ROT };
+    // flinches at the flourish strikes before the last
+    if (def && def.impacts.length > 1) {
+      const last = def.impacts[def.impacts.length - 1];
+      for (const at of def.impacts.slice(0, -1)) {
+        const t = ((at - def.sStart) / Math.max(1e-6, last - def.sStart)) * hitAt;
+        const k = e > t ? kick((e - t) / 90) * Math.exp(-(e - t) / 260) : 0;
+        p.body.lean -= 0.25 * k;
+        p.body.headPitch -= 0.4 * k;
+        p.body.twist += 0.18 * k;
+      }
+    }
+    if (e >= hitAt) {
+      const t = e - hitAt;
+      const hit = easeOut(t / 110, 2);
+      const fall = easeIn(clamp01((t - (react === 'impale' ? 380 : 120)) / 360), 2);
+      switch (react) {
+        case 'crumple':
+          // driven straight down: the knees go, the chest slams onto the thigh, then flat
+          p.body.crouch -= 0.25 * hit;
+          p.body.lean += 0.5 * hit;
+          p.body.headPitch += 0.4 * hit;
+          break;
+        case 'launch':
+          // flung back off the knees, arms trailing, head snapped back
+          p.body.lean -= 0.9 * hit;
+          p.body.headPitch -= 0.7 * hit;
+          p.free.add(_t.set(0.1, 0.25, -0.3).multiplyScalar(hit));
+          rot.hop = 0.35 * Math.sin(Math.min(1, t / 420) * Math.PI);
+          break;
+        case 'impale':
+          // run through: jerked upright and stiff, arms out, then folding over the wound and down
+          p.body.crouch += 0.3 * hit * (1 - fall);
+          p.body.lean -= 0.35 * hit * (1 - fall) - 0.6 * fall;
+          p.body.headPitch -= 0.6 * hit * (1 - fall);
+          p.free.add(_t.set(0.15, 0.3, 0.1).multiplyScalar(hit * (1 - fall)));
+          break;
+        case 'spin':
+          // spun half round by the cut, then down
+          rot.spin = 0.5 * easeOut(t / 420, 2);
+          p.body.lean -= 0.3 * hit;
+          p.body.headPitch -= 0.4 * hit;
+          break;
+      }
+      out.lying = fall;
+    }
+    return { pose: lerpResolved(this.snapshot, p, easeOut(e / 200, 3)), rot };
   }
 
   /** Leap and vanish abilities: the dodge state plays a whole move over its duration. */

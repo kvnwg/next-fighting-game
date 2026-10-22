@@ -567,6 +567,9 @@ export function isCharacterId(v: unknown): v is CharacterId {
   return typeof v === 'string' && Object.prototype.hasOwnProperty.call(CHARACTERS, v);
 }
 
+/** Each fighter's body size relative to the reference body (the renderer's model scale), for spacing paired animations. */
+export const BODY_SCALE: Record<CharacterId, number> = { ronin: 0.94, juggernaut: 1.19, duelist: 0.84, lancer: 1.0, shade: 0.88, reaper: 1.12, monk: 0.84, paladin: 1.02 };
+
 export function getAttack(char: CharacterDef, key: AttackKey): AttackDef | null {
   switch (key) {
     case 'h':

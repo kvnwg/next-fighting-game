@@ -2,9 +2,9 @@
  * A simulated world (the lobby or one arena). Runs the authoritative combat loop: inputs ->
  * state machines -> hit detection -> lag-compensated hit resolution -> broadcast.
  */
-import { AttackDef, AttackKey } from '../shared/characters';
+import { AttackDef, AttackKey, BODY_SCALE } from '../shared/characters';
 import { COMBAT, MAX_LAG_COMP_MS, PLAYER_RADIUS, SNAPSHOT_HZ, FALL_DEATH_Y, SPRINT_MULT } from '../shared/config';
-import { HitResult, applyHit, decideOutcome, defenseAt, inAttackCone, pruneDefenseLog, pushDefense } from '../shared/combat';
+import { HitResult, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pruneDefenseLog, pushDefense } from '../shared/combat';
 import { FORCED_STATES, INPUT_ACTIONS, InputAction, InputOptions } from '../shared/fighter';
 import { MapDef, hazardAt, inSafeZone, onFloor } from '../shared/maps';
 import { clamp, forward, turnToward, yawTo } from '../shared/math';
@@ -350,6 +350,7 @@ export abstract class Instance {
 
     this.detectHits(now);
     this.resolveHits(now);
+    this.stepExecutions(now);
     this.environment(now, dt);
     this.rules(now, dt);
     this.lastTick = now;
@@ -357,7 +358,7 @@ export abstract class Instance {
   }
 
   private moveBot(f: ServerFighter, now: number, dt: number, all: ServerFighter[]): void {
-    if (!f.isAlive() || this.isFrozen()) return;
+    if (!f.isAlive() || this.isFrozen() || f.state === 'execute' || f.state === 'executed') return;
     const speed = f.char.stats.speed * f.moveSpeedMult(now);
     let vx = f.moveX * speed;
     let vz = f.moveZ * speed;
@@ -486,7 +487,9 @@ export abstract class Instance {
 
       // knockback / pulls along the attacker -> defender line
       const dir = Math.hypot(d.x - a.x, d.z - a.z) > 0.01 ? forward(yawTo(a.x, a.z, d.x, d.z)) : forward(a.yaw);
-      if (res.pull !== null) {
+      if (res.execute) {
+        this.startExecution(a, d, now);
+      } else if (res.pull !== null) {
         const fw = forward(a.yaw);
         const tx = a.x + fw.x * res.pull;
         const tz = a.z + fw.z * res.pull;
@@ -522,6 +525,49 @@ export abstract class Instance {
         this.onKill(victim, killer, outcome === 'deathblow' ? 'deathblow' : 'slain', now);
       }
     }
+  }
+
+  /** Executions in progress: when each one's finishing blow lands. */
+  private executions: { a: ServerFighter; d: ServerFighter; hitAt: number }[] = [];
+
+  /**
+   * Stand the pair for the execution: the victim squarely in front of the executioner, facing
+   * them, at a distance that suits the bigger of the two, so the paired animation lines up.
+   */
+  private startExecution(a: ServerFighter, d: ServerFighter, now: number): void {
+    const yaw = yawTo(a.x, a.z, d.x, d.z);
+    const fw = forward(yaw);
+    const k = Math.max(BODY_SCALE[a.char.id] ?? 1, BODY_SCALE[d.char.id] ?? 1);
+    const dist = COMBAT.executeDistance * k;
+    const p = { x: a.x + fw.x * dist, z: a.z + fw.z * dist };
+    pushOut(p, PLAYER_RADIUS, getColliders(this.map));
+    if (this.map.edge === 'wall') clampToFloor(this.map, p);
+    this.teleport(a, a.x, a.z, yaw, 'execute');
+    this.teleport(d, p.x, p.z, yawTo(p.x, p.z, a.x, a.z), 'execute');
+    d.knock = null;
+    a.knock = null;
+    this.executions.push({ a, d, hitAt: now + COMBAT.executeHitAt });
+  }
+
+  private stepExecutions(now: number): void {
+    if (!this.executions.length) return;
+    this.executions = this.executions.filter((ex) => {
+      const { a, d } = ex;
+      if (!this.fighters.has(a.id) || !this.fighters.has(d.id) || d.state !== 'executed') return false;
+      if (now < ex.hitAt) return true;
+      const hit = executeBlow(a, d, now);
+      const ev: CombatEvent = { k: 'execute', a: a.id, d: d.id, dmg: hit.damage, x: Math.round(((a.x + d.x) / 2) * 100) / 100, y: Math.round((d.y + 1.2) * 100) / 100, z: Math.round(((a.z + d.z) / 2) * 100) / 100 };
+      if (hit.healed) ev.heal = Math.round(hit.healed);
+      if (hit.killed) ev.tags = ['kill'];
+      this.fx.push(ev);
+      if (hit.killed) this.onKill(d, a, 'deathblow', now);
+      else {
+        // the blow throws them back out of reach
+        const fw = forward(yawTo(a.x, a.z, d.x, d.z));
+        this.shove(d, fw.x * 1.4, fw.z * 1.4);
+      }
+      return false;
+    });
   }
 
   protected environment(now: number, dt: number): void {

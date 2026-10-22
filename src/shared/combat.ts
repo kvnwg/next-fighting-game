@@ -136,7 +136,7 @@ function postureMult(f: Fighter): number {
 }
 
 function blockPostureDamage(attacker: Fighter, defender: Fighter, atk: AttackDef): number {
-  return atk.blockPosture * postureMult(attacker) * (defender.mods.blockPostureMult ?? 1);
+  return atk.blockPosture * postureMult(attacker) * (defender.mods.blockPostureMult ?? 1) * COMBAT.hitPostureMult;
 }
 
 export interface HitResult {
@@ -157,6 +157,8 @@ export interface HitResult {
   pull: number | null;
   backstab: boolean;
   tipper: boolean;
+  /** an execution started (the deathblow lands later, see executeBlow) */
+  execute: boolean;
 }
 
 export interface HitGeometry {
@@ -191,6 +193,7 @@ export function applyHit(
     pull: null,
     backstab: false,
     tipper: false,
+    execute: false,
   };
 
   const tipper = !!attacker.mods.tipperBonus && geo.distance >= atk.range * 0.7;
@@ -274,8 +277,8 @@ export function applyHit(
         dmgMult *= 1 + attacker.mods.backstabBonus;
         r.backstab = true;
       }
-      if (dealDamage(atk.damage * dmgMult)) break;
-      const postureAmt = atk.posture * aPost * (outcome === 'armor' ? 0.5 : 1);
+      if (dealDamage(atk.damage * dmgMult * COMBAT.hitDamageMult)) break;
+      const postureAmt = atk.posture * aPost * COMBAT.hitPostureMult * (outcome === 'armor' ? 0.5 : 1);
       const broke = defender.addPosture(postureAmt, now);
       if (broke) {
         defender.force('broken', now, COMBAT.brokenTime);
@@ -291,11 +294,12 @@ export function applyHit(
     }
 
     case 'deathblow': {
-      defender.posture = 0;
-      if (dealDamage(COMBAT.deathblowDamage * attacker.damageMult(now))) break;
-      defender.force('knockdown', now, COMBAT.knockdownTime);
-      defender.invulnUntil = now + COMBAT.knockdownTime;
-      r.pushDefender = 1.2;
+      // the execution: both locked into the paired animation; the blow lands later (executeBlow)
+      attacker.force('execute', now, COMBAT.executeTime);
+      defender.force('executed', now, COMBAT.executeTime);
+      attacker.invulnUntil = now + COMBAT.executeTime;
+      defender.invulnUntil = now + COMBAT.executeTime;
+      r.execute = true;
       break;
     }
 
@@ -304,7 +308,7 @@ export function applyHit(
       if (ab.kind !== 'counter') break;
       const ct = ab.attack;
       defender.startAttack('ct', now);
-      const dealt = Math.min(attacker.hp, Math.round(ct.damage));
+      const dealt = Math.min(attacker.hp, Math.round(ct.damage * COMBAT.hitDamageMult));
       attacker.hp -= dealt;
       attacker.lastDamageAt = now;
       r.damage = dealt;
@@ -314,7 +318,7 @@ export function applyHit(
         r.killed = attacker;
         break;
       }
-      const broke = attacker.addPosture(ct.posture * postureMult(defender), now);
+      const broke = attacker.addPosture(ct.posture * postureMult(defender) * COMBAT.hitPostureMult, now);
       r.attackerBroken = broke;
       attacker.force(broke ? 'broken' : 'stagger', now, broke ? COMBAT.brokenTime : COMBAT.staggerTime + 200);
       r.pushAttacker = 1.0;
@@ -322,4 +326,29 @@ export function applyHit(
     }
   }
   return r;
+}
+
+/**
+ * The execution's finishing blow: most of a fight's damage. Returns the damage dealt and whether
+ * it killed. The victim's posture comes back whole either way.
+ */
+export function executeBlow(attacker: Fighter, defender: Fighter, now: number): { damage: number; killed: boolean; healed: number } {
+  const amount = defender.maxHp * COMBAT.executeDamage * attacker.damageMult(now);
+  const dealt = Math.min(defender.hp, Math.round(amount));
+  defender.hp -= dealt;
+  defender.lastDamageAt = now;
+  defender.posture = 0;
+  let healed = 0;
+  const ls = attacker.mods.lifesteal ?? 0;
+  if (ls > 0 && dealt > 0) {
+    const before = attacker.hp;
+    attacker.heal(dealt * ls);
+    healed = attacker.hp - before;
+  }
+  if (defender.hp <= 0) {
+    defender.hp = 0;
+    defender.force('dead', now);
+    return { damage: dealt, killed: true, healed };
+  }
+  return { damage: dealt, killed: false, healed };
 }

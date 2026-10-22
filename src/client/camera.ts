@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { angleDiff, clamp, forward, yawTo } from '../shared/math';
 import { G } from './render/gfx/globals';
+import { COMBAT } from '../shared/config';
 
 /** Narrower than a typical action camera so the opponent reads bigger. */
 export const CAMERA_FOV = 50;
@@ -367,5 +368,32 @@ export function introShots(me: ShotSubject, op: ShotSubject, end: CamPose): Shot
     { duration: 1.2, from: { pos: closeUp(op, 3.2, 1.0, 1.6), look: chest(op), fov: 42 }, to: { pos: closeUp(op, 2.4, 0.7, 1.45), look: chest(op), fov: 40 } },
     { duration: 1.1, from: { pos: closeUp(me, 3.2, -1.0, 1.6), look: chest(me), fov: 42 }, to: { pos: closeUp(me, 2.4, -0.7, 1.45), look: chest(me), fov: 40 } },
     { duration: 1.3, from: { pos: closeUp(me, 2.4, -0.7, 1.45), look: chest(me), fov: 40 }, via: closeUp(me, -1.0, -4.0, 2.0), lookVia: chest(me), to: end },
+  ];
+}
+
+/**
+ * The execution's camera, timed to the paired animation: wide and low from the side as it begins,
+ * over the kneeling victim's shoulder up at the executioner winding up, low and close from the
+ * front quarter as the blow comes down, then pulling up and away as they go down.
+ * `a` is the executioner, `d` the victim, `k` the bigger body scale.
+ */
+export function executionShots(a: THREE.Vector3, d: THREE.Vector3, k: number): Shot[] {
+  const A = a.clone();
+  const D = d.clone();
+  const u = new THREE.Vector3(D.x - A.x, 0, D.z - A.z);
+  if (u.lengthSq() < 1e-4) u.set(0, 0, 1);
+  u.normalize();
+  const r = new THREE.Vector3(u.z, 0, -u.x);
+  const mid = A.clone().add(D).multiplyScalar(0.5);
+  const at = (base: THREE.Vector3, ru: number, uu: number, y: number) => base.clone().addScaledVector(r, ru * k).addScaledVector(u, uu * k).setY(base.y + y * k);
+  const pose = (pos: THREE.Vector3, look: THREE.Vector3, fov: number, subject?: THREE.Vector3): CamPose => ({ pos, look, fov, subject });
+  const hit = COMBAT.executeHitAt / 1000;
+  const s1 = 0.75;
+  const s2 = hit - 0.55;
+  return [
+    { duration: s1, from: pose(at(mid, 5.6, -0.4, 0.45), at(mid, 0, 0, 1.0), 38), to: pose(at(mid, 4.9, 0.6, 0.6), at(mid, 0, 0, 1.0), 34) },
+    { duration: s2 - s1, from: pose(at(D, 2.2, 2.5, 2.0), at(A, 0, 0, 1.35), 36, at(A, 0, 0, 1.2)), to: pose(at(D, 1.9, 2.1, 1.85), at(A, 0, 0, 1.45), 32, at(A, 0, 0, 1.2)) },
+    { duration: hit - s2 + 0.15, from: pose(at(mid, -4.6, -0.9, 0.55), at(mid, 0, 0.1, 1.0), 40), to: pose(at(mid, -4.0, -0.7, 0.5), at(mid, 0, 0.15, 0.95), 35) },
+    { duration: COMBAT.executeTime / 1000 - hit - 0.15, from: pose(at(mid, 3.4, -0.6, 1.2), at(D, 0, 0, 0.6), 36), to: pose(at(mid, 6.2, -1.8, 3.2), at(D, 0, 0, 0.5), 44), via: at(mid, 5.2, 0.4, 2) },
   ];
 }

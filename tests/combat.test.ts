@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyHit, decideOutcome, defenseAt, pushDefense } from '../src/shared/combat';
+import { applyHit, decideOutcome, defenseAt, executeBlow, pushDefense } from '../src/shared/combat';
 import { CHARACTERS } from '../src/shared/characters';
 import { COMBAT } from '../src/shared/config';
 import { DefenseEvent, Fighter } from '../src/shared/fighter';
@@ -115,7 +115,7 @@ describe('hit resolution', () => {
     expect(outcome).toBe('mikiri');
   });
 
-  it('full posture breaks guard, then the next hit is a deathblow', () => {
+  it('full posture breaks guard, then the next hit starts an execution that does the damage', () => {
     const { A, D } = duel();
     D.posture = D.maxPosture - 1;
     D.input('blockDown', 500);
@@ -127,9 +127,29 @@ describe('hit resolution', () => {
     expect(D.state).toBe('broken');
     const t2 = tHit + 500;
     expect(decideOutcome(A, D, A.attack!, t2, defenseAt([], t2))).toBe('deathblow');
-    applyHit(A, D, A.attack!, A.attackKey!, 'deathblow', t2, { distance: 2 });
-    expect(D.hp).toBe(D.maxHp - COMBAT.deathblowDamage);
+    const r = applyHit(A, D, A.attack!, A.attackKey!, 'deathblow', t2, { distance: 2 });
+    expect(r.execute).toBe(true);
+    expect(A.state).toBe('execute');
+    expect(D.state).toBe('executed');
+    // locked in: neither can act until it plays out
+    expect(D.input('dodge', t2 + 100)).toBe(false);
+    expect(A.input('light', t2 + 100)).toBe(false);
+    const blow = executeBlow(A, D, t2 + COMBAT.executeHitAt);
+    expect(blow.damage).toBe(Math.round(D.maxHp * COMBAT.executeDamage));
+    expect(D.hp).toBe(D.maxHp - blow.damage);
     expect(D.posture).toBe(0);
+    // survived it: floored afterwards
+    D.update(t2 + COMBAT.executeTime + 1);
+    expect(D.state).toBe('knockdown');
+  });
+
+  it('an ordinary hit does little damage but a lot of posture', () => {
+    const { A, D } = duel();
+    A.input('light', 1000);
+    const tHit = 1000 + A.atkWindup;
+    applyHit(A, D, A.attack!, A.attackKey!, 'hit', tHit, { distance: 2 });
+    expect(D.maxHp - D.hp).toBe(Math.round(A.attack!.damage * COMBAT.hitDamageMult));
+    expect(D.posture).toBeCloseTo(A.attack!.posture * COMBAT.hitPostureMult, 5);
   });
 
   it('attacks from behind ignore guard', () => {

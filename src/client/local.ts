@@ -156,7 +156,9 @@ export class LocalController {
       mz /= len;
     }
     this.moveDir = { x: mx, z: mz };
-    if (this.frozen) {
+    // an execution holds both fighters where it placed them
+    const executing = sim.state === 'execute' || sim.state === 'executed';
+    if (this.frozen || executing) {
       mx = 0;
       mz = 0;
     }
@@ -173,7 +175,7 @@ export class LocalController {
       else if (sim.state === 'idle' && len > 0.1) want = Math.atan2(mx, mz);
       else if (sim.state === 'attack' || sim.state === 'block' || sim.state === 'stance') want = ctx.camYaw;
     }
-    if (want !== null && !this.frozen) sim.yaw = turnToward(sim.yaw, want, sim.turnRate(now) * dt);
+    if (want !== null && !this.frozen && !executing) sim.yaw = turnToward(sim.yaw, want, sim.turnRate(now) * dt);
 
     const lunge = sim.lungeSpeed(now);
     if (lunge !== 0) {

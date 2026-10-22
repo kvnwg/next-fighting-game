@@ -37,7 +37,7 @@ export const COMBAT = {
   /** Defender's own posture gain when deflecting, as a fraction of the attack's block posture. */
   deflectSelfPosture: 0.15,
   /** Attacker posture gain when deflected, as a fraction of the attack's posture value. */
-  deflectAttackerPosture: 1.0,
+  deflectAttackerPosture: 1.5,
   perilousDeflectMult: 1.4,
   mikiriPosture: 45,
 
@@ -59,6 +59,22 @@ export const COMBAT = {
   brokenTime: 1800,
   knockdownTime: 1100,
   deathblowDamage: 40,
+  /**
+   * Damage comes mostly from executions. Ordinary hits take only this much of their listed damage
+   * (they're for building posture), and posture damage from hits, blocks and deflects is raised.
+   */
+  hitDamageMult: 0.35,
+  hitPostureMult: 1.4,
+  /**
+   * Striking a posture-broken fighter starts an execution: both are locked into a paired
+   * animation for executeTime ms, the finishing blow lands at executeHitAt, and it takes
+   * executeDamage of the victim's max health.
+   */
+  executeTime: 3000,
+  executeHitAt: 2150,
+  executeDamage: 0.38,
+  /** how far apart the executioner and the victim stand, per unit of body scale */
+  executeDistance: 1.55,
   /** Posture left after a posture break ends without a deathblow (0: the guard comes back whole). */
   brokenRecoverPosture: 0,
 

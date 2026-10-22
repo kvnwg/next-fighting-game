@@ -61,7 +61,7 @@ export interface FighterSnap {
 }
 
 export interface CombatEvent {
-  k: Outcome | 'feint' | 'lava' | 'fall';
+  k: Outcome | 'feint' | 'lava' | 'fall' | 'execute';
   a?: string;
   d: string;
   dmg?: number;

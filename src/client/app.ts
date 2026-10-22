@@ -1,13 +1,13 @@
 /** The client application: wires networking, input, simulation, rendering and UI together. */
 import * as THREE from 'three';
 import { AttackKey, CHARACTERS, CharacterId, getAttack, isHeavyKey } from '../shared/characters';
-import { MATCH } from '../shared/config';
+import { COMBAT, MATCH } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
 import { audio, Sfx } from './audio';
-import { CameraRig } from './camera';
+import { CameraRig, executionShots } from './camera';
 import { CARD_AT, ENTRANCES, entranceStarts, introSequence } from './entrances';
 import { ENTRANCE_MS } from './render/anim/animator';
 import { buildBlockers, constrainCamera } from './cameraClip';
@@ -18,6 +18,7 @@ import { Net } from './net';
 import { CharacterModel } from './render/character';
 import { Effects } from './render/effects';
 import { GameRenderer } from './render/renderer';
+import { G } from './render/gfx/globals';
 import { portraitURL } from './render/portrait';
 import { SelectScreen } from './select';
 import { MapView } from './render/world';
@@ -60,6 +61,10 @@ class App {
   private lastCountdown = -1;
   /** seconds left of the red-and-black beat after a posture break */
   private drama = 0;
+  /** the execution cinematic running (only for one you're in) */
+  private exec: { a: ClientFighter; d: ClientFighter; t: number; hitDone: boolean } | null = null;
+  /** the map's own fighter rim strength, restored after an execution */
+  private rimBase = 0.6;
   /** back-to-back deflects build up the spectacle */
   private deflectStreak = 0;
   private lastDeflectAt = -Infinity;
@@ -763,21 +768,42 @@ class App {
         } else if (meA) this.cam.shake(heavy ? 0.12 : 0.07, 0.12);
         break;
       case 'deathblow':
-        this.effects.burst(pos, { count: 60, color: ['#ff2a2a', '#ffffff', '#7a0a0a'], speed: 9, life: 0.8, size: 0.1 });
-        this.effects.ring(d?.pos ?? pos, '#ff2a2a', 4.5, 0.6);
-        this.effects.flash(pos, '#ff4a4a', 1.4, 0.22);
-        d?.model.flash('#ff2a2a', 1.4);
+        // the execution begins: the strike that caught them broken locks the pair in
+        if (d && a) d.execBy = a.roster.char;
+        this.effects.ring(d?.pos ?? pos, '#ff2a2a', 3.2, 0.5);
+        this.effects.flash(pos, '#ff4a4a', 1.2, 0.2);
+        d?.model.flash('#ff2a2a', 1);
+        stop(90, 0.05);
+        play('deathblow', Math.min(1, vol * 0.8));
+        if (mine && a && d) this.startExecution(a, d);
+        break;
+      case 'execute': {
+        // the finishing blow
+        if (this.exec) this.exec.hitDone = true;
+        const toCam = this.tmp3.subVectors(this.renderer.camera.position, pos).normalize();
+        this.effects.blood(pos, swing, 2.4);
+        this.effects.shatter(pos, 1.6);
+        this.effects.hitFlare(pos, swing, toCam, '#ff1a3a', 2.2);
+        this.effects.slash(pos, swing, '#ffffff', 3.2, 0.16);
+        this.effects.shockwave(d?.pos ?? pos, 1.6, '#ff3a3a');
+        this.effects.ring(d?.pos ?? pos, '#ff2a2a', 6, 0.7);
+        this.effects.burst(pos, { count: 90, color: ['#ff2a2a', '#ffffff', '#7a0a0a'], speed: 12, life: 0.9, size: 0.1, gravity: 8 });
+        d?.model.flash('#ffffff', 1.6);
         d?.model.react('hit');
-        stop(150, 0.08);
-        play('deathblow', Math.min(1, vol * 1.3));
-        this.ui.floatText('DEATHBLOW', head(d).x, head(d).y + 0.3, head(d).z, 'bad huge', '止め');
+        stop(300, 0.12);
+        play('deathblow', Math.min(1, vol * 1.4));
+        play('shatter', Math.min(1, vol * 1.2));
+        play('hitHeavy', Math.min(1, vol * 1.2));
+        this.ui.floatText(e.tags?.includes('kill') ? 'EXECUTED' : `-${e.dmg ?? 0}`, head(d).x, head(d).y + 0.3, head(d).z, 'bad huge', '処刑');
         if (mine) {
-          this.cam.shake(0.35, 0.4);
-          if (d) this.cam.punchIn(d.pos, 0.8);
-          this.renderer.flash = 0.2;
-          this.renderer.flashColor.set('#ff1a1a');
+          this.cam.shake(0.55, 0.55);
+          if (d) this.cam.punchIn(d.pos, 0.45);
+          this.renderer.flash = 0.55;
+          this.renderer.flashColor.set('#ffffff');
+          this.drama = 0.5;
         }
         break;
+      }
       case 'mikiri':
         this.effects.burst(pos, { count: 30, color: ['#ffffff', '#c8e8ff'], speed: 7, life: 0.5 });
         play('mikiri');
@@ -993,12 +1019,48 @@ class App {
 
   // ------------------------------------------------------------------ frame
 
+  /**
+   * The execution cinematic: the world sinks into the dark around the two of them, the screen
+   * letterboxes, and the camera cuts through four shots timed to the paired animation: wide and
+   * low as it begins, over the victim's shoulder on the wind-up, close on the blow, then pulling
+   * away as they go down.
+   */
+  private startExecution(a: ClientFighter, d: ClientFighter): void {
+    this.exec = { a, d, t: 0, hitDone: false };
+    this.ui.setCinematic(true);
+    this.cam.playShots(executionShots(a.pos, d.pos, Math.max(a.model.scale, d.model.scale)));
+  }
+
+  private stepExecution(dt: number): void {
+    const ex = this.exec;
+    let dark = 0;
+    if (ex) {
+      ex.t += dt * 1000;
+      const T = COMBAT.executeTime;
+      dark = Math.min(1, ex.t / 350) * (1 - Math.max(0, Math.min(1, (ex.t - (T - 450)) / 450)));
+      if (ex.t >= T || !this.fighters.has(ex.a.id) || !this.fighters.has(ex.d.id)) {
+        this.exec = null;
+        this.cam.stopShots();
+        if (!this.intro) this.ui.setCinematic(false);
+      }
+    }
+    if (G.uDark.value < 0.002 && dark === 0) {
+      this.rimBase = G.uRim.value.w;
+      G.uDark.value = 0;
+      return;
+    }
+    G.uDark.value += (dark * 0.86 - G.uDark.value) * Math.min(1, dt * 12);
+    // the fighters' rim burns brighter against the dark
+    G.uRim.value.w = this.rimBase + G.uDark.value * 0.9;
+  }
+
   private frame(t: number): void {
     requestAnimationFrame((tt) => this.frame(tt));
     const dt = Math.min(0.05, (t - this.last) / 1000);
     this.last = t;
     const now = this.net.serverNow();
     this.renderer.flash = Math.max(0, this.renderer.flash - dt * 3);
+    this.stepExecution(dt);
     if (this.drama > 0) {
       // the screen sinks to a deep red, holds and comes back
       this.drama = Math.max(0, this.drama - dt);

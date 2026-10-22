@@ -5,13 +5,15 @@
  * &chain=l0,l1,l2 plays a combo back to back (each attack chaining from where the last ended).
  */
 import * as THREE from 'three';
-import { AttackKey, CHARACTER_IDS, CharacterId, getAttack } from '../shared/characters';
+import { AttackKey, BODY_SCALE, CHARACTER_IDS, CharacterId, getAttack } from '../shared/characters';
+import { COMBAT } from '../shared/config';
+import { G } from './render/gfx/globals';
 import { FighterState } from '../shared/fighter';
 import { AnimInput, CharacterModel } from './render/character';
 import { ENTRANCE_MS } from './render/anim/animator';
 import { MAPS } from '../shared/maps';
 import { Effects } from './render/effects';
-import { CameraRig } from './camera';
+import { CameraRig, executionShots } from './camera';
 import { entranceStarts, introSequence } from './entrances';
 import { buildBlockers, constrainCamera } from './cameraClip';
 import { GameRenderer } from './render/renderer';
@@ -267,6 +269,57 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
   });
   // `lock=2.5`: the fighters stand that far apart mid-arena and the game's duel camera frames them,
   // `foe=h&at=420` freezes the opponent that far into an attack
+  // `execute=ronin,juggernaut&at=1500`: an execution frozen that far in, the executioner first,
+  // with the game's cinematic camera and darkening (`&cam=side`/`&cam=top` for a fixed view)
+  const exec = params.get('execute');
+  if (exec !== null) {
+    const [ca, cd] = (exec.split(',') as CharacterId[]).concat(['ronin', 'reaper'] as CharacterId[]).slice(0, 2);
+    const ex = [new CharacterModel(ca), new CharacterModel(cd)];
+    models.forEach((m) => r.scene.remove(m.root));
+    const k = Math.max(BODY_SCALE[ca] ?? 1, BODY_SCALE[cd] ?? 1);
+    const dist = COMBAT.executeDistance * k;
+    const ox = Number(params.get('lx') ?? 0);
+    ex[0].root.position.set(ox, 0, -dist / 2);
+    ex[1].root.position.set(ox, 0, dist / 2);
+    ex[1].root.rotation.y = Math.PI;
+    for (const m of ex) {
+      m.ghostsEnabled = params.has('ghosts');
+      if (params.has('xray')) m.enableXray(Number(params.get('xray') || 0.3));
+      r.scene.add(m.root);
+      for (let j = 0; j < 30; j++) m.update(IDLE, 0.05);
+    }
+    const at = Number(params.get('at') ?? COMBAT.executeHitAt);
+    const T = COMBAT.executeTime;
+    for (let t = 0; t <= at; t += 10) {
+      ex[0].update({ ...IDLE, state: 'execute', elapsed: t, dur: T, serial: 1 }, 0.01);
+      ex[1].update({ ...IDLE, state: 'executed', elapsed: t, dur: T, serial: 1, execBy: ca }, 0.01);
+    }
+    G.uDark.value = 0.86 * Math.min(1, at / 350) * (1 - Math.max(0, Math.min(1, (at - (T - 450)) / 450)));
+    const camMode = params.get('cam');
+    if (camMode === 'side' || camMode === 'top') {
+      const c = r.camera;
+      c.fov = 30;
+      c.updateProjectionMatrix();
+      if (camMode === 'side') c.position.set(ox + 7 * k, 1.3 * k, 0);
+      else c.position.set(ox, 9 * k, 0.01);
+      c.lookAt(ox, 0.9 * k, 0);
+    } else {
+      const rig = new CameraRig(r.camera);
+      rig.playShots(executionShots(ex[0].root.position, ex[1].root.position, k));
+      rig.update(at / 1000, ex[0].root.position, ex[1].root.position);
+    }
+    const label = document.createElement('div');
+    label.style.cssText = 'position:fixed;left:8px;top:8px;color:#fff;font:14px monospace;text-shadow:0 1px 0 #000';
+    label.textContent = `execute ${ca} -> ${cd}  ${at} ms`;
+    document.body.appendChild(label);
+    const loopEx = () => {
+      view.update(0.016, r.camera.position);
+      r.render();
+      requestAnimationFrame(loopEx);
+    };
+    loopEx();
+    return;
+  }
   const lock = params.get('lock');
   if (lock !== null) {
     const d = Number(lock) || 3;

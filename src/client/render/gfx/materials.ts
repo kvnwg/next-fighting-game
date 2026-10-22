@@ -176,6 +176,10 @@ const FOG = /* glsl */ `
     gl_FragColor.rgb = voxFog(gl_FragColor.rgb, vWorldPos);
   #endif
 #endif
+#if defined(VOX_SEE) || defined(VOX_CLOUD)
+  // executions: the world sinks into the dark, the fighters (who don't take this) stay lit
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, uDarkColor, uDark);
+#endif
 `;
 
 function definesFor(o: PatchOpts): Record<string, string> {

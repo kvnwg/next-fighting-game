@@ -20,6 +20,8 @@ void main() {
 }`;
 
 const SKY_FRAG = /* glsl */ `
+uniform float uDark;
+uniform vec3 uDarkColor;
 uniform vec3 zenith;
 uniform vec3 horizon;
 uniform vec3 band;
@@ -88,7 +90,7 @@ void main() {
   } else {
     c += discColor * smoothstep(discCos, discCos + 0.00015, sd);
   }
-  gl_FragColor = vec4(c, 1.0);
+  gl_FragColor = vec4(mix(c, uDarkColor, uDark), 1.0);
 }`;
 
 export interface SkyTheme {
@@ -129,6 +131,8 @@ export class Sky {
         night: { value: t.night ? 1 : 0 },
         stars: { value: t.night ? 1 : 0 },
         time: G.uTime,
+        uDark: G.uDark,
+        uDarkColor: G.uDarkColor,
       },
       vertexShader: SKY_VERT,
       fragmentShader: SKY_FRAG,

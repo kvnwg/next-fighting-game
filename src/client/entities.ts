@@ -3,7 +3,7 @@
  * interpolated replica of server state (everyone else).
  */
 import * as THREE from 'three';
-import { AttackDef, CHARACTERS, getAttack, isHeavyKey } from '../shared/characters';
+import { AttackDef, CHARACTERS, CharacterId, getAttack, isHeavyKey } from '../shared/characters';
 import { INTERP_DELAY_MS } from '../shared/config';
 import { Fighter, FighterState } from '../shared/fighter';
 import { angleDiff, forward } from '../shared/math';
@@ -50,6 +50,8 @@ export class ClientFighter {
   fxQueue: FxEvent[] = [];
   /** the ring entrance window on the server clock (ms), while the match intro films this fighter */
   entrance: { start: number; dur: number } | null = null;
+  /** being executed: who by (set from the execution's start event) */
+  execBy: CharacterId | null = null;
   readonly glyph: THREE.Sprite;
   readonly isLocal: boolean;
 
@@ -302,6 +304,7 @@ export class ClientFighter {
       blockHeld: this.b,
       buff: buffActive,
       dodgeKind: v.dodgeKind,
+      execBy: v.state === 'executed' ? (this.execBy ?? undefined) : undefined,
     };
     const ent = this.entrance;
     // s along the ring entrance while it plays (NaN otherwise); before it they haven't arrived yet

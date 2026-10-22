@@ -27,6 +27,12 @@ export const G = {
    * Scenery on the line of sight to them dissolves, rather than the camera jumping round it.
    */
   uSee: { value: [new THREE.Vector4(), new THREE.Vector4()] },
+  /**
+   * The world sinks into darkness (0..1) toward this colour while the fighters stay lit, for
+   * executions. Fighters' materials don't take it.
+   */
+  uDark: { value: 0 },
+  uDarkColor: { value: new THREE.Color('#06030a') },
 };
 
 /** GLSL declarations matching G (include once per shader). */
@@ -41,6 +47,8 @@ uniform vec4 uFog;
 uniform vec4 uPushers[4];
 uniform vec4 uRim;
 uniform vec4 uSee[2];
+uniform float uDark;
+uniform vec3 uDarkColor;
 `;
 
 /** Bind the shared uniforms into a compiled shader's uniform list. */
@@ -55,6 +63,8 @@ export function bindGlobals(uniforms: Record<string, THREE.IUniform>): void {
   uniforms.uPushers = G.uPushers;
   uniforms.uRim = G.uRim;
   uniforms.uSee = G.uSee;
+  uniforms.uDark = G.uDark;
+  uniforms.uDarkColor = G.uDarkColor;
 }
 
 /**

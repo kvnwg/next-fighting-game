@@ -91,6 +91,7 @@ void main() {
   float sd = max(dot(r, uSunDir), 0.0);
   c += uSunColor * (pow(sd, 600.0) * 30.0 + pow(sd, 60.0) * 0.6);
   c = voxFog(c, vWorldPos);
+  c = mix(c, uDarkColor, uDark);
   gl_FragColor = vec4(c, mix(opacity, 1.0, fres));
 }`;
 

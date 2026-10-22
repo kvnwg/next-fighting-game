@@ -198,6 +198,9 @@ export interface MoveDef {
   trail: TrailStyle | null;
 }
 
+/** How an executed fighter takes the finishing blow: driven into the floor, flung away, run through, spun round. */
+export type ExecuteReact = 'crumple' | 'launch' | 'impale' | 'spin';
+
 export interface Style {
   axis: EdgeAxis;
   offAxis: EdgeAxis;
@@ -215,6 +218,16 @@ export interface Style {
   roar?: MoveDef;
   /** the ring entrance: played once from s=0 to 1 over ENTRANCE_MS while the intro camera is on them */
   entrance?: MoveDef;
+  /**
+   * The execution of a posture-broken opponent: played over COMBAT.executeTime, its LAST impact
+   * landing on the finishing blow at COMBAT.executeHitAt (earlier impacts are flourish strikes).
+   * s runs linearly in time: from sStart at 0 to the last impact at executeHitAt, then on to sRest
+   * at the end, so the move's own key spacing sets its rhythm (slow wind, fast strike, held finish).
+   * The victim stands one executeDistance (x body scale) straight ahead, kneeling broken.
+   */
+  execute?: MoveDef;
+  /** how the victim takes the finishing blow */
+  executeReact?: ExecuteReact;
   /** trail colours: lights, heavies/abilities, perilous specials */
   trail: { light: string; heavy: string; special: string };
   /** spark colours this weapon throws on impact */
