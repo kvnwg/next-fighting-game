@@ -1,15 +1,15 @@
 /**
- * Third-person orbit camera with a Sekiro-style lock-on. Framed over the right shoulder: the player
- * sits in the lower-left third and, when locked on, the opponent sits right of centre, unblocked.
- * Locked on, the angle is fixed (no tilting or zooming) so the opponent always reads clearly.
+ * Third-person orbit camera with a hard lock-on, framed like Dueling Grounds: locked on, it sits
+ * close behind you and just off to the side, low and nearly level, with the opponent held in the
+ * middle of the frame. Free, it orbits over the right shoulder.
  */
 import * as THREE from 'three';
 import { angleDiff, clamp, forward, yawTo } from '../shared/math';
 import { G } from './render/gfx/globals';
 import { COMBAT } from '../shared/config';
 
-/** Narrower than a typical action camera so the opponent reads bigger. */
-export const CAMERA_FOV = 50;
+/** Wide, like Dueling Grounds (Roblox's 70): the camera sits close behind you, so it needs the width. */
+export const CAMERA_FOV = 70;
 /** Sideways offset of the camera (and its aim) to the player's right, in metres. */
 const SHOULDER = 1.4;
 /** The fixed framing while locked on: pitch and boom length (scaled with your fighter's size). */
@@ -194,10 +194,9 @@ export class CameraRig {
   }
 
   /**
-   * The duel camera, framed like a fighting game: from behind your right shoulder, looking at a
-   * point between the two of you, so you stand at the left of the frame and the opponent is whole
-   * and clear in the middle. Up close the camera swings further round to the side, so your own
-   * body never covers them; far apart it comes in behind you. It never takes the mouse.
+   * The duel camera, framed like Dueling Grounds: close behind you (about two body heights back)
+   * and only a little off to the side, low and nearly level, hard-locked on the opponent so they
+   * stay in the middle of the frame. It never takes the mouse.
    */
   private duelAim(player: THREE.Vector3, target: THREE.Vector3) {
     // framed for the bigger of the two
@@ -207,22 +206,21 @@ export class CameraRig {
     const u = forward(this.yaw);
     const rx = -u.z;
     const rz = u.x;
-    // how far round to the side: about 55° when they're in your face, 22° across the arena
+    // just off the line between you: ~15° up close (so your own back doesn't hide them), ~10° apart
     const close = THREE.MathUtils.smoothstep(d, 1.5, 7);
-    const phi = THREE.MathUtils.lerp(0.96, 0.38, close);
-    // far enough back that both fit in the frame with room to see the weapons move
-    const boom = THREE.MathUtils.clamp(2.5 + d * 0.42, 3.3, 6.8) * k;
-    const pivot = new THREE.Vector3(player.x + u.x * d * 0.42, player.y, player.z + u.z * d * 0.42);
+    const phi = THREE.MathUtils.lerp(0.26, 0.17, close);
+    // about two body heights behind you, a little further when they're far off
+    const boom = THREE.MathUtils.clamp(3.3 + d * 0.08, 3.4, 4.2) * k;
     const bx = -u.x * Math.cos(phi) + rx * Math.sin(phi);
     const bz = -u.z * Math.cos(phi) + rz * Math.sin(phi);
-    const pos = new THREE.Vector3(pivot.x + bx * boom, player.y + (1.7 + d * 0.08) * k, pivot.z + bz * boom);
+    // eye a little over head height, looking nearly level
+    const pos = new THREE.Vector3(player.x + bx * boom, player.y + 2.3 * k, player.z + bz * boom);
     const subject = new THREE.Vector3(target.x, target.y + 1.2 * k, target.z);
     // only what's behind you pulls it in (it mustn't end up inside a tree or a wall). Something
-    // between you and them doesn't move it at all: that used to swing the camera in and out as
-    // the line to them crossed a prop; now the prop dissolves instead (see G.uSee)
+    // between you and them doesn't move it at all: the prop dissolves instead (see G.uSee)
     this.constrain?.(_chest.set(player.x, player.y + 1.4 * k, player.z), pos);
-    // look a little past the middle, toward them, at chest height
-    const look = new THREE.Vector3(player.x + u.x * d * 0.62, player.y + 1.15 * k, player.z + u.z * d * 0.62);
+    // look at them, at chest height
+    const look = new THREE.Vector3(player.x + u.x * d * 0.85, player.y + 1.3 * k, player.z + u.z * d * 0.85);
     return { pos, look, subject };
   }
 
@@ -242,7 +240,8 @@ export class CameraRig {
     }
     if (target) {
       const want = yawTo(player.x, player.z, target.x, target.z);
-      this.yaw += angleDiff(this.yaw, want) * (1 - Math.exp(-dt * 8));
+      // a hard lock: the opponent never drifts far from the middle
+      this.yaw += angleDiff(this.yaw, want) * (1 - Math.exp(-dt * 18));
     }
     const { pos: desired, look: lookAt } = this.aim(player, target);
 

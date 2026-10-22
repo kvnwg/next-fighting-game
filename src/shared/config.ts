@@ -42,9 +42,10 @@ export const COMBAT = {
   perilousDeflectMult: 1.4,
   mikiriPosture: 45,
 
-  staggerTime: 380,
+  // a hit stuns about as long as Dueling Grounds' (~250 ms)
+  staggerTime: 250,
   /** While staggered you may start guarding (and deflect) after this long. */
-  staggerDefendAfter: 140,
+  staggerDefendAfter: 100,
   blockstunTime: 200,
   /**
    * Recoil after being deflected scales with how heavy the deflected attack was:
@@ -52,7 +53,7 @@ export const COMBAT = {
    */
   deflectRecoilBase: 250,
   deflectRecoilPerPosture: 12,
-  deflectRecoilMin: 320,
+  deflectRecoilMin: 400,
   deflectRecoilMax: 720,
   /** A deflected attacker can raise their guard again after this fraction of the recoil. */
   deflectedDefendFrac: 0.75,
@@ -85,10 +86,11 @@ export const COMBAT = {
   // long enough that a press during a hit still chains once the next one is allowed
   inputBuffer: 260,
 
-  dodgeTime: 380,
-  dodgeIframes: 300,
+  // a quick roll, ~280 ms as in Dueling Grounds
+  dodgeTime: 280,
+  dodgeIframes: 250,
   /** a forward dash ducks under everything for almost its whole length */
-  dashIframes: 360,
+  dashIframes: 270,
   // short: a dodge is a quick step out of the line, not a dash across the ring
   dodgeDistance: 2.4,
   dodgeCooldown: 850,

@@ -653,6 +653,8 @@ class App {
     const meA = e.a === this.myId;
     const mine = meD || meA;
     const vol = this.volumeAt(e.x, e.z);
+    // no words or numbers over a fight: Dueling Grounds shows none
+    const say = (..._: unknown[]): void => undefined;
     const head = (f: ClientFighter | undefined) => (f ? new THREE.Vector3(f.pos.x, f.pos.y + 2.1 * f.model.scale, f.pos.z) : pos);
     // impact freeze on both fighters; the one struck shudders through it
     const stop = (ms: number, shudder = 0) => {
@@ -662,109 +664,57 @@ class App {
     if (mine && e.a && e.d) this.lastHitTarget = { id: meA ? e.d : e.a, until: performance.now() + 5000 };
     // heavies, specials and abilities hit harder: longer freeze, bigger shake, more sparks
     const heavy = isHeavyKey(e.key) || e.key === 'sp' || e.key === 'ab' || e.key === 'ia' || e.key === 'ct';
-    const style = a?.model.animator.style;
     const swing = a ? a.swingDir : new THREE.Vector3(0, 0, 1);
 
     // your attack connected: its on-contact cancels open on your side too (the server has its own)
     if (meA && this.local && (e.k === 'hit' || e.k === 'armor' || e.k === 'block' || e.k === 'guardBreak')) this.local.sim.contactSerial = this.local.sim.attackSerial;
     switch (e.k) {
       case 'deflect': {
-        // the clash: steel on steel, and the whole screen knows it. Back-to-back deflects build up.
+        // the clash, as Dueling Grounds does it: a gold streak and flash at the blades, a brief
+        // orange tint, embers falling. No freeze, no shake, no zoom, no text.
         const nowMs = performance.now();
         const streak = (this.deflectStreak = nowMs - this.lastDeflectAt < 2500 ? this.deflectStreak + 1 : 1);
         this.lastDeflectAt = nowMs;
-        const big = (heavy ? 1.3 : 1) * (1 + 0.18 * Math.min(3, streak - 1));
-        const camPos = this.renderer.camera.position;
-        const toCam = this.tmp3.subVectors(camPos, pos).normalize();
-        // a star of light at the contact: a hot core, rays flung out across the view, and rings
-        this.effects.flash(pos, '#ffffff', 1.6 * big, 0.12);
-        this.effects.flash(pos, '#ffd24a', 2.8 * big, 0.3);
-        const side = this.tmp2.set(0, 1, 0).cross(toCam).normalize();
-        const up = new THREE.Vector3().crossVectors(toCam, side);
-        for (let i = 0; i < 10; i++) {
-          const ang = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
-          const len = (i % 2 ? 0.9 : 1.6) * big * (0.8 + Math.random() * 0.4);
-          const end = pos.clone().addScaledVector(side, Math.cos(ang) * len).addScaledVector(up, Math.sin(ang) * len);
-          this.effects.beam(pos, end, i % 3 ? '#fff1a0' : '#ffffff', 0.035 * big, 0.14);
-        }
-        this.effects.ring(pos, '#fff1a0', 1.6 * big, 0.32, toCam, true);
-        this.effects.ring(pos, '#ffb02a', 2.8 * big, 0.5, toCam, true);
-        // a ground ring at their feet, and sparks: a hot burst, a stream kicked back the way the
-        // blade came, and a fountain that rains and bounces off the floor
-        if (d) this.effects.ring(this.tmp.set(d.pos.x, d.pos.y + 0.05, d.pos.z), '#ffd27a', 2.2 * big, 0.45);
-        this.effects.burst(pos, { count: Math.round(40 * big), color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 13, life: 0.35, size: 0.05, gravity: 6, drag: 3, stretch: 0.1 });
-        this.effects.spray(pos, swing.clone().negate(), ['#ffffff', '#fff1a0', '#ffd24a'], Math.round((heavy ? 30 : 22) * big), 12, 0.6, { stretch: 0.08 });
-        this.effects.burst(pos, { count: Math.round(26 * big), color: ['#ffd24a', '#ff9a2a', '#fff6c0'], speed: 6, up: 5, life: 1.1, size: 0.04, gravity: 12, drag: 0.6, stretch: 0.05 });
+        const big = (heavy ? 1.2 : 1) * (1 + 0.1 * Math.min(3, streak - 1));
+        const toCam = this.tmp3.subVectors(this.renderer.camera.position, pos).normalize();
+        this.effects.flash(pos, '#fff6d0', 0.9 * big, 0.1);
+        this.effects.flash(pos, '#ffb02a', 1.6 * big, 0.2);
+        this.effects.slash(pos, this.tmp2.set(0, 1, 0).cross(toCam).normalize(), '#ffd24a', 1.3 * big, 0.06);
+        this.effects.burst(pos, { count: Math.round(14 * big), color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 9, life: 0.25, size: 0.04, gravity: 6, drag: 3, stretch: 0.1 });
+        this.effects.burst(pos, { count: Math.round(16 * big), color: ['#ffd24a', '#ff9a2a', '#fff6c0'], speed: 3, up: 2, life: 0.45, size: 0.035, gravity: 9, drag: 0.8 });
         d?.model.react('deflect');
         a?.model.react('blocked');
-        // gold on both: the defender's perfect timing, and the attacker turned aside and open
-        a?.model.flash('#ffc34a', 1.2);
-        d?.model.flash('#fff6d0', 0.7);
-        stop(heavy ? 140 : 110, heavy ? 0.05 : 0.035);
+        a?.model.flash('#ffc34a', 0.8);
         if (mine) {
-          this.cam.shake(heavy ? 0.22 : 0.16, 0.2);
-          // a small nudge in on the clash
-          this.cam.punchIn(this.tmp.copy(pos).setY(pos.y - 1.2), 0.15);
-          this.renderer.flash = (heavy ? 0.16 : 0.12) * Math.min(1.6, big);
-          this.renderer.flashColor.set('#ffe7a0');
+          this.renderer.flash = 0.2;
+          this.renderer.flashColor.set('#ff9a2a');
         }
-        if (meD) {
-          this.ui.floatText(streak > 1 ? `DEFLECT ×${streak}` : 'DEFLECT', pos.x, pos.y + 0.4, pos.z, streak > 2 ? 'good huge' : 'good big', '弾');
-          this.local?.onDeflected();
-        }
-        else if (meA) this.ui.floatText('DEFLECTED', pos.x, pos.y + 0.4, pos.z, 'bad big', '弾');
+        if (meD) this.local?.onDeflected();
         break;
       }
       case 'block':
-        this.effects.burst(pos, { count: 12, color: ['#ffb04a', '#ff8a2a', '#ffe0a0'], speed: 5, life: 0.35, size: 0.06 });
+        this.effects.burst(pos, { count: 10, color: ['#ffb04a', '#ff8a2a', '#ffe0a0'], speed: 5, life: 0.3, size: 0.05 });
         a?.model.react('blocked');
         if (d) d.model.react('guard', { side: Math.max(-1, Math.min(1, swing.x * Math.cos(d.yaw) - swing.z * Math.sin(d.yaw))), heavy });
-        stop(heavy ? 60 : 40, heavy ? 0.025 : 0.015);
-        if (meD) this.cam.shake(heavy ? 0.1 : 0.06, 0.1);
         break;
       case 'guardBreak':
-        this.effects.burst(pos, { count: 40, color: ['#ff9a2a', '#ffd24a', '#ff5a2a'], speed: 8, life: 0.6, size: 0.09 });
+        this.effects.burst(pos, { count: 24, color: ['#ff9a2a', '#ffd24a', '#ff5a2a'], speed: 7, life: 0.45, size: 0.07 });
         // the guard shatters like glass
-        this.effects.shards(pos, swing, 40);
-        this.effects.ring(d?.pos ?? pos, '#ff9a2a', 3);
-        d?.model.flash('#ff7a2a', 1.1);
-        stop(110, 0.06);
-        this.ui.floatText('GUARD BROKEN', head(d).x, head(d).y, head(d).z, 'warn big', '破');
-        if (mine) {
-          this.cam.shake(0.22, 0.28);
-          if (d) this.cam.punchIn(d.pos, 0.2);
-          this.renderer.flash = meD ? 0.12 : 0.06;
-          this.renderer.flashColor.set(meD ? '#ff3a1a' : '#fff4e0');
-        }
+        this.effects.shards(pos, swing, 24);
+        d?.model.flash('#ff7a2a', 1);
+        if (meA) this.cam.shake(0.16, 0.2);
         break;
       case 'hit':
       case 'armor':
-        // the attacker's sparks sprayed the way the weapon was going, a slash streak through the
-        // contact, an impact star, and a few darker chips
-        this.effects.spray(pos, swing, style?.sparks ?? ['#ffffff', '#fee761', '#feae34'], heavy ? 26 : 16, heavy ? 12 : 9, 0.5);
-        this.effects.burst(pos, { count: heavy ? 8 : 5, color: ['#ffffff', '#fee761'], speed: 7, life: 0.2, size: 0.04, gravity: 4, drag: 4, stretch: 0.08 });
-        this.effects.burst(pos, { count: 10, color: ['#e43b44', '#a22633', '#3e2731'], speed: 4, life: 0.45, size: 0.07 });
-        // a clean hit draws blood, flung the way the blade went; armour soaks it
-        if (e.k === 'hit') this.effects.blood(pos, swing, heavy ? 1.5 : 1);
-        this.effects.slash(pos, swing, heavy ? (style?.trail.heavy ?? '#ffd27a') : (style?.trail.light ?? '#ffffff'), heavy ? 1.7 : 1.15, heavy ? 0.09 : 0.06);
-        // the flare across the target, along the cut
-        this.effects.hitFlare(pos, swing, this.tmp3.subVectors(this.renderer.camera.position, pos).normalize(), heavy ? '#ff2a4a' : '#ff5a78', heavy ? 1.25 : 1);
-        this.effects.flash(pos, '#ffffff', heavy ? 1.0 : 0.75, 0.1);
-        d?.model.flash(heavy ? '#ff6a5a' : '#ffffff', 1.2);
+        // as Dueling Grounds draws it: one thin red slash through the contact, and blood (that
+        // armour soaks). Only the one who landed it feels it in the camera.
+        if (e.k === 'hit') this.effects.blood(pos, swing, heavy ? 1.3 : 0.9);
+        this.effects.slash(pos, swing, '#ff2a3a', heavy ? 1.6 : 1.2, heavy ? 0.05 : 0.035);
+        this.effects.burst(pos, { count: heavy ? 6 : 4, color: ['#ffffff', '#ff8a8a'], speed: 6, life: 0.15, size: 0.035, gravity: 4, drag: 4, stretch: 0.08 });
+        d?.model.flash('#ffffff', 0.9);
         // knocked the way the blade went: + travels toward the defender's left
         if (d) d.model.react('hit', { side: Math.max(-1, Math.min(1, swing.x * Math.cos(d.yaw) - swing.z * Math.sin(d.yaw))), heavy });
-        stop(heavy ? 120 : 80, heavy ? 0.07 : 0.04);
-        if (heavy && mine && a && d) {
-          const len = Math.hypot(d.pos.x - a.pos.x, d.pos.z - a.pos.z) || 1;
-          this.cam.kick((d.pos.x - a.pos.x) / len, (d.pos.z - a.pos.z) / len, meD ? 0.22 : 0.12);
-        }
-        if (e.dmg) this.ui.floatText(`-${e.dmg}`, pos.x, pos.y + 0.3, pos.z, meD ? 'dmg me' : 'dmg');
-        if (e.k === 'armor') this.ui.floatText('ARMOR', head(d).x, head(d).y, head(d).z, 'warn');
-        if (meD) {
-          this.cam.shake(heavy ? 0.24 : 0.15, heavy ? 0.24 : 0.18);
-          this.renderer.flash = heavy ? 0.1 : 0.07;
-          this.renderer.flashColor.set('#ff2a2a');
-        } else if (meA) this.cam.shake(heavy ? 0.12 : 0.07, 0.12);
+        if (meA) this.cam.shake(heavy ? 0.2 : 0.13, heavy ? 0.24 : 0.16);
         break;
       case 'deathblow':
         // the execution begins: the strike that caught them broken locks the pair in
@@ -789,7 +739,7 @@ class App {
         d?.model.flash('#ffffff', 1.6);
         d?.model.react('hit');
         stop(300, 0.12);
-        this.ui.floatText(e.tags?.includes('kill') ? 'EXECUTED' : `-${e.dmg ?? 0}`, head(d).x, head(d).y + 0.3, head(d).z, 'bad huge', '処刑');
+        say(e.tags?.includes('kill') ? 'EXECUTED' : `-${e.dmg ?? 0}`, head(d).x, head(d).y + 0.3, head(d).z, 'bad huge', '処刑');
         if (mine) {
           this.cam.shake(0.55, 0.55);
           if (d) this.cam.punchIn(d.pos, 0.45);
@@ -800,59 +750,50 @@ class App {
       }
       case 'mikiri':
         this.effects.burst(pos, { count: 30, color: ['#ffffff', '#c8e8ff'], speed: 7, life: 0.5 });
-        stop(100);
-        this.ui.floatText('MIKIRI COUNTER', head(d).x, head(d).y, head(d).z, 'good big', '見切り');
+        say('MIKIRI COUNTER', head(d).x, head(d).y, head(d).z, 'good big', '見切り');
         if (mine) {
-          this.cam.shake(0.2, 0.2);
-          this.cam.punchIn(pos.clone().setY(pos.y - 1.2), 0.2);
+          this.cam.shake(0.14, 0.18);
         }
         break;
       case 'evade':
         if (e.tags?.includes('blink')) {
           this.effects.burst(pos, { count: 26, color: ['#9b6bff', '#3a2a5a', '#d0b8ff'], speed: 3, life: 0.6, size: 0.12, gravity: -1, up: 1 });
-        } else if (mine) this.ui.floatText('EVADED', head(d).x, head(d).y, head(d).z, 'muted');
+        } else if (mine) say('EVADED', head(d).x, head(d).y, head(d).z, 'muted');
         break;
       case 'counter':
         this.effects.burst(pos, { count: 24, color: ['#ffd24a', '#ffffff'], speed: 6, life: 0.45 });
         a?.model.react('hit');
-        stop(90);
-        this.ui.floatText('COUNTER!', head(d).x, head(d).y, head(d).z, 'good big', '返し');
-        if (e.dmg) this.ui.floatText(`-${e.dmg}`, head(a).x, head(a).y - 0.5, head(a).z, meA ? 'dmg me' : 'dmg');
+        say('COUNTER!', head(d).x, head(d).y, head(d).z, 'good big', '返し');
+        if (e.dmg) say(`-${e.dmg}`, head(a).x, head(a).y - 0.5, head(a).z, meA ? 'dmg me' : 'dmg');
         break;
       case 'feint':
-        if (d) this.ui.floatText('FEINT', head(d).x, head(d).y, head(d).z, 'warn small');
+        if (d) say('FEINT', head(d).x, head(d).y, head(d).z, 'warn small');
         break;
       case 'lava':
         this.effects.burst(pos, { count: 8, color: ['#ffb030', '#ff5a10'], speed: 2, up: 3, life: 0.5, gravity: -2 });
         if (meD) {
-          if (e.dmg) this.ui.floatText(`-${e.dmg}`, pos.x, pos.y + 1.5, pos.z, 'dmg me');
+          if (e.dmg) say(`-${e.dmg}`, pos.x, pos.y + 1.5, pos.z, 'dmg me');
         }
         break;
       case 'fall':
-        this.ui.floatText('RING OUT', pos.x, 1.5, pos.z, 'bad big', '落');
+        say('RING OUT', pos.x, 1.5, pos.z, 'bad big', '落');
         break;
       default:
         break;
     }
     if (e.tags?.includes('broken') && d) {
-      this.ui.floatText('POSTURE BROKEN', head(d).x, head(d).y + 0.4, head(d).z, 'warn big', '崩し');
-      this.effects.ring(d.pos, '#ffb02a', 3.2);
-      // the moment of the fight: the guard shatters, the world drops to red and black for a beat
-      this.effects.shatter(this.tmp.set(d.pos.x, d.pos.y + 1.2 * d.model.scale, d.pos.z), 1.2);
-      d.hitstop(160, 0.07);
-      if (mine) {
-        this.drama = 0.3;
-        this.cam.punchIn(d.pos, 0.25);
-        this.cam.shake(0.3, 0.35);
-      }
+      // a posture break: a red X slashed across them and the screen tinted red for a beat
+      const chest = this.tmp.set(d.pos.x, d.pos.y + 1.2 * d.model.scale, d.pos.z);
+      const toCam = this.tmp3.subVectors(this.renderer.camera.position, chest).normalize();
+      const side = this.tmp2.set(0, 1, 0).cross(toCam).normalize();
+      for (const s of [1, -1]) this.effects.slash(chest, new THREE.Vector3().copy(side).multiplyScalar(s).add(new THREE.Vector3(0, 1, 0)).normalize(), '#ff1a2a', 2, 0.07);
+      this.effects.shatter(chest, 0.8);
+      if (mine) this.drama = 0.3;
     }
     if (e.tags?.includes('abroken') && a) {
-      this.ui.floatText('POSTURE BROKEN', head(a).x, head(a).y + 0.4, head(a).z, 'warn big', '崩し');
-      this.effects.ring(a.pos, '#ffb02a', 3.2);
+      const chest = this.tmp.set(a.pos.x, a.pos.y + 1.2 * a.model.scale, a.pos.z);
+      this.effects.shatter(chest, 0.8);
     }
-    if (e.tags?.includes('backstab')) this.ui.floatText('BACKSTAB', head(d).x, head(d).y + 0.2, head(d).z, 'warn');
-    if (e.tags?.includes('tipper')) this.ui.floatText('TIPPER', head(d).x, head(d).y + 0.2, head(d).z, 'warn small');
-    if (e.heal && meA) this.ui.floatText(`+${e.heal}`, head(a).x, head(a).y, head(a).z, 'heal');
     // the sound of it all: who hit whom, with what, on what (audio.ts / audio/recipes.ts)
     audio.combat(e, { a: a?.roster.char, d: d?.roster.char, vol, pos, heavy, mine, streak: e.k === 'deflect' ? this.deflectStreak : 1 });
   }
