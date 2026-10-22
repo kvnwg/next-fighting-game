@@ -90,10 +90,11 @@ export class Input {
     });
     canvas.addEventListener('mousedown', (e) => {
       if (this.touchMode) return;
-      // take the keyboard back: the preventDefault below would otherwise stop a click from
-      // focusing the page, so after clicking outside it (e.g. the frame it's embedded in) the
-      // mouse would still fight but the keys would go elsewhere
-      if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body && !this.isTypingEl(document.activeElement)) document.activeElement.blur();
+      // take the keyboard back. The preventDefault below stops a click from doing what a click
+      // normally does to focus: taking it off a text box (a chat or name field left focused would
+      // swallow every key as typing, while the mouse still fights) and into this page (after a
+      // click outside the frame it's embedded in)
+      if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur();
       window.focus();
       if (!this.locked) {
         if (!this.suspended) this.requestLock();
@@ -128,10 +129,7 @@ export class Input {
   }
 
   private isTyping(e: KeyboardEvent): boolean {
-    return this.isTypingEl(e.target as HTMLElement | null);
-  }
-
-  private isTypingEl(t: Element | null): boolean {
+    const t = e.target as HTMLElement | null;
     return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
   }
 

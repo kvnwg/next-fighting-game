@@ -312,9 +312,10 @@ export class UI {
         this.closeChat();
       } else if (e.key === 'Escape') this.closeChat();
     });
-    // touch keyboards have no Escape: tapping away closes the chat
+    // clicking or tapping away closes the chat (touch keyboards have no Escape, and a chat left
+    // open would keep the game's keys switched off)
     this.chatInput.addEventListener('blur', () => {
-      if (this.touch && this.chatOpen) this.closeChat();
+      if (this.chatOpen) this.closeChat();
     });
     // keep the buttons from stealing keyboard focus (space/enter would click them)
     this.hud.querySelectorAll('button, select').forEach((b) => b.addEventListener('mouseup', () => (b as HTMLElement).blur()));
