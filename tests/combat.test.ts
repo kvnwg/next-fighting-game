@@ -32,7 +32,8 @@ describe('fighter state machine', () => {
     // during the active frames: buffered, not chained yet
     expect(A.input('light', 1000 + l0.windup + 20)).toBe(false);
     expect(A.attackKey).toBe('l0');
-    A.update(1000 + l0.windup + l0.active + 10);
+    // ...and it goes off once the chain window opens, half way into the recovery
+    A.update(1000 + l0.windup + l0.active + l0.recovery * 0.5);
     expect(A.attackKey).toBe('l1');
   });
 
@@ -79,6 +80,15 @@ describe('fighter state machine', () => {
 });
 
 describe('hit resolution', () => {
+  it('a jump is untouchable on the way up, and open on the way down and landing', () => {
+    const log: DefenseEvent[] = [];
+    pushDefense(log, { type: 'jump', t: 1000 });
+    expect(defenseAt(log, 1000 + 200).iframes).toBe(true);
+    expect(defenseAt(log, 1000 + COMBAT.jumpIframesEnd + 50).iframes).toBe(false);
+    expect(defenseAt(log, 1000 + 740).iframes).toBe(false);
+  });
+
+
   it('deflects a timed guard and staggers the attacker', () => {
     const { A, D } = duel();
     A.input('light', 1000);

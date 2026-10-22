@@ -13,7 +13,8 @@ function fighter(id: CharacterId = 'ronin'): Fighter {
 /** Press `action` in the recovery of the current attack and let the chain take it. */
 function chain(f: Fighter, action: 'light' | 'heavy', t: number): number {
   const a = f.attack!;
-  const at = t + f.atkWindup + a.active + 10;
+  // the next hit of a string waits for half the recovery
+  const at = t + f.atkWindup + a.active + a.recovery * 0.5;
   f.input(action, at);
   f.update(at);
   return at;

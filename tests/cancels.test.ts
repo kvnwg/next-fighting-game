@@ -18,7 +18,7 @@ describe('cancel table', () => {
     const f = fighter();
     f.input('light', 1000);
     expect(f.canCancel('heavy', 1001)).toBe(false);
-    const t = recovery(f, 0);
+    const t = recovery(f, 0.5);
     f.update(t);
     expect(f.input('heavy', t)).toBe(true);
     expect(f.attackKey).toBe('h');
@@ -40,7 +40,7 @@ describe('cancel table', () => {
     const f = fighter();
     f.input('light', 1000);
     f.contactSerial = f.attackSerial;
-    const t = recovery(f, 0);
+    const t = recovery(f, 0.5);
     f.update(t);
     f.input('light', t);
     expect(f.attackKey).toBe('l1');
@@ -61,7 +61,7 @@ describe('cancel table', () => {
   it('a dash light carries on into the string from its second hit', () => {
     const f = fighter();
     f.startAttack('dl', 1000);
-    const t = recovery(f, 0);
+    const t = recovery(f, 0.5);
     f.update(t);
     expect(f.input('light', t)).toBe(true);
     expect(f.attackKey).toBe('l1');

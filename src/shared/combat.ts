@@ -49,6 +49,8 @@ export function defenseAt(log: readonly DefenseEvent[], t: number): DefenseInfo 
       }
     } else if (e.type === 'jump') {
       if (t >= e.t + COMBAT.jumpEvadeStart && t <= e.t + COMBAT.jumpEvadeEnd) info.airborne = true;
+      // untouchable on the way up only
+      if (t >= e.t + COMBAT.jumpIframesStart && t <= e.t + COMBAT.jumpIframesEnd) info.iframes = true;
     }
   }
   if (lastGuard && lastGuard.type === 'guardOn') {

@@ -25,18 +25,18 @@ export interface CancelWindow {
 const REC = (from = 0, onContact = false): CancelWindow => ({ phase: 'recovery', from, onContact });
 
 export const CANCELS: Record<MoveClass, Partial<Record<CancelInto, CancelWindow>>> = {
-  // the first lights: chain into the next light, or a heavy, or (on contact) the special; dodge or
-  // jump out at once, guard a little later
-  light: { light: REC(), heavy: REC(), special: REC(0, true), dodge: REC(), jump: REC(0.3), guard: REC(0.4) },
+  // the first lights: chain into the next light (not before half its recovery, so strings have a
+  // rhythm rather than a blur), or a heavy, or (on contact) the special; dodge or jump out at once
+  light: { light: REC(0.45), heavy: REC(0.3), special: REC(0, true), dodge: REC(), jump: REC(0.3), guard: REC(0.4) },
   // the last light ends the string: a heavy or the special can still follow
   lightEnd: { heavy: REC(), special: REC(0, true), dodge: REC(0.25), guard: REC(0.5) },
   // heavies chain into the next heavy; the special on contact; dodge from mid-recovery. A feintable
   // heavy can also be cancelled into guard in its windup (the feint, see Fighter.canFeint)
-  heavy: { heavy: REC(), special: REC(0, true), dodge: REC(0.4), guard: REC(0.55) },
+  heavy: { heavy: REC(0.45), special: REC(0, true), dodge: REC(0.4), guard: REC(0.55) },
   // the heavy finisher commits: only the special on contact, or a late dodge
   heavyEnd: { special: REC(0, true), dodge: REC(0.6), guard: REC(0.7) },
   // out of a dash: the light string carries on from its second hit, or a heavy
-  dash: { light: REC(), heavy: REC(0.2), special: REC(0, true), dodge: REC(0.4), guard: REC(0.5) },
+  dash: { light: REC(0.4), heavy: REC(0.3), special: REC(0, true), dodge: REC(0.4), guard: REC(0.5) },
   // retreating attacks: get further away, or turn it round into a heavy
   back: { heavy: REC(0.3), dodge: REC(), jump: REC(0.3), guard: REC(0.4) },
   // in the air a light can follow into the heavy plunge if it connected; nothing else until landing

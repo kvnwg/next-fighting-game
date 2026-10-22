@@ -17,7 +17,8 @@ export const HIT_CONFIRM_SLACK_MS = 35;
 // ---- Movement ------------------------------------------------------------------
 export const PLAYER_RADIUS = 0.45;
 export const GRAVITY = 30;
-export const JUMP_VELOCITY = 9.2;
+// a high jump: ~2.2 m at the top, ~0.77 s in the air
+export const JUMP_VELOCITY = 11.5;
 export const SPRINT_MULT = 1.45;
 export const FALL_DEATH_Y = -9;
 
@@ -81,16 +82,18 @@ export const COMBAT = {
   /** Attack recovery can be cancelled into guard once this fraction of it has elapsed. */
   recoveryGuardCancel: 0.4,
   feintCooldown: 1600,
-  inputBuffer: 180,
+  // long enough that a press during a hit still chains once the next one is allowed
+  inputBuffer: 260,
 
   dodgeTime: 380,
   dodgeIframes: 300,
   /** a forward dash ducks under everything for almost its whole length */
   dashIframes: 360,
-  dodgeDistance: 4.2,
+  // short: a dodge is a quick step out of the line, not a dash across the ring
+  dodgeDistance: 2.4,
   dodgeCooldown: 850,
   /** Minimum time between jumps (longer than a jump's airtime, so evasion can't be chained). */
-  jumpCooldown: 900,
+  jumpCooldown: 1000,
   /** A forward dodge (stick within ~45° of facing) turns light and heavy into dash attacks... */
   dashDot: 0.7,
   /** ...from this fraction of the dodge on, and for this long (ms) after it ends. */
@@ -100,7 +103,13 @@ export const COMBAT = {
   backstepDot: 0.65,
   /** Window after a jump press during which sweeps and grabs pass under you. */
   jumpEvadeStart: 50,
-  jumpEvadeEnd: 620,
+  jumpEvadeEnd: 650,
+  /**
+   * A jump is untouchable for a moment on the way up (this window after the press), and fully
+   * open on the way down and as it lands.
+   */
+  jumpIframesStart: 40,
+  jumpIframesEnd: 340,
 
   /**
    * Posture recovers slowly, and only once you stop: not until this long (ms) after the last posture
