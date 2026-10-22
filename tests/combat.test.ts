@@ -44,15 +44,28 @@ describe('fighter state machine', () => {
     expect(A.drainEvents().some((e) => e.type === 'feint')).toBe(true);
   });
 
-  it('cannot feint a non-feintable light (except the Duelist)', () => {
+  it('a deflect press cuts any attack short, but only a feintable one reads as a feint', () => {
     const { A } = duel();
     A.input('light', 1000);
+    A.drainEvents();
     A.input('blockDown', 1100);
-    expect(A.state).toBe('attack');
+    expect(A.state).toBe('block');
+    expect(A.drainEvents().some((e) => e.type === 'feint')).toBe(false);
     const duelist = new Fighter('x', 'duelist');
     duelist.input('light', 1000);
+    duelist.drainEvents();
     duelist.input('blockDown', 1100);
     expect(duelist.state).toBe('block');
+    expect(duelist.drainEvents().some((e) => e.type === 'feint')).toBe(true);
+  });
+
+  it('a deflect press registers at once, even mid-swing or mid-recovery', () => {
+    const { A } = duel();
+    A.input('heavy', 1000);
+    const t = 1000 + A.atkWindup + 30;
+    A.input('blockDown', t);
+    expect(A.state).toBe('block');
+    expect(A.parryUntil).toBeGreaterThan(t + COMBAT.parryWindow - 1);
   });
 
   it('shrinks the deflect window when spamming', () => {

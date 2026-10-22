@@ -7,6 +7,9 @@ import { AbilityDef, AttackDef, AttackKey, CHARACTERS, CharacterDef, CharacterId
 import { COMBAT, JUMP_VELOCITY } from './config';
 import { forward } from './math';
 
+/** States a deflect press cuts straight out of into guard. */
+const GUARD_ANYTIME = new Set<string>(['idle', 'stance', 'attack', 'dodge', 'stagger', 'deflected']);
+
 export type FighterState =
   | 'idle'
   | 'attack'
@@ -492,6 +495,8 @@ export class Fighter {
    * or before your own attack recovery let you cancel.
    */
   private legalSince(kind: 'guard' | 'evade', now: number): number {
+    // a deflect press is never held back: it cuts into whatever the fighter is doing
+    if (kind === 'guard' && GUARD_ANYTIME.has(this.state)) return this.stateStart;
     switch (this.state) {
       case 'stagger':
         return this.stateStart + COMBAT.staggerDefendAfter;
@@ -521,45 +526,27 @@ export class Fighter {
     const window = (COMBAT.parryWindow + (this.mods.parryWindowBonus ?? 0)) * Math.pow(COMBAT.parrySpamFactor, this.spamCount);
     this.parryUntil = pressTime + window;
 
-    const e = now - this.stateStart;
+    // Deflecting is instant: the press raises the guard right away out of anything the fighter can
+    // act from (their own attack at any point, a dodge, a stagger, being deflected), so the
+    // window always opens when the button goes down.
     switch (this.state) {
-      case 'idle':
-      case 'stance':
-        this.setState('block', now, 0, pressTime);
-        return true;
       case 'block':
       case 'blockstun':
         // already guarding: a fresh press re-opens the deflect window
         this.emit({ type: 'guardOn', t: pressTime, parryUntil: this.parryUntil });
         return true;
-      case 'attack': {
-        const phase = this.attackPhase(now);
-        if (phase === 'windup' && this.canFeint(now)) {
+      case 'attack':
+        // pulled out of a windup it reads as a feint
+        if (this.attackPhase(now) === 'windup' && this.canFeint(now)) {
           this.feintReadyAt = now + COMBAT.feintCooldown;
           this.emit({ type: 'feint', t: now });
-          this.setState('block', now, 0, pressTime);
-          return true;
         }
-        if (this.canCancel('guard', now)) {
-          this.setState('block', now, 0, pressTime);
-          return true;
-        }
-        return false;
-      }
-      case 'stagger':
-        if (e >= COMBAT.staggerDefendAfter) {
-          this.setState('block', now, 0, pressTime);
-          return true;
-        }
-        return false;
-      case 'deflected':
-        if (e >= this.stateDur * COMBAT.deflectedDefendFrac) {
-          this.setState('block', now, 0, pressTime);
-          return true;
-        }
-        return false;
+        this.setState('block', now, 0, pressTime);
+        return true;
       default:
-        return false;
+        if (!GUARD_ANYTIME.has(this.state)) return false;
+        this.setState('block', now, 0, pressTime);
+        return true;
     }
   }
 

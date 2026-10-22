@@ -849,7 +849,8 @@ export class Animator {
     const t = e / dur;
     switch (a.state) {
       case 'block':
-        return { target: resolve(st.block), tau: 90 };
+        // the guard snaps up: a deflect is instant, so it has to look it
+        return { target: resolve(st.block), tau: 45 };
       case 'blockstun': {
         // the guard is driven back by the impact, then recovers
         const p = resolve(st.block);

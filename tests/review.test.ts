@@ -55,13 +55,13 @@ describe('defense timeline', () => {
     expect(out).not.toBe('deflect');
   });
 
-  it('cannot backdate a guard to before a stagger allowed it', () => {
+  it('cannot backdate a guard to before the stagger began', () => {
     const { D } = duel();
     D.force('stagger', 1000, COMBAT.staggerTime);
     D.drainEvents();
-    D.input('blockDown', 1000 + COMBAT.staggerDefendAfter + 5, { pressTime: 900 });
+    D.input('blockDown', 1020, { pressTime: 900 });
     const on = D.drainEvents().find((e) => e.type === 'guardOn');
-    expect(on && on.t).toBeGreaterThanOrEqual(1000 + COMBAT.staggerDefendAfter);
+    expect(on && on.t).toBeGreaterThanOrEqual(1000);
   });
 });
 
