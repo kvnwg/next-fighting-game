@@ -44,13 +44,17 @@ export function buildWarden() {
   b.bone('torso', 'pelvis', [0, 56, 0]);
   b.bone('head', 'torso', [0, 88, 4]);
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
-    b.bone(`pauldron${side}`, 'torso', [21 * s, SHOULDER_Y + 4, 0]);
     b.bone(`upperArm${side}`, 'torso', [21 * s, SHOULDER_Y, 0]);
+    // the pauldron rides the upper arm (its rig slot), so the plates stay over the deltoid however
+    // high the arm goes instead of standing off the torso for the arm to come up through
+    b.bone(`pauldron${side}`, `upperArm${side}`, [21 * s, SHOULDER_Y, 0]);
     b.bone(`forearm${side}`, `upperArm${side}`, [41 * s, SHOULDER_Y, 0]);
     b.bone(`hand${side}`, `forearm${side}`, [58 * s, SHOULDER_Y, 0]);
     b.bone(`thigh${side}`, 'pelvis', [12 * s, 50, 0]);
     b.bone(`shin${side}`, `thigh${side}`, [12.5 * s, 29, 0]);
     b.bone(`foot${side}`, `shin${side}`, [12.5 * s, 6, 1]);
+    // the tassets: the hip plates below the belt, hung from the thigh so the leg lifts them in a lunge
+    b.bone(`tasset${side}`, `thigh${side}`, [12 * s, 50, 0]);
   }
 
   // Plate band around a limb axis. axis 'x' (arms, u = |x|) or 'y' (legs,
@@ -121,7 +125,7 @@ export function buildWarden() {
     if (p[1] < 43 + hash3(Math.floor(p[0]), 1, 2) * 1.5) return undefined;
     if (p[1] < 44.2 || ax < 7.6 || p[1] > 55.8) return 'gold';
     return stone(p, 8);
-  });
+  }, { bone: (p) => (p[1] < 50.5 ? (p[0] > 0 ? 'tassetL' : 'tassetR') : 'pelvis') });
   // big square front buckle
   b.fill([-5.5, 46, 11], [5.5, 57.5, 15.5], (p) => {
     if (p[2] > 13.8 + bump(p, 1)) return undefined;
@@ -224,26 +228,6 @@ export function buildWarden() {
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
     const span = (a, c) => (s > 0 ? [a, c] : [-c, -a]);
 
-    b.use(`pauldron${side}`);
-    const layers = [
-      { c: [33.5, 78.5, 0], r: [9.5, 7.5, 12.2], cut: 74 },
-      { c: [30, 82.8, 0], r: [11, 8.6, 13.6], cut: 78.2 },
-      { c: [26, 87.2, 0.5], r: [12.2, 9.4, 14.8], cut: 82.6 },
-    ];
-    for (const [i, L] of layers.entries()) {
-      const c = [L.c[0] * s, L.c[1], L.c[2]];
-      b.fill(c.map((v, k) => v - L.r[k] - 2), c.map((v, k) => v + L.r[k] + 2), (p) => {
-        if (p[1] < L.cut) return undefined;
-        const g = 1 + bump(p, 0.14);
-        const q = [0, 1, 2].reduce((acc, k) => acc + ((p[k] - c[k]) / (L.r[k] * g)) ** 2, 0);
-        const qi = [0, 1, 2].reduce((acc, k) => acc + ((p[k] - c[k]) / (L.r[k] * g - 2.4)) ** 2, 0);
-        if (q > 1) return undefined;
-        if (qi < 1) return 'suit';
-        if (p[1] < L.cut + 1.1) return 'gold';
-        return stone(p, 20 + i);
-      });
-    }
-
     b.use(`upperArm${side}`);
     const [ux0, ux1] = span(18, 42);
     b.fill([ux0, SHOULDER_Y - 8, -8], [ux1, SHOULDER_Y + 8, 8], (p) => (sel((p[1] - SHOULDER_Y) / 6.6, p[2] / 6.6, 2.5) <= 1 ? 'suit' : undefined));
@@ -251,6 +235,30 @@ export function buildWarden() {
     band({ axis: 'x', s, c: [SHOULDER_Y, 0], u0: 32, u1: 38, r0: 7.6, r1: 8.6, seed: 30 });
     // elbow cop
     b.ellipsoid([40.5 * s, SHOULDER_Y + 0.5, -1], [3.6, 7.6, 7.6], (p) => stone(p, 31));
+
+    // pauldron, drawn along the T-posed arm (u out along it, v up, which is the outside of the
+    // shoulder once the arm hangs): a great cap over the joint and two lames down the upper arm,
+    // each overlapping the next with a gilded lower edge, open on the armpit side
+    b.use(`pauldron${side}`);
+    const lames = [
+      { u: 24.5, v: 3, r: [11.5, 12, 15], u0: 15.5, u1: 31, vcut: -2, seed: 22 },
+      { u: 30.5, v: 2.2, r: [9.5, 11, 14], u0: 24, u1: 36, vcut: -2.6, seed: 21 },
+      { u: 35.5, v: 1.4, r: [8, 10, 13], u0: 30, u1: 40.5, vcut: -3.2, seed: 20 },
+    ];
+    for (const L of lames) {
+      const R = Math.max(...L.r) + 2;
+      b.fill([span(L.u0, L.u1)[0], SHOULDER_Y - R, -R], [span(L.u0, L.u1)[1], SHOULDER_Y + R, R], (p) => {
+        const u = Math.abs(p[0]);
+        const v = p[1] - SHOULDER_Y;
+        if (v < L.vcut) return undefined;
+        const g = 1 + bump(p, 0.14);
+        const d = [(u - L.u) / (L.r[0] * g), (v - L.v) / (L.r[1] * g), p[2] / (L.r[2] * g)];
+        const di = [(u - L.u) / (L.r[0] * g - 2.4), (v - L.v) / (L.r[1] * g - 2.4), p[2] / (L.r[2] * g - 2.4)];
+        if (d[0] ** 2 + d[1] ** 2 + d[2] ** 2 > 1 || di[0] ** 2 + di[1] ** 2 + di[2] ** 2 < 1) return undefined;
+        if (u > L.u1 - 1.1 || v < L.vcut + 1.1) return 'gold';
+        return stone(p, L.seed);
+      });
+    }
 
     b.use(`forearm${side}`);
     const [fx0, fx1] = span(41, 58.5);
@@ -318,8 +326,6 @@ export const poses = {
   apose: {
     upperArmL: [0, 0, -45],
     upperArmR: [0, 0, 45],
-    pauldronL: [0, 0, -18],
-    pauldronR: [0, 0, 18],
     forearmL: [0, -10, -8],
     forearmR: [0, 10, 8],
   },

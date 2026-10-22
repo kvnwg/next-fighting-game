@@ -473,11 +473,11 @@ const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
     jh: { name: 'Falling Star', anim: 'overhead' },
   },
   juggernaut: {
-    h1: { name: 'Cross Cleave', anim: 'uppercut' },
+    h1: { name: 'Rising Cleave', anim: 'uppercut' },
     h2: { name: 'Earthbreaker', anim: 'spin', knockback: 1.4 },
     dl: { name: 'Charging Uppercut', anim: 'thrust', lunge: 1.2 },
     dh: { name: 'Diving Smash', anim: 'slam', lunge: 2.2 },
-    bl: { name: 'Retreating Backhand', anim: 'thrust' },
+    bl: { name: 'Ram', anim: 'thrust' },
     bh: { name: 'Retreating Sweep', anim: 'uppercut' },
     jl: { name: 'Air Whirl', anim: 'overhead' },
     jh: { name: 'Meteor', anim: 'slam', knockback: 1.2 },

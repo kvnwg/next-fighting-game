@@ -40,6 +40,30 @@ export function aim(az: number, el: number): V3 {
   return [Math.sin(a) * Math.cos(e), Math.sin(e), Math.cos(a) * Math.cos(e)];
 }
 
+// ------------------------------------------------------------------- where the fists go
+//
+// Read off the sledgehammer reference (bio/juggernaut/trace): the fists keep to a band from the
+// right hip up past the right side of the helm. Loading, they come up in front of the right
+// shoulder while the head drops away behind him on the left; at the top they are over the right
+// side of the helm; at contact both arms are thrown out straight ahead.
+
+/** the guard carry: low in front at the right hip */
+export const LOW: V3 = [-0.04, 0.2, 0.32];
+/** loading: up in front of the right shoulder, elbows bent, the head of the hammer hanging behind */
+export const SHLD: V3 = [-0.15, 0.58, 0.22];
+/** over the top: above the right side of the helm, the arms nearly straight up */
+export const HIGH: V3 = [-0.08, 0.86, 0.16];
+/** straight up overhead */
+export const OVER: V3 = [-0.03, 0.92, 0.22];
+/** contact: out ahead at full stretch */
+export const OUT: V3 = [-0.06, 0.26, 0.47];
+/** contact for a blow at chest height: the arms out level */
+export const CHEST: V3 = [-0.05, 0.36, 0.46];
+/** after a slam: the head in the floor ahead, the arms still out long and low */
+export const REST: V3 = [-0.03, 0.24, 0.46];
+/** the guard's haft: down and ahead to the head resting on the floor in front of his left foot */
+export const GUARD_DIR = aim(42, -40);
+
 /** Torso space (as authored) to the fighter's root frame, for a body pose and whole-body rotation. */
 function torsoFrame(b: BodyPose, r: Rot, out: THREE.Matrix4): THREE.Matrix4 {
   out.makeTranslation(0, (b.crouch + b.lift + r.hop) * LEG_K, 0);
