@@ -118,7 +118,12 @@ export function buildRonin() {
     b.box([s > 0 ? 3.0 : -5.0, 1, 2.0], [s > 0 ? 5.0 : -3.0, 3, 4.8], (p) => (Math.abs(Math.abs(p[0]) - 3.5) < 0.6 ? 'strap' : undefined));
   }
 
-  // ---- pelvis: robe skirt, obi -------------------------------------------
+  // ---- robe skirt, obi -----------------------------------------------------
+  // The two front panels of the skirt (either side of the opening) ride their own thighs, so a
+  // stepping knee carries its panel forward instead of punching through it. The back half stays on
+  // the pelvis (the title scene drapes it over the ground when he sits); the obi and everything
+  // tucked through it stay on the pelvis too.
+  const skirtBone = (p) => (p[2] > 0 ? (p[0] > 0 ? 'thighL' : 'thighR') : 'pelvis');
   b.use('pelvis');
   b.fill([-14, 21, -10], [14, 41, 10], (p, v) => {
     const s = 41 - p[1];
@@ -132,7 +137,7 @@ export function buildRonin() {
     if (p[2] > 0 && Math.abs(p[0]) < gap + 1.1) return 'coatTrim';
     const a = Math.floor((Math.atan2(p[2], p[0]) + Math.PI) * 4.2);
     return a % 3 === 0 ? 'coatFold' : 'coat';
-  });
+  }, { bone: skirtBone });
 
   b.fill([-12, 36, -8.5], [12, 41.4, 8.5], (p) => {
     if (superellipse(p[0] / 11.3, p[2] / 7.6) > 1) return undefined;
@@ -269,6 +274,10 @@ export function buildRonin() {
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
     const span = (a, c) => (s > 0 ? [a, c] : [-c, -a]);
 
+    // The sleeve is cut at the elbow (x = 22.5): the shoulder half rides the upper arm and the
+    // half past the elbow, cuff and the hanging end of the pouch, rides the forearm, so a bent
+    // arm bends the sleeve where the elbow is instead of pushing the forearm out through it.
+    const sleeveBone = (p) => (Math.abs(p[0]) < 22.5 ? `upperArm${side}` : `forearm${side}`);
     b.use(`upperArm${side}`);
     const [sx0, sx1] = span(9.0, 26.5);
     b.fill([sx0, 44, -4], [sx1, 59.5, 4], (p, v) => {
@@ -284,10 +293,10 @@ export function buildRonin() {
       if (vv < -3.5 && Math.floor(u) % 4 === 0) return 'coatFold';
       if (vv > 3 && Math.floor(u) % 6 === 0) return 'coatFold';
       return 'coat';
-    }, { mode: 'under' });
+    }, { mode: 'under', bone: sleeveBone });
     // sleeve mouth: hollow the cuff so the forearm reads as coming out of it
     const [cx0, cx1] = span(25.6, 26.6);
-    b.fill([cx0, 52, -2.5], [cx1, 58, 2.5], (p) => (superellipse((p[1] - SHOULDER_Y) / 2.4, p[2] / 2.4, 2) <= 1 ? 'coatFold' : undefined));
+    b.fill([cx0, 52, -2.5], [cx1, 58, 2.5], (p) => (superellipse((p[1] - SHOULDER_Y) / 2.4, p[2] / 2.4, 2) <= 1 ? 'coatFold' : undefined), { bone: `forearm${side}` });
 
     b.use(`forearm${side}`);
     const [fx0, fx1] = span(21.5, 31.5);
