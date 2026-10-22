@@ -718,6 +718,7 @@ class App {
       case 'block':
         this.effects.burst(pos, { count: 12, color: ['#ffb04a', '#ff8a2a', '#ffe0a0'], speed: 5, life: 0.35, size: 0.06 });
         a?.model.react('blocked');
+        if (d) d.model.react('guard', { side: Math.max(-1, Math.min(1, swing.x * Math.cos(d.yaw) - swing.z * Math.sin(d.yaw))), heavy });
         stop(heavy ? 60 : 40, heavy ? 0.025 : 0.015);
         if (meD) this.cam.shake(heavy ? 0.1 : 0.06, 0.1);
         break;

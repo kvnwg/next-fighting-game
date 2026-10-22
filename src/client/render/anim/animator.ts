@@ -99,7 +99,7 @@ export interface AnimFrame {
   footfall: 'L' | 'R' | null;
 }
 
-export type Reaction = 'deflect' | 'blocked' | 'hit' | 'roar';
+export type Reaction = 'deflect' | 'blocked' | 'guard' | 'hit' | 'roar';
 
 /** How a hit landed: from which side (+1: the blow travels toward the fighter's left) and how hard. */
 export interface HitInfo {
@@ -1139,6 +1139,22 @@ export class Animator {
           tilt(pose.main, -0.3 * k);
           shiftHands(pose, BACK, 0.05 * k);
           b.lean -= 0.08 * k;
+          break;
+        }
+        case 'guard': {
+          // the blow lands on the guard: the guard is driven back into the body, the knees give to
+          // soak it, the weight rocks onto the heels and comes back (a heavy one, much harder)
+          const h = r.hit ?? { side: 0, heavy: false };
+          const big = h.heavy ? 1.7 : 1;
+          const k = kick(r.t / 0.05) * (h.heavy ? Math.exp(-Math.max(0, r.t - 0.1) * 5) : 1);
+          shiftHands(pose, BACK, 0.07 * big * k);
+          if (pose.off) pose.off.pos.z -= 0.06 * big * k;
+          pose.main.pos.x += h.side * 0.04 * big * k;
+          b.crouch -= 0.07 * big * k;
+          b.lean -= 0.1 * big * k;
+          b.back += 0.04 * big * k;
+          b.twist += h.side * 0.12 * big * k;
+          b.headPitch += 0.06 * big * k;
           break;
         }
         case 'hit': {
