@@ -106,11 +106,11 @@ const sweep = glaive([
 
 // Lunging Cut: raised up the right side, the left hand letting go and thrown out for balance, then
 // the glaive brought over the top in the right hand alone and laid out level into a deep lunge
-const H_END: GK = [1.07, [-0.1, 0.25, 0.78], [0.05, -0.25, 0.97], NaN];
+const H_END: GK = [1.07, [-0.1, 0.22, 0.8], [0.06, -0.33, 0.94], NaN];
 const lunge = glaive([
   at(-1.0, G),
   [-0.55, [-0.18, 0.28, 0.23], [-0.15, 0.95, 0.2], SP],
-  [-0.12, [-0.3, 0.85, -0.05], [-0.2, 0.85, -0.45], NaN],
+  [-0.12, [-0.3, 0.88, -0.12], [-0.2, 0.8, -0.55], NaN],
   [0.05, [-0.28, 0.85, 0.1], [-0.1, 0.95, 0.3], NaN],
   [0.22, [-0.2, 0.62, 0.45], [-0.05, 0.55, 0.85], NaN],
   [0.45, [-0.12, 0.33, 0.78], [0.0, 0.05, 1], NaN],
@@ -119,12 +119,12 @@ const lunge = glaive([
 
 // Cross Cleave: the left hand back on the shaft and the blade cocked high over the left shoulder,
 // then cleaved down across them from their upper left to the floor at their right
-const H1_END: GK = [1.07, [-0.4, 0.23, 0.0], [-0.45, -0.3, 0.85], 0.35];
+const H1_END: GK = [1.07, [-0.42, 0.2, 0.0], [-0.55, -0.3, 0.78], 0.35];
 const cross = glaive([
   [-1.0, H_END[1], H_END[2], NaN],
   [-0.6, [-0.05, 0.45, 0.3], [0.2, 0.75, 0.2], SP],
-  [-0.12, [0.0, 0.45, 0.33], [0.35, 0.8, -0.45], 0.4],
-  [0.2, [-0.28, 0.35, 0.08], [0.1, 0.45, 0.9], 0.4],
+  [-0.12, [0.0, 0.48, 0.3], [0.4, 0.75, -0.55], 0.4],
+  [0.2, [-0.33, 0.35, 0.15], [0.1, 0.45, 0.9], 0.4],
   [0.45, [-0.38, 0.23, 0.08], [-0.15, 0.05, 1], 0.4],
   H1_END,
 ]);
@@ -138,7 +138,7 @@ const splitter = glaive([
   [-1.2, [-0.15, 0.5, 0.15], [-0.6, 0.3, 0.6], NaN],
   [-1.0, [-0.05, 0.68, 0.3], [-0.95, -0.15, 0.15], -0.5],
   [-0.55, [-0.06, 0.55, 0.32], [-0.95, 0.0, 0.1], -0.5],
-  [-0.12, [-0.08, 0.45, 0.32], [-0.95, 0.1, 0.05], -0.5],
+  [-0.12, [-0.18, 0.4, 0.3], [-0.92, 0.15, -0.1], -0.5],
   [0.0, [-0.15, 0.55, 0.3], [-0.85, 0.0, 0.5], NaN],
   [0.2, [-0.33, 0.33, 0.03], [-0.4, -0.05, 0.9], 0.3],
   [0.45, [-0.33, 0.25, 0.35], [0.1, 0.2, 1], 0.3],
@@ -173,20 +173,25 @@ const serpent = glaive([
   [1.07, [-0.35, 0.3, 0.45], [0.08, 0.08, 1], 0.1],
 ]);
 
-// Rising Dragon: the left hand drops behind the right and the blade trails low behind on the right
-// through the charge, swung round at the floor and ripped up through them
+// Rising Dragon: the left hand lets go and the blade trails low behind on the right in the right
+// hand through the charge, the left arm pumping; it is swung round at the floor, the left hand
+// takes the shaft behind the right, and it is ripped up through them
 const dragon = glaive([
   at(-1.0, G),
   [-0.8, [-0.3, 0.2, 0.1], [-0.3, -0.1, 0.9], NaN],
-  [-0.6, [-0.38, 0.12, 0.0], [-0.5, -0.25, -0.6], -0.3],
-  [-0.12, [-0.4, 0.2, 0.03], [-0.6, -0.3, 0.45], -0.3],
+  [-0.6, [-0.36, 0.12, 0.03], [-0.5, -0.25, -0.6], NaN],
+  [-0.12, [-0.42, 0.18, 0.03], [-0.6, -0.3, 0.45], NaN],
+  [0.2, [-0.25, 0.3, 0.25], [-0.35, 0.1, 0.93], -0.35],
   [0.45, [0.12, 0.3, 0.45], [-0.35, 0.35, 0.87], -0.35],
-  [1.07, [-0.1, 0.48, 0.3], [0.25, 0.9, 0.35], -0.35],
+  [1.07, [0.0, 0.5, 0.42], [0.25, 0.9, 0.35], -0.35],
 ]);
 const dragonFree = track([
   [-1.0, [-0.19, 0.32, 0.48]],
-  [-0.8, [0.0, 0.25, 0.3]],
-  [-0.6, [-0.16, 0.21, 0.22]],
+  [-0.8, [0.3, 0.3, 0.3]],
+  [-0.6, [0.35, 0.22, -0.2]],
+  [-0.36, [0.3, 0.3, 0.32]],
+  [-0.12, [0.5, 0.35, 0.1]],
+  [0.12, [0.1, 0.3, 0.4]],
 ]);
 
 // Parting Sweep: the left hand lets go and the right swings the blade out wide on the right, the
@@ -211,7 +216,7 @@ const wheel = glaive([
   at(-1.4, G),
   [-1.0, [-0.23, 0.35, 0.25], [0.05, 1, 0.15]],
   [-0.6, [0.0, 0.73, 0.2], [0.8, 0.3, -0.5]],
-  [-0.12, [0.0, 0.58, 0.1], [0.47, 0.73, -0.52]],
+  [-0.12, [0.02, 0.56, 0.06], [0.5, 0.65, -0.6]],
   [0.15, [-0.15, 0.48, 0.42], [0.05, 0.5, 0.85]],
   [0.45, [-0.33, 0.28, 0.05], [-0.1, 0.1, 1]],
   [1.07, [-0.35, 0.4, -0.05], [-0.45, -0.35, 0.8], 0.35],
@@ -232,41 +237,52 @@ const skywheel = glaive([
 const plunge = glaive([
   at(-1.0, G),
   [-0.5, [-0.15, 0.85, 0.15], [0.05, -0.95, 0.25]],
-  [-0.12, [-0.12, 0.85, 0.15], [0.0, -0.89, 0.45]],
+  [-0.12, [-0.12, 0.9, 0.1], [0.0, -0.89, 0.45]],
   [0.45, [-0.35, 0.78, 0.25], [0.15, -0.55, 0.82], 0.3],
   [1.1, [-0.35, 0.78, 0.3], [0.15, -0.6, 0.79], 0.3],
 ]);
 
 // Execution, Lightning Spike: the glaive presented upright, then twirled flat over the head in the
-// right hand, the blade whipping past their face; caught in both hands, turned and drawn back high
-// by the right ear with the blade aimed down at their chest while the bolt strikes it; then the step,
-// the drop and the drive that runs them through, held, and wrenched out and stood upright
+// right hand, wound back round the left and whipped past their face; then drawn back as far as the
+// arm reaches, high behind the right ear with the blade aimed down at their chest, and held there
+// while the bolt strikes it; then the stride, the hips, the trunk and last the arm, faster and
+// faster, run them through and on; held, sunk into, and wrenched out and stood upright
 const EXEC_HIT = 2.15;
-const EX_AIM: V3 = [0.12, -0.62, 0.78];
+const EX_AIM: V3 = [0.12, -0.55, 0.83];
 const EX_HIT_DIR: V3 = [0.22, -0.3, 0.93];
 const EX_HIT_R: V3 = [-0.3, 0.74, 0.22];
-const EX_AIM_R: V3 = [-0.36, 0.84, -0.4];
+const EX_AIM_R: V3 = [-0.28, 0.85, -0.55];
+const EX_TU: V3 = [0, -0.22, 1];
+const EX_TV: V3 = [-1, -0.1, 0];
+const EX_PIVOT: V3 = [-0.22, 0.86, 0.18];
 const execGlaive = seq(
   [
     [0.0, 0.3, line(G_R, [-0.23, 0.28, 0.28], G_DIR, [0.05, 1, 0.12], UPE, SP, 0.5, { body: true })],
     [0.3, 0.5, line([-0.23, 0.28, 0.28], [-0.25, 0.62, 0.22], [0.05, 1, 0.12], [0.0, 0.25, 1], UPE, 0.5, NaN, { body: true })],
-    // flat over the head in the right hand: forward, round the right, behind, the left, forward again
-    [0.5, 1.08, arc([-0.22, 0.86, 0.18], -0.15, circle([0, -0.22, 1], [-1, -0.1, 0], 1.25, 0, 14), NaN, { body: true })],
-    [1.08, 1.2, line([-0.25, 0.84, 0.05], [-0.34, 0.82, -0.32], [0.0, -0.1, -1], EX_AIM, UPE, NaN, NaN, { body: true })],
-    // loaded high by the right ear like a harpoon, the left arm pointing it at them, the weight
-    // rocking further back
-    [1.2, 1.62, line([-0.34, 0.82, -0.32], EX_AIM_R, EX_AIM, EX_AIM, UPE, NaN, NaN, { body: true })],
-    // the drive: down its line in the right hand alone, the left arm flung back against it
-    [1.62, 1.95, line(EX_AIM_R, [-0.33, 0.8, -0.05], EX_AIM, [0.18, -0.42, 0.89], UPE, NaN, NaN, { body: true })],
-    [1.95, EXEC_HIT, line([-0.33, 0.8, -0.05], EX_HIT_R, [0.18, -0.42, 0.89], EX_HIT_DIR, UPE, NaN, NaN, { body: true })],
-    // pinned: pressed on through
-    [EXEC_HIT, 2.45, line(EX_HIT_R, [-0.26, 0.72, 0.3], EX_HIT_DIR, [0.2, -0.34, 0.92], UPE, NaN, NaN, { body: true })],
-    // the left hand takes the shaft and it is wrenched back out along its line and swung up to stand upright at his right side
-    [2.45, 2.62, line([-0.26, 0.72, 0.3], [-0.28, 0.6, -0.05], [0.2, -0.34, 0.92], [0.1, -0.3, 0.95], UPE, 0.4, 0.4, { body: true })],
-    [2.62, 2.8, line([-0.28, 0.6, -0.05], [-0.28, 0.25, 0.23], [0.1, -0.3, 0.95], [0.05, 1, 0.1], UPE, 0.4, 0.5, { body: true })],
-    [2.8, 4.0, line([-0.28, 0.25, 0.23], [-0.28, 0.25, 0.23], [0.05, 1, 0.1], [0.05, 1, 0.1], UPE, 0.5, 0.5, { body: true })],
+    // flat over the head in the right hand: round the right and behind, unhurried, wound on round the
+    // left, then whipped forward past their face and on round to the right
+    [0.5, 0.84, arc(EX_PIVOT, -0.15, circle(EX_TU, EX_TV, 0.6, 0, 8), NaN, { body: true })],
+    [0.84, 0.95, arc(EX_PIVOT, -0.15, circle(EX_TU, EX_TV, 0.4, 216, 6), NaN, { body: true })],
+    [0.95, 1.08, arc(EX_PIVOT, -0.15, circle(EX_TU, EX_TV, 0.25, 0, 4), NaN, { body: true })],
+    // drawn back as far as it goes: the right arm stretched long up behind the ear, the blade aimed
+    // down at their chest, the left arm pointing it at them
+    [1.08, 1.38, line([-0.25, 0.84, 0.05], EX_AIM_R, [-1, -0.1, 0], EX_AIM, UPE, NaN, NaN, { body: true })],
+    // held, the stretch breathing a little further
+    [1.38, 1.66, line(EX_AIM_R, [-0.29, 0.86, -0.58], EX_AIM, EX_AIM, UPE, NaN, NaN, { body: true })],
+    // the release, slow and then explosive: the arm comes last, most of its travel in the last 0.13 s
+    [1.66, 1.85, line([-0.29, 0.86, -0.58], [-0.33, 0.84, -0.45], EX_AIM, [0.13, -0.52, 0.84], UPE, NaN, NaN, { body: true })],
+    [1.85, 2.02, line([-0.33, 0.84, -0.45], [-0.36, 0.8, -0.08], [0.13, -0.52, 0.84], [0.18, -0.42, 0.89], UPE, NaN, NaN, { body: true })],
+    [2.02, EXEC_HIT, line([-0.36, 0.8, -0.08], EX_HIT_R, [0.18, -0.42, 0.89], EX_HIT_DIR, UPE, NaN, NaN, { body: true })],
+    // carried on through them, then the weight sinks into it
+    [EXEC_HIT, 2.4, line(EX_HIT_R, [-0.22, 0.7, 0.36], EX_HIT_DIR, [0.2, -0.36, 0.91], UPE, NaN, NaN, { body: true })],
+    [2.4, 2.5, line([-0.22, 0.7, 0.36], [-0.22, 0.68, 0.37], [0.2, -0.36, 0.91], [0.2, -0.37, 0.9], UPE, NaN, NaN, { body: true })],
+    // the left hand takes the shaft, it is wrenched back out along its line and swung up to stand
+    // upright at his right side
+    [2.5, 2.66, line([-0.22, 0.68, 0.37], [-0.28, 0.6, -0.05], [0.2, -0.37, 0.9], [0.1, -0.3, 0.95], UPE, 0.4, 0.4, { body: true })],
+    [2.66, 2.82, line([-0.28, 0.6, -0.05], [-0.28, 0.25, 0.23], [0.1, -0.3, 0.95], [0.05, 1, 0.1], UPE, 0.4, 0.5, { body: true })],
+    [2.82, 4.0, line([-0.28, 0.25, 0.23], [-0.28, 0.25, 0.23], [0.05, 1, 0.1], [0.05, 1, 0.1], UPE, 0.5, 0.5, { body: true })],
   ],
-  0.05,
+  0.04,
 );
 
 // Entrance: planted upright beside the kneeling body where the bolt struck, wrenched out, twirled
@@ -363,10 +379,10 @@ export const spear: Style = {
       keys: [
         GUARD_KEY(-1.0),
         K(-0.55, b({ twist: -0.3, hipTwist: -0.25, lean: 0.0, crouch: -0.2, step: 0.28, back: 0.34 })),
-        K(-0.12, b({ twist: -0.9, hipTwist: -0.5, lean: -0.15, side: -0.12, crouch: -0.24, step: 0.2, back: 0.42, headPitch: -0.08 })),
+        K(-0.12, b({ twist: -1.15, hipTwist: -0.7, lean: -0.28, side: -0.18, crouch: -0.3, step: 0.18, back: 0.55, headPitch: -0.1 })),
         K(0.08, b({ front: 'R', twist: -0.3, hipTwist: -0.05, lean: 0.25, crouch: -0.3, step: 0.15, back: 0.2 })),
         K(0.45, b({ front: 'R', twist: 0.6, hipTwist: 0.3, lean: 0.75, crouch: -0.5, step: 0.9, back: 0.6, width: 0.18 })),
-        K(1.07, b({ front: 'R', twist: 0.4, hipTwist: 0.3, lean: 0.75, crouch: -0.5, step: 0.9, back: 0.6, width: 0.18 })),
+        K(1.07, b({ front: 'R', twist: 0.5, hipTwist: 0.35, lean: 0.82, crouch: -0.56, step: 0.9, back: 0.6, width: 0.2 })),
       ],
       main: lunge,
       // the free arm flung out to the left for balance, then thrown back as the right arm lays it out
@@ -389,12 +405,12 @@ export const spear: Style = {
     // trunk bows after them and it is cleaved down across them
     h1: mv({
       keys: [
-        K(-1.0, b({ front: 'R', twist: 0.4, hipTwist: 0.3, lean: 0.75, crouch: -0.5, step: 0.9, back: 0.6, width: 0.18 })),
+        K(-1.0, b({ front: 'R', twist: 0.5, hipTwist: 0.35, lean: 0.82, crouch: -0.56, step: 0.9, back: 0.6, width: 0.2 })),
         K(-0.6, b({ front: 'R', twist: 0.3, hipTwist: 0.2, lean: 0.2, crouch: -0.3, step: 0.55, back: 0.45 })),
-        K(-0.12, b({ front: 'R', twist: 0.3, hipTwist: 0.35, lean: -0.1, crouch: -0.24, step: 0.5, back: 0.4, headPitch: -0.08 })),
+        K(-0.12, b({ front: 'R', twist: 0.55, hipTwist: 0.5, lean: -0.24, side: 0.12, crouch: -0.3, step: 0.45, back: 0.5, headPitch: -0.1 })),
         K(0.2, b({ front: 'R', twist: -0.2, hipTwist: 0.0, lean: 0.2, crouch: -0.35, step: 0.7, back: 0.5 })),
         K(0.45, b({ front: 'R', twist: -0.8, hipTwist: -0.35, lean: 0.55, crouch: -0.45, step: 0.85, back: 0.55, width: 0.2 })),
-        K(1.07, b({ front: 'R', twist: -1.1, hipTwist: -0.5, lean: 0.55, crouch: -0.45, step: 0.85, back: 0.55, width: 0.2 })),
+        K(1.07, b({ front: 'R', twist: -1.3, hipTwist: -0.65, lean: 0.62, crouch: -0.52, step: 0.85, back: 0.55, width: 0.22 })),
       ],
       main: cross,
       free: track([
@@ -413,13 +429,13 @@ export const spear: Style = {
     // the trunk drops after them and it is driven down and round into a low thrust with a thunderclap
     h2: mv({
       keys: [
-        K(-1.4, b({ front: 'R', twist: -1.1, hipTwist: -0.5, lean: 0.55, crouch: -0.45, step: 0.85, back: 0.55, width: 0.2 })),
+        K(-1.4, b({ front: 'R', twist: -1.3, hipTwist: -0.65, lean: 0.62, crouch: -0.52, step: 0.85, back: 0.55, width: 0.22 })),
         K(-1.0, b({ twist: -0.6, hipTwist: -0.3, lean: -0.05, crouch: -0.1, step: 0.25, back: 0.28, headPitch: -0.12 })),
         K(-0.55, b({ twist: -0.9, hipTwist: -0.5, lean: -0.08, crouch: -0.06, step: 0.22, back: 0.32, headPitch: -0.15 })),
-        K(-0.12, b({ twist: -1.05, hipTwist: -0.7, lean: -0.1, crouch: -0.1, step: 0.2, back: 0.4, headPitch: -0.1 })),
+        K(-0.12, b({ twist: -1.2, hipTwist: -0.85, lean: -0.25, side: 0.12, crouch: -0.18, step: 0.18, back: 0.5, headPitch: -0.12 })),
         K(0.2, b({ twist: -1.0, hipTwist: -0.45, lean: 0.2, crouch: -0.3, step: 0.55, back: 0.5 })),
-        K(0.45, b({ twist: -0.93, hipTwist: -0.3, lean: 0.5, crouch: -0.5, step: 0.9, back: 0.6, width: 0.2 })),
-        K(1.07, b({ twist: -1.0, hipTwist: -0.35, lean: 0.55, crouch: -0.5, step: 0.9, back: 0.6, width: 0.2 })),
+        K(0.45, b({ twist: -0.85, hipTwist: -0.25, lean: 0.58, crouch: -0.55, step: 0.92, back: 0.6, width: 0.2 })),
+        K(1.07, b({ twist: -0.75, hipTwist: -0.2, lean: 0.64, crouch: -0.6, step: 0.92, back: 0.6, width: 0.22 })),
       ],
       main: splitter,
       free: splitterFree,
@@ -445,9 +461,11 @@ export const spear: Style = {
       keys: [
         K(-1.6, b({ crouch: -0.12, lean: -0.05, twist: 0.2, hipTwist: 0 }), { spin: 0 }),
         K(-1.0, b({ crouch: -0.06, lean: -0.1, twist: -0.2, hipTwist: 0, headPitch: -0.12 }), { spin: 0 }),
-        K(-0.6, b({ front: 'R', twist: -0.2, hipTwist: 0, crouch: -0.4, lean: 0.3, step: 0.2, back: 0.24, width: 0.24 }), { spin: -0.1 }),
+        // wound up the other way against the turns to come, then dropped into them
+        K(-0.82, b({ twist: 0.55, hipTwist: 0.3, crouch: -0.22, lean: 0.05, side: -0.08, headPitch: -0.05 }), { spin: 0.04 }),
+        K(-0.6, b({ front: 'R', twist: -0.2, hipTwist: 0, crouch: -0.44, lean: 0.32, step: 0.2, back: 0.24, width: 0.24 }), { spin: -0.1 }),
         K(0.55, b({ front: 'R', twist: -0.1, hipTwist: 0, crouch: -0.42, lean: 0.32, step: 0.2, back: 0.24, width: 0.24 }), { spin: -1 }),
-        K(1.6, b({ front: 'R', twist: -0.1, hipTwist: 0, crouch: -0.34, lean: 0.24, step: 0.24, back: 0.26, width: 0.22 }), { spin: -2 }),
+        K(1.6, b({ front: 'R', twist: -0.1, hipTwist: 0, crouch: -0.42, lean: 0.3, step: 0.24, back: 0.26, width: 0.22 }), { spin: -2 }),
         K(1.9, b({ crouch: -0.18, lean: 0.12 }), { spin: -2 }),
       ],
       main: whirl,
@@ -505,9 +523,9 @@ export const spear: Style = {
         K(-0.8, b({ front: 'R', twist: -0.8, crouch: -0.22, lean: 0.42 }), { hop: 0.08 }),
         K(-0.6, b({ twist: -0.8, hipTwist: -0.5, crouch: -0.28, lean: 0.4, step: 0.4, back: 0.4 }), { hop: 0 }),
         K(-0.36, b({ front: 'R', twist: -0.8, hipTwist: -0.4, crouch: -0.26, lean: 0.4 }), { hop: 0.08 }),
-        K(-0.12, b({ twist: -0.83, hipTwist: -0.55, crouch: -0.42, lean: 0.4, step: 0.6, back: 0.5 }), { hop: 0 }),
+        K(-0.12, b({ twist: -0.83, hipTwist: -0.55, crouch: -0.46, lean: 0.15, step: 0.6, back: 0.55 }), { hop: 0 }),
         K(0.45, b({ twist: 0.6, hipTwist: 0.35, crouch: -0.3, lean: 0.35, step: 0.85, back: 0.5 }), { hop: 0.05 }),
-        K(1.07, b({ twist: -0.4, hipTwist: 0.2, crouch: -0.12, lean: 0.0, step: 0.75, back: 0.55, headPitch: -0.15 }), { hop: 0 }),
+        K(1.07, b({ twist: -0.3, hipTwist: 0.3, crouch: -0.06, lean: -0.12, step: 0.75, back: 0.55, headPitch: -0.2 }), { hop: 0.04 }),
       ],
       main: dragon,
       free: dragonFree,
@@ -552,9 +570,9 @@ export const spear: Style = {
         GUARD_KEY(-1.4),
         K(-1.0, b({ twist: -0.8, hipTwist: -0.45, crouch: -0.2, back: 0.42, lean: 0.0 })),
         K(-0.6, b({ twist: -0.2, hipTwist: -0.1, crouch: -0.18, back: 0.5, lean: -0.05, headPitch: -0.1 })),
-        K(-0.12, b({ twist: 0.72, hipTwist: 0.3, lean: -0.15, crouch: -0.22, back: 0.55, step: 0.26 })),
+        K(-0.12, b({ twist: 0.9, hipTwist: 0.5, lean: -0.28, side: -0.1, crouch: -0.3, back: 0.62, step: 0.22 })),
         K(0.45, b({ twist: -0.8, hipTwist: -0.35, lean: 0.35, crouch: -0.36, step: 0.28, back: 0.62 })),
-        K(1.07, b({ twist: -1.1, hipTwist: -0.5, lean: 0.3, crouch: -0.36, step: 0.24, back: 0.62 })),
+        K(1.07, b({ twist: -1.15, hipTwist: -0.6, lean: 0.34, crouch: -0.44, step: 0.24, back: 0.62 })),
       ],
       main: wheel,
       impacts: [0.45],
@@ -588,9 +606,9 @@ export const spear: Style = {
       keys: [
         K(-1.0, body, { hop: 0, flip: 0 }),
         K(-0.5, b({ twist: -0.6, crouch: -0.05, lean: -0.1 }), { hop: 0.2 }),
-        K(-0.12, b({ twist: -0.4, crouch: 0.0, lean: -0.2, headPitch: -0.1, step: 0.25, back: 0.25 }), { hop: 0.32, flip: -0.02 }),
-        K(0.45, b({ twist: -0.93, hipTwist: -0.5, crouch: -0.55, lean: 0.25, step: 0.6, back: 0.5, width: 0.2 }), { hop: 0, flip: 0.02 }),
-        K(1.1, b({ twist: -0.8, hipTwist: -0.45, crouch: -0.55, lean: 0.3, step: 0.6, back: 0.5, width: 0.2 }), { flip: 0 }),
+        K(-0.12, b({ twist: -0.45, crouch: 0.02, lean: -0.32, headPitch: -0.16, step: 0.25, back: 0.25 }), { hop: 0.36, flip: -0.03 }),
+        K(0.45, b({ twist: -0.93, hipTwist: -0.5, crouch: -0.6, lean: 0.25, step: 0.6, back: 0.5, width: 0.22 }), { hop: 0, flip: 0.02 }),
+        K(1.1, b({ twist: -0.85, hipTwist: -0.45, crouch: -0.62, lean: 0.28, step: 0.6, back: 0.5, width: 0.2 }), { flip: 0 }),
       ],
       main: plunge,
       impacts: [0.45],
@@ -610,57 +628,64 @@ export const spear: Style = {
       K(0.0, body),
       // presenting the glaive: tall, square, looking down at them
       K(0.3, b({ twist: -0.45, hipTwist: -0.25, crouch: -0.06, lean: 0.0, step: 0.24, back: 0.26, headPitch: 0.25 })),
-      // the twirl: the body rises and turns with it
+      // the twirl: the body rises and turns with it, then coils left behind the blade
       K(0.55, b({ twist: -0.2, hipTwist: -0.15, crouch: -0.03, lean: -0.05, step: 0.22, back: 0.24, headPitch: 0.1 })),
-      K(0.95, b({ twist: 0.1, hipTwist: 0.0, crouch: -0.06, lean: -0.06, step: 0.22, back: 0.24, headPitch: 0.08 })),
-      // caught and drawn back: the trunk winds right, the weight goes onto the rear leg
-      K(1.2, b({ twist: -0.85, hipTwist: -0.5, crouch: -0.16, lean: -0.15, side: 0.05, step: 0.3, back: 0.4, headPitch: 0.14 })),
-      K(1.62, b({ twist: -1.0, hipTwist: -0.6, crouch: -0.2, lean: -0.22, side: 0.06, step: 0.28, back: 0.46, headPitch: 0.16 })),
-      // the front foot strides, the hips drop and turn, the trunk pitches after them
-      K(1.85, b({ twist: -0.75, hipTwist: -0.25, crouch: -0.3, lean: 0.1, step: 0.55, back: 0.5, headPitch: 0.1 })),
-      K(EXEC_HIT, b({ twist: -0.25, hipTwist: 0.0, crouch: -0.3, lean: 0.4, step: 0.8, back: 0.55, width: 0.18, headPitch: 0.1 })),
-      K(2.45, b({ twist: -0.25, hipTwist: 0.0, crouch: -0.34, lean: 0.42, step: 0.8, back: 0.55, width: 0.18, headPitch: 0.15 })),
+      K(0.8, b({ twist: 0.35, hipTwist: 0.15, crouch: -0.12, lean: -0.1, side: -0.05, step: 0.22, back: 0.3, headPitch: 0.12 })),
+      // and unwinds hard to the right as it whips past their face
+      K(0.95, b({ twist: -0.25, hipTwist: -0.1, crouch: -0.1, lean: 0.12, step: 0.3, back: 0.26, headPitch: 0.1 })),
+      K(1.08, b({ twist: -0.55, hipTwist: -0.35, crouch: -0.14, lean: 0.0, step: 0.26, back: 0.34, headPitch: 0.12 })),
+      // the full load: all the weight on the bent rear leg, hips and shoulders turned right away from
+      // them, the trunk arched back and leaning over the rear foot, eyes on the target
+      K(1.38, b({ twist: -1.0, hipTwist: -0.75, crouch: -0.26, lean: -0.3, side: 0.1, step: 0.22, back: 0.55, headPitch: 0.2 })),
+      K(1.66, b({ twist: -1.05, hipTwist: -0.78, crouch: -0.28, lean: -0.32, side: 0.11, step: 0.22, back: 0.56, headPitch: 0.2 })),
+      // the release, ground up: the front foot strides, the hips snap round, the trunk pitches in
+      K(1.85, b({ twist: -0.95, hipTwist: -0.45, crouch: -0.3, lean: -0.1, step: 0.55, back: 0.55, headPitch: 0.15 })),
+      K(2.02, b({ twist: -0.55, hipTwist: 0.05, crouch: -0.34, lean: 0.3, step: 0.82, back: 0.56, width: 0.18, headPitch: 0.1 })),
+      K(EXEC_HIT, b({ twist: -0.2, hipTwist: 0.1, crouch: -0.36, lean: 0.48, step: 0.85, back: 0.56, width: 0.18, headPitch: 0.1 })),
+      // the mass carries on into it, then the knees give and the weight sinks
+      K(2.4, b({ twist: -0.1, hipTwist: 0.1, crouch: -0.44, lean: 0.56, step: 0.85, back: 0.56, width: 0.2, headPitch: 0.18 })),
+      K(2.5, b({ twist: -0.12, hipTwist: 0.08, crouch: -0.47, lean: 0.52, step: 0.85, back: 0.56, width: 0.2, headPitch: 0.2 })),
       // wrenched out with a push back off the front foot, and straightening tall over them
-      K(2.62, b({ twist: -0.55, hipTwist: -0.3, crouch: -0.2, lean: 0.05, step: 0.4, back: 0.45, headPitch: 0.2 })),
+      K(2.66, b({ twist: -0.55, hipTwist: -0.3, crouch: -0.2, lean: 0.05, step: 0.4, back: 0.45, headPitch: 0.2 })),
       K(3.0, b({ twist: -0.6, hipTwist: -0.35, crouch: -0.1, lean: -0.02, step: 0.3, back: 0.32, headPitch: 0.1 })),
     ],
     main: execGlaive,
     // the left hand flung out for balance through the twirl, pointing at them through the aim,
-    // thrown back against the drive, and onto the shaft to wrench it out
+    // flung back against the drive, and onto the shaft to wrench it out
     free: track([
       [0.45, [-0.12, 0.62, 0.3]],
       [0.6, [0.55, 0.5, 0.2]],
-      [1.0, [0.6, 0.5, 0.1]],
-      // pointing the blade at them through the aim
-      [1.25, [0.6, 0.52, 0.28]],
-      [1.62, [0.6, 0.5, 0.3]],
-      // flung back as the right arm drives it in, then forward to take the shaft
+      [0.8, [0.62, 0.42, -0.05]],
+      [1.0, [0.6, 0.5, 0.15]],
+      [1.3, [0.6, 0.52, 0.28]],
+      [1.66, [0.62, 0.5, 0.3]],
       [1.95, [0.55, 0.38, 0.0]],
-      [EXEC_HIT, [0.42, 0.22, -0.36]],
-      [2.4, [0.4, 0.2, -0.34]],
-      [2.5, [0.1, 0.4, 0.4]],
+      [2.1, [0.42, 0.22, -0.36]],
+      [2.45, [0.4, 0.2, -0.34]],
+      [2.56, [0.1, 0.4, 0.4]],
     ]),
     impacts: [0.95, EXEC_HIT],
     start: 0,
     chamber: 0.5,
     end: 2.62,
     rest: 3.0,
-    ghosts: [1.75, 2.2],
+    ghosts: [1.9, 2.25],
     fx: [
       fx(0.3, 'sparkle', 'tip', 0.7, BOLT),
       fx(0.55, 'whirl', 'main', 0.9, BOLT),
       fx(0.95, 'flashline', 'tip', 0.8, BOLT),
-      fx(1.3, 'bolt', 'tip', 1.0),
-      fx(1.32, 'sparkle', 'tip', 1.0, BOLT),
-      fx(1.35, 'embers', 'root', 0.7, BOLT),
-      fx(1.85, 'stomp', 'feet', 0.9),
+      fx(1.4, 'bolt', 'tip', 1.0),
+      fx(1.42, 'sparkle', 'tip', 1.0, BOLT),
+      fx(1.45, 'embers', 'root', 0.7, BOLT),
+      fx(1.8, 'stomp', 'feet', 0.9),
       fx(EXEC_HIT, 'flashline', 'tip', 1.6, BOLT),
       fx(EXEC_HIT, 'bolt', 'tip', 1.2),
       fx(EXEC_HIT, 'sparkle', 'tip', 1.3, BOLT),
       fx(EXEC_HIT + 0.02, 'shockwave', 'feet', 1.1, BOLT),
       fx(2.5, 'embers', 'tip', 0.8, BOLT),
-      fx(2.78, 'dust', 'feet', 0.8),
-      fx(2.8, 'shockwave', 'feet', 0.6, BOLT),
+      fx(2.45, 'dust', 'feet', 0.7),
+      fx(2.8, 'dust', 'feet', 0.8),
+      fx(2.82, 'shockwave', 'feet', 0.6, BOLT),
     ],
     trail: { life: 0.28, glow: 0.9 },
   }),
