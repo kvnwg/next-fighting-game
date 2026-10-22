@@ -23,7 +23,7 @@ import { MAT } from '../materials';
 import type { Profile } from '../profiles';
 import type { GuardOpts, HitOpts, Striker, SwingOpts } from '../recipes';
 import { bodyLayer, ring, striker, strikerRing } from '../recipes';
-import { Out, at, filtered, jit, modal, noise, osc, pick, rand, rattle, scaled, spatter, squelch, tear, thump } from '../synth';
+import { Out, at, chance, filtered, jit, modal, noise, osc, pick, rand, rattle, scaled, spatter, squelch, tear, thump } from '../synth';
 import { CLASHES, crack, tingBase } from '../clang';
 import type { Voice } from '../voices';
 
@@ -99,31 +99,35 @@ function swing(o0: Out, p: Profile, s: SwingOpts): void {
 
 const G_HIT = 1.35;
 
-/** The cut itself: a bright, dense "shhk", held for ~50 ms and then gone. */
+/**
+ * The cut itself, as the recordings have it: one bright, dense "shhk" across 1-12 kHz that is over
+ * in ~70 ms (-10 dB by ~70 ms, -20 by ~150), often with a smaller second "chk" just behind it as
+ * the edge comes out. No long hiss after it: what looks like one in the recordings is their music.
+ */
 function shhk(o: Out, h: number, pt: boolean, k: number): void {
-  const held = (pt ? 0.032 : 0.045) * (0.8 + 0.4 * h) * jit(1, 0.12);
-  const dur = held + 0.03;
-  const q = held / dur;
-  const env = (x: number) => (x < 0.04 ? x / 0.04 : x < q ? 1 - 0.7 * ((x - 0.04) / (q - 0.04)) : 0.3 * Math.pow(1 - (x - q) / (1 - q), 1.5));
-  noise(o, { type: 'bandpass', f: (pt ? 3400 : 4000) * jit(1, 0.08), q: pt ? 0.85 : 0.5, dur, gain: (0.8 + 0.5 * h) * k, shape: env, type2: 'highpass', f2: 1100 });
+  const len = (pt ? 0.055 : 0.075) * (0.85 + 0.3 * h) * jit(1, 0.1);
+  const env = (x: number) => (x < 0.03 ? x / 0.03 : x < 0.35 ? 1 - 0.35 * ((x - 0.03) / 0.32) : 0.65 * Math.pow(1 - (x - 0.35) / 0.65, 2.2));
+  noise(o, { type: 'bandpass', f: (pt ? 3600 : 4400) * jit(1, 0.08), q: pt ? 0.8 : 0.5, dur: len, gain: (0.85 + 0.5 * h) * k, shape: env, type2: 'highpass', f2: 900 });
+  // the body of it lower down, so it's a cut, not a hiss
+  noise(o, { color: 'pink', type: 'bandpass', f: rand(1300, 1700), q: 0.9, dur: len * 0.8, gain: (0.5 + 0.3 * h) * k, shape: env });
   // the hard front of it
-  noise(o, { type: 'highpass', f: jit(3000, 0.1), q: 0.7, dur: 0.01, gain: (0.35 + 0.3 * h) * k, a: 0.0004 });
+  noise(o, { type: 'highpass', f: jit(3000, 0.1), q: 0.7, dur: 0.01, gain: (0.4 + 0.3 * h) * k, a: 0.0004 });
+  // the edge coming back out: a smaller "chk" a beat behind
+  if (!pt || chance(0.4)) noise(o, { type: 'bandpass', f: rand(3200, 4200), q: 0.7, dur: 0.035, gain: (0.3 + 0.2 * h) * k, delay: rand(0.06, 0.085), shape: env });
 }
 
-/** The wet half: the edge opening flesh (a short, fairly bright "shlk"), the spray, the drops. */
+/** The wet half: the edge opening flesh (a short, fairly bright "shlk"), a little spray, the drops. */
 function blood(o: Out, st: Striker, h: number, k: number): void {
   const pt = st.edge === 'point';
   // the flesh parting: a resonant sweep down through 3 kHz to 700 Hz
-  squelch(o, (pt ? 0.06 : 0.08) * (0.8 + 0.4 * h), pt ? 2200 : 3200, pt ? 500 : 700, { gain: (0.4 + 0.35 * h) * k, delay: 0.004 }, pt ? 0.6 : 1);
+  squelch(o, (pt ? 0.06 : 0.075) * (0.8 + 0.4 * h), pt ? 2200 : 3000, pt ? 500 : 650, { gain: (0.45 + 0.35 * h) * k, delay: 0.004 }, pt ? 0.6 : 1);
   // the meat of it: a short wet thwack
-  thump(o, rand(180, 220), 75, 0.07, (0.25 + 0.3 * h) * k, 0.002);
-  noise(o, { color: 'pink', type: 'lowpass', f: rand(550, 700), q: 0.8, dur: 0.07, gain: (0.85 + 0.7 * h) * k, a: 0.002 });
-  noise(o, { color: 'pink', type: 'bandpass', f: rand(650, 900), q: 0.9, dur: 0.055, gain: (0.9 + 0.8 * h) * k, a: 0.001 });
-  // the spray flung off the edge: a high hiss that hangs for ~300 ms
-  const sl = (pt ? 0.38 : 0.52) * (0.85 + 0.3 * h) * jit(1, 0.1);
-  noise(o, { type: 'bandpass', f: rand(5500, 7000), f1: rand(3800, 4600), q: 0.6, dur: sl, gain: (0.055 + 0.035 * h) * k, delay: 0.03, shape: (x) => Math.min(1, x / 0.1) * Math.pow(1 - x, 0.8) });
-  // and the drops ticking down
-  spatter(o, Math.round((pt ? 3 : 5) + 6 * h), 0.2 + 0.1 * h, 2300, 4200, { gain: (0.12 + 0.08 * h) * k, delay: rand(0.12, 0.17), type: 'highpass', f: 1200 });
+  thump(o, rand(180, 220), 75, 0.07, (0.3 + 0.3 * h) * k, 0.002);
+  noise(o, { color: 'pink', type: 'lowpass', f: rand(550, 700), q: 0.8, dur: 0.06, gain: (0.7 + 0.6 * h) * k, a: 0.002 });
+  // a short flick of spray off the edge, gone by ~150 ms
+  noise(o, { type: 'bandpass', f: rand(4500, 5500), f1: rand(2800, 3400), q: 0.8, dur: 0.12 + 0.04 * h, gain: (0.05 + 0.04 * h) * k, delay: 0.025, shape: (x) => Math.min(1, x / 0.15) * Math.pow(1 - x, 1.6) });
+  // and a few drops landing, quietly
+  spatter(o, Math.round((pt ? 2 : 3) + 4 * h), 0.18 + 0.08 * h, 1800, 3600, { gain: (0.07 + 0.05 * h) * k, delay: rand(0.12, 0.17), type: 'highpass', f: 1000 });
 }
 
 function hit(o0: Out, a: Profile, d: Profile, s: HitOpts): void {
