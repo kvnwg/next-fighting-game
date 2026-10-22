@@ -175,12 +175,12 @@ const twinHits = [hitAt(twin, 2, 0), hitAt(twin, 3, 1)];
 // through upright and down the centre line as the whole body folds over the front knee
 /**
  * Jodan, in torso space: the fists at the front edge of the brim, just above it (higher is out of
- * reach), and the blade raised steeply back over the crown. Both are authored short of that, since
- * a heavy's tell pushes its chamber about half as far again from guard: the fists come up from
- * the chin and the upright blade is turned a further ~25 degrees back.
+ * reach), and the blade laid back over the crown, about 145 degrees from the guard blade, as far
+ * back as the arms take it (the tell's extra turn has faded out by there). The fists are authored
+ * short of the brim; the tell pushes the chamber's position on up from the chin.
  */
-const JODAN_GRIP: V3 = [-0.085, 0.47, 0.29];
-const JODAN_DIR: V3 = [-0.06, 1, -0.07];
+const JODAN_GRIP: V3 = [-0.085, 0.5, 0.33];
+const JODAN_DIR: V3 = [-0.07, 0.85, -0.52];
 const heavenHit = 0.45;
 const heavenBody = [
   // stretched long and leaning back over the rear foot, the weight right back on it
@@ -216,7 +216,7 @@ const wheelBody = [
   K(1.0, B({ ...body, twist: 1.0, hipTwist: 0.4, lean: 0.34, crouch: -0.4, step: 0.58, back: 0.38, width: 0.17, headPitch: -0.05 })),
 ];
 const wheel = keyed(wheelBody, [
-  { s: -0.06, grip: [-0.5, 0.2, 0.14], dir: [-0.88, -0.18, 0.3] },
+  { s: -0.06, grip: [-0.42, 0.22, -0.02], dir: [-0.7, -0.05, -0.7] },
   { s: 0.25, grip: [-0.45, 0.14, 0.36], dir: [-0.62, -0.25, 0.74] },
   { s: wheelHit, grip: [-0.22, 0.16, 0.42], dir: [0.0, -0.18, 0.98] },
   { s: 0.7, grip: [-0.05, 0.18, 0.38], dir: [0.7, -0.15, 0.7] },
@@ -225,7 +225,7 @@ const wheel = keyed(wheelBody, [
 
 // Crescent Moon: a full turn to the left with the blade trailing low, rising up the right side as
 // the turn closes; a leap, and a kesa cleave from high on the right that lands on the front knee
-const crescent = swing(0.25, [[-0.75, -0.25, -0.6], [-0.95, 0.1, -0.2], [-0.85, 0.45, -0.25], [-0.6, 0.62, 0.5], [-0.15, 0.3, 1], [0.45, -0.12, 0.88], [0.65, -0.15, 0.74]], G2, [2, [-0.16, 0.5, 0.16], -0.55, 0.0], [6, [0.05, 0.46, 0.44], 0.5, 0.76]);
+const crescent = swing(0.25, [[-0.75, -0.25, -0.6], [-0.95, 0.1, -0.2], [-0.7, 0.6, -0.4], [-0.4, 0.9, -0.15], [-0.15, 0.3, 1], [0.45, -0.12, 0.88], [0.65, -0.15, 0.74]], G2, [2, [-0.16, 0.5, 0.16], -0.55, 0.0], [6, [0.05, 0.46, 0.44], 0.5, 0.76]);
 const crescentTop = hitAt(crescent, 3);
 const crescentHit = hitAt(crescent, 4);
 
@@ -244,7 +244,7 @@ const gatotsuBody = [
 ];
 const gatotsu = keyed(gatotsuBody, [
   { s: -0.4, grip: [-0.22, 0.25, 0.32], dir: [-0.05, 0.3, 0.95] },
-  { s: -0.1, grip: [-0.35, 0.39, 0.06], dir: [-0.45, 0.88, -0.12], torso: true },
+  { s: -0.1, grip: [-0.36, 0.39, 0.0], dir: [-0.4, 0.72, -0.56], torso: true },
   { s: 0.3, grip: [-0.42, 0.5, 0.12], dir: [-0.4, 0.7, 0.6], torso: true },
   { s: 0.55, grip: [-0.28, 0.48, 0.25], dir: [0.03, 0.15, 1], g2: G2 },
   { s: gatotsuHit, grip: [-0.08, 0.48, 0.52], dir: [0.03, -0.02, 1], g2: G2 },
@@ -262,7 +262,7 @@ const galeHit = 0.8;
 
 // Thunder Draw: hasso on the run, the blade dropping to the right as both hands close, one flat
 // passing cut at the waist, and the body folds right over the front knee as it carries round
-const thunder = swing(0.26, [[-0.92, 0.35, -0.15], [-0.95, 0.1, -0.1], [-0.6, -0.05, 0.8], [0.0, -0.05, 1], [0.65, -0.1, 0.75], [0.95, -0.05, 0.1], [0.72, -0.1, -0.65]], G2, [0, [-0.22, 0.5, 0.12], -0.75, 0.42], [3, [-0.06, 0.45, 0.41], 0.4, 0.62]);
+const thunder = swing(0.26, [[-0.7, 0.4, -0.6], [-0.9, 0.05, -0.42], [-0.6, -0.05, 0.8], [0.0, -0.05, 1], [0.65, -0.1, 0.75], [0.95, -0.05, 0.1], [0.72, -0.1, -0.65]], G2, [0, [-0.22, 0.5, 0.12], -0.75, 0.42], [3, [-0.06, 0.45, 0.41], 0.4, 0.62]);
 const thunderHit = hitAt(thunder, 3);
 
 // Fading Cut: one-handed gyaku kiriage, low on the right up to high on the left, as the rear foot
@@ -272,7 +272,7 @@ const fadingHit = hitAt(fading, 2);
 
 // Mountain Wall: the blade hung point-down in front (the wall), wheeled up past the left shoulder
 // on a hop back, and cut down from high on the left as the weight lands
-const wall = two([0, 0.42, 0.14], 0.25, [[0.3, -0.6, 0.72], [0.85, -0.3, 0.4], [0.75, 0.55, -0.3], [0.45, 0.85, 0.2], [0.12, 0.3, 1], [-0.4, -0.2, 0.9], [-0.62, -0.28, 0.72]], [0.0, 0.36, 0.3]);
+const wall = two([0, 0.42, 0.14], 0.25, [[0.3, -0.6, 0.72], [0.85, -0.3, 0.4], [0.55, 0.6, -0.58], [0.45, 0.85, 0.2], [0.12, 0.3, 1], [-0.4, -0.2, 0.9], [-0.62, -0.28, 0.72]], [0.0, 0.36, 0.3]);
 const wallTop = hitAt(wall, 3);
 const wallHit = hitAt(wall, 4);
 
