@@ -134,6 +134,32 @@ const GUARD_DIR: V3 = [-0.15, 0.48, 0.86];
 const GUARD_EDGE: V3 = [0, -0.9, 0.45];
 const GUARD_FREE: V3 = [0.2, 0.04, 0.24];
 
+/**
+ * The execution, Noose of Souls. s runs in seconds of the 3 s execution: the blow at EXEC_HIT
+ * (2.15 s), and the chain pays out around each impact (throwOut), so the overhead lasso swells
+ * out to its full length over their head at the flourish and the cast lands it on them.
+ */
+const EXEC_HIT = 2.15;
+const EXEC_PASS = 1.38;
+const noose = seq(
+  [
+    // let down on its chain and wheeled forward at the right side, the wrist turning it
+    [0.0, 0.72, whirl([-0.36, 0.26, 0.12], [0, 1, 0.1], [0, 0.1, 1], 1, 0, 0.1, [-0.28, 0.62, 0.04])],
+    // raised over the head and whirled flat, widening: right, ahead, left, behind
+    [0.72, 1.62, whirl([-0.2, 0.92, 0.02], [-1, 0.14, 0], [0, 0.14, 1], 1.75, 0, 0.12, [-0.22, 0.86, -0.12])],
+    // the serve: from behind the head, the elbow drives up and forward and the sickle flies over
+    // the top and down onto the back of their neck
+    [1.62, 2.17, cast([[0, -0.14, -1], [-0.06, 0.72, -0.69], [-0.06, 1, 0.04], [-0.02, 0.62, 0.78], [0, -0.62, 0.78], [-0.1, -0.68, 0.72]], 0.16, [-0.2, 0.74, -0.22], { pivot1: [-0.16, 0.9, -0.1] })],
+    // hauled: the fist yanked down and back to the right hip, the hooked blade reaping across
+    // their throat as the chain reels it in
+    [2.17, 2.62, line([-0.17, 0.98, -0.08], [-0.42, 0.16, -0.04], [-0.1, -0.68, 0.72], [-0.8, -0.32, 0.5], [0, -1, 0.2])],
+    // caught, one turn at the side to shake it off, and down to the guard's hold
+    [2.62, 3.0, whirl([-0.36, 0.14, 0.12], [0, 0.1, 1], [0, -1, 0.1], 1, 0, 0.1, [-0.32, 0.0, 0.18])],
+  ],
+  0.09,
+);
+const nooseHit = hitAt(noose, 4, 2);
+
 export const scythe: Style = {
   axis: '-x',
   offAxis: '-x',
@@ -548,5 +574,72 @@ export const scythe: Style = {
       fx(0.84, 'whirl', 'root', 0.8, BLOOD),
       fx(0.9, 'wisps', 'tip', 0.6),
     ],
+  }),
+  // Execution, Noose of Souls: the sickle let down and wheeled at the side, raised and whirled flat
+  // over the head in a widening lasso that sweeps out over them, then served over the top onto the
+  // back of the neck and hauled in, reaping across the throat; they are spun round off the hook
+  executeReact: 'spin',
+  execute: mv({
+    keys: [
+      K(0.0, body),
+      // drawing up tall over them, square, looking down
+      K(0.35, B({ ...body, twist: -0.1, hipTwist: 0.0, crouch: -0.01, lean: -0.04, step: 0.14, back: 0.2, headPitch: 0.25 })),
+      // the arm rises with the wheel, the chest opening to the right
+      K(0.72, B({ ...body, twist: -0.22, hipTwist: -0.05, crouch: -0.03, lean: -0.08, step: 0.14, back: 0.22, headPitch: 0.1 })),
+      // the lasso overhead: the trunk counter-sways under it, the weight settling, eyes up on it
+      K(1.05, B({ ...body, twist: -0.04, hipTwist: 0.02, crouch: -0.06, lean: -0.1, side: 0.05, step: 0.16, back: 0.22, headPitch: -0.12 })),
+      K(EXEC_PASS, B({ ...body, twist: 0.14, hipTwist: 0.06, crouch: -0.08, lean: -0.06, side: -0.03, step: 0.16, back: 0.22, headPitch: 0.05 })),
+      // loading the serve: weight back on the rear leg, hips then chest wound right, leaning away
+      K(1.66, B({ ...body, twist: -0.62, hipTwist: -0.34, crouch: -0.08, lean: -0.18, side: 0.06, step: 0.12, back: 0.3, headPitch: 0.05 })),
+      // the front foot strides in and plants, the hips turn through ahead of the chest
+      K(1.92, B({ ...body, twist: -0.26, hipTwist: 0.06, crouch: -0.13, lean: 0.04, step: 0.36, back: 0.26, headPitch: 0.12 })),
+      K(EXEC_HIT, B({ ...body, twist: 0.16, hipTwist: 0.14, crouch: -0.14, lean: 0.06, step: 0.34, back: 0.26, headPitch: 0.22 })),
+      // the haul: driven back off the front foot, hips and chest wrenched round to the right
+      K(2.32, B({ ...body, twist: -0.36, hipTwist: -0.18, crouch: -0.13, lean: -0.1, step: 0.3, back: 0.36, headPitch: 0.12 })),
+      K(2.62, B({ ...body, twist: -0.78, hipTwist: -0.38, crouch: -0.1, lean: -0.14, side: 0.05, step: 0.26, back: 0.34, headPitch: 0.1 })),
+      // straightening tall, turning back to face what is left of them
+      K(3.0, B({ ...body, twist: -0.3, crouch: -0.04, lean: 0.0, headPitch: 0.2 })),
+    ],
+    main: noose,
+    // the slack paid out ahead, then flung wide to the left to balance the lasso, reaching at them
+    // through the load, swept back by the serve, and seizing the chain to haul it in
+    free: track([
+      [0.0, GUARD_FREE],
+      [0.4, [0.24, 0.12, 0.32]],
+      [0.95, [0.56, 0.42, 0.14]],
+      [EXEC_PASS, [0.58, 0.46, 0.06]],
+      [1.68, [0.34, 0.5, 0.42]],
+      [EXEC_HIT, [0.42, 0.22, -0.16]],
+      [2.36, [0.12, 0.3, 0.36]],
+      [2.62, [0.06, 0.14, 0.14]],
+      [3.0, GUARD_FREE],
+    ]),
+    impacts: [EXEC_PASS, nooseHit],
+    start: 0,
+    chamber: 0.5,
+    end: 2.7,
+    rest: 3.0,
+    ghosts: [1.8, 2.36],
+    fx: [
+      fx(0.05, 'smoke', 'feet', 1.0),
+      fx(0.3, 'fog', 'root', 0.8),
+      fx(0.45, 'soulfire', 'tip', 0.6),
+      fx(0.8, 'wisps', 'tip', 0.7),
+      fx(0.95, 'whirl', 'root', 1.0, '#b8ffd0'),
+      fx(1.2, 'wisps', 'tip', 0.9),
+      fx(EXEC_PASS, 'whirl', 'root', 1.4, SOUL),
+      fx(EXEC_PASS, 'wisps', 'tip', 1.1),
+      fx(1.92, 'stomp', 'feet', 0.8),
+      fx(1.95, 'spiral', 'main', 0.9, SOUL),
+      fx(nooseHit, 'flashline', 'main', 1.4, SOUL),
+      fx(nooseHit, 'soulfire', 'tip', 1.4),
+      fx(nooseHit, 'wisps', 'tip', 1.5),
+      fx(nooseHit, 'shake', 'root', 0.7),
+      fx(2.34, 'smoke', 'feet', 1.0),
+      fx(2.45, 'flashline', 'tip', 0.9, BLOOD),
+      fx(2.7, 'wisps', 'tip', 0.8, BLOOD),
+      fx(2.85, 'soulfire', 'tip', 0.6),
+    ],
+    trail: { life: 0.3, glow: 0.9 },
   }),
 };
