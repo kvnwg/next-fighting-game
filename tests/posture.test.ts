@@ -16,20 +16,24 @@ function run(f: Fighter, from: number, to: number, act?: (t: number) => void, ev
 }
 
 describe('posture', () => {
-  it('holds while the fighter keeps attacking, and recovers slowly once they stop', () => {
+  it('holds while the fighter keeps attacking, and recovers fast once they have stopped a moment', () => {
     const f = new Fighter('a', 'ronin');
     f.addPosture(40, 1000);
     let t = 1000;
     // swinging again and again for five seconds: nothing comes back
     t = run(f, t, t + 5000, (now) => f.input('light', now), 450);
     expect(f.posture).toBe(40);
-    // standing still: still nothing for a moment, then it drains slowly
+    // standing still (once the last swing has finished): still nothing for a moment, then it
+    // comes back quickly and evenly
+    t = run(f, t, t + 1500);
     const end = f.lastBusyAt;
     run(f, t, end + COMBAT.postureCalmDelay - 100);
     expect(f.posture).toBe(40);
-    run(f, end + COMBAT.postureCalmDelay - 100, end + COMBAT.postureCalmDelay + 1000);
+    run(f, end + COMBAT.postureCalmDelay - 100, end + COMBAT.postureCalmDelay + 100);
     expect(f.posture).toBeLessThan(40);
-    expect(f.posture).toBeGreaterThan(25);
+    expect(f.posture).toBeGreaterThan(40 - f.maxPosture * COMBAT.postureRegenFrac * 0.25);
+    run(f, end + COMBAT.postureCalmDelay + 100, end + COMBAT.postureCalmDelay + 1200);
+    expect(f.posture).toBe(0);
   });
 
   it('does not recover until a while after the last posture damage', () => {

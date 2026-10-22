@@ -125,10 +125,11 @@ export const COMBAT = {
    * damage, and never while attacking, dodging or reeling, nor until this long after the last of
    * those, so pressing an attack never lets the guard rebuild.
    */
-  postureRegenDelay: 2500,
-  postureCalmDelay: 800,
-  postureRegenRate: 10,
-  guardRegenMult: 1.6,
+  postureRegenDelay: 1800,
+  postureCalmDelay: 1500,
+  /** then it refills at this fraction of the whole bar per second (Dueling Grounds: ~0.78) */
+  postureRegenFrac: 0.78,
+  guardRegenMult: 1.15,
 
   hitKnockback: 0.55,
   blockKnockback: 0.3,

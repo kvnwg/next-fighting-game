@@ -778,9 +778,10 @@ export class Fighter {
       this.state !== 'broken' &&
       this.state !== 'dead'
     ) {
-      const hpFactor = 0.35 + 0.65 * (this.hp / this.maxHp);
+      // out of the fight for a moment, it comes back fast and evenly, as in Dueling Grounds
+      // (most of the bar in about a second)
       const guard = this.isGuarding() ? COMBAT.guardRegenMult : 1;
-      const rate = COMBAT.postureRegenRate * this.char.stats.postureRegen * hpFactor * guard;
+      const rate = this.maxPosture * COMBAT.postureRegenFrac * this.char.stats.postureRegen * guard;
       this.posture = Math.max(0, this.posture - rate * dt);
     }
   }
