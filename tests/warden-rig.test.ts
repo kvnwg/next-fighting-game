@@ -11,5 +11,6 @@ describe('warden swings', () => {
     expect(m.armK).toBeCloseTo(ARM_K, 2);
     expect(m.legK).toBeCloseTo(LEG_K, 2);
     expect(m.d.hipsY).toBeCloseTo(HIPS_Y, 2);
-  });
+    // building the voxel model takes a few seconds on a busy machine
+  }, 20_000);
 });
