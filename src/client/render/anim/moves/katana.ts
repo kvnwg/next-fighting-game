@@ -183,10 +183,12 @@ const JODAN_GRIP: V3 = [-0.085, 0.47, 0.29];
 const JODAN_DIR: V3 = [-0.06, 1, -0.07];
 const heavenHit = 0.45;
 const heavenBody = [
-  K(-0.2, B({ ...body, twist: -0.05, lean: -0.17, crouch: 0.0, step: 0.22, back: 0.36, headPitch: -0.2 })),
-  K(0.15, B({ ...body, twist: 0.0, lean: 0.05, crouch: -0.08, step: 0.42, back: 0.36 }), { hop: 0.08 }),
-  K(heavenHit, B({ ...body, twist: 0.03, lean: 0.78, crouch: -0.38, step: 0.64, back: 0.4 }), { hop: 0 }),
-  K(1.05, B({ ...body, twist: 0.03, lean: 1.0, crouch: -0.48, step: 0.66, back: 0.42, headPitch: 0.15 })),
+  // stretched long and leaning back over the rear foot, the weight right back on it
+  K(-0.2, B({ ...body, twist: -0.05, lean: -0.25, crouch: 0.03, step: 0.2, back: 0.44, side: 0.04, headPitch: -0.22 })),
+  K(0.15, B({ ...body, twist: 0.0, lean: 0.05, crouch: -0.08, step: 0.42, back: 0.4 }), { hop: 0.08 }),
+  K(heavenHit, B({ ...body, twist: 0.03, lean: 0.85, crouch: -0.4, step: 0.66, back: 0.42 }), { hop: 0 }),
+  // the stop: the knees give and the weight sinks over the front foot
+  K(1.05, B({ ...body, twist: 0.03, lean: 1.05, crouch: -0.54, step: 0.68, back: 0.44, headPitch: 0.15 })),
 ];
 const heaven = keyed(heavenBody, [
   { s: -0.16, grip: JODAN_GRIP, dir: JODAN_DIR, g2: G2, torso: true },
@@ -194,7 +196,7 @@ const heaven = keyed(heavenBody, [
   { s: 0.3, grip: [0.0, 0.62, 0.48], dir: [0.0, 0.7, 0.72], g2: G2 },
   { s: heavenHit, grip: [-0.02, 0.44, 0.48], dir: [0.0, 0.1, 1], g2: G2 },
   { s: 0.75, grip: [-0.02, 0.38, 0.46], dir: [0.0, -0.06, 1], g2: G2 },
-  { s: 1.05, grip: [-0.02, 0.34, 0.44], dir: [0.0, -0.1, 1], g2: G2 },
+  { s: 1.05, grip: [-0.02, 0.36, 0.44], dir: [0.0, -0.04, 1], g2: G2 },
 ]);
 
 // Iai Flash: out of the scabbard mouth, flat across the body
@@ -206,13 +208,15 @@ const drawHit = hitAt(draw, 2);
 // the front at their thighs and on round to the left as the hips unwind
 const wheelHit = 0.45;
 const wheelBody = [
-  K(-0.08, B({ ...body, twist: -0.45, hipTwist: -0.25, lean: 0.32, crouch: -0.34, step: 0.42, back: 0.36, width: 0.2 })),
+  // wound right as far as the hips go, the weight back, the arm flung out behind
+  K(-0.08, B({ ...body, twist: -0.7, hipTwist: -0.4, lean: 0.26, crouch: -0.36, step: 0.36, back: 0.44, width: 0.2 })),
   K(0.25, B({ ...body, twist: -0.2, hipTwist: 0.0, lean: 0.36, crouch: -0.4, step: 0.5, back: 0.4, width: 0.2 })),
   K(wheelHit, B({ ...body, twist: 0.1, hipTwist: 0.2, lean: 0.4, crouch: -0.42, step: 0.58, back: 0.4, width: 0.18 })),
-  K(1.0, B({ ...body, twist: 0.8, hipTwist: 0.3, lean: 0.3, crouch: -0.3, step: 0.58, back: 0.38, width: 0.16, headPitch: -0.05 })),
+  // carried on round to the left by the blade, the knees taking it
+  K(1.0, B({ ...body, twist: 1.0, hipTwist: 0.4, lean: 0.34, crouch: -0.4, step: 0.58, back: 0.38, width: 0.17, headPitch: -0.05 })),
 ];
 const wheel = keyed(wheelBody, [
-  { s: -0.06, grip: [-0.5, 0.2, 0.2], dir: [-0.85, -0.2, 0.48] },
+  { s: -0.06, grip: [-0.5, 0.2, 0.14], dir: [-0.88, -0.18, 0.3] },
   { s: 0.25, grip: [-0.45, 0.14, 0.36], dir: [-0.62, -0.25, 0.74] },
   { s: wheelHit, grip: [-0.22, 0.16, 0.42], dir: [0.0, -0.18, 0.98] },
   { s: 0.7, grip: [-0.05, 0.18, 0.38], dir: [0.7, -0.15, 0.7] },
@@ -232,14 +236,15 @@ const crescentHit = hitAt(crescent, 4);
 const gatotsuHit = 0.8;
 const gatotsuBody = [
   K(-0.4, B({ ...body, twist: -0.2, lean: 0.05, crouch: -0.1, step: 0.24, back: 0.24 })),
-  K(-0.1, B({ ...body, twist: -0.32, hipTwist: -0.17, lean: 0.03, crouch: -0.08, step: 0.21, back: 0.24 })),
+  // the hand cocked back beside the temple, the chest turned away and the weight on the rear foot
+  K(-0.1, B({ ...body, twist: -0.48, hipTwist: -0.28, lean: -0.05, crouch: -0.1, step: 0.2, back: 0.32 })),
   K(0.3, B({ ...body, twist: -0.4, hipTwist: -0.15, lean: 0.3, crouch: -0.2, step: 0.5, back: 0.45 })),
   K(gatotsuHit, B({ ...body, twist: -0.2, hipTwist: 0.0, lean: 0.6, crouch: -0.32, step: 0.85, back: 0.66, headPitch: -0.15 })),
-  K(1.08, B({ ...body, twist: -0.2, hipTwist: 0.0, lean: 0.62, crouch: -0.32, step: 0.85, back: 0.66, headPitch: -0.15 })),
+  K(1.08, B({ ...body, twist: -0.2, hipTwist: 0.0, lean: 0.7, crouch: -0.4, step: 0.86, back: 0.68, headPitch: -0.15 })),
 ];
 const gatotsu = keyed(gatotsuBody, [
   { s: -0.4, grip: [-0.22, 0.25, 0.32], dir: [-0.05, 0.3, 0.95] },
-  { s: -0.1, grip: [-0.33, 0.37, 0.11], dir: [-0.45, 0.88, -0.1], torso: true },
+  { s: -0.1, grip: [-0.35, 0.39, 0.06], dir: [-0.45, 0.88, -0.12], torso: true },
   { s: 0.3, grip: [-0.42, 0.5, 0.12], dir: [-0.4, 0.7, 0.6], torso: true },
   { s: 0.55, grip: [-0.28, 0.48, 0.25], dir: [0.03, 0.15, 1], g2: G2 },
   { s: gatotsuHit, grip: [-0.08, 0.48, 0.52], dir: [0.03, -0.02, 1], g2: G2 },
@@ -284,10 +289,10 @@ const starGround = 0.72;
 const starBody = [
   K(0, B({ ...body, twist: 0.0, lean: 0.25, crouch: -0.2, headPitch: 0.1 }), { flip: 0 }),
   K(0.2, B({ ...body, twist: 0.0, lean: 0.4, crouch: -0.24 }), { flip: 0.45, hop: 0.4 }),
-  K(starTop, B({ ...body, twist: 0.02, lean: -0.05, crouch: -0.06, step: 0.36, headPitch: -0.14 }), { flip: 0.94, hop: 0.2 }),
+  K(starTop, B({ ...body, twist: 0.02, lean: -0.18, crouch: -0.02, step: 0.32, headPitch: -0.18 }), { flip: 0.94, hop: 0.2 }),
   K(starHit, B({ ...body, twist: 0.03, lean: 0.55, crouch: -0.3, step: 0.5, back: 0.32 }), { flip: 1, hop: 0 }),
-  K(starGround, B({ ...body, twist: 0.03, lean: 0.75, crouch: -0.48, step: 0.56, back: 0.36 })),
-  K(1.06, B({ ...body, twist: 0.03, lean: 0.78, crouch: -0.5, step: 0.56, back: 0.36, headPitch: 0.12 })),
+  K(starGround, B({ ...body, twist: 0.03, lean: 0.8, crouch: -0.52, step: 0.56, back: 0.36 })),
+  K(1.06, B({ ...body, twist: 0.03, lean: 0.86, crouch: -0.56, step: 0.58, back: 0.38, headPitch: 0.12 })),
 ];
 const star = keyed(starBody, [
   { s: 0, grip: [-0.13, 0.33, 0.34], dir: [0, 0.95, 0.3], g2: G2, torso: true },
@@ -346,11 +351,19 @@ const execBody = [
   K(0.95, B({ ...stanceBody, crouch: -0.24, lean: 0.3, headPitch: 0.42 })),
   K(1.2, B({ ...stanceBody, crouch: -0.21, lean: 0.28, headPitch: 0.4 })),
   K(1.42, B({ ...stanceBody, crouch: -0.25, lean: 0.3, headPitch: -0.08 })),
-  K(1.7, B({ ...stanceBody, crouch: -0.3, lean: 0.28, twist: 0.4, hipTwist: 0.15, step: 0.34, back: 0.34, headPitch: -0.05 })),
-  K(1.92, B({ ...stanceBody, crouch: -0.33, lean: 0.3, twist: 0.45, hipTwist: 0.2, step: 0.38, back: 0.36, headPitch: -0.05 })),
-  K(EXEC_HIT, B({ ...body, crouch: -0.28, lean: 0.3, twist: -0.2, hipTwist: -0.25, step: 0.85, back: 0.5 })),
-  K(2.45, B({ ...body, crouch: -0.32, lean: 0.32, twist: -0.55, hipTwist: -0.3, step: 0.88, back: 0.52, headPitch: 0.05 })),
-  K(2.75, B({ ...body, crouch: -0.24, lean: 0.22, twist: -0.25, hipTwist: -0.15, step: 0.6, back: 0.4, headPitch: 0.1 })),
+  // the coil: the hips sink and wind left as far as they go (away from the cut, which runs left to
+  // right), the chest winds further still, the weight settles back onto the rear foot and the
+  // left hand draws the scabbard back; held, breathing, before the release
+  K(1.6, B({ ...stanceBody, crouch: -0.33, lean: 0.22, twist: 0.7, hipTwist: 0.3, step: 0.32, back: 0.4, headPitch: -0.05 })),
+  K(1.85, B({ ...stanceBody, crouch: -0.43, lean: 0.15, twist: 0.95, hipTwist: 0.45, side: 0.06, step: 0.28, back: 0.46, headPitch: -0.1 })),
+  K(1.97, B({ ...stanceBody, crouch: -0.41, lean: 0.17, twist: 0.93, hipTwist: 0.45, side: 0.06, step: 0.28, back: 0.46, headPitch: -0.1 })),
+  // the release, legs first: the front foot drives out and the hips snap round before the chest
+  K(2.06, B({ ...body, crouch: -0.4, lean: 0.26, twist: 0.6, hipTwist: -0.05, step: 0.6, back: 0.5 })),
+  K(EXEC_HIT, B({ ...body, crouch: -0.32, lean: 0.45, twist: -0.25, hipTwist: -0.35, step: 0.92, back: 0.52 })),
+  // the blade's momentum carries the body on round; the knees give and the weight sinks
+  K(2.45, B({ ...body, crouch: -0.44, lean: 0.42, twist: -0.8, hipTwist: -0.4, step: 0.92, back: 0.54, headPitch: 0.05 })),
+  K(2.6, B({ ...body, crouch: -0.36, lean: 0.3, twist: -0.85, hipTwist: -0.35, step: 0.8, back: 0.5, headPitch: 0.08 })),
+  K(2.75, B({ ...body, crouch: -0.26, lean: 0.22, twist: -0.3, hipTwist: -0.15, step: 0.6, back: 0.4, headPitch: 0.1 })),
   K(3.0, B({ ...body, crouch: -0.18, lean: 0.16, twist: -0.05, step: 0.4, back: 0.32, headPitch: 0.15 })),
 ];
 const execMain = keyed(execBody, [
@@ -366,15 +379,17 @@ const execMain = keyed(execBody, [
   // stillness, then the thumb pushes the guard free of the mouth and holds it there, loaded
   { s: 1.42, grip: IAI_GRIP, dir: KATANA_SHEATH, torso: true },
   { s: 1.48, grip: ENT_KOI, dir: KATANA_SHEATH, torso: true },
-  { s: 1.94, grip: ENT_KOI, dir: KATANA_SHEATH, torso: true },
-  // the draw: out along the scabbard's line, then round from low by the left hip, rising across
-  // through the neck to high on the right (the edge leads up and out)
-  { s: 2.0, grip: ENT_OUT, dir: KATANA_SHEATH, torso: true },
-  { s: 2.06, grip: [0.0, 0.24, 0.44], dir: [0.8, -0.35, 0.5] },
-  { s: EXEC_HIT, grip: [-0.02, 0.48, 0.48], dir: [0.15, 0.22, 0.96] },
-  { s: 2.3, grip: [-0.5, 0.6, 0.38], dir: [-0.6, 0.55, 0.58] },
-  // zanshin: held high out to the right at full stretch
-  { s: 2.45, grip: [-0.62, 0.64, 0.26], dir: [-0.75, 0.45, 0.48] },
+  { s: 1.98, grip: ENT_KOI, dir: KATANA_SHEATH, torso: true },
+  // the draw, slow out of the mouth and fastest at the end: the hilt eases out along the scabbard's
+  // line, then the blade wheels round from low by the left hip, rising across through the neck to
+  // high on the right (the edge leads up and out)
+  { s: 2.06, grip: ENT_OUT, dir: KATANA_SHEATH, torso: true },
+  { s: 2.1, grip: [0.04, 0.2, 0.4], dir: [0.85, -0.4, 0.1] },
+  { s: EXEC_HIT, grip: [-0.02, 0.6, 0.46], dir: [0.24, 0.3, 0.92] },
+  // carried well past them, out and back to the right
+  { s: 2.3, grip: [-0.55, 0.62, 0.32], dir: [-0.75, 0.55, 0.38] },
+  // zanshin: held high out to the right at full stretch as the knees take the stop
+  { s: 2.45, grip: [-0.66, 0.62, 0.14], dir: [-0.85, 0.42, 0.15] },
   // o-chiburi: up beside the right temple and snapped down to the low right, where the guard is
   { s: 2.58, grip: [-0.4, 0.62, 0.12], dir: [-0.55, 0.8, -0.2], torso: true },
   { s: 2.72, grip: [-0.36, 0.1, 0.36], dir: [-0.45, -0.28, 0.85], torso: true },
@@ -521,9 +536,9 @@ export const katana: Style = {
         K(0, B({ ...body, front: 'L', twist: -0.6, lean: 0.2, crouch: -0.14, step: 0.52, back: 0.3 }), { spin: 0 }),
         K(0.16, B({ ...body, front: 'L', twist: -0.3, lean: 0.26, crouch: -0.32, step: 0.3, back: 0.3, width: 0.16 }), { spin: 0.3 }),
         K(hitAt(crescent, 2), B({ ...body, front: 'R', twist: -0.55, hipTwist: -0.2, lean: 0.0, crouch: -0.12, step: 0.4, back: 0.36 }), { spin: 0.82, hop: 0.12 }),
-        K(crescentTop, B({ ...body, front: 'R', twist: -0.5, hipTwist: -0.1, lean: -0.15, crouch: -0.04, step: 0.48, back: 0.38, headPitch: -0.12 }), { spin: 0.95, hop: 0.3 }),
-        K(crescentHit, B({ ...body, twist: 0.2, hipTwist: 0.2, lean: 0.62, crouch: -0.38, step: 0.68, back: 0.38 }), { spin: 1, hop: 0 }),
-        K(1.06, B({ ...body, twist: 0.5, hipTwist: 0.25, lean: 0.78, crouch: -0.46, step: 0.7, back: 0.38, headPitch: 0.12 }), { spin: 1 }),
+        K(crescentTop, B({ ...body, front: 'R', twist: -0.65, hipTwist: -0.2, lean: -0.28, crouch: -0.02, step: 0.46, back: 0.44, headPitch: -0.2 }), { spin: 0.95, hop: 0.3 }),
+        K(crescentHit, B({ ...body, twist: 0.25, hipTwist: 0.25, lean: 0.72, crouch: -0.44, step: 0.7, back: 0.4 }), { spin: 1, hop: 0 }),
+        K(1.06, B({ ...body, twist: 0.65, hipTwist: 0.3, lean: 0.9, crouch: -0.54, step: 0.72, back: 0.4, headPitch: 0.12 }), { spin: 1 }),
       ],
       main: crescent,
       impacts: [crescentHit],
@@ -569,10 +584,10 @@ export const katana: Style = {
     // round, a white streak hanging behind
     dh: mv({
       keys: [
-        K(-0.15, B({ ...body, twist: -0.8, hipTwist: -0.3, crouch: -0.24, lean: 0.4, step: 0.45, back: 0.45 })),
+        K(-0.15, B({ ...body, twist: -1.0, hipTwist: -0.45, crouch: -0.28, lean: 0.34, step: 0.42, back: 0.5 })),
         K(thunderHit - 0.15, B({ ...body, twist: -0.4, hipTwist: 0.1, crouch: -0.34, lean: 0.55, step: 0.75, back: 0.55 })),
         K(thunderHit, B({ ...body, twist: 0.3, hipTwist: 0.25, crouch: -0.34, lean: 0.58, step: 0.9, back: 0.6, width: 0.12 })),
-        K(1.05, B({ ...body, twist: 0.9, hipTwist: 0.3, crouch: -0.5, lean: 0.85, step: 0.9, back: 0.6, headPitch: 0.1 })),
+        K(1.05, B({ ...body, twist: 1.1, hipTwist: 0.4, crouch: -0.56, lean: 0.9, step: 0.92, back: 0.6, headPitch: 0.1 })),
       ],
       main: thunder,
       impacts: [thunderHit],
@@ -608,9 +623,9 @@ export const katana: Style = {
       keys: [
         K(0, B({ ...body, twist: 0.25, lean: 0.05, crouch: -0.12, step: 0.26, back: 0.3 })),
         K(hitAt(wall, 2), B({ ...body, twist: 0.5, hipTwist: 0.2, lean: -0.15, crouch: -0.04, step: 0.24, back: 0.55, headPitch: -0.1 }), { hop: 0.06 }),
-        K(wallTop, B({ ...body, twist: 0.35, hipTwist: 0.1, lean: -0.2, crouch: -0.04, step: 0.22, back: 0.68, headPitch: -0.12 }), { hop: 0.08 }),
-        K(wallHit, B({ ...body, twist: -0.2, hipTwist: -0.15, lean: 0.4, crouch: -0.36, step: 0.3, back: 0.62 }), { hop: 0 }),
-        K(1.05, B({ ...body, twist: -0.4, hipTwist: -0.2, lean: 0.46, crouch: -0.4, step: 0.3, back: 0.62, headPitch: 0.1 })),
+        K(wallTop, B({ ...body, twist: 0.55, hipTwist: 0.25, lean: -0.3, crouch: -0.02, step: 0.22, back: 0.7, headPitch: -0.16 }), { hop: 0.08 }),
+        K(wallHit, B({ ...body, twist: -0.3, hipTwist: -0.2, lean: 0.45, crouch: -0.38, step: 0.3, back: 0.62 }), { hop: 0 }),
+        K(1.05, B({ ...body, twist: -0.6, hipTwist: -0.3, lean: 0.5, crouch: -0.48, step: 0.3, back: 0.62, headPitch: 0.1 })),
       ],
       main: wall,
       impacts: [wallHit],
@@ -668,9 +683,11 @@ export const katana: Style = {
       [0.0, SAYA],
       [0.5, KATANA_SHEATH_MOUTH],
       [0.66, ENT_SAYA],
-      [1.94, ENT_SAYA],
-      // saya-biki: the left hand draws the scabbard back as the right draws the blade
-      [2.1, [0.24, 0.06, -0.04]],
+      [1.48, ENT_SAYA],
+      // saya-biki: the left hand draws the scabbard back through the coil, and on as the right draws
+      [1.85, [0.16, 0.07, 0.06]],
+      [1.98, [0.16, 0.07, 0.06]],
+      [2.12, [0.26, 0.06, -0.06]],
       [2.45, [0.3, 0.1, -0.08]],
       [2.8, [0.2, 0.1, 0.06]],
       [3.0, SAYA],
