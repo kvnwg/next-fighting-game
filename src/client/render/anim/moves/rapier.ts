@@ -327,6 +327,60 @@ const plunge = glide([
 ]);
 const JH_TB = tb({ crouch: 0.0, lean: -0.16, step: 0.24, back: 0.2, twist: FT - 0.2, headPitch: 0.28 });
 
+// ------------------------------------------------------------------------------------ execution
+
+// Execution, Coup de Grâce Finale: s is the time in seconds (the blow lands at 2.15 s). Over the
+// kneeling victim the Duelist draws himself up and salutes them, hilt to the chin (ref 1.83 s); then,
+// the arm out long and only the wrist moving, the point flicks a Z across their face and chest;
+// then the coup de grâce tell (ref 1.42 s and 4.17 s): the blade drawn back level by the ear, the
+// weight sat deep on the back leg, the free hand stretched out aiming at their heart, held while
+// the body coils a little deeper; then the arm shoots straight first, and only after it the
+// deepest lunge of all (ref 7.83 s) runs them through. He holds them on the point, pushes back off
+// the front foot to draw it out, flicks the blood off the blade and salutes again over the body.
+const EXEC_HIT = 2.15;
+const X_SALUTE: V3 = [-0.03, 0.66, 0.3];
+// the flourish: the hand out at their face height, the arm long, only the wrist turning
+const Z_HAND: V3 = [-0.1, 0.56, 0.74];
+const X_TELL: V3 = [-0.28, 0.64, 0.04];
+const X_IN: V3 = [-0.05, 0.5, 1.02];
+// run through the heart: the point a little downhill at a kneeling chest
+const X_IN_D: V3 = [0.02, -0.07, 1];
+const execBlade = glide(
+  [
+    [0.0, GUARD_POS, GUARD_DIR],
+    // drawn up tall, the blade lowered out to the side, point down: contempt
+    [0.32, [-0.34, 0.14, 0.24], [-0.4, -0.62, 0.66], FWD],
+    // the salute: the hilt to the chin, the blade straight up before the face, breathing
+    [0.55, X_SALUTE, SALUTE_D, FWD],
+    [0.84, [-0.03, 0.68, 0.31], [0.02, 1, 0.1], FWD],
+    // the Z: lowered on to them, then three wrist flicks, right to left high, down across, and
+    // right to left low (the hand drifts a hand's width, the point travels a metre)
+    [0.92, Z_HAND, [-0.55, 0.18, 0.82]],
+    [1.0, [-0.06, 0.57, 0.76], [0.5, 0.2, 0.84]],
+    [1.12, [-0.1, 0.5, 0.75], [-0.5, -0.3, 0.82]],
+    [1.24, [-0.06, 0.48, 0.76], [0.5, -0.3, 0.82]],
+    // drawn back into the tell, the point coming level on their heart, coiling
+    [1.48, X_TELL, [0.04, 0.0, 1]],
+    [1.86, [-0.3, 0.64, -0.01], [0.04, 0.0, 1]],
+    // the arm goes first: straight before the feet move
+    [1.98, [-0.08, 0.5, 0.82], [0.03, -0.08, 1]],
+    [EXEC_HIT, X_IN, X_IN_D],
+    // held on the point, leaning in
+    [2.4, [-0.05, 0.49, 1.04], X_IN_D],
+    // drawn out as the front foot pushes back
+    [2.52, [-0.14, 0.5, 0.56], [0.03, -0.05, 1]],
+    // flicked clean: a snap of the wrist down and out to the right
+    [2.62, [-0.32, 0.26, 0.36], [-0.5, -0.62, 0.6]],
+    // and the salute again over the body
+    [2.78, X_SALUTE, SALUTE_D, FWD],
+    [3.0, [-0.03, 0.68, 0.3], SALUTE_D, FWD],
+  ],
+  0.03,
+);
+const X_TALL = tb({ crouch: -0.04, lean: -0.04, step: 0.2, back: 0.18, width: 0.08, twist: FT - 0.1, hipTwist: 0.3, headPitch: 0.22 });
+const X_COIL = tb({ crouch: -0.32, lean: -0.14, step: 0.36, back: 0.56, twist: FT + 0.28, headPitch: 0.06 });
+const X_LUNGE = tb({ crouch: -0.47, lean: 0.56, step: 0.66, back: 0.74, twist: FT + 0.18, headPitch: -0.02, width: 0.09 });
+
 // ------------------------------------------------------------------------------------ entrance
 
 // Entrance: the blade hanging loose by the right leg, raised in salute (hilt at the chin, blade
@@ -687,6 +741,77 @@ export const rapier: Style = {
       trail: { life: 0.22, glow: 0.6 },
     }),
   },
+  // Execution, Coup de Grâce Finale (see execBlade): the salute, the Z, the aim, run through
+  executeReact: 'impale',
+  execute: mv({
+    keys: [
+      K(0.0, body),
+      // drawn up tall, heels nearly together, looking down at them
+      K(0.32, X_TALL),
+      K(0.55, tb({ ...X_TALL, headPitch: 0.12, lean: -0.06 })),
+      K(0.84, tb({ ...X_TALL, headPitch: 0.14, lean: -0.05 })),
+      // a small advance into the flourish, sitting into the stance
+      K(0.94, tb({ crouch: -0.2, lean: 0.06, step: 0.44, back: 0.36, twist: FT + 0.05, headPitch: 0.1 })),
+      K(1.24, tb({ crouch: -0.22, lean: 0.08, step: 0.46, back: 0.38, twist: FT + 0.02, headPitch: 0.12 })),
+      // sat back deep into the tell, and coiling deeper through the held aim
+      K(1.48, X_COIL),
+      K(1.86, tb({ ...X_COIL, crouch: -0.35, back: 0.6, lean: -0.16 })),
+      // the arm extends: the feet are still planted
+      K(1.97, tb({ ...X_COIL, crouch: -0.34, lean: 0.0, back: 0.6 })),
+      // the front foot kicks out and the back leg drives straight
+      K(EXEC_HIT, X_LUNGE),
+      K(2.4, tb({ ...X_LUNGE, lean: 0.6, crouch: -0.48 })),
+      // pushed back off the front foot, drawing it out, rising
+      K(2.55, tb({ crouch: -0.2, lean: 0.04, step: 0.4, back: 0.42, twist: FT + 0.05, headPitch: 0.1 })),
+      K(2.64, tb({ crouch: -0.14, lean: -0.02, step: 0.3, back: 0.3, twist: FT - 0.05, headPitch: 0.16 })),
+      // heels together, chin up, the salute; then the small bow of the head
+      K(2.8, tb({ ...X_TALL, headPitch: -0.06 })),
+      K(3.0, tb({ ...X_TALL, headPitch: 0.2, lean: 0.04 })),
+    ],
+    main: execBlade,
+    // on the hip through the salute, out wide for balance in the flourish, stretched out at their
+    // heart through the aim, flung back behind (outside the cape) by the lunge, back on the hip
+    free: track([
+      [0.0, F_GUARD],
+      [0.3, [0.3, 0.02, 0.06]],
+      [0.84, [0.3, 0.02, 0.06]],
+      [0.98, F_GUARD],
+      [1.24, [0.62, 0.5, -0.02]],
+      [1.5, F_AIM],
+      [1.86, [-0.06, 0.58, 0.38]],
+      [2.02, F_GUARD],
+      [EXEC_HIT, F_BACK],
+      [2.4, F_BACK],
+      [2.6, [0.55, 0.3, 0.0]],
+      [2.8, [0.3, 0.02, 0.06]],
+    ]),
+    impacts: [1.0, 1.12, 1.24, EXEC_HIT],
+    start: 0,
+    chamber: 0.9,
+    end: 2.62,
+    rest: 3.0,
+    lead: 0.04,
+    ghosts: [1.9, EXEC_HIT],
+    fx: [
+      fx(0.55, 'sparkle', 'tip', 1.0, '#ffffff'),
+      fx(0.92, 'petals', 'tip', 0.6, '#ffb8cc'),
+      fx(1.0, 'flashline', 'tip', 0.6),
+      fx(1.12, 'flashline', 'tip', 0.6),
+      fx(1.24, 'flashline', 'tip', 0.7),
+      fx(1.24, 'sparkle', 'tip', 0.6, '#ff8aa0'),
+      fx(1.5, 'sparkle', 'tip', 1.1, '#ff3a5a'),
+      fx(1.95, 'spiral', 'tip', 0.8, '#ffd0d8'),
+      fx(2.1, 'dust', 'feet', 1.2),
+      fx(EXEC_HIT, 'flashline', 'tip', 1.8, '#ff3a5a'),
+      fx(EXEC_HIT, 'sparkle', 'tip', 1.3, '#ff2a4a'),
+      fx(EXEC_HIT, 'petals', 'tip', 1.4, '#ff5a7a'),
+      fx(EXEC_HIT + 0.02, 'stomp', 'feet', 0.8),
+      fx(2.62, 'sparkle', 'tip', 0.7, '#ff2a4a'),
+      fx(2.8, 'sparkle', 'tip', 0.9, '#ffffff'),
+      fx(2.8, 'petals', 'root', 0.9),
+    ],
+    trail: { life: 0.26, glow: 0.9 },
+  }),
   // Entrance: a loose swagger and the cape flicked back over the shoulder, a salute snapped down to
   // the side, then a flick through a falling petal and the point levelled at their eyes, settling
   // into the en garde
