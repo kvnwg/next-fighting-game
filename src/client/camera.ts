@@ -72,6 +72,8 @@ export class CameraRig {
   private kickVel = new THREE.Vector3();
   private shots: Shot[] = [];
   private shotT = 0;
+  /** total length of the shots already played through (for syncShots) */
+  private shotsPlayed = 0;
 
   constructor(readonly camera: THREE.PerspectiveCamera) {
     camera.fov = CAMERA_FOV;
@@ -127,6 +129,15 @@ export class CameraRig {
     this.shots = shots;
     // joining late starts partway through
     this.shotT = startAt;
+    this.shotsPlayed = 0;
+  }
+
+  /**
+   * Pin the shots to an outside clock (seconds since they started), so a cinematic timed to the
+   * server (an execution) stays on its animation even if frames drop.
+   */
+  syncShots(t: number): void {
+    if (this.shots.length) this.shotT = Math.max(0, t - this.shotsPlayed);
   }
 
   stopShots(): void {
@@ -307,6 +318,7 @@ export class CameraRig {
     let shot = this.shots[0];
     while (this.shotT >= shot.duration) {
       this.shotT -= shot.duration;
+      this.shotsPlayed += shot.duration;
       this.shots.shift();
       if (this.shots.length === 0) {
         // hand back to the follow camera from where the last shot ended

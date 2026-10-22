@@ -63,7 +63,7 @@ class App {
   /** seconds left of the red-and-black beat after a posture break */
   private drama = 0;
   /** the execution cinematic running (only for one you're in) */
-  private exec: { a: ClientFighter; d: ClientFighter; t: number; hitDone: boolean } | null = null;
+  private exec: { a: ClientFighter; d: ClientFighter; t: number; start: number; hitDone: boolean } | null = null;
   /** the map's own fighter rim strength, restored after an execution */
   private rimBase = 0.6;
   /** back-to-back deflects build up the spectacle */
@@ -1074,7 +1074,7 @@ class App {
    * away as they go down.
    */
   private startExecution(a: ClientFighter, d: ClientFighter): void {
-    this.exec = { a, d, t: 0, hitDone: false };
+    this.exec = { a, d, t: 0, start: this.net.serverNow(), hitDone: false };
     this.ui.setCinematic(true);
     // laid out the way the server stands them (the victim straight ahead at the execution distance),
     // not from where the two are drawn this frame: they're still sliding into place
@@ -1090,11 +1090,13 @@ class App {
     this.cam.playShots(executionShots(a.pos.clone(), D, Math.max(a.model.scale, d.model.scale)));
   }
 
-  private stepExecution(dt: number): void {
+  private stepExecution(dt: number, now: number): void {
     const ex = this.exec;
     let dark = 0;
     if (ex) {
-      ex.t += dt * 1000;
+      // on the server's clock, like the paired animation, so the camera can't drift off it
+      ex.t = now - ex.start;
+      this.cam.syncShots(ex.t / 1000);
       const T = COMBAT.executeTime;
       dark = Math.min(1, ex.t / 350) * (1 - Math.max(0, Math.min(1, (ex.t - (T - 450)) / 450)));
       if (ex.t >= T || !this.fighters.has(ex.a.id) || !this.fighters.has(ex.d.id)) {
@@ -1119,7 +1121,7 @@ class App {
     this.last = t;
     const now = this.net.serverNow();
     this.renderer.flash = Math.max(0, this.renderer.flash - dt * 3);
-    this.stepExecution(dt);
+    this.stepExecution(dt, now);
     if (this.drama > 0) {
       // the screen sinks to a deep red, holds and comes back
       this.drama = Math.max(0, this.drama - dt);
