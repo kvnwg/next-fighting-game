@@ -1,6 +1,6 @@
 /** The client application: wires networking, input, simulation, rendering and UI together. */
 import * as THREE from 'three';
-import { AttackKey, CHARACTERS, CharacterId, getAttack, isHeavyKey } from '../shared/characters';
+import { AttackKey, BODY_SCALE, CHARACTERS, CharacterId, getAttack, isHeavyKey } from '../shared/characters';
 import { COMBAT, MATCH } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
@@ -12,6 +12,7 @@ import { CARD_AT, ENTRANCES, entranceStarts, introSequence } from './entrances';
 import { ENTRANCE_MS } from './render/anim/animator';
 import { buildBlockers, constrainCamera } from './cameraClip';
 import { ClientFighter } from './entities';
+import { AURAS } from './auras';
 import { Bind, Input } from './input';
 import { LocalController } from './local';
 import { Net } from './net';
@@ -781,13 +782,13 @@ class App {
         // the finishing blow
         if (this.exec) this.exec.hitDone = true;
         const toCam = this.tmp3.subVectors(this.renderer.camera.position, pos).normalize();
-        this.effects.blood(pos, swing, 2.4);
-        this.effects.shatter(pos, 1.6);
-        this.effects.hitFlare(pos, swing, toCam, '#ff1a3a', 2.2);
-        this.effects.slash(pos, swing, '#ffffff', 3.2, 0.16);
+        this.effects.blood(pos, swing, 1.8);
+        this.effects.shatter(pos, 0.9);
+        this.effects.hitFlare(pos, swing, toCam, '#ff1a3a', 1.2);
+        this.effects.slash(pos, swing, '#ffffff', 2.2, 0.1);
         this.effects.shockwave(d?.pos ?? pos, 1.6, '#ff3a3a');
         this.effects.ring(d?.pos ?? pos, '#ff2a2a', 6, 0.7);
-        this.effects.burst(pos, { count: 90, color: ['#ff2a2a', '#ffffff', '#7a0a0a'], speed: 12, life: 0.9, size: 0.1, gravity: 8 });
+        this.effects.burst(pos, { count: 45, color: ['#ff2a2a', '#ffffff', '#7a0a0a'], speed: 10, life: 0.8, size: 0.08, gravity: 8 });
         d?.model.flash('#ffffff', 1.6);
         d?.model.react('hit');
         stop(300, 0.12);
@@ -798,9 +799,8 @@ class App {
         if (mine) {
           this.cam.shake(0.55, 0.55);
           if (d) this.cam.punchIn(d.pos, 0.45);
-          this.renderer.flash = 0.55;
+          this.renderer.flash = 0.3;
           this.renderer.flashColor.set('#ffffff');
-          this.drama = 0.5;
         }
         break;
       }
@@ -854,7 +854,7 @@ class App {
       this.effects.shatter(this.tmp.set(d.pos.x, d.pos.y + 1.2 * d.model.scale, d.pos.z), 1.2);
       d.hitstop(160, 0.07);
       if (mine) {
-        this.drama = 0.75;
+        this.drama = 0.3;
         this.cam.punchIn(d.pos, 0.25);
         this.cam.shake(0.3, 0.35);
         play('shatter', Math.min(1, vol * 1.2));
@@ -872,6 +872,54 @@ class App {
   }
 
   /** Effects a move's choreography asks for: dust on a stomp, a shockwave under a slam, petals off an iai cut. */
+  /** Per-fighter aura emitters: how many puffs are owed, and where the fighter was last frame. */
+  private auraState = new Map<string, { acc: number; prev: THREE.Vector3 }>();
+
+  /** The fighter's ambient aura (see auras.ts): puffs off the body, more on the move, off the blade in a swing. */
+  private auraFx(f: ClientFighter, dt: number): void {
+    const aura = AURAS[f.roster.char];
+    if (!aura || dt <= 0 || !f.model.root.visible) return;
+    const cam = this.renderer.camera.position;
+    if (f.pos.distanceToSquared(cam) > 40 * 40) return;
+    let st = this.auraState.get(f.id);
+    if (!st) this.auraState.set(f.id, (st = { acc: 0, prev: f.pos.clone() }));
+    const vx = (f.pos.x - st.prev.x) / dt;
+    const vz = (f.pos.z - st.prev.z) / dt;
+    st.prev.copy(f.pos);
+    const speed = Math.min(6, Math.hypot(vx, vz));
+    const k = f.model.scale;
+    const fx = this.effects;
+    const color = () => aura.colors[Math.floor(Math.random() * aura.colors.length)];
+    const opts = { life: aura.life, size: aura.size * k, gravity: -aura.rise * 0.35, drag: 1.1, grow: aura.grow };
+    // off the body: rising, streaming back against the way he's moving
+    st.acc += (aura.rate + aura.moveRate * Math.min(1, speed / 3)) * dt;
+    const fw = forward(f.yaw);
+    while (st.acc >= 1) {
+      st.acc -= 1;
+      const side = (Math.random() * 2 - 1) * aura.spread * k;
+      const h = (aura.from[0] + Math.random() * (aura.from[1] - aura.from[0])) * k;
+      const back = (Math.random() * 0.12 - 0.1) * k;
+      fx.emit(
+        f.pos.x + fw.z * side + fw.x * back,
+        f.pos.y + h,
+        f.pos.z - fw.x * side + fw.z * back,
+        -vx * 0.35 + (Math.random() - 0.5) * 0.15,
+        aura.rise * (0.6 + Math.random() * 0.6),
+        -vz * 0.35 + (Math.random() - 0.5) * 0.15,
+        color(),
+        opts,
+      );
+    }
+    // boiling off the blade as it cuts
+    if (f.model.swingMain) {
+      const n = Math.round(aura.swingRate * dt + Math.random());
+      const tip = f.weaponTip(this.tmp3);
+      for (let i = 0; i < n; i++) {
+        fx.emit(tip.x, tip.y, tip.z, (Math.random() - 0.5) * 0.3, aura.rise * (0.3 + Math.random() * 0.5), (Math.random() - 0.5) * 0.3, color(), { ...opts, life: aura.life * 0.6, size: aura.size * k * 0.8 });
+      }
+    }
+  }
+
   private moveFx(f: ClientFighter): void {
     if (!f.fxQueue.length) return;
     const me = this.local?.cf;
@@ -1028,7 +1076,18 @@ class App {
   private startExecution(a: ClientFighter, d: ClientFighter): void {
     this.exec = { a, d, t: 0, hitDone: false };
     this.ui.setCinematic(true);
-    this.cam.playShots(executionShots(a.pos, d.pos, Math.max(a.model.scale, d.model.scale)));
+    // laid out the way the server stands them (the victim straight ahead at the execution distance),
+    // not from where the two are drawn this frame: they're still sliding into place
+    const k = Math.max(BODY_SCALE[a.roster.char] ?? 1, BODY_SCALE[d.roster.char] ?? 1);
+    const u = new THREE.Vector3(d.pos.x - a.pos.x, 0, d.pos.z - a.pos.z);
+    if (u.lengthSq() < 1e-4) {
+      const f = forward(a.yaw);
+      u.set(f.x, 0, f.z);
+    }
+    u.normalize();
+    const D = a.pos.clone().addScaledVector(u, COMBAT.executeDistance * k);
+    D.y = a.pos.y;
+    this.cam.playShots(executionShots(a.pos.clone(), D, Math.max(a.model.scale, d.model.scale)));
   }
 
   private stepExecution(dt: number): void {
@@ -1091,6 +1150,7 @@ class App {
       f.updateVisual(dt, now, buff);
       this.stateCues(f, now);
       this.moveFx(f);
+      this.auraFx(f, dt);
     }
 
     // grass parts around the fighters nearest the camera

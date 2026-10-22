@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import { CHARACTERS, CharacterDef, CharacterId, isHeavyKey } from '../../shared/characters';
+import { COMBAT } from '../../shared/config';
 import { AnimFrame, AnimInput, Animator, Reaction } from './anim/animator';
 import { smooth, solveTwoBone } from './anim/math';
 import { CHAR_LAYER, FX_LAYER } from './renderer';
@@ -200,6 +201,8 @@ export class CharacterModel {
   private readonly mainPivot = new THREE.Group();
   private readonly offPivot = new THREE.Group();
   private readonly materials: THREE.MeshLambertMaterial[] = [];
+  private readonly weaponMats: THREE.MeshLambertMaterial[] = [];
+  private readonly weaponGlow = new THREE.Color();
   private flashT = 0;
   private readonly cloth: Cloth[] = [];
   /** a chain weapon: how far it reaches, how far out it is now (m), and the chain's links */
@@ -337,6 +340,21 @@ export class CharacterModel {
     };
     this.trailMain = local(this.weapon.main, this.weapon.base, this.weapon.tip);
     this.trailOff = this.weapon.off && this.weapon.offBase && this.weapon.offTip ? local(this.weapon.off, this.weapon.offBase, this.weapon.offTip) : null;
+    // the weapons get materials of their own (they share the body's otherwise), so they can glow
+    // on their own in an execution
+    for (const w of [this.weapon.main, this.weapon.off]) {
+      w?.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh || !(mesh.material instanceof THREE.MeshLambertMaterial)) return;
+        const m = mesh.material.clone();
+        m.onBeforeCompile = mesh.material.onBeforeCompile;
+        m.customProgramCacheKey = mesh.material.customProgramCacheKey;
+        m.userData = { ...mesh.material.userData };
+        mesh.material = m;
+        this.materials.push(m);
+        this.weaponMats.push(m);
+      });
+    }
     torso.add(this.mainPivot);
     this.mainPivot.add(this.weapon.main);
     if (this.weapon.off) {
@@ -785,6 +803,13 @@ export class CharacterModel {
       } else {
         m.emissive.copy(m.userData.baseEmissive as THREE.Color);
       }
+    }
+    // executing: the weapon burns in the fighter's colour against the darkened world, brightest at the blow
+    if (a.state === 'execute' && this.flashT <= 0) {
+      const near = Math.exp(-(((a.elapsed - COMBAT.executeHitAt) / 260) ** 2));
+      const k = 0.35 + 0.15 * Math.sin(performance.now() / 70) + 0.9 * near;
+      this.weaponGlow.set(this.animator.style.trail.heavy).multiplyScalar(k);
+      for (const m of this.weaponMats) m.emissive.copy(this.weaponGlow);
     }
   }
 
