@@ -50,6 +50,8 @@ export class ClientFighter {
   fxQueue: FxEvent[] = [];
   /** the ring entrance window on the server clock (ms), while the match intro films this fighter */
   entrance: { start: number; dur: number } | null = null;
+  /** who this fighter keeps their eyes on (the game sets it each frame; null: no one) */
+  lookAt: THREE.Vector3 | null = null;
   /** being executed: who by (set from the execution's start event) */
   execBy: CharacterId | null = null;
   readonly glyph: THREE.Sprite;
@@ -263,6 +265,8 @@ export class ClientFighter {
   }
 
   updateVisual(dt: number, serverNow: number, buffActive: boolean): void {
+    // the head tracks whoever they're fighting
+    this.model.lookYaw = this.lookAt ? angleDiff(this.yaw, Math.atan2(this.lookAt.x - this.pos.x, this.lookAt.z - this.pos.z)) : null;
     // movement analysis for the walk cycle
     const dx = this.pos.x - this.prevPos.x;
     const dz = this.pos.z - this.prevPos.z;

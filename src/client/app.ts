@@ -1134,6 +1134,15 @@ class App {
       const sprint = this.input.isDown('dodge') && performance.now() - this.dodgePressAt > 220;
       this.local.update(dt, now, { axes: this.input.moveAxes(), camYaw: this.cam.yaw, sprint, others, lock: this.lock });
     }
+    // everyone keeps their eyes on their opponent: in a duel the other fighter, in the lobby
+    // whoever the local player is locked on to (and that fighter watches them back)
+    const duelists = this.kind === 'arena' ? [...this.fighters.values()] : [];
+    const lockOn = this.local ? this.lock : null;
+    for (const f of this.fighters.values()) {
+      if (duelists.length === 2) f.lookAt = (duelists[0] === f ? duelists[1] : duelists[0]).pos;
+      else if (this.local && f === this.local.cf) f.lookAt = lockOn?.pos ?? null;
+      else f.lookAt = lockOn === f && this.local ? this.local.cf.pos : null;
+    }
     for (const f of this.fighters.values()) {
       f.interpolate(now);
       const buff = (f.flags & 1) === 1 || (!!f.sim && f.sim.buffActive(now));

@@ -217,6 +217,13 @@ export class CharacterModel {
   private smears: Ghost[] = [];
   private smearPrev = { main: new THREE.Matrix4(), off: new THREE.Matrix4(), tipMain: new THREE.Vector3(), tipOff: new THREE.Vector3(), ok: false };
   smearsEnabled = true;
+  /**
+   * Where the opponent is, as a yaw from the fighter's facing (radians; 0 straight ahead), so the
+   * head can track them. Set by the game each frame; 0 when there's no one to watch.
+   */
+  lookYaw: number | null = null;
+  private lookSm = 0;
+  private lookW = 0;
   /** the last animation frame, for effects that need it (kick trails, cue anchors) */
   frame: AnimFrame | null = null;
   /** afterimages on dashes and flips (the dev strip viewer turns them off) */
@@ -683,7 +690,12 @@ export class CharacterModel {
     const tuck = smooth(Math.min(1, (Math.abs(Math.sin(f.flip / 2)) + Math.abs(Math.sin(f.roll / 2))) * 1.7));
     // the spine counters most of the pelvis's roll, so the shoulders ride level
     this.torso.rotation.set(b.lean * (1 - lying * 0.8), b.twist - b.hipTwist, b.side - f.pelvisRoll * 0.8 * (1 - lying));
-    this.head.rotation.set(b.headPitch - b.lean * 0.5, -b.twist * 0.75, -b.side * 0.6);
+    // the eyes stay on the opponent: the head turns toward them (within its range) over the body
+    const lookW = (1 - lying) * this.lookW;
+    this.lookW += ((this.lookYaw === null ? 0 : 1) - this.lookW) * Math.min(1, dt * 6);
+    if (this.lookYaw !== null) this.lookSm += (this.lookYaw - this.lookSm) * Math.min(1, dt * 10);
+    const neck = Math.max(-1.0, Math.min(1.0, this.lookSm - (b.twist * 0.25 + f.spin)));
+    this.head.rotation.set(b.headPitch - b.lean * 0.5, -b.twist * 0.75 + neck * lookW, -b.side * 0.6);
 
     // weapons (torso space, carried over to this fighter's reach)
     const mainPos = this.mapTorso(p.main.pos, _mp);
