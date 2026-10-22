@@ -45,6 +45,8 @@ export interface AnimInput {
   entrance?: boolean;
   /** being executed: who by (their style decides the strikes to flinch at and how the blow lands) */
   execBy?: CharacterId;
+  /** the fighter's facing (rad), so feet can stay planted while the body turns on the spot */
+  yaw?: number;
 }
 
 /** How long each fighter's ring entrance lasts. */
@@ -366,6 +368,10 @@ export class Animator {
   private landT = -1;
   private landK = 0;
   private feet = { L: new THREE.Vector3(0.13, 0.05, 0.2), R: new THREE.Vector3(-0.13, 0.05, -0.18) };
+  /** turning on the spot: the facing the feet were planted at (null: they follow the body), and
+   *  the step that catches them up (seconds into it; -1: none) */
+  private plantYaw: number | null = null;
+  private turnStepT = -1;
   /** effect cues: the furthest s this move has reached, so each cue fires once */
   private fxMaxS = -Infinity;
   private lastLying = 0;
@@ -1191,6 +1197,46 @@ export class Animator {
     }
   }
 
+  /**
+   * Standing and turning, the feet stay where they are on the ground (rather than pivoting with the
+   * body like a turntable) until the turn has wound the legs up, then they catch up in two quick
+   * steps, the lead foot first.
+   */
+  private plantFeet(a: AnimInput, stance: AnimFrame['feet'], w: number, dt: number, lying: number): void {
+    const still = (a.state === 'idle' || a.state === 'block') && !a.entrance && !a.airborne && w < 0.3 && lying < 0.1;
+    if (a.yaw === undefined || !still) {
+      this.plantYaw = null;
+      this.turnStepT = -1;
+      return;
+    }
+    if (this.plantYaw === null) this.plantYaw = a.yaw;
+    let d = this.plantYaw - a.yaw;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (this.turnStepT < 0 && Math.abs(d) > 0.42) this.turnStepT = 0;
+    let eL = 0;
+    let eR = 0;
+    if (this.turnStepT >= 0) {
+      this.turnStepT += dt;
+      const q = Math.min(1, this.turnStepT / 0.24);
+      const first = smooth(q / 0.6);
+      const second = smooth((q - 0.4) / 0.6);
+      const lead = stance.L.z > stance.R.z ? 'L' : 'R';
+      eL = lead === 'L' ? first : second;
+      eR = lead === 'L' ? second : first;
+      if (q >= 1) {
+        this.plantYaw = a.yaw;
+        this.turnStepT = -1;
+        d = 0;
+      }
+    }
+    for (const [foot, e] of [['L', eL], ['R', eR]] as const) {
+      const v = stance[foot];
+      v.applyAxisAngle(UP, d * (1 - e));
+      // the stepping foot comes off the ground
+      v.y += Math.sin(Math.PI * e) * 0.07;
+    }
+  }
+
   /** Where each ankle goes, in the fighter's root frame: a planted stance, a stepping walk cycle or a tuck. */
   private footTargets(a: AnimInput, b: BodyPose, dt: number, lying: number): AnimFrame['feet'] {
     const lead = b.front;
@@ -1228,6 +1274,7 @@ export class Animator {
         stance[foot].lerp(target, w);
       }
     }
+    this.plantFeet(a, stance, w, dt, lying);
     if (a.airborne && lying < 0.5) {
       stance.L.set(0.13, 0.42, lead === 'L' ? 0.18 : -0.05);
       stance.R.set(-0.13, 0.36, lead === 'R' ? 0.18 : -0.05);

@@ -309,6 +309,7 @@ export class ClientFighter {
       buff: buffActive,
       dodgeKind: v.dodgeKind,
       execBy: v.state === 'executed' ? (this.execBy ?? undefined) : undefined,
+      yaw: this.yaw,
     };
     const ent = this.entrance;
     // s along the ring entrance while it plays (NaN otherwise); before it they haven't arrived yet
