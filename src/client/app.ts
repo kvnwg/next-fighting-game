@@ -6,7 +6,7 @@ import { MAPS, LOBBY_MAP, MapDef, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
-import { audio, Sfx } from './audio';
+import { audio } from './audio';
 import { CameraRig, executionShots } from './camera';
 import { CARD_AT, ENTRANCES, entranceStarts, introSequence } from './entrances';
 import { ENTRANCE_MS } from './render/anim/animator';
@@ -160,6 +160,7 @@ class App {
     // the title screen is up: loading is over
     requestAnimationFrame(() => platform.loadingStop());
     audio.setMuted('platform', platform.settings.muteAudio);
+    audio.setListener(this.renderer.camera);
     platform.onSettingsChange((p) => audio.setMuted('platform', p.muteAudio));
     // a signed-in CrazyGames player gets their name filled in
     if (!settings.name) void platform.username().then((name) => name && this.titleScreen?.setName(name));
@@ -344,6 +345,7 @@ class App {
   private loadMap(map: MapDef): void {
     this.mapView?.dispose();
     this.map = map;
+    audio.setSpace(map.id);
     this.mapView = new MapView(map, this.scene, this.renderer);
     const blockers = buildBlockers(map);
     this.cam.constrain = (from, to, wallsOnly) => constrainCamera(map, wallsOnly ? [] : blockers, from, to);
@@ -377,7 +379,7 @@ class App {
       this.local = new LocalController(me, this.net, map);
       this.local.onAction = (a, ok) => {
         if (!ok) return;
-        if (a === 'jump') audio.play('jump', 0.6);
+        if (a === 'jump') audio.jump(me.roster.char, { vol: 0.6, pos: me.pos });
       };
       this.local.onTeleport(m.x, m.z, m.yaw, m.epoch, undefined);
       this.cam.snapBehind(m.yaw);
@@ -651,7 +653,6 @@ class App {
     const meA = e.a === this.myId;
     const mine = meD || meA;
     const vol = this.volumeAt(e.x, e.z);
-    const play = (s: Sfx, v = vol) => audio.play(s, v);
     const head = (f: ClientFighter | undefined) => (f ? new THREE.Vector3(f.pos.x, f.pos.y + 2.1 * f.model.scale, f.pos.z) : pos);
     // impact freeze on both fighters; the one struck shudders through it
     const stop = (ms: number, shudder = 0) => {
@@ -694,8 +695,6 @@ class App {
         this.effects.burst(pos, { count: Math.round(40 * big), color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 13, life: 0.35, size: 0.05, gravity: 6, drag: 3, stretch: 0.1 });
         this.effects.spray(pos, swing.clone().negate(), ['#ffffff', '#fff1a0', '#ffd24a'], Math.round((heavy ? 30 : 22) * big), 12, 0.6, { stretch: 0.08 });
         this.effects.burst(pos, { count: Math.round(26 * big), color: ['#ffd24a', '#ff9a2a', '#fff6c0'], speed: 6, up: 5, life: 1.1, size: 0.04, gravity: 12, drag: 0.6, stretch: 0.05 });
-        play('deflect');
-        play('deflectRing', vol * Math.min(1, 0.7 + 0.1 * streak));
         d?.model.react('deflect');
         a?.model.react('blocked');
         // gold on both: the defender's perfect timing, and the attacker turned aside and open
@@ -718,7 +717,6 @@ class App {
       }
       case 'block':
         this.effects.burst(pos, { count: 12, color: ['#ffb04a', '#ff8a2a', '#ffe0a0'], speed: 5, life: 0.35, size: 0.06 });
-        play('block');
         a?.model.react('blocked');
         stop(heavy ? 60 : 40, heavy ? 0.025 : 0.015);
         if (meD) this.cam.shake(heavy ? 0.1 : 0.06, 0.1);
@@ -729,7 +727,6 @@ class App {
         this.effects.shards(pos, swing, 40);
         this.effects.ring(d?.pos ?? pos, '#ff9a2a', 3);
         d?.model.flash('#ff7a2a', 1.1);
-        play('guardBreak');
         stop(110, 0.06);
         this.ui.floatText('GUARD BROKEN', head(d).x, head(d).y, head(d).z, 'warn big', '破');
         if (mine) {
@@ -759,7 +756,6 @@ class App {
           const len = Math.hypot(d.pos.x - a.pos.x, d.pos.z - a.pos.z) || 1;
           this.cam.kick((d.pos.x - a.pos.x) / len, (d.pos.z - a.pos.z) / len, meD ? 0.22 : 0.12);
         }
-        play(heavy ? 'hitHeavy' : 'hit');
         if (e.dmg) this.ui.floatText(`-${e.dmg}`, pos.x, pos.y + 0.3, pos.z, meD ? 'dmg me' : 'dmg');
         if (e.k === 'armor') this.ui.floatText('ARMOR', head(d).x, head(d).y, head(d).z, 'warn');
         if (meD) {
@@ -775,7 +771,6 @@ class App {
         this.effects.flash(pos, '#ff4a4a', 1.2, 0.2);
         d?.model.flash('#ff2a2a', 1);
         stop(90, 0.05);
-        play('deathblow', Math.min(1, vol * 0.8));
         if (mine && a && d) this.startExecution(a, d);
         break;
       case 'execute': {
@@ -792,9 +787,6 @@ class App {
         d?.model.flash('#ffffff', 1.6);
         d?.model.react('hit');
         stop(300, 0.12);
-        play('deathblow', Math.min(1, vol * 1.4));
-        play('shatter', Math.min(1, vol * 1.2));
-        play('hitHeavy', Math.min(1, vol * 1.2));
         this.ui.floatText(e.tags?.includes('kill') ? 'EXECUTED' : `-${e.dmg ?? 0}`, head(d).x, head(d).y + 0.3, head(d).z, 'bad huge', '処刑');
         if (mine) {
           this.cam.shake(0.55, 0.55);
@@ -806,7 +798,6 @@ class App {
       }
       case 'mikiri':
         this.effects.burst(pos, { count: 30, color: ['#ffffff', '#c8e8ff'], speed: 7, life: 0.5 });
-        play('mikiri');
         stop(100);
         this.ui.floatText('MIKIRI COUNTER', head(d).x, head(d).y, head(d).z, 'good big', '見切り');
         if (mine) {
@@ -817,13 +808,10 @@ class App {
       case 'evade':
         if (e.tags?.includes('blink')) {
           this.effects.burst(pos, { count: 26, color: ['#9b6bff', '#3a2a5a', '#d0b8ff'], speed: 3, life: 0.6, size: 0.12, gravity: -1, up: 1 });
-          play('blink');
         } else if (mine) this.ui.floatText('EVADED', head(d).x, head(d).y, head(d).z, 'muted');
         break;
       case 'counter':
         this.effects.burst(pos, { count: 24, color: ['#ffd24a', '#ffffff'], speed: 6, life: 0.45 });
-        play('deflect');
-        play('hit');
         a?.model.react('hit');
         stop(90);
         this.ui.floatText('COUNTER!', head(d).x, head(d).y, head(d).z, 'good big', '返し');
@@ -831,12 +819,10 @@ class App {
         break;
       case 'feint':
         if (d) this.ui.floatText('FEINT', head(d).x, head(d).y, head(d).z, 'warn small');
-        play('feint', vol * 0.8);
         break;
       case 'lava':
         this.effects.burst(pos, { count: 8, color: ['#ffb030', '#ff5a10'], speed: 2, up: 3, life: 0.5, gravity: -2 });
         if (meD) {
-          play('burn');
           if (e.dmg) this.ui.floatText(`-${e.dmg}`, pos.x, pos.y + 1.5, pos.z, 'dmg me');
         }
         break;
@@ -849,7 +835,6 @@ class App {
     if (e.tags?.includes('broken') && d) {
       this.ui.floatText('POSTURE BROKEN', head(d).x, head(d).y + 0.4, head(d).z, 'warn big', '崩し');
       this.effects.ring(d.pos, '#ffb02a', 3.2);
-      if (e.k !== 'guardBreak') play('guardBreak');
       // the moment of the fight: the guard shatters, the world drops to red and black for a beat
       this.effects.shatter(this.tmp.set(d.pos.x, d.pos.y + 1.2 * d.model.scale, d.pos.z), 1.2);
       d.hitstop(160, 0.07);
@@ -857,18 +842,17 @@ class App {
         this.drama = 0.3;
         this.cam.punchIn(d.pos, 0.25);
         this.cam.shake(0.3, 0.35);
-        play('shatter', Math.min(1, vol * 1.2));
       }
     }
     if (e.tags?.includes('abroken') && a) {
       this.ui.floatText('POSTURE BROKEN', head(a).x, head(a).y + 0.4, head(a).z, 'warn big', '崩し');
       this.effects.ring(a.pos, '#ffb02a', 3.2);
-      play('guardBreak');
     }
     if (e.tags?.includes('backstab')) this.ui.floatText('BACKSTAB', head(d).x, head(d).y + 0.2, head(d).z, 'warn');
     if (e.tags?.includes('tipper')) this.ui.floatText('TIPPER', head(d).x, head(d).y + 0.2, head(d).z, 'warn small');
     if (e.heal && meA) this.ui.floatText(`+${e.heal}`, head(a).x, head(a).y, head(a).z, 'heal');
-    if (e.tags?.includes('kill')) play('death', vol);
+    // the sound of it all: who hit whom, with what, on what (audio.ts / audio/recipes.ts)
+    audio.combat(e, { a: a?.roster.char, d: d?.roster.char, vol, pos, heavy, mine, streak: e.k === 'deflect' ? this.deflectStreak : 1 });
   }
 
   /** Effects a move's choreography asks for: dust on a stomp, a shockwave under a slam, petals off an iai cut. */
@@ -926,6 +910,8 @@ class App {
     const far = !!me && dist2D(me.pos.x, me.pos.z, f.pos.x, f.pos.z) > 32;
     for (const { cue, pos, dir } of f.fxQueue) {
       if (far) continue;
+      // the entrances have their own sounds; an execution's cues ride over the duck
+      if (!f.entrance) audio.cue(cue.kind, f.roster.char, cue.scale, { vol: this.volumeAt(pos.x, pos.z), pos, hero: !!this.exec && (this.exec.a === f || this.exec.d === f) });
       const sc = cue.scale;
       const color = cue.color ?? f.model.animator.style.trail.heavy;
       const fx = this.effects;
@@ -1037,15 +1023,15 @@ class App {
       const vol = this.volumeAt(f.pos.x, f.pos.z);
       if (v.state === 'attack' && v.attack?.perilous && f.lastPerilousSerial !== v.serial) {
         f.lastPerilousSerial = v.serial;
-        audio.play('perilous', vol);
+        audio.perilous(f.roster.char, { vol, pos: f.pos });
         this.effects.flash(this.tmp.set(f.pos.x, f.pos.y + 2.4 * f.model.scale, f.pos.z), '#ff2a2a', 1.4, 0.3);
       }
-      if (v.state === 'dodge' && v.elapsed < 200) audio.play('dodge', vol * 0.8);
+      if (v.state === 'dodge' && v.elapsed < 200) audio.dodge(f.roster.char, v.dodgeKind ?? 'roll', { vol: vol * 0.8, pos: f.pos });
     }
     if (v.state === 'attack' && v.attack && !v.attack.noHitbox) {
       if (v.elapsed >= v.windup - 30 && f.lastSwingSerial !== v.serial) {
         f.lastSwingSerial = v.serial;
-        audio.play(isHeavyKey(v.key) || v.attack.perilous ? 'heavySwing' : 'swing', this.volumeAt(f.pos.x, f.pos.z));
+        audio.swing(f.id, f.roster.char, v.key, { heavy: isHeavyKey(v.key) || !!v.attack.perilous, vol: this.volumeAt(f.pos.x, f.pos.z), pos: f.pos });
       }
       if (settings.parryCue && !f.isLocal && f.lastCueSerial !== v.serial && v.elapsed >= v.windup - 160 && v.elapsed < v.windup) {
         f.lastCueSerial = v.serial;
@@ -1058,11 +1044,13 @@ class App {
     }
     const buff = (f.flags & 1) === 1 || (!!f.sim && f.sim.buffActive(now));
     if (buff && !this.buffSeen.get(f.id)) {
-      audio.play('buff', this.volumeAt(f.pos.x, f.pos.z));
+      audio.buff({ vol: this.volumeAt(f.pos.x, f.pos.z), pos: f.pos });
       f.model.react('roar');
       this.effects.ring(f.pos, '#ff6a2a', 2.5, 0.5);
     }
     this.buffSeen.set(f.id, buff);
+    // footsteps, landings, and the whooshes of an execution's choreography
+    audio.motion(f.id, f.roster.char, { vol: this.volumeAt(f.pos.x, f.pos.z), pos: f.pos, speed: f.speed, airborne: f.airborne, state: v.state, tip: v.state === 'execute' ? f.weaponTip(this.tmp3) : null });
   }
 
   // ------------------------------------------------------------------ frame

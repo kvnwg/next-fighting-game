@@ -1,59 +1,97 @@
-/** All sound is synthesised with WebAudio, so the game ships with zero audio assets. */
+/**
+ * All sound is synthesised with WebAudio, so the game ships with zero audio assets. The toolkit,
+ * materials, per-fighter profiles and recipes live in ./audio/; this is the live engine: it owns the
+ * AudioContext and the mix, places each sound in stereo from the camera, keeps sounds from
+ * machine-gunning, cuts a swing's follow-through when it lands, and runs the execution's bed.
+ */
+import { CHARACTERS, CharacterId, getAttack } from '../shared/characters';
+import type { CombatEvent } from '../shared/protocol';
+import { LEGACY_LEVEL, Sfx, legacy } from './audio/legacy';
+import { LEVEL, WET } from './audio/levels';
+import { Mixer, Voice } from './audio/mixer';
+import { Profile, profile } from './audio/profiles';
+import * as R from './audio/recipes';
+import type { Out } from './audio/synth';
 import { settings } from './settings';
 
-type Sfx =
-  | 'swing'
-  | 'heavySwing'
-  | 'deflect'
-  | 'block'
-  | 'hit'
-  | 'hitHeavy'
-  | 'deflectRing'
-  | 'shatter'
-  | 'guardBreak'
-  | 'deathblow'
-  | 'perilous'
-  | 'dodge'
-  | 'jump'
-  | 'mikiri'
-  | 'feint'
-  | 'step'
-  | 'click'
-  | 'matchFound'
-  | 'countdown'
-  | 'fight'
-  | 'victory'
-  | 'defeat'
-  | 'burn'
-  | 'blink'
-  | 'buff'
-  | 'death'
-  // ring entrances
-  | 'wind'
-  | 'taiko'
-  | 'tink'
-  | 'draw'
-  | 'rumble'
-  | 'stomp'
-  | 'whoosh'
-  | 'gong'
-  | 'pluck'
-  | 'shing'
-  | 'chime'
-  | 'thunder'
-  | 'zap'
-  | 'whisper'
-  | 'scrape'
-  | 'bell'
-  | 'breath'
-  | 'thump'
-  | 'fanfare'
-  | 'clang';
+interface V3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** Anything with a position and a world matrix (a three.js camera). */
+interface Listener {
+  position: V3;
+  matrixWorld: { elements: ArrayLike<number> };
+}
+
+/** Each map's acoustic and what you walk on. */
+const SPACES: Record<string, { room: string; floor: R.Floor }> = {
+  title: { room: 'valley', floor: 'earth' },
+  lobby: { room: 'stone', floor: 'stone' },
+  sakura: { room: 'open', floor: 'earth' },
+  bamboo: { room: 'grove', floor: 'earth' },
+  summit: { room: 'valley', floor: 'stone' },
+  forge: { room: 'hall', floor: 'stone' },
+  bridge: { room: 'valley', floor: 'wood' },
+  ruins: { room: 'stone', floor: 'stone' },
+};
+
+/** Outcomes where the swing met something (its follow-through is cut). */
+const CONTACT = new Set<CombatEvent['k']>(['hit', 'armor', 'block', 'guardBreak', 'deflect', 'mikiri', 'counter', 'deathblow']);
+
+const MAX_VOICES = 48;
+
+export interface Placed {
+  /** distance volume from the caller (0..1) */
+  vol: number;
+  pos?: V3;
+}
+
+export interface CombatOpts extends Placed {
+  a?: CharacterId;
+  d?: CharacterId;
+  heavy: boolean;
+  /** the local player is the attacker or the defender */
+  mine: boolean;
+  /** back-to-back deflects */
+  streak?: number;
+}
+
+interface Emit {
+  level: number;
+  vol: number;
+  pos?: V3;
+  wet?: number;
+  hero?: boolean;
+  /** throttle key: a repeat within `gap` s is dropped, within 2.5×gap softened */
+  key?: string;
+  gap?: number;
+  /** 0: footsteps and other garnish (dropped first when busy) */
+  priority?: number;
+  delay?: number;
+}
+
+interface Walker {
+  phase: number;
+  last: number;
+  air: boolean;
+  tip: V3 | null;
+  lastWhoosh: number;
+}
 
 class AudioEngine {
   private ctx: AudioContext | null = null;
-  private master: GainNode | null = null;
-  private noise: AudioBuffer | null = null;
+  private mix: Mixer | null = null;
+  private listener: Listener | null = null;
+  private floor: R.Floor = 'earth';
+  private roomId = 'open';
+  private active = 0;
+  private recent = new Map<string, number>();
+  private swings = new Map<string, { voice: Voice; at: number }>();
+  private execs = new Map<string, Voice>();
+  private walkers = new Map<string, Walker>();
 
   /** Must be called from a user gesture. */
   unlock(): void {
@@ -61,13 +99,8 @@ class AudioEngine {
       const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!Ctx) return;
       this.ctx = new Ctx();
-      this.master = this.ctx.createGain();
-      this.master.connect(this.ctx.destination);
-      // long enough for the entrance swells; bursts loop it besides
-      const len = this.ctx.sampleRate * 3;
-      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-      const d = this.noise.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this.mix = new Mixer(this.ctx);
+      this.mix.setRoom(this.roomId);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
     this.setVolume(settings.volume);
@@ -78,7 +111,7 @@ class AudioEngine {
 
   setVolume(v: number): void {
     this.volume = v;
-    if (this.master) this.master.gain.value = this.mutedBy.size ? 0 : v * 0.6;
+    if (this.mix) this.mix.master.gain.value = this.mutedBy.size ? 0 : v * 0.9;
   }
 
   /** Mute for a reason (the platform's setting, an ad playing) until every reason is lifted. */
@@ -88,248 +121,250 @@ class AudioEngine {
     this.setVolume(this.volume);
   }
 
-  private tone(type: OscillatorType, f0: number, f1: number, dur: number, gain: number, delay = 0, dest?: AudioNode): void {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime + delay;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(f0, t);
-    o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(dest ?? this.master!);
-    o.start(t);
-    o.stop(t + dur + 0.02);
+  /** The camera: sounds are panned and filtered from where it is and which way it faces. */
+  setListener(l: Listener): void {
+    this.listener = l;
   }
 
-  private noiseBurst(dur: number, gain: number, filter: BiquadFilterType, f0: number, f1: number, q = 1, delay = 0): void {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime + delay;
-    const src = ctx.createBufferSource();
-    src.buffer = this.noise;
-    src.loop = true;
-    const bq = ctx.createBiquadFilter();
-    bq.type = filter;
-    bq.Q.value = q;
-    bq.frequency.setValueAtTime(f0, t);
-    bq.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(bq).connect(g).connect(this.master!);
-    src.start(t, Math.random() * 0.5);
-    src.stop(t + dur + 0.05);
+  /** The map's acoustic (reverb) and floor (footsteps). */
+  setSpace(mapId: string): void {
+    const s = SPACES[mapId] ?? { room: 'open', floor: 'earth' };
+    this.floor = s.floor;
+    this.roomId = s.room;
+    this.mix?.setRoom(s.room);
   }
 
-  /** Metallic ring: a cluster of inharmonic partials. */
-  private ring(base: number, dur: number, gain: number): void {
-    for (const [ratio, amp] of [
-      [1, 1],
-      [2.76, 0.6],
-      [5.4, 0.4],
-      [8.93, 0.25],
-    ]) {
-      this.tone('sine', base * ratio, base * ratio * 0.995, dur * (1.2 - ratio * 0.08), gain * amp);
+  // ---------------------------------------------------------------- core
+
+  private place(pos: V3 | undefined): { pan: number; air?: number } {
+    const l = this.listener;
+    if (!pos || !l) return { pan: 0 };
+    const dx = pos.x - l.position.x;
+    const dy = pos.y - l.position.y;
+    const dz = pos.z - l.position.z;
+    const dist = Math.hypot(dx, dy, dz) || 1;
+    const e = l.matrixWorld.elements;
+    const side = (dx * e[0] + dy * e[1] + dz * e[2]) / dist;
+    // close sounds sit in the middle; the further off to one side, the wider
+    const pan = Math.max(-1, Math.min(1, side)) * Math.min(1, dist / 4) * 0.75;
+    const air = dist > 12 ? Math.max(2500, 18000 * Math.exp(-(dist - 12) / 22)) : undefined;
+    return { pan, air };
+  }
+
+  private emit(fn: (o: Out) => void, e: Emit): Voice | null {
+    const mix = this.mix;
+    const ctx = this.ctx;
+    if (!mix || !ctx || this.mutedBy.size || e.vol <= 0.01) return null;
+    const pr = e.priority ?? 1;
+    // garnish goes first, then the ordinary sounds; combat outcomes get a little more room, and
+    // only an execution's finishing blow plays past the hard ceiling
+    if (this.active >= MAX_VOICES * 0.7 && pr < 1) return null;
+    if (this.active >= MAX_VOICES && pr < 2) return null;
+    if (this.active >= MAX_VOICES * 1.5 && pr < 3) return null;
+    let gain = e.level * Math.min(1, e.vol);
+    if (e.key) {
+      const now = ctx.currentTime;
+      const last = this.recent.get(e.key) ?? -1;
+      const gap = e.gap ?? 0.03;
+      if (now - last < gap) return null;
+      if (now - last < gap * 2.5) gain *= 0.6;
+      this.recent.set(e.key, now);
+      if (this.recent.size > 200) this.recent.clear();
     }
+    const { pan, air } = this.place(e.pos);
+    const v = mix.voice({ gain, pan, air, wet: e.wet, hero: e.hero, t: ctx.currentTime + 0.005 + (e.delay ?? 0) });
+    fn(v.out);
+    this.active++;
+    const life = Math.max(0.05, v.out.end - ctx.currentTime) + 0.3;
+    setTimeout(() => {
+      this.active--;
+      v.input.disconnect();
+    }, life * 1000);
+    return v;
   }
 
-  /** volume scales with distance from the listener (0..1) */
-  play(name: Sfx, volume = 1): void {
-    if (!this.ctx || !this.master || volume <= 0.01) return;
-    const v = Math.min(1, volume);
-    switch (name) {
-      case 'swing':
-        this.noiseBurst(0.16, 0.35 * v, 'bandpass', 900, 3200, 1.4);
-        break;
-      case 'heavySwing':
-        this.noiseBurst(0.3, 0.45 * v, 'bandpass', 400, 1600, 1.2);
-        break;
+  /** A named sound (menus, the countdown, entrances, the title screen). */
+  play(name: Sfx, volume = 1, pos?: V3): void {
+    const ui = name === 'click' || name === 'countdown' || name === 'matchFound' || name === 'fight' || name === 'victory' || name === 'defeat';
+    this.emit((o) => legacy(o, name), {
+      level: (ui ? LEVEL.ui : LEVEL.legacy) * (LEGACY_LEVEL[name] ?? 1),
+      vol: volume,
+      pos,
+      wet: ui ? 0 : 0.25,
+      key: name === 'click' ? 'click' : undefined,
+      gap: 0.02,
+      priority: ui ? 2 : 1,
+    });
+  }
+
+  // ---------------------------------------------------------------- fighters
+
+  /** The swing at the end of an attack's wind-up. Its follow-through is cut if the blow connects. */
+  swing(fighterId: string, char: CharacterId, key: string | undefined, o: Placed & { heavy: boolean }): void {
+    const p = profile(char);
+    const anim = key ? getAttack(CHARACTERS[char], key as never)?.anim : undefined;
+    const v = this.emit((out) => R.swing(out, p, { heavy: o.heavy, anim }), { level: LEVEL.swing, vol: o.vol, pos: o.pos, wet: WET.swing, key: `sw:${fighterId}`, gap: 0.06 });
+    if (v && this.ctx) this.swings.set(fighterId, { voice: v, at: this.ctx.currentTime });
+  }
+
+  /** Everything a combat event sounds like, from who hit whom with what. */
+  combat(e: CombatEvent, o: CombatOpts): void {
+    const A = profile(o.a);
+    const D = profile(o.d);
+    const anim = o.a && e.key ? getAttack(CHARACTERS[o.a], e.key)?.anim : undefined;
+    const heavy = o.heavy;
+    const pos = o.pos ?? { x: e.x, y: e.y, z: e.z };
+    const at = { vol: o.vol, pos };
+    const now = this.ctx?.currentTime ?? 0;
+    // it landed on something: the swing stops carrying through
+    if (e.a && CONTACT.has(e.k)) {
+      const s = this.swings.get(e.a);
+      if (s && now - s.at < 1.2) s.voice.stop(0.05);
+      this.swings.delete(e.a);
+    }
+    const tags = e.tags ?? [];
+    switch (e.k) {
       case 'deflect':
-        this.ring(1250 + Math.random() * 150, 0.6, 0.35 * v);
-        this.noiseBurst(0.05, 0.6 * v, 'highpass', 4000, 6000);
-        this.tone('square', 2400, 1800, 0.05, 0.08 * v);
+        this.emit((out) => R.deflect(out, A, D, { heavy, anim, streak: o.streak }), { ...at, level: LEVEL.deflect, wet: WET.deflect, key: 'deflect', gap: 0.03, priority: 2 });
         break;
       case 'block':
-        this.ring(520, 0.25, 0.25 * v);
-        this.noiseBurst(0.08, 0.5 * v, 'bandpass', 1800, 900, 0.8);
-        break;
-      case 'hit':
-        // a sharp crack on contact, the body thump under it, and a short crunch
-        this.noiseBurst(0.035, 0.7 * v, 'highpass', 3200, 1800, 0.9);
-        this.tone('sine', 190, 55, 0.16, 0.85 * v);
-        this.tone('square', 95, 40, 0.07, 0.18 * v);
-        this.noiseBurst(0.14, 0.5 * v, 'bandpass', 1400, 380, 1.2, 0.01);
-        break;
-      case 'shatter':
-        // glass breaking over a deep boom
-        this.noiseBurst(0.06, 0.9 * v, 'highpass', 5000, 2500, 0.7);
-        this.noiseBurst(0.6, 0.4 * v, 'bandpass', 3500, 1800, 2.5, 0.03);
-        for (let i = 0; i < 5; i++) this.ring(2400 + Math.random() * 2600, 0.35 + Math.random() * 0.4, 0.06 * v);
-        this.tone('sine', 90, 30, 0.9, 0.9 * v);
-        this.tone('sawtooth', 60, 28, 0.7, 0.25 * v, 0.02);
-        break;
-      case 'deflectRing':
-        // the bright tail under the clash: a long shimmering ring, a sub thump, a rising glint
-        this.ring(1850, 1.6, 0.16 * v);
-        this.ring(925, 1.1, 0.12 * v);
-        this.tone('sine', 120, 55, 0.3, 0.6 * v);
-        this.tone('sine', 2600, 4200, 0.18, 0.06 * v, 0.02);
-        this.noiseBurst(0.5, 0.18 * v, 'highpass', 6000, 9000, 0.6, 0.02);
-        break;
-      case 'hitHeavy':
-        // the same, bigger: a split-second crack, a deep boom with sub under it, and a long crunch
-        this.noiseBurst(0.05, 0.9 * v, 'highpass', 2600, 1200, 0.8);
-        this.tone('sine', 150, 32, 0.38, 1.0 * v);
-        this.tone('sine', 60, 28, 0.5, 0.7 * v, 0.01);
-        this.tone('sawtooth', 110, 38, 0.14, 0.22 * v);
-        this.noiseBurst(0.32, 0.65 * v, 'lowpass', 2600, 160, 0.9, 0.015);
+        this.emit((out) => R.block(out, A, D, { heavy, anim }), { ...at, level: LEVEL.block, wet: WET.block, key: `blk:${e.d}`, gap: 0.04, priority: 2 });
         break;
       case 'guardBreak':
-        this.ring(300, 0.9, 0.35 * v);
-        this.tone('sawtooth', 200, 60, 0.5, 0.25 * v);
-        this.noiseBurst(0.3, 0.5 * v, 'lowpass', 3000, 200);
+        this.emit((out) => R.guardBreak(out, A, D, { anim }), { ...at, level: LEVEL.guardBreak, wet: WET.big, priority: 2 });
         break;
-      case 'deathblow':
-        this.tone('sawtooth', 120, 30, 0.6, 0.5 * v);
-        this.tone('square', 60, 30, 0.7, 0.3 * v);
-        this.noiseBurst(0.5, 0.7 * v, 'lowpass', 5000, 150);
-        break;
-      case 'perilous':
-        this.tone('sawtooth', 110, 105, 0.5, 0.25 * v);
-        this.tone('square', 880, 870, 0.35, 0.08 * v, 0.02);
-        this.ring(660, 0.6, 0.2 * v);
-        break;
-      case 'mikiri':
-        this.tone('square', 90, 40, 0.3, 0.4 * v);
-        this.ring(900, 0.5, 0.3 * v);
-        break;
-      case 'dodge':
-        this.noiseBurst(0.22, 0.25 * v, 'bandpass', 600, 2000, 0.7);
-        break;
-      case 'jump':
-        this.noiseBurst(0.12, 0.15 * v, 'lowpass', 900, 300);
-        break;
-      case 'feint':
-        this.tone('triangle', 500, 900, 0.12, 0.12 * v);
-        break;
-      case 'step':
-        this.noiseBurst(0.05, 0.06 * v, 'lowpass', 500, 200);
-        break;
-      case 'click':
-        this.tone('square', 900, 1200, 0.04, 0.06);
-        break;
-      case 'matchFound':
-        [523, 659, 784, 1046].forEach((f, i) => this.tone('square', f, f, 0.14, 0.12, i * 0.09));
-        break;
-      case 'countdown':
-        this.tone('square', 660, 660, 0.12, 0.12);
-        break;
-      case 'fight':
-        this.tone('square', 990, 990, 0.35, 0.14);
-        this.ring(495, 0.8, 0.2);
-        break;
-      case 'victory':
-        [523, 659, 784, 659, 784, 1046].forEach((f, i) => this.tone('square', f, f, 0.18, 0.12, i * 0.12));
-        break;
-      case 'defeat':
-        [392, 330, 262, 196].forEach((f, i) => this.tone('triangle', f, f * 0.98, 0.3, 0.16, i * 0.2));
-        break;
-      case 'burn':
-        this.noiseBurst(0.2, 0.15 * v, 'bandpass', 1200, 600, 0.5);
-        break;
-      case 'blink':
-        this.tone('sine', 1400, 300, 0.25, 0.15 * v);
-        this.noiseBurst(0.2, 0.15 * v, 'highpass', 3000, 1000);
-        break;
-      case 'buff':
-        this.tone('sawtooth', 150, 300, 0.5, 0.25 * v);
-        this.tone('sawtooth', 152, 302, 0.5, 0.2 * v);
-        break;
-      case 'death':
-        this.tone('triangle', 300, 60, 0.8, 0.3 * v);
-        break;
-      case 'wind':
-        this.noiseBurst(2.2, 0.12 * v, 'bandpass', 500, 900, 2.5);
-        this.noiseBurst(1.6, 0.08 * v, 'bandpass', 1400, 700, 4, 0.5);
-        break;
-      case 'taiko':
-        this.tone('sine', 110, 45, 0.7, 0.8 * v);
-        this.noiseBurst(0.15, 0.4 * v, 'lowpass', 900, 120);
-        break;
-      case 'tink':
-        this.ring(2600, 0.35, 0.18 * v);
-        break;
-      case 'draw':
-        this.noiseBurst(0.35, 0.3 * v, 'highpass', 2500, 7000, 0.8);
-        this.ring(1800, 0.6, 0.14 * v);
-        break;
-      case 'rumble':
-        this.tone('sine', 42, 36, 2.0, 0.5 * v);
-        this.noiseBurst(2.0, 0.25 * v, 'lowpass', 220, 90, 0.7);
-        break;
-      case 'stomp':
-        this.tone('sine', 80, 32, 0.45, 0.9 * v);
-        this.noiseBurst(0.2, 0.45 * v, 'lowpass', 700, 80);
-        break;
-      case 'whoosh':
-        this.noiseBurst(0.5, 0.35 * v, 'bandpass', 300, 2400, 1.1);
-        break;
-      case 'gong':
-        this.ring(95, 2.6, 0.5 * v);
-        this.tone('sine', 48, 44, 2.4, 0.5 * v);
-        break;
-      case 'pluck':
-        [784, 988, 1175, 1568, 1319].forEach((f, i) => this.tone('triangle', f, f, 0.16, 0.12 * v, i * 0.11));
-        break;
-      case 'shing':
-        this.noiseBurst(0.28, 0.25 * v, 'highpass', 4000, 9000, 0.7);
-        this.ring(2200, 0.7, 0.16 * v);
-        break;
-      case 'chime':
-        this.ring(1320, 1.6, 0.14 * v);
-        break;
-      case 'thunder':
-        this.noiseBurst(0.12, 0.9 * v, 'highpass', 1200, 400);
-        this.noiseBurst(2.4, 0.7 * v, 'lowpass', 1600, 60, 0.6, 0.05);
-        this.tone('sine', 55, 30, 1.8, 0.6 * v, 0.05);
-        break;
-      case 'zap':
-        this.tone('sawtooth', 1800, 300, 0.18, 0.12 * v);
-        this.noiseBurst(0.16, 0.25 * v, 'highpass', 3500, 1500);
-        break;
-      case 'whisper':
-        this.noiseBurst(1.4, 0.14 * v, 'bandpass', 3000, 5200, 6);
-        this.noiseBurst(1.2, 0.1 * v, 'bandpass', 4400, 2600, 6, 0.25);
-        break;
-      case 'scrape':
-        this.noiseBurst(1.1, 0.25 * v, 'bandpass', 1800, 900, 3);
-        this.tone('sawtooth', 220, 180, 1.0, 0.04 * v);
-        break;
-      case 'bell':
-        this.ring(330, 2.8, 0.35 * v);
-        break;
-      case 'breath':
-        this.noiseBurst(1.5, 0.16 * v, 'lowpass', 1100, 300, 0.8);
-        this.tone('sawtooth', 73, 70, 1.6, 0.05 * v);
-        break;
-      case 'thump':
-        this.tone('sine', 70, 28, 0.6, 1.0 * v);
-        this.noiseBurst(0.35, 0.5 * v, 'lowpass', 500, 60);
-        break;
-      case 'fanfare':
-        [392, 523, 659, 784].forEach((f, i) => {
-          this.tone('sawtooth', f, f, i === 3 ? 0.7 : 0.2, 0.07 * v, i * 0.16);
-          this.tone('square', f / 2, f / 2, i === 3 ? 0.7 : 0.2, 0.04 * v, i * 0.16);
+      case 'hit':
+      case 'armor':
+        this.emit((out) => R.hit(out, A, D, { heavy, anim, armor: e.k === 'armor', tipper: tags.includes('tipper'), backstab: tags.includes('backstab') }), {
+          ...at,
+          level: LEVEL.hit,
+          wet: WET.hit,
+          key: `hit:${e.d}`,
+          gap: 0.035,
+          priority: 2,
         });
         break;
-      case 'clang':
-        this.ring(640, 0.9, 0.3 * v);
-        this.noiseBurst(0.08, 0.5 * v, 'highpass', 3000, 5000);
+      case 'deathblow': {
+        // the strike that caught them broken, then the execution's wind-up under everything
+        this.emit((out) => R.hit(out, A, D, { heavy: true, anim }), { ...at, level: LEVEL.hit * 0.8, wet: WET.hit, priority: 2 });
+        const close = o.mine || o.vol > 0.6;
+        if (close && this.mix) {
+          this.execs.get(e.d)?.stop(0.05);
+          const v = this.emit((out) => R.execWindup(out, A, o.mine), { ...at, level: LEVEL.windup * (o.mine ? 1 : 0.6), hero: true, wet: 0.2, priority: 2 });
+          if (v) this.execs.set(e.d, v);
+          if (o.mine) this.mix.duck(0.55, 0.4, 1.6, 0.4);
+        }
+        break;
+      }
+      case 'execute': {
+        this.execs.get(e.d)?.stop(0.03);
+        this.execs.delete(e.d);
+        this.emit((out) => R.execFinish(out, A, D), { ...at, level: LEVEL.finish, hero: true, wet: WET.finish, priority: 3 });
+        if (o.mine || o.vol > 0.6) this.mix?.duck(0.3, 0.01, 0.7, 1.2);
+        break;
+      }
+      case 'mikiri':
+        this.emit((out) => R.mikiri(out, A, D), { ...at, level: LEVEL.block, wet: WET.big, priority: 2 });
+        break;
+      case 'counter':
+        this.emit((out) => R.counter(out, A, D, { anim }), { ...at, level: LEVEL.deflect, wet: WET.deflect, priority: 2 });
+        break;
+      case 'evade':
+        if (tags.includes('blink')) this.emit((out) => legacy(out, 'blink'), { ...at, level: LEVEL.dodge, wet: 0.3 });
+        break;
+      case 'feint':
+        this.emit((out) => R.feint(out, D), { ...at, vol: o.vol * 0.8, level: LEVEL.swing, wet: WET.swing });
+        break;
+      case 'lava':
+        if (o.mine && e.d) this.emit((out) => legacy(out, 'burn'), { ...at, level: LEVEL.legacy, key: 'burn', gap: 0.15 });
+        break;
+      case 'fall':
+        this.emit((out) => R.fall(out), { ...at, level: LEVEL.cue, wet: 0.4 });
         break;
     }
+    if (tags.includes('broken')) {
+      if (e.k !== 'guardBreak') this.emit((out) => R.guardBreak(out, A, D, { anim }), { ...at, level: LEVEL.guardBreak * 0.85, wet: WET.big, priority: 2 });
+      if (o.mine) {
+        this.emit((out) => R.postureBreak(out, D), { ...at, level: LEVEL.posture, wet: WET.big, priority: 2, delay: 0.01 });
+        this.mix?.duck(0.65, 0.01, 0.25, 0.4);
+      }
+    }
+    // the attacker's own posture broke on the defender's guard
+    if (tags.includes('abroken')) this.emit((out) => R.guardBreak(out, D, A, {}), { ...at, level: LEVEL.guardBreak * 0.85, wet: WET.big, priority: 2 });
+    if (tags.includes('kill')) this.emit((out) => R.death(out, D), { ...at, level: LEVEL.death, wet: WET.hit, priority: 2 });
+  }
+
+  /**
+   * Per frame: footsteps at a stride's cadence (like the walk cycle's) from how fast the fighter
+   * moves, a landing when they come down from a jump, and whooshes off the weapon tip during an
+   * execution's choreography (those moves have no attack state to cue a swing).
+   */
+  motion(fighterId: string, char: CharacterId, m: Placed & { speed: number; airborne: boolean; state: string; tip?: V3 | null }): void {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    let w = this.walkers.get(fighterId);
+    if (!w) this.walkers.set(fighterId, (w = { phase: 0.5, last: now, air: m.airborne, tip: null, lastWhoosh: 0 }));
+    const dt = Math.min(0.1, Math.max(0, now - w.last));
+    w.last = now;
+    const p = profile(char);
+    const grounded = !m.airborne;
+    if (w.air && grounded && m.state !== 'dead' && m.vol > 0.45) {
+      // landing
+      this.emit((o) => R.footstep(o, p, { speed: 7, floor: this.floor }), { level: LEVEL.step * 1.3, vol: m.vol, pos: m.pos, wet: WET.step, key: `st:${fighterId}`, gap: 0.1, priority: 0 });
+      w.phase = 0;
+    }
+    w.air = m.airborne;
+    // footsteps only near the listener (a lobby full of walkers would be a drumline)
+    const walking = m.vol > 0.45 && grounded && m.speed > 0.6 && (m.state === 'idle' || m.state === 'block' || m.state === 'attack' || m.state === 'stance');
+    if (walking) {
+      // two footfalls per stride cycle; heavier bodies step a little slower
+      const cadence = Math.min(1.7, 0.62 + 0.2 * m.speed) * (p.weight > 1.3 ? 0.85 : 1);
+      w.phase += 2 * cadence * dt;
+      if (w.phase >= 1) {
+        w.phase -= 1;
+        this.emit((o) => R.footstep(o, p, { speed: m.speed, floor: this.floor }), { level: LEVEL.step, vol: m.vol, pos: m.pos, wet: WET.step, key: `st:${fighterId}`, gap: 0.12, priority: 0 });
+      }
+    } else w.phase = Math.max(w.phase, 0.6);
+    if (m.state === 'execute' && m.tip) {
+      if (w.tip && dt > 0) {
+        const sp = Math.hypot(m.tip.x - w.tip.x, m.tip.y - w.tip.y, m.tip.z - w.tip.z) / dt;
+        if (sp > 9 && now - w.lastWhoosh > 0.22) {
+          w.lastWhoosh = now;
+          this.emit((o) => R.swing(o, p, { heavy: sp > 16 }), { level: LEVEL.swing, vol: m.vol, pos: m.pos, wet: WET.swing, hero: true });
+        }
+      }
+      w.tip = { x: m.tip.x, y: m.tip.y, z: m.tip.z };
+    } else w.tip = null;
+  }
+
+  /** Forget a fighter that left. */
+  forget(fighterId: string): void {
+    this.walkers.delete(fighterId);
+    this.swings.delete(fighterId);
+  }
+
+  dodge(char: CharacterId, kind: 'roll' | 'vanish' | 'leap', o: Placed): void {
+    const p = profile(char);
+    this.emit((out) => R.dodge(out, p, kind), { level: LEVEL.dodge, vol: o.vol, pos: o.pos, wet: WET.swing });
+  }
+
+  jump(char: CharacterId, o: Placed): void {
+    this.emit((out) => R.jump(out, profile(char)), { level: LEVEL.dodge, vol: o.vol, pos: o.pos, wet: WET.step });
+  }
+
+  perilous(char: CharacterId, o: Placed): void {
+    this.emit((out) => R.perilous(out, profile(char)), { level: LEVEL.legacy, vol: o.vol, pos: o.pos, wet: 0.3, priority: 2 });
+  }
+
+  buff(o: Placed): void {
+    this.emit((out) => R.buff(out), { level: LEVEL.legacy, vol: o.vol, pos: o.pos, wet: 0.3 });
+  }
+
+  /** A move's choreographed effect (a hammer's ground slam, a spear's lightning, a thrown chain...). */
+  cue(kind: string, char: CharacterId, scale: number, o: Placed & { hero?: boolean }): void {
+    if (!R.CUES.has(kind)) return;
+    const p: Profile = profile(char);
+    this.emit((out) => void R.cue(out, p, kind, scale), { level: LEVEL.cue, vol: o.vol, pos: o.pos, wet: WET.big, hero: o.hero, key: `cue:${kind}:${char}`, gap: 0.08 });
   }
 }
 
