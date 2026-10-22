@@ -47,6 +47,8 @@ export class LocalController {
   epoch = 0;
   private seq = 0;
   private predictions = new Map<number, Prediction>();
+  /** the walk's eased velocity (m/s) */
+  private walkV = { x: 0, z: 0 };
   /** cooldown snapshot taken when a press was buffered, keyed by its sequence number */
   private bufferedPrev = new Map<number, Pick<Prediction, 'specialReadyAt' | 'abilityReadyAt' | 'dodgeReady'>>();
   frozen = false;
@@ -165,8 +167,13 @@ export class LocalController {
 
     let speed = sim.char.stats.speed * sim.moveSpeedMult(now);
     if (ctx.sprint && sim.state === 'idle' && !ctx.lock && len > 0.1) speed *= SPRINT_MULT;
-    let vx = mx * speed;
-    let vz = mz * speed;
+    // the walk eases between speeds (~50 ms) instead of jumping a step each time the state
+    // changes; lunges, dodges and shoves below are added on top, unsmoothed
+    const ease = 1 - Math.exp(-dt * 20);
+    this.walkV.x += (mx * speed - this.walkV.x) * ease;
+    this.walkV.z += (mz * speed - this.walkV.z) * ease;
+    let vx = this.walkV.x;
+    let vz = this.walkV.z;
 
     // facing
     let want: number | null = null;

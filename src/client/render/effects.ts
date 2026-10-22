@@ -437,6 +437,33 @@ export class Effects {
     this.flash(pos, color, 1.7 * scale, 0.2);
   }
 
+  /**
+   * The red streak a landed blow leaves, as Dueling Grounds draws it: a white-hot line along the
+   * swing (laid flat to the view) inside a wide red glow, lingering ~0.2 s, with red sparks
+   * thrown off along it.
+   */
+  hitStreak(pos: THREE.Vector3, along: THREE.Vector3, toCam: THREE.Vector3, scale = 1): void {
+    const a = new THREE.Vector3().copy(along).projectOnPlane(toCam);
+    if (a.lengthSq() < 1e-4) a.set(1, 0, 0);
+    a.normalize();
+    const L = 0.75 * scale;
+    const p0 = pos.clone().addScaledVector(a, -L);
+    const p1 = pos.clone().addScaledVector(a, L);
+    // the soft outer glow, the red body, and the hot core
+    this.beam(p0, p1, '#5a0812', 0.26 * scale, 0.24);
+    this.beam(p0, p1, '#ff1a32', 0.1 * scale, 0.22);
+    this.beam(pos.clone().addScaledVector(a, -L * 0.85), pos.clone().addScaledVector(a, L * 0.85), '#fff2f2', 0.035 * scale, 0.17);
+    this.flash(pos, '#ff3a4a', 1.1 * scale, 0.16);
+    this.flash(pos, '#ffffff', 0.5 * scale, 0.08);
+    // sparks flying off it, mostly along the cut
+    for (let i = 0; i < Math.round(16 * scale); i++) {
+      const k = Math.random() * 2 - 1;
+      const sp = 3 + Math.random() * 6;
+      const o = pos.clone().addScaledVector(a, k * L * 0.8);
+      this.emit(o.x, o.y, o.z, a.x * sp * Math.sign(k || 1) + (Math.random() - 0.5) * 3, a.y * sp * Math.sign(k || 1) + Math.random() * 2.5, a.z * sp * Math.sign(k || 1) + (Math.random() - 0.5) * 3, i % 3 ? '#ff3a2a' : '#ffb090', { life: 0.35 + Math.random() * 0.2, size: 0.04, gravity: 6, drag: 2.5, stretch: 0.08 });
+    }
+  }
+
   /** A shatter: white and red shards flung out in every direction. */
   shatter(pos: THREE.Vector3, scale = 1): void {
     for (let i = 0; i < 46 * scale; i++) {

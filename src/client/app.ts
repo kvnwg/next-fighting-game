@@ -709,8 +709,7 @@ class App {
         // as Dueling Grounds draws it: one thin red slash through the contact, and blood (that
         // armour soaks). Only the one who landed it feels it in the camera.
         if (e.k === 'hit') this.effects.blood(pos, swing, heavy ? 1.3 : 0.9);
-        this.effects.slash(pos, swing, '#ff2a3a', heavy ? 1.6 : 1.2, heavy ? 0.05 : 0.035);
-        this.effects.burst(pos, { count: heavy ? 6 : 4, color: ['#ffffff', '#ff8a8a'], speed: 6, life: 0.15, size: 0.035, gravity: 4, drag: 4, stretch: 0.08 });
+        this.effects.hitStreak(pos, swing, this.tmp3.subVectors(this.renderer.camera.position, pos).normalize(), heavy ? 1.35 : 1);
         // a faint tint, not a white-out (Dueling Grounds flashes the health bar instead)
         d?.model.flash('#ff8a7a', 0.3);
         // knocked the way the blade went: + travels toward the defender's left

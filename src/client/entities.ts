@@ -50,6 +50,9 @@ export class ClientFighter {
   fxQueue: FxEvent[] = [];
   /** the ring entrance window on the server clock (ms), while the match intro films this fighter */
   entrance: { start: number; dur: number } | null = null;
+  /** the facing the body is drawn at: chases yaw smoothly */
+  private visYaw = 0;
+  private visInit = false;
   /** who this fighter keeps their eyes on (the game sets it each frame; null: no one) */
   lookAt: THREE.Vector3 | null = null;
   /** being executed: who by (set from the execution's start event) */
@@ -199,7 +202,7 @@ export class ClientFighter {
     this.offTrail?.reset();
     this.pos.set(x, y, z);
     this.prevPos.copy(this.pos);
-    if (yaw !== undefined) this.yaw = yaw;
+    if (yaw !== undefined) this.yaw = this.visYaw = yaw;
     this.buf = [];
   }
 
@@ -266,7 +269,7 @@ export class ClientFighter {
 
   updateVisual(dt: number, serverNow: number, buffActive: boolean): void {
     // the head tracks whoever they're fighting
-    this.model.lookYaw = this.lookAt ? angleDiff(this.yaw, Math.atan2(this.lookAt.x - this.pos.x, this.lookAt.z - this.pos.z)) : null;
+    this.model.lookYaw = this.lookAt ? angleDiff(this.visYaw, Math.atan2(this.lookAt.x - this.pos.x, this.lookAt.z - this.pos.z)) : null;
     // movement analysis for the walk cycle
     const dx = this.pos.x - this.prevPos.x;
     const dz = this.pos.z - this.prevPos.z;
@@ -309,7 +312,7 @@ export class ClientFighter {
       buff: buffActive,
       dodgeKind: v.dodgeKind,
       execBy: v.state === 'executed' ? (this.execBy ?? undefined) : undefined,
-      yaw: this.yaw,
+      yaw: this.visYaw,
     };
     const ent = this.entrance;
     // s along the ring entrance while it plays (NaN otherwise); before it they haven't arrived yet
@@ -320,7 +323,12 @@ export class ClientFighter {
     } else if (ent && serverNow >= ent.start + ent.dur) this.entrance = null;
     const waiting = !!ent && serverNow < ent.start;
     this.model.root.position.copy(this.pos);
-    this.model.root.rotation.y = this.yaw;
+    // the body turns smoothly (~40 ms) even when the facing jumps (an attack aimed at the target)
+    if (!this.visInit) {
+      this.visYaw = this.yaw;
+      this.visInit = true;
+    } else this.visYaw += angleDiff(this.visYaw, this.yaw) * (1 - Math.exp(-dt * 25));
+    this.model.root.rotation.y = this.visYaw;
     if (this.freezeMs > 0 && this.shudder > 0) {
       // a sideways judder that dies away as the hitstop ends
       const k = this.shudder * this.model.scale * Math.min(1, this.freezeMs / this.freezeTotal);

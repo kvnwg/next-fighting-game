@@ -259,12 +259,13 @@ export class Fighter {
       case 'idle':
         return 1;
       case 'block':
-        return 0.45;
+        return 0.6;
       case 'stance':
         return this.char.ability.kind === 'counter' ? 0.15 : 0.35;
       case 'attack': {
+        // you keep moving through a swing (Dueling Grounds never roots you), just slower
         const p = this.attackPhase(now);
-        return p === 'windup' ? 0.3 : p === 'active' ? 0.1 : 0.2;
+        return p === 'windup' ? 0.55 : p === 'active' ? 0.35 : 0.45;
       }
       default:
         return 0;
