@@ -211,8 +211,8 @@ export class UI {
           <div class="hint" id="h-ability"><kbd>R</kbd>${icon('bolt')}<span class="h-label"></span><span class="h-cd"></span></div>
         </div>
         <div class="hints right">
-          <div class="hint"><span class="h-label">Parry / (Hold) Block</span>${icon('shield')}<kbd>F</kbd></div>
-          <div class="hint"><span class="h-label">Light / Heavy</span>${icon('sword')}<kbd>M1</kbd><kbd>M2</kbd></div>
+          <div class="hint"><span class="h-label">Parry / (Hold) Block</span>${icon('shield')}<kbd>M2</kbd></div>
+          <div class="hint"><span class="h-label">Light / Heavy</span>${icon('sword')}<kbd>M1</kbd><kbd>F</kbd></div>
           <div class="hint"><span class="h-label">Lock on</span>${icon('target')}<kbd>Tab</kbd></div>
         </div>
         <div class="click-hint hidden">Click the game to capture the mouse</div>
@@ -765,10 +765,10 @@ export class UI {
         </div>
         <div class="moves">
           <div>${iconHead('sword', 'Light chain [LMB ×3]')}<ul>${c.lights.map((l) => atkRow(l.name, l.damage * (l.hits ?? 1))).join('')}</ul>
-            ${iconHead('hammer', 'Heavy chain [RMB ×3]')}<ul>${[c.heavy, c.extra.h1, c.extra.h2].map((h, i) => atkRow(h.name, h.damage * (h.hits ?? 1), i === 0 && h.feintable ? ' · feint with F' : '')).join('')}</ul></div>
-          <div>${iconHead('dash', 'Dash [dodge forward, then LMB / RMB]')}<ul>${atkRow(c.extra.dl.name, c.extra.dl.damage * (c.extra.dl.hits ?? 1))}${atkRow(c.extra.dh.name, c.extra.dh.damage)}</ul>
-            ${iconHead('back', 'Backstep [walk away + LMB / RMB]')}<ul>${atkRow(c.extra.bl.name, c.extra.bl.damage)}${atkRow(c.extra.bh.name, c.extra.bh.damage)}</ul>
-            ${iconHead('jump', 'Air [jump, then LMB / RMB]')}<ul>${atkRow(c.extra.jl.name, c.extra.jl.damage)}${atkRow(c.extra.jh.name, c.extra.jh.damage)}</ul>
+            ${iconHead('hammer', 'Heavy chain [F ×3]')}<ul>${[c.heavy, c.extra.h1, c.extra.h2].map((h, i) => atkRow(h.name, h.damage * (h.hits ?? 1), i === 0 && h.feintable ? ' · feint with RMB' : '')).join('')}</ul></div>
+          <div>${iconHead('dash', 'Dash [dodge forward, then LMB / F]')}<ul>${atkRow(c.extra.dl.name, c.extra.dl.damage * (c.extra.dl.hits ?? 1))}${atkRow(c.extra.dh.name, c.extra.dh.damage)}</ul>
+            ${iconHead('back', 'Backstep [walk away + LMB / F]')}<ul>${atkRow(c.extra.bl.name, c.extra.bl.damage)}${atkRow(c.extra.bh.name, c.extra.bh.damage)}</ul>
+            ${iconHead('jump', 'Air [jump, then LMB / F]')}<ul>${atkRow(c.extra.jl.name, c.extra.jl.damage)}${atkRow(c.extra.jh.name, c.extra.jh.damage)}</ul>
             ${iconHead('peril', 'Perilous [E]')}<ul>${atkRow(c.special.name, c.special.damage, ` · ${c.special.cooldown / 1000}s`)}<li class="tip">${PERILOUS_TIP[c.special.perilous!]}</li></ul></div>
           <div>${iconHead('bolt', `Ability [R] · ${c.ability.name}`)}<p>${esc(c.ability.description)} <span class="muted">(${c.ability.cooldown / 1000}s)</span></p>
             ${iconHead('eye', `Passive · ${c.passive.name}`)}<p>${esc(c.passive.description)}</p></div>
@@ -848,8 +848,8 @@ export class UI {
               <tr><td>WASD</td><td>Move (Shift tap: dodge, hold: sprint)</td></tr>
               <tr><td>Mouse</td><td>Look / aim (click to capture; locked on, the camera holds still)</td></tr>
               <tr><td>LMB</td><td>Light attack, three in a row (after a forward dodge: dash attack; walking away: backstep attack; in the air: air attack)</td></tr>
-              <tr><td>RMB</td><td>Heavy attack, three in a row, with the same dash, backstep and air versions (press F during windup to feint)</td></tr>
-              <tr><td>F</td><td>Guard — tap right before a hit to DEFLECT</td></tr>
+              <tr><td>F</td><td>Heavy attack, three in a row, with the same dash, backstep and air versions (right-click during windup to feint)</td></tr>
+              <tr><td>RMB</td><td>Guard — tap right before a hit to DEFLECT, hold to block</td></tr>
               <tr><td>Space</td><td>Jump (evades perilous sweeps)</td></tr>
               <tr><td>E</td><td>Perilous special (unblockable)</td></tr>
               <tr><td>R</td><td>Character ability</td></tr>

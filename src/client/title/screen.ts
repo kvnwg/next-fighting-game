@@ -85,7 +85,7 @@ export class TitleScreen {
         <div class="ts-hint">${
           o.touch
             ? 'Left thumb moves · drag right side to look · tap PARRY just before a hit lands'
-            : 'WASD move · Mouse aim · LMB attack · RMB heavy · F guard / deflect · Shift dodge · Space jump'
+            : 'WASD move · Mouse aim · LMB attack · F heavy · RMB guard / deflect · Shift dodge · Space jump'
         }</div>
         <div class="ts-skip">${o.touch ? 'Tap to skip' : 'Click to skip'}</div>
       </div>`);

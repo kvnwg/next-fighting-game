@@ -35,8 +35,8 @@ export const KEYS: Record<Bind, string[]> = {
   jump: ['Space'],
   dodge: ['ShiftLeft', 'ShiftRight'],
   light: [],
-  heavy: [],
-  block: ['KeyF'],
+  heavy: ['KeyF'],
+  block: [],
   special: ['KeyE'],
   ability: ['KeyR'],
   lock: ['Tab', 'KeyQ'],
@@ -52,7 +52,8 @@ export const KEYS: Record<Bind, string[]> = {
   escape: ['Escape'],
 };
 
-const MOUSE: Record<number, Bind> = { 0: 'light', 2: 'heavy', 1: 'lock', 3: 'block', 4: 'dodge' };
+// left click attacks, right click guards (tap: deflect, hold: block)
+const MOUSE: Record<number, Bind> = { 0: 'light', 2: 'block', 1: 'lock', 3: 'heavy', 4: 'dodge' };
 
 export class Input {
   private down = new Set<Bind>();
@@ -89,6 +90,11 @@ export class Input {
     });
     canvas.addEventListener('mousedown', (e) => {
       if (this.touchMode) return;
+      // take the keyboard back: the preventDefault below would otherwise stop a click from
+      // focusing the page, so after clicking outside it (e.g. the frame it's embedded in) the
+      // mouse would still fight but the keys would go elsewhere
+      if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body && !this.isTypingEl(document.activeElement)) document.activeElement.blur();
+      window.focus();
       if (!this.locked) {
         if (!this.suspended) this.requestLock();
         if (!this.lockFailed) return;
@@ -122,7 +128,10 @@ export class Input {
   }
 
   private isTyping(e: KeyboardEvent): boolean {
-    const t = e.target as HTMLElement | null;
+    return this.isTypingEl(e.target as HTMLElement | null);
+  }
+
+  private isTypingEl(t: Element | null): boolean {
     return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
   }
 
