@@ -2,7 +2,7 @@
  * A simulated world (the lobby or one arena). Runs the authoritative combat loop: inputs ->
  * state machines -> hit detection -> lag-compensated hit resolution -> broadcast.
  */
-import { AttackDef, AttackKey, BODY_SCALE } from '../shared/characters';
+import { AttackDef, AttackKey, executeSpacing } from '../shared/characters';
 import { COMBAT, MAX_LAG_COMP_MS, PLAYER_RADIUS, SNAPSHOT_HZ, FALL_DEATH_Y, SPRINT_MULT } from '../shared/config';
 import { HitResult, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pruneDefenseLog, pushDefense } from '../shared/combat';
 import { FORCED_STATES, INPUT_ACTIONS, InputAction, InputOptions } from '../shared/fighter';
@@ -537,8 +537,7 @@ export abstract class Instance {
   private startExecution(a: ServerFighter, d: ServerFighter, now: number): void {
     const yaw = yawTo(a.x, a.z, d.x, d.z);
     const fw = forward(yaw);
-    const k = Math.max(BODY_SCALE[a.char.id] ?? 1, BODY_SCALE[d.char.id] ?? 1);
-    const dist = COMBAT.executeDistance * k;
+    const dist = executeSpacing(a.char.id, d.char.id, COMBAT.executeDistance);
     const p = { x: a.x + fw.x * dist, z: a.z + fw.z * dist };
     pushOut(p, PLAYER_RADIUS, getColliders(this.map));
     if (this.map.edge === 'wall') clampToFloor(this.map, p);

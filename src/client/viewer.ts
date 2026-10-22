@@ -5,7 +5,7 @@
  * &chain=l0,l1,l2 plays a combo back to back (each attack chaining from where the last ended).
  */
 import * as THREE from 'three';
-import { AttackKey, BODY_SCALE, CHARACTER_IDS, CharacterId, getAttack } from '../shared/characters';
+import { AttackKey, BODY_SCALE, CHARACTER_IDS, CharacterId, executeSpacing, getAttack } from '../shared/characters';
 import { COMBAT } from '../shared/config';
 import { G } from './render/gfx/globals';
 import { FighterState } from '../shared/fighter';
@@ -277,7 +277,7 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
     const ex = [new CharacterModel(ca), new CharacterModel(cd)];
     models.forEach((m) => r.scene.remove(m.root));
     const k = Math.max(BODY_SCALE[ca] ?? 1, BODY_SCALE[cd] ?? 1);
-    const dist = COMBAT.executeDistance * k;
+    const dist = executeSpacing(ca, cd, COMBAT.executeDistance);
     const ox = Number(params.get('lx') ?? 0);
     ex[0].root.position.set(ox, 0, -dist / 2);
     ex[1].root.position.set(ox, 0, dist / 2);

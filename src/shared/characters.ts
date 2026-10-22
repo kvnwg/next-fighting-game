@@ -570,6 +570,16 @@ export function isCharacterId(v: unknown): v is CharacterId {
 /** Each fighter's body size relative to the reference body (the renderer's model scale), for spacing paired animations. */
 export const BODY_SCALE: Record<CharacterId, number> = { ronin: 0.94, juggernaut: 1.19, duelist: 0.84, lancer: 1.0, shade: 0.88, reaper: 1.12, monk: 0.84, paladin: 1.02 };
 
+/**
+ * How far apart an execution stands the pair (m): one executeDistance per unit of the bigger body,
+ * except for fighters whose finisher is hand to hand. The Monk's palms reach about a metre, so he
+ * stands in close, a little further back from a bigger victim.
+ */
+export function executeSpacing(executioner: CharacterId, victim: CharacterId, base: number): number {
+  if (executioner === 'monk') return 1.05 + 0.35 * BODY_SCALE[victim];
+  return base * Math.max(BODY_SCALE[executioner] ?? 1, BODY_SCALE[victim] ?? 1);
+}
+
 export function getAttack(char: CharacterDef, key: AttackKey): AttackDef | null {
   switch (key) {
     case 'h':

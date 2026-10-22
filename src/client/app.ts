@@ -1,6 +1,6 @@
 /** The client application: wires networking, input, simulation, rendering and UI together. */
 import * as THREE from 'three';
-import { AttackKey, BODY_SCALE, CHARACTERS, CharacterId, getAttack, isHeavyKey } from '../shared/characters';
+import { AttackKey, CHARACTERS, CharacterId, executeSpacing, getAttack, isHeavyKey } from '../shared/characters';
 import { COMBAT, MATCH } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
@@ -1078,14 +1078,13 @@ class App {
     this.ui.setCinematic(true);
     // laid out the way the server stands them (the victim straight ahead at the execution distance),
     // not from where the two are drawn this frame: they're still sliding into place
-    const k = Math.max(BODY_SCALE[a.roster.char] ?? 1, BODY_SCALE[d.roster.char] ?? 1);
     const u = new THREE.Vector3(d.pos.x - a.pos.x, 0, d.pos.z - a.pos.z);
     if (u.lengthSq() < 1e-4) {
       const f = forward(a.yaw);
       u.set(f.x, 0, f.z);
     }
     u.normalize();
-    const D = a.pos.clone().addScaledVector(u, COMBAT.executeDistance * k);
+    const D = a.pos.clone().addScaledVector(u, executeSpacing(a.roster.char, d.roster.char, COMBAT.executeDistance));
     D.y = a.pos.y;
     this.cam.playShots(executionShots(a.pos.clone(), D, Math.max(a.model.scale, d.model.scale)));
   }

@@ -24,6 +24,42 @@ function kickPath(a: number, b: number, keys: [number, V3][]): Motion {
 const REAR_R: V3 = [-0.17, 0.05, -0.24];
 const LEAD_L: V3 = [0.17, 0.05, 0.22];
 
+type Ease = 'io' | 'in' | 'out' | 'lin';
+const EASE: Record<Ease, (t: number) => number> = {
+  io: (t) => t * t * (3 - 2 * t),
+  in: (t) => t * t * t,
+  out: (t) => 1 - (1 - t) ** 3,
+  lin: (t) => t,
+};
+const mix = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+/**
+ * A hand keyed along the move's s: [s, position, fingers (or knuckles), back of the hand, ease in,
+ * frame]. Each stretch between keys is eased (accelerating into a strike, settling out of one), so a
+ * long choreography keeps one continuous line of motion. A stretch whose key says 'hips' is authored
+ * in the hips' frame (aimed at them however the shoulders turn); otherwise it turns with the torso.
+ */
+type HandKey = [number, V3, V3, V3, Ease?, 'hips'?];
+function hand(keys: HandKey[]): Motion {
+  const n = 6;
+  const parts: [number, number, Motion][] = [];
+  const at = (k: HandKey, body: boolean) => line(k[1], k[1], k[2], k[2], k[3], NaN, NaN, { body });
+  parts.push([keys[0][0] - 10, keys[0][0], at(keys[0], keys[1]?.[5] === 'hips')]);
+  for (let i = 0; i < keys.length - 1; i++) {
+    const [sa, pa, da, ea] = keys[i];
+    const [sb, pb, db, eb, ease = 'io', frame] = keys[i + 1];
+    const f = EASE[ease];
+    for (let j = 0; j < n; j++) {
+      const a = f(j / n);
+      const b = f((j + 1) / n);
+      parts.push([sa + ((sb - sa) * j) / n, sa + ((sb - sa) * (j + 1)) / n, line(mix(pa, pb, a), mix(pa, pb, b), mix(da, db, a), mix(da, db, b), mix(ea, eb, (a + b) / 2), NaN, NaN, { body: frame === 'hips' })]);
+    }
+  }
+  const last = keys[keys.length - 1];
+  parts.push([last[0], last[0] + 10, at(last, last[5] === 'hips')]);
+  return seq(parts, 0.012);
+}
+
 export const gauntlets: Style = {
   axis: 'y',
   offAxis: 'y',
@@ -446,6 +482,129 @@ export const gauntlets: Style = {
       trail: { life: 0.16, glow: 0.6 },
     }),
   },
+  // Execution, Hundred-Pace Fist: an old master's fa jin, the force sent on through the air. Cloud
+  // hands, slow and turning at the waist; the lead knee up and stamped down into a deep stance that
+  // cracks the ground under them; the left palm shot out at their face, then the right drawn back
+  // beside the ear like a bow and held, breathing, while the chi gathers; then everything at once,
+  // from the floor up: the rear leg drives, the hips and the spine whip round, and the palm falls
+  // into them. Held out, then withdrawn into a one-handed salute, head bowed.
+  // (s runs in seconds: the stamp at 1.0, the left palm at 1.35, the blow at 2.15)
+  execute: (() => {
+    const T_STAMP = 1.0;
+    const T_LEFT = 1.35;
+    const T_BLOW = 2.15;
+    const PALM: V3 = [0, 1, 0.2];
+    const PALM_FWD: V3 = [0, 0, -1];
+    const UP: V3 = [0, 1, 0];
+    const horse = B({ ...body, front: 'L', step: 0.16, back: 0.2, width: 0.27, crouch: -0.36, lean: 0.1, twist: 0, hipTwist: 0, headPitch: 0.05 });
+    return mv({
+      keys: [
+        // cloud hands: the waist turns right, then left, the weight drifting with it
+        K(0.0, B({ ...body, crouch: -0.1, lean: 0.06, twist: -0.2, headPitch: 0.1 })),
+        K(0.3, B({ ...body, crouch: -0.16, lean: 0.04, twist: -0.45, hipTwist: -0.12, side: 0.05, width: 0.2, headPitch: 0.05 })),
+        K(0.6, B({ ...body, crouch: -0.18, lean: 0.04, twist: 0.35, hipTwist: 0.1, side: -0.05, width: 0.22, back: 0.22, headPitch: 0.0 })),
+        // the knee comes up, the body tall over the standing leg
+        K(0.82, B({ ...body, crouch: -0.04, lean: 0.0, twist: 0.05, hipTwist: 0.0, side: -0.06, width: 0.24, step: 0.16, back: 0.2, headPitch: -0.05 })),
+        // and stamped down: the whole weight dropped into the floor
+        K(T_STAMP, horse),
+        K(T_STAMP + 0.12, B({ ...horse, crouch: -0.38, lean: 0.14 })),
+        // the left palm, off the turn of the waist
+        K(T_LEFT, B({ ...horse, step: 0.3, back: 0.24, width: 0.22, crouch: -0.3, lean: 0.24, twist: -0.6, hipTwist: -0.18 })),
+        // the bow drawn: the right shoulder taken back, the weight sunk onto the rear leg, breathing
+        K(1.6, B({ ...horse, step: 0.32, back: 0.22, width: 0.2, crouch: -0.34, lean: 0.08, twist: -0.85, hipTwist: -0.28, headPitch: 0.0 })),
+        K(1.78, B({ ...horse, step: 0.32, back: 0.22, width: 0.2, crouch: -0.31, lean: 0.06, twist: -0.88, hipTwist: -0.3, headPitch: -0.03 })),
+        K(1.9, B({ ...horse, step: 0.32, back: 0.22, width: 0.2, crouch: -0.35, lean: 0.06, twist: -0.92, hipTwist: -0.32, headPitch: 0.0 })),
+        // fa jin: the rear leg drives, the hips snap, the spine whips, the lead foot slides in
+        K(T_BLOW, B({ ...horse, step: 0.52, back: 0.42, width: 0.2, crouch: -0.34, lean: 0.62, twist: 0.12, hipTwist: 0.14, headPitch: -0.2 })),
+        K(2.32, B({ ...horse, step: 0.52, back: 0.42, width: 0.2, crouch: -0.33, lean: 0.55, twist: 0.14, hipTwist: 0.14, headPitch: -0.12 })),
+        // withdrawn: up out of the stance, the head bowed over the salute
+        K(2.62, B({ ...body, front: 'L', step: 0.24, back: 0.22, width: 0.16, crouch: -0.12, lean: 0.06, twist: 0.12, hipTwist: 0.05, headPitch: 0.3 })),
+      ],
+      // the right hand: cloud hands, the press, drawn back like a bow, the palm, the salute
+      main: hand([
+        [0.0, [-0.12, 0.6, 0.28], [0.1, 0.3, 1], UP],
+        [0.18, [-0.08, 0.74, 0.36], [0.1, 1, 0.2], [0, 0, 1]],
+        [0.38, [-0.42, 0.62, 0.24], [-0.2, 1, 0.1], [1, 0, 0.3]],
+        [0.55, [-0.3, 0.26, 0.3], [0, 0.1, 1], UP],
+        [0.7, [-0.1, 0.18, 0.34], [0.3, 0, 1], UP],
+        // the wings open with the knee
+        [0.84, [-0.46, 0.62, 0.12], [-0.5, 0, 1], UP],
+        // and press the earth
+        [T_STAMP, [-0.26, 0.06, 0.24], [0, -0.1, 1], UP, 'in'],
+        // drawn back beside the ear like a bow, and held
+        [T_LEFT, [-0.34, 0.66, -0.06], PALM, PALM_FWD, 'io', 'hips'],
+        [1.6, [-0.34, 0.78, -0.16], PALM, PALM_FWD, 'io', 'hips'],
+        [1.9, [-0.35, 0.76, -0.2], PALM, PALM_FWD, 'io', 'hips'],
+        // the palm
+        [T_BLOW, [-0.02, 0.55, 1.2], [0, 1, 0.25], PALM_FWD, 'in', 'hips'],
+        [2.34, [-0.03, 0.6, 1.1], [0, 1, 0.2], PALM_FWD, 'out', 'hips'],
+        // the one-handed salute before the chest, palm to the left
+        [2.62, [-0.05, 0.58, 0.32], UP, [-1, 0, 0], 'io', 'hips'],
+      ]),
+      // the left hand: cloud hands a half beat behind, the press, the palm at their face, pulled back
+      off: hand([
+        [0.0, [0.14, 0.62, 0.36], [-0.1, 0.3, 1], UP],
+        [0.2, [0.1, 0.24, 0.32], [0, 0.1, 1], UP],
+        [0.38, [-0.04, 0.2, 0.34], [-0.3, 0, 1], UP],
+        [0.55, [0.08, 0.74, 0.36], [-0.1, 1, 0.2], [0, 0, 1]],
+        [0.7, [0.42, 0.62, 0.24], [0.2, 1, 0.1], [-1, 0, 0.3]],
+        [0.84, [0.46, 0.62, 0.12], [0.5, 0, 1], UP],
+        [T_STAMP, [0.26, 0.06, 0.24], [0, -0.1, 1], UP, 'in'],
+        // chambered at the hip, then shot out at their face
+        [1.18, [0.22, 0.3, 0.06], [0, 0.6, 1], PALM_FWD, 'io', 'hips'],
+        [T_LEFT, [0.06, 0.58, 0.92], PALM, PALM_FWD, 'in', 'hips'],
+        [1.6, [0.1, 0.58, 0.8], PALM, PALM_FWD, 'out', 'hips'],
+        [1.9, [0.1, 0.56, 0.76], PALM, PALM_FWD, 'io', 'hips'],
+        // pulled back to the hip as the right one goes, a fist
+        [T_BLOW, [0.24, 0.24, -0.04], [0, 0.1, 1], UP, 'in', 'hips'],
+        [2.34, [0.24, 0.22, -0.06], [0, 0.1, 1], UP, 'io', 'hips'],
+        [2.62, [0.2, 0.14, -0.1], [0, 0.1, 1], UP, 'io', 'hips'],
+      ]),
+      // the lead knee lifted and stamped down wide
+      kick: {
+        foot: 'L',
+        from: 0.66,
+        to: T_STAMP,
+        path: kickPath(0.66, T_STAMP, [
+          [0.66, [0.22, 0.05, 0.22]],
+          [0.84, [0.16, 0.5, 0.26]],
+          [0.93, [0.24, 0.3, 0.2]],
+          [T_STAMP, [0.27, 0.05, 0.16]],
+        ]),
+      },
+      impacts: [T_STAMP, T_LEFT, T_BLOW],
+      start: 0,
+      chamber: 0.1,
+      end: 2.4,
+      rest: 2.7,
+      lead: 0.04,
+      ghosts: [1.92, 2.22],
+      fx: [
+        fx(0.05, 'wisps', 'main', 0.6, '#ffb347'),
+        fx(0.35, 'wisps', 'off', 0.6, '#ffb347'),
+        fx(0.62, 'soulfire', 'feet', 0.7, '#ff9a2a'),
+        fx(T_STAMP, 'stomp', 'feet', 1.2),
+        fx(T_STAMP, 'shockwave', 'front', 0.9, '#ffb347'),
+        fx(T_STAMP + 0.02, 'quake', 'front', 0.8),
+        fx(T_LEFT, 'chi', 'off', 1.1),
+        fx(T_LEFT, 'spiral', 'off', 0.45, '#ffd08a'),
+        fx(1.45, 'wisps', 'main', 0.9, '#ff9a2a'),
+        fx(1.6, 'soulfire', 'feet', 1.0, '#ff9a2a'),
+        fx(1.75, 'wisps', 'main', 1.1, '#ffb347'),
+        fx(1.85, 'embers', 'root', 0.8, '#ffb347'),
+        fx(1.95, 'dust', 'feet', 1.0),
+        fx(T_BLOW, 'chi', 'main', 2.6),
+        fx(T_BLOW, 'spiral', 'main', 0.7, '#ffb347'),
+        fx(T_BLOW, 'flashline', 'main', 4, '#ffd08a'),
+        fx(T_BLOW, 'stomp', 'feet', 1.3),
+        fx(T_BLOW + 0.01, 'roar', 'root', 0.9, '#ff9a2a'),
+        fx(T_BLOW + 0.02, 'shockwave', 'front', 1.3, '#ff9a2a'),
+        fx(2.5, 'wisps', 'main', 0.7, '#ffd08a'),
+      ],
+      trail: { life: 0.22, glow: 0.8 },
+    });
+  })(),
+  executeReact: 'launch',
   // Ring entrance, Still Mountain: slow steps in place out of the mist, palms pressed together at
   // the chest; a long breath drawn up through the hands and let out as they part and sink; then
   // down into a horse stance and one palm driven out at them, the air ringing with it
