@@ -129,7 +129,7 @@ const cross = glaive([
   H1_END,
 ]);
 
-// Heaven Splitter: the left hand lets go and takes the shaft again behind the right, the glaive is
+// Thunderclap: the left hand lets go and takes the shaft again behind the right, the glaive is
 // raised flat overhead with the blade out to the right, then brought down and round in the right
 // hand while the left lets go once more and takes it again up toward the blade, and it is driven
 // into a low thrust
@@ -236,6 +236,38 @@ const plunge = glaive([
   [0.45, [-0.35, 0.78, 0.25], [0.15, -0.55, 0.82], 0.3],
   [1.1, [-0.35, 0.78, 0.3], [0.15, -0.6, 0.79], 0.3],
 ]);
+
+// Execution, Lightning Spike: the glaive presented upright, then twirled flat over the head in the
+// right hand, the blade whipping past their face; caught in both hands, turned and drawn back high
+// by the right ear with the blade aimed down at their chest while the bolt strikes it; then the step,
+// the drop and the drive that runs them through, held, and wrenched out and stood upright
+const EXEC_HIT = 2.15;
+const EX_AIM: V3 = [0.12, -0.62, 0.78];
+const EX_HIT_DIR: V3 = [0.22, -0.3, 0.93];
+const EX_HIT_R: V3 = [-0.3, 0.74, 0.22];
+const EX_AIM_R: V3 = [-0.36, 0.84, -0.4];
+const execGlaive = seq(
+  [
+    [0.0, 0.3, line(G_R, [-0.23, 0.28, 0.28], G_DIR, [0.05, 1, 0.12], UPE, SP, 0.5, { body: true })],
+    [0.3, 0.5, line([-0.23, 0.28, 0.28], [-0.25, 0.62, 0.22], [0.05, 1, 0.12], [0.0, 0.25, 1], UPE, 0.5, NaN, { body: true })],
+    // flat over the head in the right hand: forward, round the right, behind, the left, forward again
+    [0.5, 1.08, arc([-0.22, 0.86, 0.18], -0.15, circle([0, -0.22, 1], [-1, -0.1, 0], 1.25, 0, 14), NaN, { body: true })],
+    [1.08, 1.2, line([-0.25, 0.84, 0.05], [-0.34, 0.82, -0.32], [0.0, -0.1, -1], EX_AIM, UPE, NaN, NaN, { body: true })],
+    // loaded high by the right ear like a harpoon, the left arm pointing it at them, the weight
+    // rocking further back
+    [1.2, 1.62, line([-0.34, 0.82, -0.32], EX_AIM_R, EX_AIM, EX_AIM, UPE, NaN, NaN, { body: true })],
+    // the drive: down its line in the right hand alone, the left arm flung back against it
+    [1.62, 1.95, line(EX_AIM_R, [-0.33, 0.8, -0.05], EX_AIM, [0.18, -0.42, 0.89], UPE, NaN, NaN, { body: true })],
+    [1.95, EXEC_HIT, line([-0.33, 0.8, -0.05], EX_HIT_R, [0.18, -0.42, 0.89], EX_HIT_DIR, UPE, NaN, NaN, { body: true })],
+    // pinned: pressed on through
+    [EXEC_HIT, 2.45, line(EX_HIT_R, [-0.26, 0.72, 0.3], EX_HIT_DIR, [0.2, -0.34, 0.92], UPE, NaN, NaN, { body: true })],
+    // the left hand takes the shaft and it is wrenched back out along its line and swung up to stand upright at his right side
+    [2.45, 2.62, line([-0.26, 0.72, 0.3], [-0.28, 0.6, -0.05], [0.2, -0.34, 0.92], [0.1, -0.3, 0.95], UPE, 0.4, 0.4, { body: true })],
+    [2.62, 2.8, line([-0.28, 0.6, -0.05], [-0.28, 0.25, 0.23], [0.1, -0.3, 0.95], [0.05, 1, 0.1], UPE, 0.4, 0.5, { body: true })],
+    [2.8, 4.0, line([-0.28, 0.25, 0.23], [-0.28, 0.25, 0.23], [0.05, 1, 0.1], [0.05, 1, 0.1], UPE, 0.5, 0.5, { body: true })],
+  ],
+  0.05,
+);
 
 // Entrance: planted upright beside the kneeling body where the bolt struck, wrenched out, twirled
 // once in both hands across the front, then raised and its butt spike slammed into the floor
@@ -376,7 +408,7 @@ export const spear: Style = {
       fx: [fx(0.3, 'dust', 'feet', 0.8), fx(0.45, 'flashline', 'tip', 1.1, BOLT), fx(0.45, 'sparkle', 'tip', 0.9, BOLT), fx(0.85, 'quake', 'tip', 0.9)],
       trail: { life: 0.22, glow: 0.6 },
     }),
-    // Heaven Splitter: the body rises tall and winds right as the glaive goes up flat overhead with
+    // Thunderclap: the body rises tall and winds right as the glaive goes up flat overhead with
     // the blade out to the right; then the front foot strides out, the hips turn back to the left,
     // the trunk drops after them and it is driven down and round into a low thrust with a thunderclap
     h2: mv({
@@ -570,6 +602,68 @@ export const spear: Style = {
       trail: { life: 0.24, glow: 0.7 },
     }),
   },
+  // Execution, Lightning Spike (see execGlaive): one flourish past their face, then run through
+  // the chest; they are jerked upright on the shaft and fold off it
+  executeReact: 'impale',
+  execute: mv({
+    keys: [
+      K(0.0, body),
+      // presenting the glaive: tall, square, looking down at them
+      K(0.3, b({ twist: -0.45, hipTwist: -0.25, crouch: -0.06, lean: 0.0, step: 0.24, back: 0.26, headPitch: 0.25 })),
+      // the twirl: the body rises and turns with it
+      K(0.55, b({ twist: -0.2, hipTwist: -0.15, crouch: -0.03, lean: -0.05, step: 0.22, back: 0.24, headPitch: 0.1 })),
+      K(0.95, b({ twist: 0.1, hipTwist: 0.0, crouch: -0.06, lean: -0.06, step: 0.22, back: 0.24, headPitch: 0.08 })),
+      // caught and drawn back: the trunk winds right, the weight goes onto the rear leg
+      K(1.2, b({ twist: -0.85, hipTwist: -0.5, crouch: -0.16, lean: -0.15, side: 0.05, step: 0.3, back: 0.4, headPitch: 0.14 })),
+      K(1.62, b({ twist: -1.0, hipTwist: -0.6, crouch: -0.2, lean: -0.22, side: 0.06, step: 0.28, back: 0.46, headPitch: 0.16 })),
+      // the front foot strides, the hips drop and turn, the trunk pitches after them
+      K(1.85, b({ twist: -0.75, hipTwist: -0.25, crouch: -0.3, lean: 0.1, step: 0.55, back: 0.5, headPitch: 0.1 })),
+      K(EXEC_HIT, b({ twist: -0.25, hipTwist: 0.0, crouch: -0.3, lean: 0.4, step: 0.8, back: 0.55, width: 0.18, headPitch: 0.1 })),
+      K(2.45, b({ twist: -0.25, hipTwist: 0.0, crouch: -0.34, lean: 0.42, step: 0.8, back: 0.55, width: 0.18, headPitch: 0.15 })),
+      // wrenched out with a push back off the front foot, and straightening tall over them
+      K(2.62, b({ twist: -0.55, hipTwist: -0.3, crouch: -0.2, lean: 0.05, step: 0.4, back: 0.45, headPitch: 0.2 })),
+      K(3.0, b({ twist: -0.6, hipTwist: -0.35, crouch: -0.1, lean: -0.02, step: 0.3, back: 0.32, headPitch: 0.1 })),
+    ],
+    main: execGlaive,
+    // the left hand flung out for balance through the twirl, pointing at them through the aim,
+    // thrown back against the drive, and onto the shaft to wrench it out
+    free: track([
+      [0.45, [-0.12, 0.62, 0.3]],
+      [0.6, [0.55, 0.5, 0.2]],
+      [1.0, [0.6, 0.5, 0.1]],
+      // pointing the blade at them through the aim
+      [1.25, [0.6, 0.52, 0.28]],
+      [1.62, [0.6, 0.5, 0.3]],
+      // flung back as the right arm drives it in, then forward to take the shaft
+      [1.95, [0.55, 0.38, 0.0]],
+      [EXEC_HIT, [0.42, 0.22, -0.36]],
+      [2.4, [0.4, 0.2, -0.34]],
+      [2.5, [0.1, 0.4, 0.4]],
+    ]),
+    impacts: [0.95, EXEC_HIT],
+    start: 0,
+    chamber: 0.5,
+    end: 2.62,
+    rest: 3.0,
+    ghosts: [1.75, 2.2],
+    fx: [
+      fx(0.3, 'sparkle', 'tip', 0.7, BOLT),
+      fx(0.55, 'whirl', 'main', 0.9, BOLT),
+      fx(0.95, 'flashline', 'tip', 0.8, BOLT),
+      fx(1.3, 'bolt', 'tip', 1.0),
+      fx(1.32, 'sparkle', 'tip', 1.0, BOLT),
+      fx(1.35, 'embers', 'root', 0.7, BOLT),
+      fx(1.85, 'stomp', 'feet', 0.9),
+      fx(EXEC_HIT, 'flashline', 'tip', 1.6, BOLT),
+      fx(EXEC_HIT, 'bolt', 'tip', 1.2),
+      fx(EXEC_HIT, 'sparkle', 'tip', 1.3, BOLT),
+      fx(EXEC_HIT + 0.02, 'shockwave', 'feet', 1.1, BOLT),
+      fx(2.5, 'embers', 'tip', 0.8, BOLT),
+      fx(2.78, 'dust', 'feet', 0.8),
+      fx(2.8, 'shockwave', 'feet', 0.6, BOLT),
+    ],
+    trail: { life: 0.28, glow: 0.9 },
+  }),
   // Pole Vault: the butt planted, a backflip over the glaive, and a landing well out of reach
   leap: mv({
     keys: [

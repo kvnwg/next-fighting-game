@@ -645,7 +645,7 @@ export class CharacterModel {
     this.swingMain = f.swingMain;
     this.swingOff = f.swingOff;
     // lightning crackles along the spear through heavy swings and the special
-    const charged = a.state === 'attack' && (isHeavyKey(a.key) || a.key === 'sp');
+    const charged = (a.state === 'attack' && (isHeavyKey(a.key) || a.key === 'sp')) || a.state === 'execute';
     this.charged.forEach((m, i) => (m.visible = charged && Math.sin(performance.now() / 21 + i * 2.1) > -0.35));
 
     // body
