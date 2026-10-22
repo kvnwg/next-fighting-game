@@ -59,7 +59,7 @@ const chop = [
 // Cyclone (ref2 1.1-1.9 s): the head dragged out to his left along the floor, then whirled round
 // flat at chest height one whole turn and a quarter, the fists up in front of his chest and the
 // body upright over a wide base; the hit as it comes round the front, then he drops into a lunge
-const cyc: ReturnType<typeof H>[] = [H(-1.3, LOW, GUARD_DIR), H(-1.0, [0.02, 0.24, 0.28], aim(118, -26))];
+const cyc: ReturnType<typeof H>[] = [H(-1.3, LOW, GUARD_DIR), H(-1.0, [0.0, 0.26, 0.2], aim(170, -18))];
 for (let i = 1; i <= 10; i++) cyc.push(H(-1.0 + (1.45 * i) / 10, [0.0, 0.42 - 0.012 * i, 0.4 + 0.006 * i], aim(95 - 45.5 * i, Math.min(8, -20 + 6 * i))));
 cyc.push(H(0.62, [-0.05, 0.28, 0.46], aim(-410, -10)), H(0.82, REST, aim(-440, -28)), H(1.07, REST, aim(-450, -36)));
 

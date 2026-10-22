@@ -23,9 +23,9 @@ const windmill = [
   H(-0.38, [-0.08, 0.34, 0.3], aim(110, -34)),
   H(-0.16, [-0.13, 0.5, 0.26], aim(145, -22)),
   H(0.02, [-0.16, 0.62, 0.16], aim(150, 4)),
-  // the chamber: the fists up past the right of the helm, the head hung as far back over the
-  // left shoulder as it goes
-  H(0.14, [-0.17, 0.74, 0.12], aim(147, 12)),
+  // the chamber: the fists up past the right of the helm, the head hung right back over his back
+  // behind the left shoulder, as far as it goes
+  H(0.14, [-0.17, 0.8, 0.08], aim(170, 30)),
   H(0.26, HIGH, aim(150, 62)),
   H(0.33, OVER, aim(0, 86)),
   H(0.39, [-0.04, 0.6, 0.42], aim(-4, 40)),
@@ -41,8 +41,8 @@ const cleave = [
   H(-0.5, [0.02, 0.24, 0.44], aim(-18, -32)),
   H(-0.25, [0.02, 0.24, 0.36], aim(60, -34)),
   H(-0.05, [-0.04, 0.26, 0.28], aim(135, -28)),
-  // the chamber: the fists drawn back past the right hip, the head hung low far behind him
-  H(0.1, [-0.08, 0.27, 0.2], aim(158, -22)),
+  // the chamber: the fists drawn back past the right hip, the head hung low right round behind him
+  H(0.1, [-0.1, 0.3, 0.12], aim(-166, -6)),
   H(0.28, [-0.06, 0.3, 0.4], aim(70, -12)),
   H(0.45, [-0.1, 0.4, 0.45], aim(-15, 16)),
   H(0.62, [-0.15, 0.62, 0.34], aim(-55, 44)),
@@ -57,8 +57,8 @@ const quake = [
   H(-1.1, [-0.15, 0.76, 0.24], aim(-135, 54)),
   H(-0.75, [-0.1, 0.86, 0.2], aim(-70, 72)),
   H(-0.4, OVER, aim(0, 86)),
-  // the chamber: at full stretch overhead, tipped back as far as the tell allows
-  H(0.05, [-0.03, 0.96, 0.2], aim(10, 66)),
+  // the chamber: at full stretch overhead and tipped right back, the head hung over his back
+  H(0.05, [-0.1, 0.95, 0.12], aim(180, 62)),
   H(0.27, [-0.03, 0.92, 0.3], aim(0, 64)),
   H(0.37, [-0.04, 0.56, 0.44], aim(0, 34)),
   H(0.45, OUT, aim(0, -2)),
@@ -72,7 +72,7 @@ const dive = [
   H(-0.6, LOW, GUARD_DIR),
   H(-0.35, [-0.08, 0.4, 0.3], aim(100, -6)),
   H(-0.1, [-0.1, 0.62, 0.24], aim(112, 30)),
-  H(0.05, [-0.13, 0.8, 0.16], aim(118, 44)),
+  H(0.05, [-0.15, 0.84, 0.1], aim(165, 42)),
   H(0.27, [-0.04, 0.84, 0.32], aim(30, 74)),
   H(0.37, [-0.03, 0.56, 0.44], aim(0, 38)),
   H(0.45, OUT, aim(0, -4)),
@@ -86,7 +86,7 @@ const sweep = [
   H(-0.6, LOW, GUARD_DIR),
   H(-0.35, [-0.04, 0.34, 0.32], aim(95, 2)),
   H(-0.1, [-0.04, 0.42, 0.26], aim(125, 8)),
-  H(0.05, [-0.06, 0.46, 0.18], aim(146, 12)),
+  H(0.05, [-0.06, 0.46, 0.12], aim(-176, 8)),
   H(0.25, [0.0, 0.4, 0.38], aim(80, 8)),
   H(0.45, CHEST, aim(10, 6)),
   H(0.65, [-0.12, 0.38, 0.4], aim(-62, 6)),
@@ -105,7 +105,7 @@ whirl.push(H(0.65, [-0.02, 0.32, 0.42], aim(410, 0)), H(0.85, [0.0, 0.26, 0.38],
 const meteor = [
   H(-0.4, LOW, GUARD_DIR),
   H(-0.15, [-0.04, 0.6, 0.34], aim(10, 50)),
-  H(0.05, [-0.03, 0.95, 0.2], aim(10, 66)),
+  H(0.05, [-0.1, 0.95, 0.12], aim(180, 60)),
   H(0.27, [-0.03, 0.86, 0.34], aim(0, 64)),
   H(0.37, [-0.04, 0.56, 0.44], aim(0, 36)),
   H(0.45, OUT, aim(0, -4)),
