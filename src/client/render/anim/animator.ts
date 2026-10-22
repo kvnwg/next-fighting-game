@@ -16,6 +16,7 @@ import { FighterState } from '../../../shared/fighter';
 import { BodyKey, BodyPose, ExecuteReact, FxCue, Motion, MoveDef, Pose, Rot, Style, TrailStyle, WeaponXf, bodyToTorso } from './author';
 import { clamp01, easeIn, easeInOut, easeOut, kick, orientWeapon, smooth } from './math';
 import { STYLES, moveFor } from './styles';
+import { CARRY, Carry, GAIT, GAITS, GaitStyle, gait, swingHeight } from './swagger';
 
 export type DodgeKind = 'roll' | 'leap' | 'vanish';
 
@@ -331,8 +332,17 @@ export class Animator {
   private lastElapsed = 0;
   private walkPhase = 0;
   private walkWeight = 0;
-  /** how this fighter walks */
+  /** the share of the walk that is forward (-1 straight back, 0 a strafe) */
+  private walkFwd = 1;
+  /** 0..1 how far the hands have settled into the walk's carry (idle only), eased in and out */
+  private carryK = 0;
+  private carryW = 0;
+  /** just out of the carry: how much of the carried pose still lingers (eases the next state's snap in) */
+  private carryLeft = 0;
+  private lastWalkPhase = 0;
+  /** how this fighter walks, and how it carries itself walking */
   private readonly gaitStyle: GaitStyle;
+  private readonly carryStyle: Carry | undefined;
   /** this fighter's leg length over the reference body's: strides are planned in reference metres */
   legScale = 1;
   private breath = Math.random() * 10;
@@ -349,6 +359,7 @@ export class Animator {
   constructor(readonly char: CharacterDef) {
     this.style = STYLES[char.weaponKind];
     this.gaitStyle = { ...GAIT, ...GAITS[char.weaponKind] };
+    this.carryStyle = CARRY[char.weaponKind];
     this.current = resolve(this.style.guard);
     this.snapshot = cloneResolved(this.current);
   }
@@ -393,6 +404,8 @@ export class Animator {
       s: NaN,
     };
     let rot: Rot = { ...ZERO_ROT };
+    // the walk's clock, and how far the fighter has settled into its carry (see swagger)
+    this.stepWalk(a, dt);
 
     if (a.entrance && this.style.entrance) {
       // the fighter is hidden until their entrance, so it starts straight on its first pose, and it
@@ -439,6 +452,13 @@ export class Animator {
       }
     }
 
+    // just out of the walk's carry into a move, a block or a dodge: the new state blends from the
+    // carried pose (its snapshot), and its first few frames are eased so a hand that has far to go
+    // from the carry doesn't jump there in one
+    if (this.carryLeft > 0.01) {
+      out.pose = lerpResolved(out.pose, this.snapshot, this.carryLeft);
+      this.carryLeft *= Math.exp(-dt / 0.03);
+    }
     if (this.roarT >= 0) rot = this.roarOverlay(a, out, rot, dt);
 
     this.current = cloneResolved(out.pose);
@@ -448,7 +468,7 @@ export class Animator {
     out.spin = rot.spin * Math.PI * 2;
     out.flip = rot.flip * Math.PI * 2;
     out.roll = rot.roll * Math.PI * 2;
-    this.locomotion(a, out.pose, dt);
+    this.locomotion(a, out.pose, dt, out.fx);
     this.applyReactions(out.pose, dt);
     out.feet = this.footTargets(a, out.pose.body, dt, out.lying);
     return out;
@@ -785,6 +805,8 @@ export class Animator {
   private guardPose(a: AnimInput): ResolvedPose {
     const p = resolve(this.style.guard);
     if (a.airborne) shiftHands(p, UP, 0.08);
+    // walking out of a fight pose, the guard gives way to the walk's carry
+    if (a.state === 'idle' && this.carryW > 0.005) this.swagger(a, p);
     return p;
   }
 
@@ -904,41 +926,111 @@ export class Animator {
 
   // ---------------------------------------------------------------- layers
 
-  private locomotion(a: AnimInput, pose: ResolvedPose, dt: number): void {
-    const b = pose.body;
-    const G = this.gaitStyle;
+  /** The walk cycle's clock: how much the fighter is walking, where in the stride, and which way. */
+  private stepWalk(a: AnimInput, dt: number): void {
     const v = a.speed / this.legScale;
     const moving = !a.airborne && a.speed > 0.35 && a.state !== 'dead' && a.state !== 'knockdown' && a.state !== 'broken';
     this.walkWeight += ((moving ? smooth(v / 1.2) : 0) - this.walkWeight) * Math.min(1, dt * 8);
     // a planted foot covers one stride during the stance part of the cycle, so feet don't slide
-    const g = gait(v, G);
-    if (moving) this.walkPhase = (this.walkPhase + g.freq * dt) % 1;
+    if (moving) {
+      this.walkPhase = (this.walkPhase + gait(v, this.gaitStyle).freq * dt) % 1;
+      const len = Math.hypot(a.moveSide, a.moveForward);
+      if (len > 1e-3) this.walkFwd += (a.moveForward / len - this.walkFwd) * Math.min(1, dt * 10);
+    }
+    // settling into the carry takes a moment as the walk gets going, and the guard comes back up as
+    // the fighter stops (a slower, eased blend than the legs', so a weapon turning over to its carry
+    // doesn't snap); anything but idle drops it at once, and the new state blends from it
+    if (a.state === 'idle' && !a.entrance && this.carryStyle) {
+      this.carryLeft = 0;
+      this.carryK += (this.walkWeight - this.carryK) * Math.min(1, dt * 4.5);
+    } else {
+      if (this.carryW > 0.01) this.carryLeft = Math.max(this.carryLeft, this.carryW);
+      this.carryK = 0;
+    }
+    this.carryW = smooth(this.carryK);
+  }
+
+  /**
+   * The swagger: walking out of a fight pose (idle), the fighter falls into its own carry (see
+   * swagger.ts), the arms swinging about the shoulders against the legs. It goes as soon as the
+   * fighter does anything else: the new state blends from the carried pose.
+   */
+  private swagger(a: AnimInput, pose: ResolvedPose): void {
+    const C = this.carryStyle!;
+    const w = this.carryW;
+    const g = gait(a.speed / this.legScale, this.gaitStyle);
+    // 0 with the left foot out in front, the right behind
+    const ph = this.walkPhase * Math.PI * 2 - Math.PI * (g.stance - 0.5);
+    const b = pose.body;
+    for (const c of CARRY_CHANNELS) {
+      const to = C.body[c];
+      if (to !== undefined) b[c] += (to - b[c]) * w;
+    }
+    // the hands go from the guard to the carry
+    pose.main.pos.lerp(C.main.pos, w);
+    pose.main.quat.slerp(C.main.quat, w);
+    pose.main.hold2 += (C.main.hold2 - pose.main.hold2) * w;
+    if (pose.off && C.off) {
+      pose.off.pos.lerp(C.off.pos, w);
+      pose.off.quat.slerp(C.off.quat, w);
+    } else if (C.free) pose.free.lerp(_t.set(C.free[0], C.free[1], C.free[2]), w);
+    // the arms swing against the legs, the right forward with the left foot, further the faster
+    // the walk; walking backward they swing the other way round with the legs, strafing hardly
+    const k = Math.min(1.5, Math.max(0.6, 0.55 + (a.speed / this.legScale) / 4.5));
+    const sw = Math.cos(ph) * this.walkFwd * k * w;
+    swingArm(pose.main.pos, pose.main.quat, SHOULDER_R, C.swingR * sw, C.followR, C.bend);
+    if (pose.off && C.off) swingArm(pose.off.pos, pose.off.quat, SHOULDER_L, -C.swingL * sw, C.followL, C.bend);
+    else swingArm(pose.free, null, SHOULDER_L, -C.swingL * sw, 0, C.bend);
+    if (C.twirl) {
+      // a flick of the wrist: the point goes round a small circle once a stride
+      _q.setFromAxisAngle(UP, C.twirl * Math.cos(ph) * w);
+      pose.main.quat.premultiply(_q);
+      _q.setFromAxisAngle(X_AXIS, C.twirl * 0.7 * Math.sin(ph) * w);
+      pose.main.quat.premultiply(_q);
+    }
+  }
+
+  private locomotion(a: AnimInput, pose: ResolvedPose, dt: number, fx: FxCue[]): void {
+    const b = pose.body;
+    const G = this.gaitStyle;
+    const v = a.speed / this.legScale;
     const w = this.walkWeight;
     if (w > 0.01) {
+      const g = gait(v, G);
       const ph = this.walkPhase * Math.PI * 2;
+      // 0 with the left foot out in front: the pelvis and shoulders turn furthest here
+      const phL = ph - Math.PI * (g.stance - 0.5);
+      const fwd = this.walkFwd;
       // stand up out of the fighting crouch to walk (not mid-attack, where the move owns the legs)
       if (a.state === 'idle' || a.state === 'block') b.crouch += (Math.max(b.crouch, G.crouch) - b.crouch) * w;
       // and sink a little into long strides, so the legs can reach them
       b.crouch -= 0.05 * smooth((g.stride - 0.55) / 0.3) * w;
       // lowest as each foot lands and takes the weight, highest as the body vaults over it
       const land = 0.5 + 0.5 * Math.cos(2 * ph);
-      b.lift += (-Math.pow(land, G.heavy) * G.bob + G.bob * 0.35) * w;
+      const drop = Math.pow(land, G.heavy);
+      b.lift += (-drop * G.bob + G.bob * 0.35) * w;
       // the weight rolls over onto whichever foot is planted (L is planted around phase st/2)
       const onL = Math.cos(ph - Math.PI * g.stance);
       b.side -= onL * G.roll * w;
       b.side -= 0.07 * a.moveSide * w;
-      b.lean += G.lean * a.moveForward * w * Math.min(1, v / 4);
-      // hips swing with the legs, shoulders counter-turn
-      b.hipTwist -= Math.sin(ph) * G.hips * w;
-      b.twist += Math.sin(ph) * G.hips * 0.6 * w;
+      const lean = G.lean * fwd * w * Math.min(1, v / 4);
+      b.lean += lean;
+      // the head stays level as the body pitches into the run, and dips as each foot lands
+      b.headPitch -= lean * 0.5;
+      if (a.state === 'idle' || a.state === 'block') b.headPitch += G.nod * Math.pow(land, 3) * w;
+      // the pelvis turns with the legs (the left hip forward with the left foot) and the shoulders
+      // counter-turn against it: loosely, or with the fighter's own swagger out of a fight pose
+      b.hipTwist -= Math.cos(phL) * G.hips * fwd * w;
+      const shoulders = G.hips * 0.6 + (G.shoulders - G.hips * 0.6) * this.carryW;
+      b.twist += Math.cos(phL) * shoulders * fwd * w;
       // the weapon rides the bob and sways with the roll
-      shiftHands(pose, UP, (Math.pow(land, G.heavy) * -0.6 + 0.2) * G.bob * 0.5 * w);
+      shiftHands(pose, UP, (drop * -0.6 + 0.2) * G.bob * 0.5 * w);
       shiftHands(pose, LEFT, -onL * G.roll * 0.25 * w);
-      // arms pump against the legs: the right hand comes forward with the left foot (only out of
-      // a move, which owns the hands)
-      if (G.arms > 0 && (a.state === 'idle' || a.state === 'block')) {
-        const swing = Math.cos(ph) * G.arms * w * Math.min(1, v / 2);
-        const lift = Math.abs(Math.cos(ph)) * G.arms * 0.3 * w;
+      // walking with the guard up, the arms pump against the legs: the right hand comes forward
+      // with the left foot (only out of a move, which owns the hands)
+      if (G.arms > 0 && a.state === 'block') {
+        const swing = Math.cos(phL) * G.arms * w * Math.min(1, v / 2) * fwd;
+        const lift = Math.abs(Math.cos(phL)) * G.arms * 0.3 * w;
         pose.main.pos.z += swing;
         pose.main.pos.y += lift;
         if (pose.off) {
@@ -947,7 +1039,14 @@ export class Animator {
         }
         pose.free.z -= swing;
       }
+      // the heavy ones' footfalls kick up the dust (the left lands at phase 0, the right at 0.5)
+      const p = this.walkPhase;
+      const prev = this.lastWalkPhase;
+      if (G.dust > 0 && w > 0.6 && (a.state === 'idle' || a.state === 'block') && (p < prev || (prev < 0.5 && p >= 0.5))) {
+        fx.push({ s: 0, kind: 'dust', at: 'feet', scale: G.dust * Math.min(1.3, 0.6 + v / 5) });
+      }
     }
+    this.lastWalkPhase = this.walkPhase;
     // breathing
     this.breath += dt;
     const br = Math.sin(this.breath * 1.9) * (1 - w);
@@ -1022,6 +1121,8 @@ export class Animator {
       const len = Math.hypot(dirX, dirZ) || 1;
       const G = this.gaitStyle;
       const { stride, stance: st, lift } = gait(a.speed / this.legScale, G);
+      // the pelvis shifts out over the planted foot (the feet in towards the root under it)
+      const sway = -Math.cos(this.walkPhase * Math.PI * 2 - Math.PI * st) * G.sway;
       for (const [foot, off] of [['L', 0], ['R', 0.5]] as const) {
         const p = (this.walkPhase + off) % 1;
         let along: number;
@@ -1030,10 +1131,11 @@ export class Animator {
         else {
           const q = (p - st) / (1 - st);
           along = -stride / 2 + stride * easeInOut(q);
-          // the knee comes up early and the foot drops onto the ground (hard, for the heavy)
-          up = Math.pow(Math.sin(Math.PI * Math.pow(q, 0.8)), 1 / G.heavy) * lift;
+          // the foot comes up (early: the heel flicks up behind; late: the knee lifts in front) and
+          // drops onto the ground (hard, for the heavy)
+          up = swingHeight(q, G) * lift;
         }
-        const target = new THREE.Vector3((foot === 'L' ? G.width : -G.width) + (dirX / len) * along, 0.05 + up, (dirZ / len) * along);
+        const target = new THREE.Vector3((foot === 'L' ? G.width : -G.width) + sway + (dirX / len) * along, 0.05 + up, (dirZ / len) * along);
         stance[foot].lerp(target, w);
       }
     }
@@ -1101,66 +1203,20 @@ const REACH: Partial<Record<WeaponKind, number>> = {
   swordShield: 0.14,
 };
 
-/** How a fighter walks: the defaults, and each weapon style's character. */
-interface GaitStyle {
-  /** steps per second relative to a person's */
-  cadence: number;
-  /** feet apart (reference metres, each side) */
-  width: number;
-  /** vertical bob (m) and how hard each step lands (1 soft, higher drops onto the foot) */
-  bob: number;
-  heavy: number;
-  /** the body rolls over onto the planted foot (rad) */
-  roll: number;
-  /** hip swing (rad; the shoulders counter-turn about half as much) */
-  hips: number;
-  /** forward lean at full speed (rad) */
-  lean: number;
-  /** step height (reference metres at a walk) */
-  lift: number;
-  /** legs straighten to at least this crouch to walk */
-  crouch: number;
-  /** the longest stride a planted foot covers (reference metres) before steps just come faster */
-  reach: number;
-  /** how far the hands pump forward and back against the legs (reference metres): for light
-   * weapons in each hand, or a free hand; two-handed weapons stay in guard */
-  arms: number;
-}
-
-const GAIT: GaitStyle = { cadence: 1, width: 0.14, bob: 0.035, heavy: 1, roll: 0.035, hips: 0.12, lean: 0.14, lift: 0.1, crouch: -0.05, reach: 0.78, arms: 0 };
-
-const GAITS: Partial<Record<WeaponKind, Partial<GaitStyle>>> = {
-  // the Warden lumbers: wide-legged, slow heavy steps that drop onto each foot, the whole bulk
-  // rolling from side to side over the planted leg
-  greathammer: { cadence: 0.78, width: 0.2, bob: 0.075, heavy: 2.2, roll: 0.11, hips: 0.2, lean: 0.2, lift: 0.13, crouch: -0.09, reach: 0.88 },
-  // armoured, measured
-  swordShield: { cadence: 0.9, width: 0.16, bob: 0.045, heavy: 1.5, roll: 0.05, hips: 0.12, lift: 0.1 },
-  spear: { cadence: 0.95, width: 0.15, bob: 0.04, heavy: 1.3, roll: 0.045 },
-  // light on their feet
-  rapier: { cadence: 1.08, width: 0.12, bob: 0.03, roll: 0.025, hips: 0.14, lift: 0.09, crouch: -0.02, arms: 0.07 },
-  // runs low with the knives held down, arms pumping
-  daggers: { cadence: 1.12, width: 0.13, bob: 0.028, roll: 0.03, hips: 0.1, lift: 0.08, crouch: -0.07, reach: 0.82, arms: 0.16 },
-  // the old monk: unhurried, grounded
-  gauntlets: { cadence: 0.92, width: 0.15, bob: 0.03, heavy: 1.2, roll: 0.04, hips: 0.1, arms: 0.1 },
-  // the wraith floats: a slow glide, no footfalls
-  scythe: { cadence: 0.7, bob: 0.025, heavy: 1, roll: 0.015, hips: 0.05, lean: 0.1 },
-};
+/** The body channels a walk's carry sets. */
+const CARRY_CHANNELS = ['lean', 'twist', 'hipTwist', 'side', 'headPitch', 'crouch'] as const;
+const SHOULDER_R = new THREE.Vector3(-0.33, 0.5, 0);
+const SHOULDER_L = new THREE.Vector3(0.33, 0.5, 0);
+const _swing = new THREE.Quaternion();
 
 /**
- * The walk cycle at a speed (reference metres per second): how fast the cycle turns, the stride
- * a planted foot covers, the share of the cycle a foot is planted, and the step height. A person
- * takes about 1.8 steps a second at a stroll and nearly 3 at a run; the stride grows with speed
- * until the legs can't reach further, and beyond that the steps come faster with more air.
+ * Swing an arm about its shoulder (torso space; + brings the hand forward), the elbow bending into
+ * the forward swing; a held item turns with it by `follow`.
  */
-function gait(v: number, G: GaitStyle): { freq: number; stride: number; stance: number; lift: number } {
-  let freq = G.cadence * Math.min(1.7, 0.62 + 0.2 * v);
-  let stance = 0.62 - 0.2 * smooth((v - 1.8) / 2.5);
-  let stride = (v * stance) / freq;
-  const reach = G.reach;
-  if (stride > reach) {
-    stride = reach;
-    stance = Math.max(0.3, (reach * freq) / Math.max(0.01, v));
-    freq = (v * stance) / stride;
-  }
-  return { freq, stride, stance, lift: G.lift * (1 + 0.25 * Math.min(3, v)) };
+function swingArm(hand: THREE.Vector3, quat: THREE.Quaternion | null, shoulder: THREE.Vector3, angle: number, follow: number, bend: number): void {
+  if (Math.abs(angle) < 1e-5) return;
+  _swing.setFromAxisAngle(X_AXIS, -angle);
+  hand.sub(shoulder).applyQuaternion(_swing).add(shoulder);
+  if (angle > 0) hand.y += bend * angle;
+  if (quat && follow) quat.premultiply(_swing.setFromAxisAngle(X_AXIS, -angle * follow));
 }
