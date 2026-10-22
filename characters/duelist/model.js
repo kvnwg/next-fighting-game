@@ -84,14 +84,19 @@ export function buildDuelist() {
   b.bone('head', 'torso', [0, 62.5, 0.3]);
   b.bone('hair', 'head', [0, 65.2, -5.2]);
   b.bone('cape', 'torso', [5, 59, -4]);
-  b.bone('pauldronR', 'torso', [-9.5, 58.5, 0]);
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
     b.bone(`upperArm${side}`, 'torso', [9.5 * s, SHOULDER_Y, 0]);
     b.bone(`forearm${side}`, `upperArm${side}`, [21 * s, SHOULDER_Y, 0]);
     b.bone(`hand${side}`, `forearm${side}`, [30 * s, SHOULDER_Y, 0]);
     b.bone(`thigh${side}`, 'pelvis', [3.8 * s, 40, 0]);
     b.bone(`shin${side}`, `thigh${side}`, [3.8 * s, 22, 0.3]);
+    // the coat skirts below the waist seam hang from each hip and move with that thigh, parting
+    // at the front opening and a back vent, so a stepping or lunging leg carries its skirt along
+    // instead of swinging out through it
+    b.bone(`coat${side}`, `thigh${side}`, [3.8 * s, 40, 0]);
   }
+  // the pauldron is strapped to the upper arm: it caps the shoulder and rises with the arm
+  b.bone('pauldronR', 'upperArmR', [-9.5, 58.5, 0]);
   b.bone('rapier', 'pelvis', [8.8, 41, 4]);
 
   // ---- legs: trousers and tall cuffed boots --------------------------------
@@ -99,6 +104,8 @@ export function buildDuelist() {
     const cx = 3.8 * s;
     b.use(`thigh${side}`).fill([cx - 5, 22, -5], [cx + 5, 41, 5], (p) => (sel((p[0] - cx) / 3.4, p[2] / 3.6) <= 1 ? 'trouser' : undefined));
     b.use(`shin${side}`);
+    // the boot rides the shin; its flared cuff, which stands above the knee, rides the thigh, so a
+    // bent knee folds at the knee instead of driving the cuff into the back of the thigh
     b.fill([cx - 5, 0, -5], [cx + 5, 25.5, 7], (p) => {
       const y = p[1];
       if (y < 3.5) {
@@ -112,11 +119,13 @@ export function buildDuelist() {
       if (y > 21 && q < sel((cuff - 1) / cuff, 0)) return undefined; // open cuff
       if (y > 24.5 || Math.abs(y - 21) < 0.5) return 'bootHi';
       return 'boot';
-    });
+    }, { bone: (p) => (p[1] > 22.6 ? `thigh${side}` : `shin${side}`) });
   }
 
   // ---- pelvis: belts and the long split coat --------------------------------
   b.use('pelvis');
+  // the yoke above the seam stays on the hips; the skirts below it ride the thighs (coatL/coatR)
+  const COAT_SEAM = 37;
   b.fill([-14, 13, -10], [14, 41, 10], (p, v) => {
     const s = 40.5 - p[1];
     const X = 8.1 + s * 0.16, Z = 5.5 + s * 0.11;
@@ -129,7 +138,7 @@ export function buildDuelist() {
     if (p[1] < 14 + hash3(v[0], 1, v[2]) * 0.8) return undefined;
     if (p[1] < 15 || (p[2] > 0 && Math.abs(p[0]) < gap + 0.9)) return 'coatTrim';
     return Math.sin(a * 8) > 0.6 ? 'coatHi' : 'coat';
-  });
+  }, { bone: (p) => (p[1] > COAT_SEAM ? 'pelvis' : p[0] >= 0 ? 'coatL' : 'coatR') });
   b.fill([-10, 38.6, -7], [10, 42.2, 7], (p) => {
     if (sel(p[0] / 8.6, p[2] / 6.0) > 1) return undefined;
     if (p[2] > 4.5 && Math.abs(p[0] - 0.5) < 1.4) return Math.abs(p[0] - 0.5) < 0.6 ? 'leatherDark' : 'brass';
@@ -313,7 +322,6 @@ export const poses = {
   apose: {
     upperArmL: [0, 0, -50],
     upperArmR: [0, 0, 50],
-    pauldronR: [0, 0, 22],
     forearmL: [0, -10, -6],
     forearmR: [0, 10, 6],
   },

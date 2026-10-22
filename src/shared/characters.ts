@@ -289,11 +289,11 @@ const duelist: BaseDef = {
   ratings: { power: 2, speed: 4, reach: 4, defense: 2, difficulty: 4 },
   lights: [
     { name: 'Lunge', anim: 'thrust', windup: 240, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.4, arc: 16, lunge: 0.8, feintable: true },
-    { name: 'Disengage', anim: 'thrust', windup: 220, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.4, arc: 16, lunge: 0.5, feintable: true },
+    { name: 'Rising Cut', anim: 'thrust', windup: 220, active: 70, recovery: 280, damage: 7, posture: 9, blockPosture: 10, range: 3.4, arc: 16, lunge: 0.5, feintable: true },
     // a cut, not a thrust: it covers a wider angle
-    { name: 'Whip Cut', anim: 'slashL', windup: 220, active: 70, recovery: 300, damage: 7, posture: 9, blockPosture: 10, range: 3.3, arc: 25, lunge: 0.5, feintable: true },
+    { name: 'Coupé', anim: 'slashL', windup: 220, active: 70, recovery: 300, damage: 7, posture: 9, blockPosture: 10, range: 3.3, arc: 25, lunge: 0.5, feintable: true },
   ],
-  heavy: { name: 'Pirouette', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.7, arc: 16, lunge: 1.5, feintable: true },
+  heavy: { name: 'Moulinet', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.7, arc: 16, lunge: 1.5, feintable: true },
   special: { name: 'Coup de Grace', anim: 'thrust', windup: 620, active: 140, recovery: 600, damage: 20, posture: 30, blockPosture: 30, range: 4.7, arc: 15, lunge: 3.5, perilous: 'thrust', cooldown: 6500 },
   ability: {
     kind: 'attack',
@@ -483,15 +483,15 @@ const EXTRA: Record<CharacterId, Record<ExtraKey, Named>> = {
     jh: { name: 'Meteor', anim: 'slam', knockback: 1.2 },
   },
   duelist: {
-    h1: { name: 'Prise de Fer', anim: 'thrust' },
-    h2: { name: 'Grand Salut', anim: 'slashR' },
+    h1: { name: 'Tranchant', anim: 'thrust' },
+    h2: { name: 'Grand Coupé', anim: 'slashR' },
     // the hop and deep lunge, now what a forward dodge flows into
     dl: { name: 'Balestra', anim: 'thrust', windup: 300, active: 80, recovery: 420, damage: 10, posture: 12, blockPosture: 14, range: 3.6, arc: 16, lunge: 1.4, feintable: true },
-    dh: { name: 'Passata', anim: 'thrust' },
+    dh: { name: 'Flèche Dive', anim: 'thrust' },
     bl: { name: 'Retreating Cut', anim: 'slashL' },
-    bh: { name: 'Volte', anim: 'spin' },
-    jl: { name: 'Petal Lunge', anim: 'thrust' },
-    jh: { name: 'Sky Piercer', anim: 'thrust' },
+    bh: { name: 'Cartwheel Cut', anim: 'spin' },
+    jl: { name: 'Aerial Sweep', anim: 'thrust' },
+    jh: { name: 'Somersault Plunge', anim: 'thrust' },
   },
   lancer: {
     h1: { name: 'Cross Cleave', anim: 'sweep' },
