@@ -38,6 +38,8 @@ export class TouchControls {
   private stickId: number | null = null;
   private stickOrigin = { x: 0, y: 0 };
   private looks = new Map<number, { x: number; y: number }>();
+  /** which pointer holds each fight button down */
+  private held = new Map<Bind, number>();
   private shown = { special: false };
 
   constructor(
@@ -72,23 +74,15 @@ export class TouchControls {
     for (const el of this.root.querySelectorAll<HTMLElement>('[data-bind]')) {
       const bind = el.dataset.bind as Bind;
       this.btn[bind] = el;
-      let pointer: number | null = null;
       el.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        if (pointer !== null) return;
-        pointer = e.pointerId;
+        // a fresh press always takes the button, even if the last lift never arrived
+        if (this.held.has(bind)) this.releaseButton(bind, e.timeStamp);
+        this.held.set(bind, e.pointerId);
         el.setPointerCapture(e.pointerId);
         el.classList.add('down');
         this.input.virtual(bind, true, e.timeStamp);
       });
-      const up = (e: PointerEvent) => {
-        if (e.pointerId !== pointer) return;
-        pointer = null;
-        el.classList.remove('down');
-        this.input.virtual(bind, false, e.timeStamp);
-      };
-      el.addEventListener('pointerup', up);
-      el.addEventListener('pointercancel', up);
       el.addEventListener('contextmenu', (e) => e.preventDefault());
     }
     for (const el of this.root.querySelectorAll<HTMLElement>('[data-act]')) {
@@ -100,7 +94,11 @@ export class TouchControls {
     pad.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       pad.setPointerCapture(e.pointerId);
-      if (this.stickId === null && e.clientX < window.innerWidth * 0.45) {
+      // a new touch on the left always takes the stick: if the last thumb's lift got lost (the
+      // controls hidden under a cinematic, a system gesture), the stick would otherwise stay
+      // pushed with no way to grab it back
+      if (e.clientX < window.innerWidth * 0.45) {
+        if (this.stickId !== null) this.resetStick();
         this.stickId = e.pointerId;
         this.stickOrigin = { x: e.clientX, y: e.clientY };
         this.base.classList.remove('idle');
@@ -109,7 +107,9 @@ export class TouchControls {
         this.moveStick(e.clientX, e.clientY);
       } else this.looks.set(e.pointerId, { x: e.clientX, y: e.clientY });
     });
-    pad.addEventListener('pointermove', (e) => {
+    // moves and lifts are watched on the window, not the pad: a pointer whose capture was lost
+    // (the controls hidden mid-touch) still reports there
+    window.addEventListener('pointermove', (e) => {
       if (e.pointerId === this.stickId) {
         this.moveStick(e.clientX, e.clientY);
         return;
@@ -124,9 +124,28 @@ export class TouchControls {
     const end = (e: PointerEvent) => {
       if (e.pointerId === this.stickId) this.resetStick();
       this.looks.delete(e.pointerId);
+      for (const [bind, id] of this.held) if (id === e.pointerId) this.releaseButton(bind, e.timeStamp);
     };
-    pad.addEventListener('pointerup', end);
-    pad.addEventListener('pointercancel', end);
+    window.addEventListener('pointerup', end, true);
+    window.addEventListener('pointercancel', end, true);
+    // the backstop: when no finger is on the glass at all, nothing can be held, whatever pointer
+    // events went missing (iOS can drop the lift of a captured pointer)
+    const none = (e: TouchEvent) => {
+      if (e.touches.length === 0) this.cancel();
+    };
+    window.addEventListener('touchend', none, true);
+    window.addEventListener('touchcancel', none, true);
+    // leaving the page (app switch, notification shade) can swallow every lift
+    window.addEventListener('blur', () => this.cancel());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.cancel();
+    });
+  }
+
+  private releaseButton(bind: Bind, time: number): void {
+    this.held.delete(bind);
+    this.btn[bind]?.classList.remove('down');
+    this.input.virtual(bind, false, time);
   }
 
   private moveStick(x: number, y: number): void {
@@ -166,6 +185,7 @@ export class TouchControls {
   cancel(): void {
     this.resetStick();
     this.looks.clear();
+    for (const bind of [...this.held.keys()]) this.releaseButton(bind, performance.now());
   }
 
   update(s: TouchState): void {
