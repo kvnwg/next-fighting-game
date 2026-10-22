@@ -144,6 +144,8 @@ const _cp = new THREE.Vector3();
 const _cv = new THREE.Vector3();
 const _cf = new THREE.Vector3();
 const _cq = new THREE.Quaternion();
+const _cl1 = new THREE.Vector3();
+const _cl2 = new THREE.Vector3();
 const _chainM = new THREE.Matrix4();
 const _chainA = new THREE.Vector3();
 const _chainB = new THREE.Vector3();
@@ -538,6 +540,23 @@ export class CharacterModel {
         c.vb += (s.k * (tb - c.b) - damp * c.vb) * h;
         c.a += c.va * h;
         c.b += c.vb * h;
+      }
+      // a cape is pushed back by a thigh swinging back into it (the rear leg in a deep lunge)
+      if (!c.front && (s === CLOTH.cape || s === CLOTH.cloak)) {
+        const parent = c.pivot.parent!;
+        let push = -Infinity;
+        for (const leg of [this.legL, this.legR]) {
+          leg.upper.getWorldPosition(_cl1);
+          leg.lower.getWorldPosition(_cl2);
+          parent.worldToLocal(_cl1);
+          parent.worldToLocal(_cl2);
+          _cl2.sub(_cl1);
+          push = Math.max(push, Math.atan2(-_cl2.z, Math.max(1e-3, -_cl2.y)) - 0.15);
+        }
+        if (c.a < push) {
+          c.a = Math.min(hi, push);
+          c.va = Math.max(0, c.va);
+        }
       }
       if (c.a < lo || c.a > hi) {
         c.a = Math.min(hi, Math.max(lo, c.a));
