@@ -95,6 +95,9 @@ export function buildAssassin() {
     b.bone(`hand${side}`, `forearm${side}`, [30 * s, SHOULDER_Y, 0]);
     b.bone(`thigh${side}`, 'pelvis', [4.2 * s, 38, 0]);
     b.bone(`shin${side}`, `thigh${side}`, [4.2 * s, 20, 0.3]);
+    // the ankle: the boot's sole and toe ride the foot so they stay flat on the ground while the
+    // shin tilts over them in lunges, instead of tipping with the shin
+    b.bone(`foot${side}`, `shin${side}`, [4.2 * s, 4, 0.3]);
   }
   b.bone('daggerThigh', 'thighR', [-8.2, 34, 1]);
   b.bone('daggerBack', 'pelvis', [0, 38.5, -6.6]);
@@ -107,6 +110,7 @@ export function buildAssassin() {
       return p[1] < 22.5 ? 'leatherHi' : 'cloth';
     });
     b.use(`shin${side}`);
+    const below = (p) => (p[1] < 4 ? `foot${side}` : `shin${side}`);
     b.fill([cx - 5, 0, -5], [cx + 5, 20, 7], (p) => {
       const y = p[1];
       const a = Math.atan2(p[2], p[0] - cx);
@@ -121,7 +125,7 @@ export function buildAssassin() {
       // crossing wraps up the shin
       if (y < 18 && (Math.floor(y * 0.9 + a * 1.3) % 4 === 0 || Math.floor(y * 0.9 - a * 1.3) % 4 === 0)) return 'strap';
       return y < 18 ? 'wrapShade' : 'cloth';
-    });
+    }, { bone: below });
     b.ellipsoid([cx, 20.5, 2.6], [2.6, 2.2, 1.8], 'leatherHi'); // knee pad
   }
   // thigh strap holding the sheath
@@ -143,14 +147,16 @@ export function buildAssassin() {
   });
   b.box([6.2, 34, -2.2], [9.0, 37.5, 2.6], (p) => (p[1] > 36.8 ? 'strapHi' : 'leatherHi')); // pouch
   b.box([-9.2, 35.5, -4.8], [-6.6, 38, -1.2], 'leatherHi');
-  // tattered cloth flaps front and back
+  // tattered cloth flaps front and back, split down the middle: each half hangs from its own
+  // thigh, so a stride or a high knee carries its half along instead of the thigh swinging
+  // through a panel fixed to the pelvis
   for (const sz of [1, -1])
     b.fill([-6, 22, -8], [6, 37, 8], (p, v) => {
       const z = sz * (5.4 + (37 - p[1]) * 0.08);
       if (Math.abs(p[2] - z) > 0.6 || Math.abs(p[0]) > 4.6 - (37 - p[1]) * 0.06) return undefined;
       if (p[1] < 23 + hash3(v[0], 4, sz) * 7) return undefined;
       return Math.floor(p[0] + 10) % 3 === 0 ? 'tealDark' : 'cloth';
-    });
+    }, { bone: (p) => (p[0] > 0 ? 'thighL' : 'thighR') });
 
   // ---- torso: woven leather, bandolier, chest strap ------------------------
   b.use('torso');
