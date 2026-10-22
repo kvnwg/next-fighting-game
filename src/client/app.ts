@@ -750,7 +750,8 @@ class App {
         this.effects.hitFlare(pos, swing, this.tmp3.subVectors(this.renderer.camera.position, pos).normalize(), heavy ? '#ff2a4a' : '#ff5a78', heavy ? 1.25 : 1);
         this.effects.flash(pos, '#ffffff', heavy ? 1.0 : 0.75, 0.1);
         d?.model.flash(heavy ? '#ff6a5a' : '#ffffff', 1.2);
-        d?.model.react('hit');
+        // knocked the way the blade went: + travels toward the defender's left
+        if (d) d.model.react('hit', { side: Math.max(-1, Math.min(1, swing.x * Math.cos(d.yaw) - swing.z * Math.sin(d.yaw))), heavy });
         stop(heavy ? 120 : 80, heavy ? 0.07 : 0.04);
         if (heavy && mine && a && d) {
           const len = Math.hypot(d.pos.x - a.pos.x, d.pos.z - a.pos.z) || 1;
@@ -1050,7 +1051,7 @@ class App {
     }
     this.buffSeen.set(f.id, buff);
     // footsteps, landings, and the whooshes of an execution's choreography
-    audio.motion(f.id, f.roster.char, { vol: this.volumeAt(f.pos.x, f.pos.z), pos: f.pos, speed: f.speed, airborne: f.airborne, state: v.state, tip: v.state === 'execute' ? f.weaponTip(this.tmp3) : null });
+    audio.motion(f.id, f.roster.char, { vol: this.volumeAt(f.pos.x, f.pos.z), pos: f.pos, speed: f.speed, airborne: f.airborne, state: v.state, tip: v.state === 'execute' ? f.weaponTip(this.tmp3) : null, footfall: f.model.frame?.footfall ?? null });
   }
 
   // ------------------------------------------------------------------ frame

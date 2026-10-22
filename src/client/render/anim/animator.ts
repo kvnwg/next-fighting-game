@@ -92,9 +92,20 @@ export interface AnimFrame {
   trail: TrailStyle | null;
   /** where the current move is along its s axis (NaN outside moves; for tools) */
   s: number;
+  /** the pelvis: sideways shift over the planted foot (m, + toward the fighter's left) and its roll (rad) */
+  pelvisShift: number;
+  pelvisRoll: number;
+  /** a foot landed this frame (footsteps) */
+  footfall: 'L' | 'R' | null;
 }
 
 export type Reaction = 'deflect' | 'blocked' | 'hit' | 'roar';
+
+/** How a hit landed: from which side (+1: the blow travels toward the fighter's left) and how hard. */
+export interface HitInfo {
+  side: number;
+  heavy: boolean;
+}
 
 const REST_LEFT = new THREE.Vector3(0.3, 0.12, 0.08);
 /** seconds a style's roar takes */
@@ -346,7 +357,14 @@ export class Animator {
   /** this fighter's leg length over the reference body's: strides are planned in reference metres */
   legScale = 1;
   private breath = Math.random() * 10;
-  private reactions: { kind: Reaction; t: number }[] = [];
+  private reactions: { kind: Reaction; t: number; hit?: HitInfo }[] = [];
+  private footfall: 'L' | 'R' | null = null;
+  private pelvis = { shift: 0, roll: 0 };
+  /** landing from the air: time since touchdown (s) and how hard */
+  private wasAirborne = false;
+  private airTime = 0;
+  private landT = -1;
+  private landK = 0;
   private feet = { L: new THREE.Vector3(0.13, 0.05, 0.2), R: new THREE.Vector3(-0.13, 0.05, -0.18) };
   /** effect cues: the furthest s this move has reached, so each cue fires once */
   private fxMaxS = -Infinity;
@@ -364,13 +382,13 @@ export class Animator {
     this.snapshot = cloneResolved(this.current);
   }
 
-  react(kind: Reaction): void {
+  react(kind: Reaction, hit?: HitInfo): void {
     if (kind === 'roar' && this.style.roar) {
       this.roarT = 0;
       this.roarFxS = -Infinity;
       return;
     }
-    this.reactions.push({ kind, t: 0 });
+    this.reactions.push({ kind, t: 0, hit });
     if (this.reactions.length > 6) this.reactions.shift();
   }
 
@@ -402,6 +420,9 @@ export class Animator {
       ghost: false,
       trail: null,
       s: NaN,
+      pelvisShift: 0,
+      pelvisRoll: 0,
+      footfall: null,
     };
     let rot: Rot = { ...ZERO_ROT };
     // the walk's clock, and how far the fighter has settled into its carry (see swagger)
@@ -470,7 +491,12 @@ export class Animator {
     out.roll = rot.roll * Math.PI * 2;
     this.locomotion(a, out.pose, dt, out.fx);
     this.applyReactions(out.pose, dt);
+    this.landing(a, out.pose, dt);
     out.feet = this.footTargets(a, out.pose.body, dt, out.lying);
+    out.pelvisShift = this.pelvis.shift;
+    out.pelvisRoll = this.pelvis.roll;
+    out.footfall = this.footfall;
+    this.footfall = null;
     return out;
   }
 
@@ -1042,6 +1068,10 @@ export class Animator {
       // the heavy ones' footfalls kick up the dust (the left lands at phase 0, the right at 0.5)
       const p = this.walkPhase;
       const prev = this.lastWalkPhase;
+      if (w > 0.5 && !a.airborne) {
+        if (p < prev) this.footfall = 'L';
+        else if (prev < 0.5 && p >= 0.5) this.footfall = 'R';
+      }
       if (G.dust > 0 && w > 0.6 && (a.state === 'idle' || a.state === 'block') && (p < prev || (prev < 0.5 && p >= 0.5))) {
         fx.push({ s: 0, kind: 'dust', at: 'feet', scale: G.dust * Math.min(1.3, 0.6 + v / 5) });
       }
@@ -1055,11 +1085,40 @@ export class Animator {
     shiftHands(pose, UP, br * 0.008);
   }
 
+  /**
+   * Touching down from the air: the knees take it, a dip and a small pitch forward that springs
+   * back, deeper the longer the fall. Moves that land on their own (plunges) own the legs already.
+   */
+  private landing(a: AnimInput, pose: ResolvedPose, dt: number): void {
+    if (a.airborne) {
+      this.airTime += dt;
+      this.wasAirborne = true;
+      return;
+    }
+    if (this.wasAirborne) {
+      this.wasAirborne = false;
+      this.landT = 0;
+      this.landK = clamp01((this.airTime - 0.15) / 0.5);
+    }
+    this.airTime = 0;
+    if (this.landT < 0) return;
+    this.landT += dt;
+    if (this.landT > 0.4 || a.state === 'attack') {
+      this.landT = -1;
+      return;
+    }
+    const k = kick(this.landT / 0.07) * Math.exp(-this.landT * 7) * (0.4 + 0.6 * this.landK);
+    pose.body.crouch -= 0.2 * k;
+    pose.body.lean += 0.14 * k;
+    pose.body.headPitch += 0.1 * k;
+    shiftHands(pose, UP, -0.05 * k);
+  }
+
   private applyReactions(pose: ResolvedPose, dt: number): void {
     for (let i = this.reactions.length - 1; i >= 0; i--) {
       const r = this.reactions[i];
       r.t += dt;
-      const life = r.kind === 'roar' ? 0.95 : 0.35;
+      const life = r.kind === 'roar' ? 0.95 : r.hit?.heavy ? 0.6 : 0.35;
       if (r.t > life) {
         this.reactions.splice(i, 1);
         continue;
@@ -1083,11 +1142,20 @@ export class Animator {
           break;
         }
         case 'hit': {
-          const k = kick(r.t / 0.05);
-          b.lean -= 0.22 * k;
-          b.headPitch -= 0.35 * k;
-          b.crouch -= 0.04 * k;
-          shiftHands(pose, BACK, 0.04 * k);
+          // knocked the way the blow travelled: twisted and bent away from it, the head snapped
+          // round, the weapon knocked aside; a heavy one rocks the weight back onto the heels and
+          // takes longer to shake off
+          const h = r.hit ?? { side: 0, heavy: false };
+          const big = h.heavy ? 1.6 : 1;
+          const k = kick(r.t / (h.heavy ? 0.07 : 0.05)) * (h.heavy ? Math.exp(-Math.max(0, r.t - 0.12) * 5) : 1);
+          b.lean -= 0.22 * big * k;
+          b.headPitch -= 0.35 * big * k;
+          b.crouch -= 0.04 * big * k;
+          b.twist += h.side * 0.32 * big * k;
+          b.side += h.side * 0.14 * big * k;
+          b.back += (h.heavy ? 0.08 : 0.02) * k;
+          shiftHands(pose, BACK, 0.04 * big * k);
+          pose.main.pos.x += h.side * 0.06 * big * k;
           break;
         }
         case 'roar': {
@@ -1115,14 +1183,19 @@ export class Animator {
       R: new THREE.Vector3(-b.width, 0.05, lead === 'R' ? b.step : -b.back),
     };
     const w = this.walkWeight;
+    this.pelvis.shift *= 0.9;
+    this.pelvis.roll *= 0.9;
     if (w > 0.01) {
       const dirX = a.moveSide;
       const dirZ = a.moveForward;
       const len = Math.hypot(dirX, dirZ) || 1;
       const G = this.gaitStyle;
       const { stride, stance: st, lift } = gait(a.speed / this.legScale, G);
-      // the pelvis shifts out over the planted foot (the feet in towards the root under it)
+      // the pelvis shifts out over the planted foot (and the hip on the swinging side drops), so
+      // the feet stay planted under it
       const sway = -Math.cos(this.walkPhase * Math.PI * 2 - Math.PI * st) * G.sway;
+      this.pelvis.shift = -sway * w;
+      this.pelvis.roll = sway * 2.4 * w;
       for (const [foot, off] of [['L', 0], ['R', 0.5]] as const) {
         const p = (this.walkPhase + off) % 1;
         let along: number;
@@ -1135,7 +1208,7 @@ export class Animator {
           // drops onto the ground (hard, for the heavy)
           up = swingHeight(q, G) * lift;
         }
-        const target = new THREE.Vector3((foot === 'L' ? G.width : -G.width) + sway + (dirX / len) * along, 0.05 + up, (dirZ / len) * along);
+        const target = new THREE.Vector3((foot === 'L' ? G.width : -G.width) + (dirX / len) * along, 0.05 + up, (dirZ / len) * along);
         stance[foot].lerp(target, w);
       }
     }

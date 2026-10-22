@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { CHARACTERS, CharacterDef, CharacterId, isHeavyKey } from '../../shared/characters';
 import { COMBAT } from '../../shared/config';
-import { AnimFrame, AnimInput, Animator, Reaction } from './anim/animator';
+import { AnimFrame, AnimInput, Animator, HitInfo, Reaction } from './anim/animator';
 import { smooth, solveTwoBone } from './anim/math';
 import { CHAR_LAYER, FX_LAYER } from './renderer';
 import { patchMaterial } from './gfx/materials';
@@ -451,8 +451,8 @@ export class CharacterModel {
   }
 
   /** A short additive reaction on top of whatever the fighter is doing. */
-  react(kind: Reaction): void {
-    this.animator.react(kind);
+  react(kind: Reaction, hit?: HitInfo): void {
+    this.animator.react(kind, hit);
   }
 
   /** The chain hangs from the hand to the sickle's ring: a rope of links under gravity, both ends held. */
@@ -671,7 +671,9 @@ export class CharacterModel {
     // crouches and hops scale with the legs; lying, the hips come down to the floor
     const d = this.d;
     this.hips.position.y = d.hipsY * (1 - lying) + (b.crouch * (1 - lying) + b.lift + 0.14 * lying) * this.legK;
-    this.hips.rotation.set(-1.45 * lying, b.hipTwist * (1 - lying) + f.spin, 0);
+    // the pelvis shifts over the planted foot and drops on the swinging side as it walks
+    this.hips.position.x = f.pelvisShift * this.legK * (1 - lying);
+    this.hips.rotation.set(-1.45 * lying, b.hipTwist * (1 - lying) + f.spin, f.pelvisRoll * (1 - lying));
     // flips and cartwheels turn the whole body about the hips; the legs tuck while inverted
     _euler.set(f.flip, 0, f.roll);
     _acro.setFromEuler(_euler);
@@ -679,7 +681,8 @@ export class CharacterModel {
     this.body.quaternion.copy(_acro);
     this.body.position.copy(_pivot).sub(_pivot.clone().applyQuaternion(_acro));
     const tuck = smooth(Math.min(1, (Math.abs(Math.sin(f.flip / 2)) + Math.abs(Math.sin(f.roll / 2))) * 1.7));
-    this.torso.rotation.set(b.lean * (1 - lying * 0.8), b.twist - b.hipTwist, b.side);
+    // the spine counters most of the pelvis's roll, so the shoulders ride level
+    this.torso.rotation.set(b.lean * (1 - lying * 0.8), b.twist - b.hipTwist, b.side - f.pelvisRoll * 0.8 * (1 - lying));
     this.head.rotation.set(b.headPitch - b.lean * 0.5, -b.twist * 0.75, -b.side * 0.6);
 
     // weapons (torso space, carried over to this fighter's reach)

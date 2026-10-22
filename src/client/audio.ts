@@ -299,7 +299,7 @@ class AudioEngine {
    * moves, a landing when they come down from a jump, and whooshes off the weapon tip during an
    * execution's choreography (those moves have no attack state to cue a swing).
    */
-  motion(fighterId: string, char: CharacterId, m: Placed & { speed: number; airborne: boolean; state: string; tip?: V3 | null }): void {
+  motion(fighterId: string, char: CharacterId, m: Placed & { speed: number; airborne: boolean; state: string; tip?: V3 | null; footfall?: 'L' | 'R' | null }): void {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
     let w = this.walkers.get(fighterId);
@@ -316,7 +316,10 @@ class AudioEngine {
     w.air = m.airborne;
     // footsteps only near the listener (a lobby full of walkers would be a drumline)
     const walking = m.vol > 0.45 && grounded && m.speed > 0.6 && (m.state === 'idle' || m.state === 'block' || m.state === 'attack' || m.state === 'stance');
-    if (walking) {
+    if (walking && m.footfall !== undefined) {
+      // the animated feet say when one lands
+      if (m.footfall) this.emit((o) => R.footstep(o, p, { speed: m.speed, floor: this.floor }), { level: LEVEL.step, vol: m.vol, pos: m.pos, wet: WET.step, key: `st:${fighterId}`, gap: 0.12, priority: 0 });
+    } else if (walking) {
       // two footfalls per stride cycle; heavier bodies step a little slower
       const cadence = Math.min(1.7, 0.62 + 0.2 * m.speed) * (p.weight > 1.3 ? 0.85 : 1);
       w.phase += 2 * cadence * dt;
