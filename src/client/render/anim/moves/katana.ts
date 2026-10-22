@@ -15,7 +15,7 @@
  * point-down whip at 3.42-3.75 s, Heaven Splitter the jodan cut at 1.92-2.33 s, Gatotsu the thrust
  * at 2.67-3.00 s, Ground Wheel the wide low sweep at 4.00-4.33 s.
  */
-import { B, K, P, Style, V, X, arc, bodyToTorso, fx, hitAt, line, mv, N, seq, track } from '../author';
+import { B, K, P, Style, X, arc, fx, hitAt, line, mv, N, seq, track } from '../author';
 import type { KeyIn, Motion, V3 } from '../author';
 
 /** The scabbard (torso space): runs back and down from the left hip; the Iai grip sits just outside its mouth. */
@@ -39,29 +39,6 @@ const H = { body: true };
 const one = (pivot: V3, r: number, dirs: V3[], pivot1?: V3) => arc(pivot, r, dirs, NaN, { body: true, pivot1 });
 const two = (pivot: V3, r: number, dirs: V3[], pivot1?: V3) => arc(pivot, r, dirs, G2, { body: true, pivot1 });
 
-/** Where the left hand closes on the hilt in guard (the guard is one-handed, the left on the saya). */
-const GUARD_LEFT: V3 = (() => {
-  const d = N(GUARD_DIR);
-  return [GUARD_GRIP[0] + d.x * G2, GUARD_GRIP[1] + d.y * G2, GUARD_GRIP[2] + d.z * G2];
-})();
-
-/**
- * Where to park the free left hand through a two-handed chamber: on the hilt (a fist at `grip`, the
- * blade along `dir`, both in torso space), less the attack's tell. The tell pushes the whole
- * chamber pose further from guard, the left hand's blend onto the hilt included, which would carry
- * the hand on past the hilt unless the free spot it blends from already sits there once pushed.
- */
-function onHilt(grip: V3, dir: V3, tell: number): V3 {
-  const d = N(dir);
-  const k = 1 - 1 / (1 + tell);
-  return [0, 1, 2].map((i) => grip[i] + [d.x, d.y, d.z][i] * G2 + (SAYA[i] - GUARD_LEFT[i]) * k) as V3;
-}
-
-/** A hips-frame blade direction in torso space, for a torso turned `tw` and pitched `ln`. */
-function inTorso(dir: V3, tw: number, ln: number): V3 {
-  const d = bodyToTorso(V(dir).normalize(), tw, ln);
-  return [d.x, d.y, d.z];
-}
 
 /** A torso-space point seen from the hips, for a torso turned `twist` and pitched `lean` (bodyToTorso undone). */
 function fromTorso(p: V3, twist: number, lean: number): V3 {
@@ -188,7 +165,7 @@ const petal = keyed(petalBody, [
 // Twin Swallow: both hands meet in hasso by the right shoulder; kesa down to the low left, then
 // the blade turns over and snaps back flat from left to right
 const twin = seq([
-  [-0.1, 0.62, swing(0.24, [[-0.8, 0.55, -0.25], [-0.6, 0.65, 0.45], [-0.15, 0.3, 1], [0.45, -0.35, 0.82], [0.7, -0.5, 0.45]], G2, [0, [-0.2, 0.62, 0.1], -0.45, 0.1], [2, [-0.1, 0.4, 0.48], 0.4, 0.5])],
+  [-0.1, 0.62, swing(0.24, [[-0.8, 0.55, -0.25], [-0.6, 0.65, 0.45], [-0.15, 0.3, 1], [0.45, -0.35, 0.82], [0.7, -0.5, 0.45]], G2, [0, [-0.2, 0.62, 0.1], -0.45, 0.1], [2, [-0.06, 0.4, 0.44], 0.4, 0.5])],
   [0.62, 1.12, two([0.0, 0.34, 0.24], 0.24, [[0.7, -0.5, 0.45], [0.85, -0.08, 0.5], [0.45, 0.02, 0.9], [-0.05, 0.05, 1], [-0.65, 0.02, 0.75], [-0.9, -0.05, 0.25]], [-0.04, 0.34, 0.26])],
 ], 0.06);
 const twinHits = [hitAt(twin, 2, 0), hitAt(twin, 3, 1)];
@@ -244,7 +221,7 @@ const wheel = keyed(wheelBody, [
 
 // Crescent Moon: a full turn to the left with the blade trailing low, rising up the right side as
 // the turn closes; a leap, and a kesa cleave from high on the right that lands on the front knee
-const crescent = swing(0.25, [[-0.75, -0.25, -0.6], [-0.95, 0.1, -0.2], [-0.85, 0.45, -0.25], [-0.6, 0.62, 0.5], [-0.15, 0.3, 1], [0.45, -0.12, 0.88], [0.65, -0.15, 0.74]], G2, [2, [-0.2, 0.62, 0.12], -0.55, 0.0], [6, [0.05, 0.46, 0.44], 0.5, 0.76]);
+const crescent = swing(0.25, [[-0.75, -0.25, -0.6], [-0.95, 0.1, -0.2], [-0.85, 0.45, -0.25], [-0.6, 0.62, 0.5], [-0.15, 0.3, 1], [0.45, -0.12, 0.88], [0.65, -0.15, 0.74]], G2, [2, [-0.16, 0.5, 0.16], -0.55, 0.0], [6, [0.05, 0.46, 0.44], 0.5, 0.76]);
 const crescentTop = hitAt(crescent, 3);
 const crescentHit = hitAt(crescent, 4);
 
@@ -280,7 +257,7 @@ const galeHit = 0.8;
 
 // Thunder Draw: hasso on the run, the blade dropping to the right as both hands close, one flat
 // passing cut at the waist, and the body folds right over the front knee as it carries round
-const thunder = swing(0.26, [[-0.92, 0.35, -0.15], [-0.95, 0.1, -0.1], [-0.6, -0.05, 0.8], [0.0, -0.05, 1], [0.65, -0.1, 0.75], [0.95, -0.05, 0.1], [0.72, -0.1, -0.65]], G2, [0, [-0.22, 0.5, 0.12], -0.75, 0.42], [3, [-0.1, 0.45, 0.44], 0.4, 0.62]);
+const thunder = swing(0.26, [[-0.92, 0.35, -0.15], [-0.95, 0.1, -0.1], [-0.6, -0.05, 0.8], [0.0, -0.05, 1], [0.65, -0.1, 0.75], [0.95, -0.05, 0.1], [0.72, -0.1, -0.65]], G2, [0, [-0.22, 0.5, 0.12], -0.75, 0.42], [3, [-0.06, 0.45, 0.41], 0.4, 0.62]);
 const thunderHit = hitAt(thunder, 3);
 
 // Fading Cut: one-handed gyaku kiriage, low on the right up to high on the left, as the rear foot
@@ -292,11 +269,6 @@ const fadingHit = hitAt(fading, 2);
 // on a hop back, and cut down from high on the left as the weight lands
 const wall = two([0, 0.42, 0.14], 0.25, [[0.3, -0.6, 0.72], [0.85, -0.3, 0.4], [0.75, 0.55, -0.3], [0.45, 0.85, 0.2], [0.12, 0.3, 1], [-0.4, -0.2, 0.9], [-0.62, -0.28, 0.72]], [0.0, 0.36, 0.3]);
 const wallTop = hitAt(wall, 3);
-const WALL_TOP_GRIP: V3 = (() => {
-  const d = N([0.75, 0.55, -0.3]);
-  const g = bodyToTorso(V([d.x * 0.25, 0.42 + d.y * 0.25, 0.2 + d.z * 0.25]), 0.5, -0.15);
-  return [g.x, g.y, g.z];
-})();
 const wallHit = hitAt(wall, 4);
 
 // Swallow Dive: in the air, one hand, the blade held out backhand on the left; the whole body
@@ -359,6 +331,56 @@ const entrance = seq([
   [0.96, 2, line(GUARD_GRIP, GUARD_GRIP, GUARD_DIR, GUARD_DIR, GUARD_EDGE)],
 ], 0.012);
 
+// Execution, the last iai. The s axis is seconds here (the execution plays it linearly: the blow at
+// 2.15 s, the rest at 3.0). The blood of the breaking blow is shaken off and the blade fed home in one
+// snap; then stillness in iai, head bowed under the hat, breathing; the eyes come up and the thumb
+// frees the guard. The hips sink and coil, and the draw explodes out of the mouth on a long sliding
+// step: round from low by the left hip, rising across the kneeling man's neck, the arm thrown out
+// high to the right at full length in zanshin. Then the o-chiburi off the right temple, down to the low guard.
+const EXEC_HIT = 2.15;
+const execBody = [
+  K(0.0, B({ ...body, twist: -0.2, lean: 0.12, crouch: -0.14 })),
+  K(0.28, B({ ...body, twist: -0.35, lean: 0.1, crouch: -0.12, side: -0.05 })),
+  K(0.5, B({ ...body, twist: 0.15, lean: 0.2, crouch: -0.18, step: 0.3 })),
+  K(0.66, B({ ...stanceBody, crouch: -0.2, lean: 0.26, headPitch: 0.2 })),
+  K(0.95, B({ ...stanceBody, crouch: -0.24, lean: 0.3, headPitch: 0.42 })),
+  K(1.2, B({ ...stanceBody, crouch: -0.21, lean: 0.28, headPitch: 0.4 })),
+  K(1.42, B({ ...stanceBody, crouch: -0.25, lean: 0.3, headPitch: -0.08 })),
+  K(1.7, B({ ...stanceBody, crouch: -0.3, lean: 0.28, twist: 0.4, hipTwist: 0.15, step: 0.34, back: 0.34, headPitch: -0.05 })),
+  K(1.92, B({ ...stanceBody, crouch: -0.33, lean: 0.3, twist: 0.45, hipTwist: 0.2, step: 0.38, back: 0.36, headPitch: -0.05 })),
+  K(EXEC_HIT, B({ ...body, crouch: -0.28, lean: 0.3, twist: -0.2, hipTwist: -0.25, step: 0.85, back: 0.5 })),
+  K(2.45, B({ ...body, crouch: -0.32, lean: 0.32, twist: -0.55, hipTwist: -0.3, step: 0.88, back: 0.52, headPitch: 0.05 })),
+  K(2.75, B({ ...body, crouch: -0.24, lean: 0.22, twist: -0.25, hipTwist: -0.15, step: 0.6, back: 0.4, headPitch: 0.1 })),
+  K(3.0, B({ ...body, crouch: -0.18, lean: 0.16, twist: -0.05, step: 0.4, back: 0.32, headPitch: 0.15 })),
+];
+const execMain = keyed(execBody, [
+  // the blood of the break shaken off: up beside the right temple, flicked down to the low right
+  { s: 0.0, grip: GUARD_GRIP, dir: GUARD_DIR, torso: true },
+  { s: 0.12, grip: [-0.36, 0.5, 0.2], dir: [-0.5, 0.85, -0.15], torso: true },
+  { s: 0.28, grip: [-0.42, 0.12, 0.38], dir: [-0.55, -0.3, 0.78], torso: true },
+  // noto in one snap: swung flat round to the left hip, the point fed into the mouth, home
+  { s: 0.4, grip: [-0.1, 0.18, 0.42], dir: [0.15, -0.05, 1], torso: true },
+  { s: 0.5, grip: [0.0, 0.14, 0.36], dir: [0.9, 0.02, -0.4], torso: true },
+  { s: 0.56, grip: ENT_OUT, dir: KATANA_SHEATH, torso: true },
+  { s: 0.64, grip: IAI_GRIP, dir: KATANA_SHEATH, torso: true },
+  // stillness, then the thumb pushes the guard free of the mouth and holds it there, loaded
+  { s: 1.42, grip: IAI_GRIP, dir: KATANA_SHEATH, torso: true },
+  { s: 1.48, grip: ENT_KOI, dir: KATANA_SHEATH, torso: true },
+  { s: 1.94, grip: ENT_KOI, dir: KATANA_SHEATH, torso: true },
+  // the draw: out along the scabbard's line, then round from low by the left hip, rising across
+  // through the neck to high on the right (the edge leads up and out)
+  { s: 2.0, grip: ENT_OUT, dir: KATANA_SHEATH, torso: true },
+  { s: 2.06, grip: [0.0, 0.24, 0.44], dir: [0.8, -0.35, 0.5] },
+  { s: EXEC_HIT, grip: [-0.02, 0.48, 0.48], dir: [0.15, 0.22, 0.96] },
+  { s: 2.3, grip: [-0.5, 0.6, 0.38], dir: [-0.6, 0.55, 0.58] },
+  // zanshin: held high out to the right at full stretch
+  { s: 2.45, grip: [-0.62, 0.64, 0.26], dir: [-0.75, 0.45, 0.48] },
+  // o-chiburi: up beside the right temple and snapped down to the low right, where the guard is
+  { s: 2.58, grip: [-0.4, 0.62, 0.12], dir: [-0.55, 0.8, -0.2], torso: true },
+  { s: 2.72, grip: [-0.36, 0.1, 0.36], dir: [-0.45, -0.28, 0.85], torso: true },
+  { s: 3.0, grip: GUARD_GRIP, dir: GUARD_DIR, torso: true },
+], 0.1, 0.02);
+
 export const katana: Style = {
   axis: 'y',
   offAxis: 'y',
@@ -411,7 +433,6 @@ export const katana: Style = {
         K(1.1, B({ ...body, twist: -0.7, hipTwist: -0.2, lean: 0.4, crouch: -0.3, step: 0.64, back: 0.36, headPitch: 0.08 })),
       ],
       main: twin,
-      free: track([[-0.1, onHilt([-0.2, 0.62, 0.1], inTorso([-0.8, 0.55, -0.25], -0.45, 0.1), 0.41)]]),
       impacts: twinHits,
       chamber: -0.1,
       end: 1.1,
@@ -423,7 +444,6 @@ export const katana: Style = {
     h: mv({
       keys: heavenBody,
       main: heaven,
-      free: track([[-0.2, onHilt(JODAN_GRIP, JODAN_DIR, 0.56)]]),
       impacts: [heavenHit],
       start: 0,
       chamber: -0.16,
@@ -506,7 +526,6 @@ export const katana: Style = {
         K(1.06, B({ ...body, twist: 0.5, hipTwist: 0.25, lean: 0.78, crouch: -0.46, step: 0.7, back: 0.38, headPitch: 0.12 }), { spin: 1 }),
       ],
       main: crescent,
-      free: track([[0.12, onHilt([-0.2, 0.62, 0.12], inTorso([-0.85, 0.45, -0.25], -0.55, 0), 0.6)]]),
       impacts: [crescentHit],
       start: 0,
       chamber: 0.12,
@@ -556,7 +575,6 @@ export const katana: Style = {
         K(1.05, B({ ...body, twist: 0.9, hipTwist: 0.3, crouch: -0.5, lean: 0.85, step: 0.9, back: 0.6, headPitch: 0.1 })),
       ],
       main: thunder,
-      free: track([[-0.03, onHilt([-0.22, 0.5, 0.12], inTorso([-0.92, 0.35, -0.15], -0.75, 0.42), 0.5)]]),
       impacts: [thunderHit],
       chamber: -0.03,
       ghosts: [-0.1, 0.85],
@@ -595,8 +613,6 @@ export const katana: Style = {
         K(1.05, B({ ...body, twist: -0.4, hipTwist: -0.2, lean: 0.46, crouch: -0.4, step: 0.3, back: 0.62, headPitch: 0.1 })),
       ],
       main: wall,
-      // the wall's chamber, high on the left: the arc's fist and blade there, seen from the torso
-      free: track([[hitAt(wall, 2), onHilt(WALL_TOP_GRIP, inTorso([0.75, 0.55, -0.3], 0.5, -0.15), 0.53)]]),
       impacts: [wallHit],
       start: 0,
       chamber: hitAt(wall, 2),
@@ -632,11 +648,6 @@ export const katana: Style = {
     jh: mv({
       keys: starBody,
       main: star,
-      free: track([
-        [0, onHilt([-0.13, 0.33, 0.34], [0, 0.95, 0.3], 0.43)],
-        [0.18, onHilt([-0.09, 0.45, 0.28], [0, 1, 0.15], 0.43)],
-        [starTop, onHilt(JODAN_GRIP, JODAN_DIR, 0.43)],
-      ]),
       impacts: [starHit],
       start: 0,
       chamber: 0.1,
@@ -647,6 +658,44 @@ export const katana: Style = {
       trail: { life: 0.22, glow: 0.6 },
     }),
   },
+  // Execution: the last iai (see execMain). One blow, rising across the neck; the cut
+  // spins them half round
+  executeReact: 'spin',
+  execute: mv({
+    keys: execBody,
+    main: execMain,
+    free: track([
+      [0.0, SAYA],
+      [0.5, KATANA_SHEATH_MOUTH],
+      [0.66, ENT_SAYA],
+      [1.94, ENT_SAYA],
+      // saya-biki: the left hand draws the scabbard back as the right draws the blade
+      [2.1, [0.24, 0.06, -0.04]],
+      [2.45, [0.3, 0.1, -0.08]],
+      [2.8, [0.2, 0.1, 0.06]],
+      [3.0, SAYA],
+    ]),
+    impacts: [EXEC_HIT],
+    start: 0,
+    chamber: 1.95,
+    end: 2.5,
+    rest: 3.0,
+    ghosts: [1.96, 2.35],
+    fx: [
+      fx(0.28, 'sparkle', 'tip', 0.6, '#ff4a3a'),
+      fx(0.64, 'sparkle', 'main', 0.5, '#ffffff'),
+      fx(0.66, 'dust', 'feet', 0.5),
+      fx(0.8, 'fog', 'feet', 1.1),
+      fx(1.0, 'petals', 'root', 0.8),
+      fx(1.48, 'sparkle', 'main', 0.7, '#ffffff'),
+      fx(1.97, 'dust', 'feet', 1.2),
+      fx(EXEC_HIT, 'flashline', 'tip', 2, '#ffffff'),
+      fx(EXEC_HIT, 'shake', 'root', 1),
+      fx(EXEC_HIT + 0.02, 'petals', 'tip', 1.6),
+      fx(2.72, 'sparkle', 'tip', 0.6, '#ff4a3a'),
+    ],
+    trail: { life: 0.34, glow: 1, color: '#ffffff' },
+  }),
   // Ring entrance: still under the hat with a hand on the hilt; the thumb frees the guard and the
   // eyes come up; then one flat draw at the opponent, zanshin, the chiburi, and the low guard
   entrance: mv({

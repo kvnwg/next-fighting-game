@@ -71,6 +71,70 @@ const nail = (side: 1 | -1): Motion => {
   );
 };
 
+// Execution beats (seconds)
+const EXEC_CUT1 = 0.44;
+const EXEC_CUT2 = 0.66;
+const EXEC_HIT = 2.15;
+const EXEC_BODY = [
+  K(0.0, B({ ...body, crouch: -0.12, lean: 0.1 }), { spin: 0, hop: 0 }),
+  // the flick: weight sits back, the wrists snap the points down and out
+  K(0.16, B({ ...body, crouch: -0.18, lean: 0.06, twist: 0, step: 0.2, back: 0.3, headPitch: 0.1 })),
+  // down into the smoke, coiled to the right
+  K(0.3, B({ ...body, crouch: -0.36, lean: 0.32, twist: -0.4, hipTwist: -0.2, step: 0.26, back: 0.3, width: 0.2 }), { spin: 0 }),
+  // the whirl, side-bent so the arms open on the diagonal
+  K(EXEC_CUT1, B({ ...body, crouch: -0.28, lean: 0.24, twist: 0, side: -0.26, step: 0.22, back: 0.24, width: 0.17 }), { spin: 0.25 }),
+  K(EXEC_CUT2, B({ ...body, crouch: -0.28, lean: 0.24, twist: 0, side: -0.26, step: 0.22, back: 0.24, width: 0.17 }), { spin: 0.75 }),
+  K(0.8, B({ ...body, crouch: -0.34, lean: 0.3, twist: 0, step: 0.3, back: 0.3, width: 0.2 }), { spin: 1 }),
+  // rising slowly, tall onto the toes, chest arched back: the fangs raised
+  K(1.15, B({ ...body, crouch: -0.12, lean: 0.0, twist: -0.1, step: 0.22, back: 0.26, width: 0.15, headPitch: 0.05 })),
+  K(1.6, B({ ...body, crouch: 0.02, lean: -0.16, twist: -0.12, step: 0.22, back: 0.26, width: 0.14, headPitch: 0.12 })),
+  // breathing at the top, then the legs sink deep under the raised fists to load the spring
+  K(1.72, B({ ...body, crouch: -0.1, lean: -0.12, twist: -0.12, step: 0.24, back: 0.3, width: 0.15, headPitch: 0.12 })),
+  K(1.92, B({ ...body, crouch: -0.44, lean: 0.18, twist: 0, step: 0.3, back: 0.36, width: 0.18, headPitch: 0.1 }), { hop: 0 }),
+  // the pounce: off both feet, the body pitched out flat over them and the fists brought over the
+  // hood and down, so both points come down from above into the hollows of the collarbones
+  K(2.04, B({ ...body, crouch: -0.12, lean: 0.75, twist: 0, step: 0.46, back: 0.5, width: 0.15, headPitch: 0.3 }), { hop: 0.26 }),
+  K(EXEC_HIT, B({ ...body, crouch: -0.12, lean: 1.18, twist: 0.02, step: 0.5, back: 0.66, width: 0.15, headPitch: 0.55 }), { hop: 0.32 }),
+  // hung on the blades while they stiffen, then the feet come down under
+  K(2.32, B({ ...body, crouch: -0.2, lean: 1.0, twist: 0.02, step: 0.56, back: 0.56, width: 0.16, headPitch: 0.45 }), { hop: 0.16 }),
+  // landed, ripping both blades out with a push off the chest, a half step back
+  K(2.46, B({ ...body, crouch: -0.42, lean: 0.45, twist: 0, step: 0.56, back: 0.42, width: 0.2, headPitch: 0.15 }), { hop: 0 }),
+  K(2.62, B({ ...body, crouch: -0.28, lean: 0.24, twist: 0, step: 0.44, back: 0.36, width: 0.19, headPitch: 0.15 })),
+  K(3.0, B({ ...body, crouch: -0.14, lean: 0.12, twist: 0, step: 0.34, back: 0.3, width: 0.18, headPitch: 0.2 })),
+];
+// the right hand ([s, fist, point]) in the body's frame (unpitched by the lean, so the pounce can
+// be aimed at where the kneeling man is); the left mirrors it across x
+const EXEC_R: [number, V3, V3][] = [
+  [0.0, G_R[0], G_R[1]],
+  [0.08, [-0.4, 0.3, 0.3], [-0.3, 0.4, 0.86]],
+  [0.16, [-0.46, 0.06, 0.24], [-0.55, -0.6, 0.58]],
+  [0.3, [-0.44, 0.14, 0.12], [-0.5, -0.45, 0.74]],
+  // flung out high on the diagonal for the whirl
+  [EXEC_CUT1, [-0.66, 0.74, 0.2], [-0.78, 0.45, 0.44]],
+  [EXEC_CUT2, [-0.66, 0.74, 0.18], [-0.78, 0.45, 0.42]],
+  [0.8, [-0.4, 0.3, 0.34], [-0.3, -0.2, 0.93]],
+  // raised high beside the hood, the point up and back
+  [1.15, [-0.3, 0.78, 0.16], [-0.1, 0.8, 0.6]],
+  [1.6, [-0.24, 1.0, 0.12], [-0.05, 0.92, 0.38]],
+  [1.92, [-0.26, 1.0, 0.08], [-0.05, 0.94, 0.3]],
+  // over the hood and down, the wrist snapping the point down into the collarbone
+  [2.04, [-0.2, 0.92, 0.52], [-0.02, 0.45, 0.89]],
+  [EXEC_HIT, [-0.13, 0.08, 0.95], [0.04, -0.32, 0.95]],
+  [2.32, [-0.13, 0.05, 0.93], [0.04, -0.34, 0.94]],
+  // ripped out and flicked clean, out low to the side
+  [2.46, [-0.3, 0.3, 0.6], [-0.4, 0.2, 0.9]],
+  [2.6, [-0.52, 0.12, 0.26], [-0.7, -0.6, 0.38]],
+  [3.0, [-0.5, 0.1, 0.24], [-0.6, -0.7, 0.38]],
+];
+const mirror = (ks: [number, V3, V3][], swap: Record<number, [V3, V3]> = {}): [number, V3, V3][] =>
+  ks.map(([s, p, d]) => (swap[s] ? [s, ...swap[s]] : [s, [-p[0], p[1], p[2]], [-d[0], d[1], d[2]]]));
+// the left: the same, but low when the right is high in the whirl (and the other way round)
+const EXEC_L = mirror(EXEC_R, {
+  0: [G_L[0], G_L[1]],
+  [EXEC_CUT1]: [[0.6, 0.12, 0.16], [0.78, -0.45, 0.44]],
+  [EXEC_CUT2]: [[0.6, 0.12, 0.14], [0.78, -0.45, 0.42]],
+});
+
 // Entrance blades: sheathed-looking along the forearms, drawn from the right thigh and the small
 // of the back
 const SHEATH_R: V3 = [-0.1, -0.3, -1];
@@ -551,6 +615,47 @@ export const daggers: Style = {
       trail: { life: 0.2, glow: 0.6 },
     }),
   },
+  // Execution, Twin Fangs (s is seconds: the blow at 2.15, the rest at 3.0). The blood of the break
+  // flicked off both blades; a crouch into smoke and one whirling turn about the kneeling man with
+  // the arms flung open on the diagonal (the reference's whirl), a blade raking past his face at
+  // each half; then up tall onto the toes, chest arched, both fists raised high beside the hood
+  // with the points up (the reference's falling fang), breathing there; and the whole body dives
+  // down after them on a long step, both blades driven down into the hollows of his collarbones.
+  // Held in while he stiffens, ripped out and flicked clean to either side, and stood up cold
+  executeReact: 'impale',
+  execute: mv({
+    keys: EXEC_BODY,
+    main: right(EXEC_R, 0.04, { body: true }),
+    off: left(EXEC_L, 0.04, { body: true }),
+    impacts: [EXEC_CUT1, EXEC_CUT2, EXEC_HIT],
+    start: 0,
+    chamber: 0.3,
+    end: 2.6,
+    rest: 3.0,
+    lead: 0.04,
+    ghosts: [0.32, 0.78],
+    fx: [
+      fx(0.14, 'sparkle', 'tip', 0.5, '#ff2a6a'),
+      fx(0.14, 'sparkle', 'offTip', 0.5, '#ff2a6a'),
+      fx(0.3, 'smoke', 'feet', 1.3),
+      fx(0.34, 'whirl', 'root', 1.0, '#b55088'),
+      fx(EXEC_CUT1, 'flashline', 'tip', 0.8, '#efe0ff'),
+      fx(EXEC_CUT2, 'flashline', 'offTip', 0.8, '#efe0ff'),
+      fx(0.8, 'dust', 'feet', 0.7),
+      fx(1.05, 'smoke', 'feet', 0.7),
+      fx(1.62, 'sparkle', 'tip', 0.7, '#ffffff'),
+      fx(1.62, 'sparkle', 'offTip', 0.7, '#ffffff'),
+      fx(1.95, 'dust', 'feet', 1.1),
+      fx(EXEC_HIT, 'flashline', 'tip', 1.6, '#ff2a6a'),
+      fx(EXEC_HIT, 'flashline', 'offTip', 1.6, '#ff2a6a'),
+      fx(EXEC_HIT, 'stomp', 'feet', 0.9),
+      fx(EXEC_HIT, 'shake', 'root', 1),
+      fx(2.5, 'sparkle', 'tip', 0.6, '#ff2a6a'),
+      fx(2.5, 'sparkle', 'offTip', 0.6, '#ff2a6a'),
+      fx(2.55, 'smoke', 'feet', 0.8),
+    ],
+    trail: { life: 0.3, glow: 0.8, color: '#ff2a6a' },
+  }),
   // Shadow Step: (unseen for most of it) back out of the smoke crouched low, blades out wide,
   // settling into the guard
   vanish: mv({
