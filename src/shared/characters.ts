@@ -384,7 +384,7 @@ const reaper: BaseDef = {
   ratings: { power: 3, speed: 2, reach: 4, defense: 3, difficulty: 3 },
   lights: [
     { name: 'Overhand Cast', anim: 'slashR', windup: 340, active: 110, recovery: 360, damage: 10, posture: 11, blockPosture: 15, range: 3.8, arc: 55, lunge: 0.4 },
-    { name: 'Backhand Cast', anim: 'slashL', windup: 320, active: 110, recovery: 360, damage: 10, posture: 11, blockPosture: 15, range: 3.8, arc: 55, lunge: 0.4 },
+    { name: 'Dart Cast', anim: 'slashL', windup: 320, active: 110, recovery: 360, damage: 10, posture: 11, blockPosture: 15, range: 3.8, arc: 55, lunge: 0.4 },
     { name: 'Gyre', anim: 'spin', windup: 420, active: 160, recovery: 500, damage: 12, posture: 14, blockPosture: 18, range: 3.8, arc: 55 },
   ],
   heavy: { name: 'Execution', anim: 'overhead', windup: 680, active: 120, recovery: 560, damage: 20, posture: 26, blockPosture: 34, range: 3.9, arc: 25, lunge: 0.8, feintable: true },

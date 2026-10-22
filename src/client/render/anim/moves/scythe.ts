@@ -3,7 +3,7 @@
  * and every blow throws it: the right arm drives it out along the line of the cast and the chain
  * pays out after it, so a move is authored as the line the sickle flies along, swept round through
  * the windup so the chain whips in before the throw lands in front of the Wraith. An overhand cast
- * from the right shoulder, a backhand cast from the left, a turn that slings it out on the spin, a
+ * from the right shoulder, a dart cast punched out from beside the ear, a turn that slings it out on the spin, a
  * vertical cast from over the head, a lasso whirled at the side and thrown straight, a leaping turn
  * that brings it down on them, a diving throw, a rising backhand out of the dash, a flick on the
  * retreat, a whirl over the head while drifting away, a cartwheel in the air, a somersault that
@@ -13,7 +13,7 @@
 import { B, K, P, Style, X, arc, circle, fx, hitAt, line, mv, seq, track } from '../author';
 import type { Motion, V3 } from '../author';
 
-const body = B({ front: 'L', step: 0.26, back: 0.28, width: 0.17, crouch: -0.13, lean: 0.1, twist: -0.3 });
+const body = B({ front: 'L', step: 0.18, back: 0.2, width: 0.11, crouch: -0.07, lean: 0.08, twist: -0.3 });
 const SOUL = '#63c74d';
 
 /** The right shoulder: casts turn about it, the arm driving the chain out along the throw. */
@@ -26,22 +26,18 @@ const cast = (dirs: V3[], r = 0.42, pivot: V3 = SH, opts: { pivot1?: V3; edgeSig
 const whirl = (pivot: V3, u: V3, v: V3, turns: number, startDeg = 0, r = 0.12, pivot1?: V3): Motion =>
   arc(pivot, r, circle(u, v, turns, startDeg, Math.ceil(Math.abs(turns) * 10)), NaN, { pivot1 });
 
-// Overhand Cast: whipped up behind the right shoulder, over and out at them, round to the left
-const overhand = cast([[-0.35, 0.55, -0.76], [-0.3, 1, -0.05], [-0.15, 0.72, 0.68], [-0.02, 0.24, 1], [0.35, 0.08, 0.93], [0.72, -0.05, 0.68]]);
+// Overhand Cast: flung up over the right shoulder with the arm raised high, then the arm comes
+// over the top and drives straight out at them at shoulder height, the chain following it out
+const overhand = cast([[-0.32, 0.78, -0.54], [-0.22, 1, 0.02], [-0.1, 0.62, 0.78], [-0.02, 0.14, 1], [0.2, -0.02, 0.98], [0.42, -0.12, 0.9]], 0.42, SH, { edgeSign: -1 });
 const overhandHit = hitAt(overhand, 3);
 
-// Backhand Cast: looped over the head to the left, then slung flat round from the left into them
-const backhand = seq(
-  [
-    [-1.1, -0.25, cast([[-0.6, 0.6, 0.5], [-0.1, 1, 0.1], [0.6, 0.6, -0.5], [0.85, 0.2, -0.5]], 0.3, [-0.18, 0.5, 0.08])],
-    [-0.25, 1.07, cast([[0.85, 0.2, -0.5], [1, 0.16, 0.2], [0.62, 0.16, 0.78], [0.02, 0.17, 1], [-0.55, 0.12, 0.83], [-0.88, 0.05, 0.47]], 0.32, [-0.06, 0.4, 0.1])],
-  ],
-  0.1,
-);
-const backhandHit = hitAt(backhand, 3, 1);
+// Dart Cast: the hand cocked up beside the ear with the sickle hanging down the back, then the arm
+// punches straight out and up at their head, the sickle whipped over the hand and away along it
+const dart = cast([[0.5, -0.62, -0.6], [0.05, 0.25, -0.97], [-0.12, 0.98, -0.1], [-0.06, 0.62, 0.78], [0, 0.02, 1], [0.06, -0.1, 0.99], [0.12, -0.18, 0.98]], 0.16, [-0.22, 0.64, -0.08], { pivot1: [-0.2, 0.6, 0.42], edgeSign: -1 });
+const dartHit = hitAt(dart, 4);
 
-// Vertical cast: from low behind, up past the right ear, over and down onto them
-const vertical = cast([[-0.12, -0.2, -1], [-0.12, 0.6, -0.8], [-0.08, 1, 0.0], [-0.03, 0.75, 0.66], [0, 0.32, 0.95], [0.02, 0.16, 1], [0.08, 0.08, 1]], 0.44, [-0.22, 0.56, 0.02]);
+// Vertical cast: raised straight up over the head, then over the top and down out onto them
+const vertical = cast([[-0.12, 0.93, -0.35], [-0.08, 1, 0.05], [-0.05, 0.8, 0.6], [-0.02, 0.45, 0.89], [0, 0.2, 0.98], [0.03, 0.02, 1], [0.06, -0.12, 0.99]], 0.44, [-0.24, 0.54, 0.02]);
 const verticalHit = hitAt(vertical, 4);
 
 // Lasso: whirled flat at the right side, then thrown dead straight, the arm reaching after it
@@ -94,8 +90,9 @@ const graveWind = seq(
   0.1,
 );
 
-// Ghost Wheel: through the cartwheel it trails out on the right, and the turn slings it at them
-const wheelAir = cast([[-0.9, 0.4, -0.2], [-1, 0.0, 0.15], [-0.75, -0.1, 0.65], [-0.05, 0.05, 1], [0.5, 0.0, 0.85], [0.7, -0.15, 0.6]], 0.4);
+// Ghost Wheel: held up over the head through the cartwheel, then swung down round the right side
+// as the body comes upright, and the turn slings it at them
+const wheelAir = cast([[-0.35, 0.93, -0.1], [-0.72, 0.68, 0.15], [-0.78, 0.22, 0.58], [-0.05, 0.05, 1], [0.5, 0.0, 0.85], [0.7, -0.15, 0.6]], 0.4);
 const wheelAirHit = hitAt(wheelAir, 3);
 
 // Last Rites: held up behind through the somersault, then over and down on them as the Wraith lands
@@ -130,11 +127,12 @@ const keyed = (ks: Grip[], blend = 0.03): Motion => {
 };
 const BLOOD = '#ff3a3a';
 
-/** The guard: the sickle low at the right hip, its point toward them, the left hand out over the chain. */
-const GUARD_POS: V3 = [-0.3, -0.02, 0.24];
-const GUARD_DIR: V3 = [-0.12, 0.2, 1];
-const GUARD_EDGE: V3 = [0, -1, 0.2];
-const GUARD_FREE: V3 = [0.16, 0.1, 0.32];
+/** The guard: both hands low, the sickle at the right hip with its head raised toward them, the left
+ * hand in front of the left hip paying out the chain. */
+const GUARD_POS: V3 = [-0.3, 0.0, 0.2];
+const GUARD_DIR: V3 = [-0.15, 0.48, 0.86];
+const GUARD_EDGE: V3 = [0, -0.9, 0.45];
+const GUARD_FREE: V3 = [0.2, 0.04, 0.24];
 
 export const scythe: Style = {
   axis: '-x',
@@ -143,55 +141,54 @@ export const scythe: Style = {
   sparks: ['#ffffff', '#b8ffd0', SOUL],
   guard: P(body, X(GUARD_POS, GUARD_DIR, GUARD_EDGE, '-x'), null, GUARD_FREE),
   // the sickle across the chest in both hands, blade up, the chain hanging from the right
-  block: P(B({ ...body, crouch: -0.18, twist: -0.1 }), X([-0.26, 0.4, 0.32], [1, 0.12, 0.05], [0, 1, 0.2], '-x', 0.42)),
+  block: P(B({ ...body, crouch: -0.12, twist: -0.1 }), X([-0.26, 0.4, 0.32], [1, 0.12, 0.05], [0, 1, 0.2], '-x', 0.42)),
   moves: {
-    // Overhand Cast: coiled back on the right foot, the sickle whipped up behind the shoulder and
-    // thrown over at them off the front foot, the chain trailing round to the left after it
+    // Overhand Cast (the reference's main throw): coiled on the rear foot with the hips and chest
+    // turned away, the throwing arm raised high and the sickle flung up behind it; the front foot
+    // plants, the hips then the chest turn through, the arm comes over the top and the elbow
+    // straightens out at them at shoulder height, the free arm sweeping back with the slack
     l0: mv({
       keys: [
-        K(-0.15, B({ ...body, twist: -0.85, hipTwist: -0.35, lean: -0.18, crouch: -0.08, headPitch: -0.1 })),
-        K(overhandHit + 0.1, B({ ...body, twist: 0.0, hipTwist: 0.05, lean: 0.36, crouch: -0.22, step: 0.44 })),
-        K(1.05, B({ ...body, twist: 0.55, hipTwist: 0.25, lean: 0.4, crouch: -0.24, step: 0.46 })),
+        K(-0.15, B({ ...body, twist: -0.7, hipTwist: -0.35, lean: -0.12, crouch: -0.04, step: 0.12, back: 0.26, headPitch: -0.12 })),
+        K(overhandHit + 0.1, B({ ...body, twist: 0.2, hipTwist: 0.12, lean: 0.3, crouch: -0.13, step: 0.38, back: 0.24, headPitch: 0.05 })),
+        K(1.05, B({ ...body, twist: 0.45, hipTwist: 0.22, lean: 0.32, crouch: -0.14, step: 0.4, back: 0.24 })),
       ],
       main: overhand,
       free: track([
-        [-0.15, [0.32, 0.38, 0.32]],
-        [overhandHit, [0.3, 0.16, 0.12]],
-        [1.0, [0.26, 0.1, 0.1]],
+        [-0.15, [0.24, 0.08, 0.26]],
+        [overhandHit, [0.42, 0.22, -0.16]],
+        [1.0, [0.36, 0.14, -0.04]],
       ]),
       impacts: [overhandHit],
       fx: [fx(overhandHit, 'wisps', 'tip', 0.6)],
     }),
-    // Backhand Cast: looped once over the head to the left, the body wound round after it, then
-    // slung flat across from the left into them
+    // Dart Cast: the hand cocked up beside the right ear, elbow high, the sickle hanging down the
+    // back; a short step in, the chest squares up and the arm punches straight out and up at their
+    // head, the sickle whipping over the hand and away along the line of the arm
     l1: mv({
       keys: [
-        K(-1.1, B({ ...body, twist: -0.3, lean: 0.05 })),
-        K(-0.25, B({ ...body, twist: 0.95, hipTwist: 0.35, lean: -0.05, crouch: -0.1, side: 0.08 })),
-        K(backhandHit + 0.1, B({ ...body, twist: 0.0, hipTwist: -0.05, lean: 0.3, crouch: -0.22, step: 0.44 })),
-        K(1.05, B({ ...body, twist: -0.75, hipTwist: -0.3, lean: 0.34, crouch: -0.24, step: 0.46 })),
+        K(-0.2, B({ ...body, twist: -0.45, hipTwist: -0.18, lean: -0.06, crouch: -0.05, step: 0.14, back: 0.24, headPitch: -0.05 })),
+        K(dartHit + 0.1, B({ ...body, twist: 0.08, hipTwist: 0.06, lean: 0.22, crouch: -0.11, step: 0.34, back: 0.22, headPitch: -0.12 })),
+        K(1.05, B({ ...body, twist: 0.2, hipTwist: 0.1, lean: 0.24, crouch: -0.12, step: 0.36, back: 0.22 })),
       ],
-      main: backhand,
+      main: dart,
       free: track([
-        [-1.1, [0.2, 0.2, 0.3]],
-        [-0.25, [0.36, 0.3, -0.1]],
-        [backhandHit, [0.38, 0.28, 0.12]],
-        [1.0, [0.3, 0.2, 0.2]],
+        [-0.2, [0.22, 0.06, 0.28]],
+        [dartHit, [0.26, 0.1, 0.16]],
+        [1.0, [0.24, 0.06, 0.2]],
       ]),
-      impacts: [backhandHit],
-      start: -1.1,
-      chamber: -0.3,
-      blendIn: 0.3,
-      fx: [fx(-0.7, 'wisps', 'tip', 0.4), fx(backhandHit, 'wisps', 'tip', 0.6)],
+      impacts: [dartHit],
+      chamber: 0.02,
+      fx: [fx(dartHit, 'flashline', 'main', 0.5, '#b8ffd0'), fx(dartHit, 'wisps', 'tip', 0.6)],
     }),
     // Gyre: a long turn to the right with the sickle swung out at arm's length; three quarters
     // round the chain flies out at them, and the turn carries it on round
     l2: mv({
       keys: [
-        K(-1.6, B({ ...body, twist: 0.3, lean: 0.2, crouch: -0.2 }), { spin: 0 }),
-        K(-1.0, B({ ...body, twist: 0.0, lean: 0.24, crouch: -0.24, step: 0.2, back: 0.2, width: 0.22 }), { spin: -0.15 }),
-        K(0.55, B({ ...body, twist: 0.0, lean: 0.26, crouch: -0.26, step: 0.2, back: 0.2, width: 0.22, side: -0.1 }), { spin: -0.825 }),
-        K(1.1, B({ ...body, twist: -0.1, lean: 0.24, crouch: -0.22, step: 0.24, back: 0.24 }), { spin: -1 }),
+        K(-1.6, B({ ...body, twist: 0.3, lean: 0.2, crouch: -0.13 }), { spin: 0 }),
+        K(-1.0, B({ ...body, twist: 0.0, lean: 0.24, crouch: -0.16, step: 0.2, back: 0.2, width: 0.22 }), { spin: -0.15 }),
+        K(0.55, B({ ...body, twist: 0.0, lean: 0.26, crouch: -0.17, step: 0.2, back: 0.2, width: 0.22, side: -0.1 }), { spin: -0.825 }),
+        K(1.1, B({ ...body, twist: -0.1, lean: 0.24, crouch: -0.14, step: 0.24, back: 0.24 }), { spin: -1 }),
       ],
       main: seq([
         [-1.6, 0.45, line([-0.4, 0.42, 0.0], [-0.52, 0.42, 0.2], [-0.9, -0.05, -0.3], [-0.88, 0.22, 0.45], [0, -1, 0])],
@@ -210,19 +207,20 @@ export const scythe: Style = {
       fx: [fx(-0.9, 'whirl', 'root', 0.9, '#b8ffd0'), fx(0.45, 'wisps', 'tip', 0.8)],
       trail: { life: 0.24, glow: 0.5 },
     }),
-    // Execution: leant far back with the sickle swung up past the ear from behind, then the whole
-    // body folds forward and the cast comes down over the top onto them
+    // Execution: the free arm thrown out to the left with the slack for balance, the sickle swung
+    // straight up over the head as the weight rocks back; then the front foot drives in, the body
+    // folds forward from the hips and the arm brings it over the top and down out onto them
     h: mv({
       keys: [
-        K(-0.2, B({ ...body, lean: -0.36, crouch: -0.04, twist: -0.25, hipTwist: -0.1, headPitch: -0.2, step: 0.22, back: 0.36 })),
-        K(verticalHit + 0.1, B({ ...body, lean: 0.52, crouch: -0.28, twist: 0.0, step: 0.5, back: 0.32 })),
-        K(1.05, B({ ...body, lean: 0.58, crouch: -0.32, twist: 0.05, step: 0.52, back: 0.34, headPitch: 0.1 })),
+        K(-0.2, B({ ...body, lean: -0.24, crouch: -0.04, twist: -0.22, hipTwist: -0.12, headPitch: -0.22, step: 0.16, back: 0.3, side: 0.06 })),
+        K(verticalHit + 0.1, B({ ...body, lean: 0.42, crouch: -0.17, twist: 0.08, hipTwist: 0.06, step: 0.46, back: 0.3 })),
+        K(1.05, B({ ...body, lean: 0.48, crouch: -0.19, twist: 0.12, hipTwist: 0.08, step: 0.48, back: 0.3, headPitch: 0.1 })),
       ],
       main: vertical,
       free: track([
-        [-0.2, [0.26, 0.55, 0.2]],
-        [verticalHit, [0.28, 0.2, 0.25]],
-        [1.0, [0.3, 0.1, 0.2]],
+        [-0.2, [0.56, 0.42, 0.12]],
+        [verticalHit, [0.32, 0.12, 0.18]],
+        [1.0, [0.3, 0.08, 0.2]],
       ]),
       impacts: [verticalHit],
       chamber: -0.12,
@@ -233,10 +231,10 @@ export const scythe: Style = {
     // thrown dead straight at them with the arm reaching after it, and reeled back
     h1: mv({
       keys: [
-        K(-1.4, B({ ...body, lean: 0.4, crouch: -0.26, twist: -0.2 })),
-        K(-0.2, B({ ...body, twist: -0.7, hipTwist: -0.3, lean: 0.02, crouch: -0.14, side: 0.06 })),
-        K(LASSO_HIT + 0.1, B({ ...body, twist: 0.05, hipTwist: 0.05, lean: 0.24, crouch: -0.22, step: 0.48, side: -0.06 })),
-        K(1.05, B({ ...body, twist: -0.25, hipTwist: -0.1, lean: 0.08, crouch: -0.18, step: 0.4, back: 0.32 })),
+        K(-1.4, B({ ...body, lean: 0.4, crouch: -0.17, twist: -0.2 })),
+        K(-0.2, B({ ...body, twist: -0.7, hipTwist: -0.3, lean: 0.02, crouch: -0.09, side: 0.06 })),
+        K(LASSO_HIT + 0.1, B({ ...body, twist: 0.05, hipTwist: 0.05, lean: 0.24, crouch: -0.14, step: 0.48, side: -0.06 })),
+        K(1.05, B({ ...body, twist: -0.25, hipTwist: -0.1, lean: 0.08, crouch: -0.12, step: 0.4, back: 0.32 })),
       ],
       main: lasso,
       free: track([
@@ -256,13 +254,13 @@ export const scythe: Style = {
     // the head, and down on them as the Wraith lands
     h2: mv({
       keys: [
-        K(-1.6, B({ ...body, twist: -0.4, hipTwist: -0.2, lean: 0.3, crouch: -0.32, width: 0.22 }), { spin: 0, hop: 0 }),
-        K(-1.1, B({ ...body, twist: -0.2, lean: 0.05, crouch: -0.06 }), { spin: 0.12, hop: 0.2 }),
+        K(-1.6, B({ ...body, twist: -0.4, hipTwist: -0.2, lean: 0.3, crouch: -0.21, width: 0.22 }), { spin: 0, hop: 0 }),
+        K(-1.1, B({ ...body, twist: -0.2, lean: 0.05, crouch: -0.04 }), { spin: 0.12, hop: 0.2 }),
         K(-0.5, B({ ...body, twist: 0.0, lean: -0.2, crouch: 0.0, headPitch: -0.2 }), { spin: 0.65, hop: 0.45 }),
-        K(-0.1, B({ ...body, twist: -0.1, lean: -0.3, crouch: -0.02, headPitch: -0.2 }), { spin: 0.95, hop: 0.35 }),
-        K(fallHit + 0.1, B({ ...body, twist: 0.0, lean: 0.58, crouch: -0.36, step: 0.5, back: 0.34 }), { spin: 1, hop: 0 }),
-        K(1.3, B({ ...body, twist: 0.0, lean: 0.55, crouch: -0.36, step: 0.5, back: 0.34 })),
-        K(1.6, B({ ...body, lean: 0.3, crouch: -0.2 })),
+        K(-0.1, B({ ...body, twist: -0.1, lean: -0.3, crouch: -0.01, headPitch: -0.2 }), { spin: 0.95, hop: 0.35 }),
+        K(fallHit + 0.1, B({ ...body, twist: 0.0, lean: 0.58, crouch: -0.23, step: 0.5, back: 0.34 }), { spin: 1, hop: 0 }),
+        K(1.3, B({ ...body, twist: 0.0, lean: 0.55, crouch: -0.23, step: 0.5, back: 0.34 })),
+        K(1.6, B({ ...body, lean: 0.3, crouch: -0.13 })),
       ],
       main: fall,
       free: track([
@@ -294,9 +292,9 @@ export const scythe: Style = {
     // the dive like a spear, the left arm reaching with it
     dl: mv({
       keys: [
-        K(-0.4, B({ ...body, twist: -0.75, hipTwist: -0.3, lean: 0.45, crouch: -0.28, side: -0.08 })),
-        K(DRIFT_HIT + 0.1, B({ ...body, twist: 0.05, hipTwist: 0.0, lean: 0.62, crouch: -0.36, step: 0.52, back: 0.4 })),
-        K(1.05, B({ ...body, twist: 0.25, hipTwist: 0.1, lean: 0.5, crouch: -0.3, step: 0.48, back: 0.38 })),
+        K(-0.4, B({ ...body, twist: -0.75, hipTwist: -0.3, lean: 0.45, crouch: -0.18, side: -0.08 })),
+        K(DRIFT_HIT + 0.1, B({ ...body, twist: 0.05, hipTwist: 0.0, lean: 0.62, crouch: -0.23, step: 0.52, back: 0.4 })),
+        K(1.05, B({ ...body, twist: 0.25, hipTwist: 0.1, lean: 0.5, crouch: -0.2, step: 0.48, back: 0.38 })),
       ],
       main: drift,
       free: track([
@@ -315,9 +313,9 @@ export const scythe: Style = {
     // rising backhand cast up across them that tears the ground open beneath it
     dh: mv({
       keys: [
-        K(-0.2, B({ ...body, twist: 1.0, hipTwist: 0.4, lean: 0.4, crouch: -0.3, side: 0.12 })),
-        K(rendHit + 0.1, B({ ...body, twist: 0.0, hipTwist: 0.0, lean: 0.5, crouch: -0.3, step: 0.5, back: 0.38 })),
-        K(1.05, B({ ...body, twist: -0.8, hipTwist: -0.3, lean: 0.1, crouch: -0.14, side: -0.1, headPitch: -0.15 })),
+        K(-0.2, B({ ...body, twist: 1.0, hipTwist: 0.4, lean: 0.4, crouch: -0.2, side: 0.12 })),
+        K(rendHit + 0.1, B({ ...body, twist: 0.0, hipTwist: 0.0, lean: 0.5, crouch: -0.2, step: 0.5, back: 0.38 })),
+        K(1.05, B({ ...body, twist: -0.8, hipTwist: -0.3, lean: 0.1, crouch: -0.09, side: -0.1, headPitch: -0.15 })),
       ],
       main: rend,
       free: track([
@@ -342,9 +340,9 @@ export const scythe: Style = {
     // right snapped out at their waist and drawn in again as the Wraith gives ground
     bl: mv({
       keys: [
-        K(-0.15, B({ ...body, twist: -0.75, hipTwist: -0.25, lean: 0.2, crouch: -0.14 })),
-        K(flickHit + 0.1, B({ ...body, twist: 0.05, hipTwist: 0.05, lean: -0.28, crouch: -0.22, back: 0.42, step: 0.16, side: 0.06, headPitch: 0.2 })),
-        K(1.05, B({ ...body, twist: 0.4, hipTwist: 0.15, lean: -0.34, crouch: -0.24, back: 0.44, step: 0.14, headPitch: 0.3 })),
+        K(-0.15, B({ ...body, twist: -0.75, hipTwist: -0.25, lean: 0.2, crouch: -0.09 })),
+        K(flickHit + 0.1, B({ ...body, twist: 0.05, hipTwist: 0.05, lean: -0.28, crouch: -0.14, back: 0.42, step: 0.16, side: 0.06, headPitch: 0.2 })),
+        K(1.05, B({ ...body, twist: 0.4, hipTwist: 0.15, lean: -0.34, crouch: -0.16, back: 0.44, step: 0.14, headPitch: 0.3 })),
       ],
       main: flick,
       free: track([
@@ -359,10 +357,10 @@ export const scythe: Style = {
     // them and it flies out at their head
     bh: mv({
       keys: [
-        K(-1.4, B({ ...body, twist: 0.1, lean: 0.0, crouch: -0.1, headPitch: -0.2 })),
-        K(-0.6, B({ ...body, twist: -0.15, lean: -0.28, crouch: -0.14, side: 0.08, headPitch: -0.3, back: 0.4 })),
-        K(GRAVE_HIT + 0.1, B({ ...body, twist: 0.0, lean: -0.12, crouch: -0.22, side: -0.04, headPitch: -0.1, back: 0.46, step: 0.16 })),
-        K(1.05, B({ ...body, twist: 0.35, lean: -0.3, crouch: -0.24, back: 0.46, step: 0.14 })),
+        K(-1.4, B({ ...body, twist: 0.1, lean: 0.0, crouch: -0.07, headPitch: -0.2 })),
+        K(-0.6, B({ ...body, twist: -0.15, lean: -0.28, crouch: -0.09, side: 0.08, headPitch: -0.3, back: 0.4 })),
+        K(GRAVE_HIT + 0.1, B({ ...body, twist: 0.0, lean: -0.12, crouch: -0.14, side: -0.04, headPitch: -0.1, back: 0.46, step: 0.16 })),
+        K(1.05, B({ ...body, twist: 0.35, lean: -0.3, crouch: -0.16, back: 0.46, step: 0.14 })),
       ],
       main: graveWind,
       free: track([
@@ -379,19 +377,19 @@ export const scythe: Style = {
       fx: [fx(-1.2, 'smoke', 'feet', 0.8), fx(-0.9, 'whirl', 'root', 0.8, '#b8ffd0'), fx(-0.3, 'whirl', 'root', 1.0, '#b8ffd0'), fx(GRAVE_HIT, 'wisps', 'tip', 1.0)],
       trail: { life: 0.26, glow: 0.6 },
     }),
-    // Ghost Wheel: a cartwheel in the air with the sickle trailing out on the right; coming upright
-    // the turn slings it out at them
+    // Ghost Wheel: a cartwheel in the air, the sickle held up over the head and the free arm flung
+    // wide; coming upright it swings down round the right side and the turn slings it out at them
     jl: mv({
       keys: [
-        K(-0.9, B({ ...body, twist: -0.3, lean: 0.0, crouch: -0.05 }), { roll: 0, hop: 0.1 }),
-        K(-0.3, B({ ...body, twist: -0.5, lean: 0.1, crouch: -0.1, side: 0.1 }), { roll: -0.55, hop: 0.3 }),
-        K(wheelAirHit + 0.1, B({ ...body, twist: 0.0, lean: 0.3, crouch: -0.15, side: -0.05 }), { roll: -1, hop: 0.1 }),
-        K(1.05, B({ ...body, twist: 0.5, hipTwist: 0.2, lean: 0.34, crouch: -0.2, side: -0.1 }), { roll: -1, hop: 0 }),
+        K(-0.9, B({ ...body, twist: -0.3, lean: 0.0, crouch: -0.03 }), { roll: 0, hop: 0.1 }),
+        K(-0.3, B({ ...body, twist: -0.5, lean: 0.1, crouch: -0.07, side: 0.1 }), { roll: -0.55, hop: 0.3 }),
+        K(wheelAirHit + 0.1, B({ ...body, twist: 0.0, lean: 0.3, crouch: -0.1, side: -0.05 }), { roll: -1, hop: 0.1 }),
+        K(1.05, B({ ...body, twist: 0.5, hipTwist: 0.2, lean: 0.34, crouch: -0.13, side: -0.1 }), { roll: -1, hop: 0 }),
       ],
       main: wheelAir,
       free: track([
-        [-0.9, [0.4, 0.4, 0.1]],
-        [wheelAirHit, [0.42, 0.3, 0.0]],
+        [-0.9, [0.56, 0.36, 0.05]],
+        [wheelAirHit, [0.46, 0.3, 0.0]],
         [1.0, [0.3, 0.2, 0.15]],
       ]),
       impacts: [wheelAirHit],
@@ -407,12 +405,12 @@ export const scythe: Style = {
     // onto them as the Wraith lands, the ground cracking under it
     jh: mv({
       keys: [
-        K(-1.0, B({ ...body, lean: -0.1, crouch: -0.1 }), { flip: 0, hop: 0 }),
-        K(-0.6, B({ ...body, lean: 0.2, crouch: -0.15 }), { flip: 0.3, hop: 0.4 }),
-        K(-0.2, B({ ...body, lean: 0.1, crouch: -0.1 }), { flip: 0.8, hop: 0.5 }),
+        K(-1.0, B({ ...body, lean: -0.1, crouch: -0.07 }), { flip: 0, hop: 0 }),
+        K(-0.6, B({ ...body, lean: 0.2, crouch: -0.1 }), { flip: 0.3, hop: 0.4 }),
+        K(-0.2, B({ ...body, lean: 0.1, crouch: -0.07 }), { flip: 0.8, hop: 0.5 }),
         K(0.15, B({ ...body, lean: -0.3, crouch: 0.0, headPitch: -0.1 }), { flip: 1, hop: 0.35 }),
-        K(ritesHit + 0.1, B({ ...body, twist: -0.05, lean: 0.55, crouch: -0.4, step: 0.46, headPitch: 0.1 }), { hop: 0 }),
-        K(1.2, B({ ...body, twist: -0.05, lean: 0.5, crouch: -0.38, step: 0.46 })),
+        K(ritesHit + 0.1, B({ ...body, twist: -0.05, lean: 0.55, crouch: -0.26, step: 0.46, headPitch: 0.1 }), { hop: 0 }),
+        K(1.2, B({ ...body, twist: -0.05, lean: 0.5, crouch: -0.25, step: 0.46 })),
       ],
       main: rites,
       free: track([
@@ -435,10 +433,10 @@ export const scythe: Style = {
     // wide crouch, then swept round flat along the ground at their ankles in green fire
     sp: mv({
       keys: [
-        K(-1.6, B({ ...body, twist: -0.4, lean: 0.1, crouch: -0.14 })),
-        K(-0.5, B({ ...body, twist: -0.9, hipTwist: -0.3, crouch: -0.3, lean: 0.25, step: 0.3, back: 0.34, width: 0.22, side: 0.1 })),
-        K(reapingHit + 0.1, B({ ...body, twist: 0.0, hipTwist: 0.0, crouch: -0.44, lean: 0.4, step: 0.48, back: 0.38, width: 0.24 })),
-        K(1.05, B({ ...body, twist: 0.8, hipTwist: 0.3, crouch: -0.4, lean: 0.38, step: 0.48, back: 0.38, width: 0.24 })),
+        K(-1.6, B({ ...body, twist: -0.4, lean: 0.1, crouch: -0.09 })),
+        K(-0.5, B({ ...body, twist: -0.9, hipTwist: -0.3, crouch: -0.14, lean: 0.2, step: 0.18, back: 0.2, width: 0.28, side: 0.1 })),
+        K(reapingHit + 0.1, B({ ...body, twist: 0.0, hipTwist: 0.0, crouch: -0.17, lean: 0.36, step: 0.26, back: 0.2, width: 0.3 })),
+        K(1.05, B({ ...body, twist: 0.8, hipTwist: 0.3, crouch: -0.16, lean: 0.34, step: 0.26, back: 0.2, width: 0.3 })),
       ],
       main: reaping,
       free: track([
@@ -467,10 +465,10 @@ export const scythe: Style = {
     // of souls reaches out after it, and the Wraith hauls it back in hand over hand
     ab: mv({
       keys: [
-        K(-0.6, B({ ...body, lean: -0.3, twist: -0.6, crouch: -0.04 })),
-        K(0.85, B({ ...body, lean: 0.36, twist: 0.05, crouch: -0.2, step: 0.44 })),
-        K(1.35, B({ ...body, lean: -0.15, twist: -0.4, crouch: -0.26, step: 0.36, back: 0.38 })),
-        K(1.7, B({ ...body, lean: 0.06, twist: -0.3, crouch: -0.14 })),
+        K(-0.6, B({ ...body, lean: -0.3, twist: -0.6, crouch: -0.03 })),
+        K(0.85, B({ ...body, lean: 0.36, twist: 0.05, crouch: -0.13, step: 0.44 })),
+        K(1.35, B({ ...body, lean: -0.15, twist: -0.4, crouch: -0.17, step: 0.36, back: 0.38 })),
+        K(1.7, B({ ...body, lean: 0.06, twist: -0.3, crouch: -0.09 })),
       ],
       main: seq(
         [
@@ -501,18 +499,18 @@ export const scythe: Style = {
   entrance: mv({
     keys: [
       // sunk in the mist, rising, turned away
-      K(0.0, B({ ...body, lift: -1.05, crouch: -0.3, lean: 0.85, twist: 0.2, side: 0.12, headPitch: 0.6 }), { spin: 0.42 }),
-      K(0.1, B({ ...body, lift: -0.9, crouch: -0.3, lean: 0.8, twist: 0.2, side: 0.12, headPitch: 0.6 })),
-      K(0.22, B({ ...body, lift: -0.4, crouch: -0.22, lean: 0.5, twist: 0.15, side: 0.06, headPitch: 0.45 })),
-      K(0.34, B({ ...body, lift: 0.04, crouch: -0.1, lean: 0.2, twist: 0.05, headPitch: 0.25 })),
+      K(0.0, B({ ...body, lift: -1.05, crouch: -0.2, lean: 0.85, twist: 0.2, side: 0.12, headPitch: 0.6 }), { spin: 0.42 }),
+      K(0.1, B({ ...body, lift: -0.9, crouch: -0.2, lean: 0.8, twist: 0.2, side: 0.12, headPitch: 0.6 })),
+      K(0.22, B({ ...body, lift: -0.4, crouch: -0.14, lean: 0.5, twist: 0.15, side: 0.06, headPitch: 0.45 })),
+      K(0.34, B({ ...body, lift: 0.04, crouch: -0.07, lean: 0.2, twist: 0.05, headPitch: 0.25 })),
       // the slow turn to face them, the head leading
-      K(0.4, B({ ...body, lift: 0.04, crouch: -0.12, lean: 0.24, twist: 0.0, headPitch: 0.2 }), { spin: 0.42 }),
-      K(0.52, B({ ...body, lift: 0.04, crouch: -0.14, lean: 0.28, twist: -0.7, hipTwist: 0.0, headPitch: 0.1 }), { spin: 0.3 }),
-      K(0.66, B({ ...body, lift: 0.03, crouch: -0.14, lean: 0.26, twist: -0.4, headPitch: 0.0 }), { spin: 0.0 }),
+      K(0.4, B({ ...body, lift: 0.04, crouch: -0.08, lean: 0.24, twist: 0.0, headPitch: 0.2 }), { spin: 0.42 }),
+      K(0.52, B({ ...body, lift: 0.04, crouch: -0.09, lean: 0.28, twist: -0.7, hipTwist: 0.0, headPitch: 0.1 }), { spin: 0.3 }),
+      K(0.66, B({ ...body, lift: 0.03, crouch: -0.09, lean: 0.26, twist: -0.4, headPitch: 0.0 }), { spin: 0.0 }),
       // one whirl round under the raised sickle
-      K(0.72, B({ ...body, lift: 0.08, crouch: -0.04, lean: -0.08, twist: 0.0, headPitch: -0.15 }), { spin: 0.0 }),
+      K(0.72, B({ ...body, lift: 0.08, crouch: -0.03, lean: -0.08, twist: 0.0, headPitch: -0.15 }), { spin: 0.0 }),
       K(0.8, B({ ...body, lift: 0.22, crouch: 0.0, lean: -0.1, twist: 0.0, side: 0.06, headPitch: -0.1 }), { spin: -0.55 }),
-      K(0.86, B({ ...body, lift: 0.14, crouch: -0.04, lean: 0.0, twist: -0.1, headPitch: -0.05 }), { spin: -1 }),
+      K(0.86, B({ ...body, lift: 0.14, crouch: -0.03, lean: 0.0, twist: -0.1, headPitch: -0.05 }), { spin: -1 }),
       K(0.97, body),
     ],
     main: keyed([
