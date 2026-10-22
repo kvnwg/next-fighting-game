@@ -109,6 +109,20 @@ describe('hit resolution', () => {
     expect(f.onGround).toBe(true);
   });
 
+  it('a quick tap deflects: the window plays out after the button is released', () => {
+    const { A, D } = duel();
+    A.input('light', 1000);
+    const tHit = 1000 + A.atkWindup;
+    D.input('blockDown', tHit - 120);
+    D.input('blockUp', tHit - 80);
+    D.update(tHit - 40);
+    expect(D.state).toBe('block');
+    expect(decideOutcome(A, D, A.attack!, tHit, defenseAt(logOf(D), tHit))).toBe('deflect');
+    // and once the window is over the guard comes down
+    D.update(D.parryUntil + 10);
+    expect(D.state).toBe('idle');
+  });
+
   it('a jump is untouchable on the way up, and open on the way down and landing', () => {
     const log: DefenseEvent[] = [];
     pushDefense(log, { type: 'jump', t: 1000 });

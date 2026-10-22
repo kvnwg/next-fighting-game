@@ -126,6 +126,8 @@ export class Fighter {
   yaw = 0;
   vy = 0;
   onGround = true;
+  /** a guard released inside its deflect window stays up until then (see releaseBlock) */
+  guardLingerUntil = -Infinity;
 
   buffered: { action: InputAction; until: number; opts: InputOptions } | null = null;
   /** Set when a buffered input timed out without ever taking effect. */
@@ -571,6 +573,12 @@ export class Fighter {
 
   releaseBlock(now: number, pressTime = now): boolean {
     this.blockHeld = false;
+    // let go inside the deflect window and it still plays out: the guard drops when it ends, so
+    // a quick tap deflects as well as a hold does
+    if (this.state === 'block' && pressTime < this.parryUntil) {
+      this.guardLingerUntil = this.parryUntil;
+      return true;
+    }
     if (this.state === 'block') this.setState('idle', now, 0, pressTime);
     else this.syncGuard(pressTime);
     return true;
@@ -721,6 +729,9 @@ export class Fighter {
       default:
         break;
     }
+
+    // a released guard held up for the rest of its deflect window comes down when it ends
+    if (this.state === 'block' && !this.blockHeld && now >= this.guardLingerUntil) this.setState('idle', now, 0, Math.min(now, this.guardLingerUntil));
 
     // Holding guard re-raises it as soon as the current state allows.
     if (this.blockHeld) {
