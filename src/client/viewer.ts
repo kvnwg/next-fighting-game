@@ -195,6 +195,8 @@ function showStrip(r: GameRenderer, params: URLSearchParams, n: number): void {
     const m = new CharacterModel(id);
     m.ghostsEnabled = params.has('ghosts');
     m.smearsEnabled = params.has('ghosts');
+    // `xray`: see-through body with the skeleton drawn over it
+    if (params.has('xray')) m.enableXray(Number(params.get('xray') || 0.3));
     if (params.has('target')) {
       // a stand-in for the opponent's chest, where every hit should land
       const mark = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.08), new THREE.MeshBasicMaterial({ color: '#ff3355' }));

@@ -150,6 +150,22 @@ const _chainB = new THREE.Vector3();
 const _chainS = new THREE.Vector3(1, 1, 1);
 const Z_AXIS_C = new THREE.Vector3(0, 0, 1);
 const _chainTwist = new THREE.Quaternion().setFromAxisAngle(Z_AXIS_C, Math.PI / 2);
+type SkeletonJoint = 'pelvis' | 'chest' | 'head' | `${'armR' | 'armL' | 'legR' | 'legL'}.${'upper' | 'lower' | 'end'}`;
+const SPINE = '#ffd23a';
+const RIGHT = '#ff4a5a';
+const LEFT = '#4ab0ff';
+const SKELETON: [SkeletonJoint, SkeletonJoint, string][] = [
+  ['pelvis', 'chest', SPINE], ['chest', 'head', SPINE],
+  ['chest', 'armR.upper', RIGHT], ['armR.upper', 'armR.lower', RIGHT], ['armR.lower', 'armR.end', RIGHT],
+  ['chest', 'armL.upper', LEFT], ['armL.upper', 'armL.lower', LEFT], ['armL.lower', 'armL.end', LEFT],
+  ['pelvis', 'legR.upper', RIGHT], ['legR.upper', 'legR.lower', RIGHT], ['legR.lower', 'legR.end', RIGHT],
+  ['pelvis', 'legL.upper', LEFT], ['legL.upper', 'legL.lower', LEFT], ['legL.lower', 'legL.end', LEFT],
+];
+const _skA = new THREE.Vector3();
+const _skB = new THREE.Vector3();
+const _skC = new THREE.Color();
+const _skM = new THREE.Matrix4();
+
 export class CharacterModel {
   readonly root = new THREE.Group();
   readonly char: CharacterDef;
@@ -535,6 +551,67 @@ export class CharacterModel {
     }
   }
 
+  /**
+   * X-ray (dev viewer): the body turns see-through and the skeleton the animator drives is drawn
+   * over it, so you can see where every limb is under the clothes. Spine and head yellow, the right
+   * side red, the left side blue; a dot at every joint.
+   */
+  private skeleton: { lines: THREE.LineSegments; dots: THREE.InstancedMesh } | null = null;
+  enableXray(opacity = 0.3): void {
+    for (const m of this.materials) {
+      m.transparent = true;
+      m.opacity = opacity;
+      m.depthWrite = false;
+    }
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SKELETON.length * 6), 3));
+    lineGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SKELETON.length * 6), 3));
+    const lines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false, transparent: true, linewidth: 2 }));
+    lines.renderOrder = 10;
+    lines.frustumCulled = false;
+    const dots = new THREE.InstancedMesh(new THREE.SphereGeometry(0.035 * this.scale, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff', depthTest: false, transparent: true }), 16);
+    dots.renderOrder = 11;
+    dots.frustumCulled = false;
+    this.root.add(lines, dots);
+    this.skeleton = { lines, dots };
+  }
+
+  private drawSkeleton(): void {
+    const sk = this.skeleton;
+    if (!sk) return;
+    this.root.updateMatrixWorld(true);
+    const joint = (name: SkeletonJoint, out: THREE.Vector3) => {
+      const g =
+        name === 'pelvis' ? this.hips : name === 'chest' ? this.torso : name === 'head' ? this.head
+        : (name.startsWith('armR') ? this.armR : name.startsWith('armL') ? this.armL : name.startsWith('legR') ? this.legR : this.legL)[name.endsWith('.upper') ? 'upper' : name.endsWith('.lower') ? 'lower' : 'end'];
+      g.getWorldPosition(out);
+      // the chest point sits at the shoulders' height, the head point mid-skull
+      if (name === 'chest') out.copy(this.shoulderMid).applyMatrix4(this.torso.matrixWorld);
+      if (name === 'head') out.copy(_skA.set(0, 0.12 * this.scale, 0)).applyMatrix4(this.head.matrixWorld);
+      return this.root.worldToLocal(out);
+    };
+    const pos = sk.lines.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const col = sk.lines.geometry.getAttribute('color') as THREE.BufferAttribute;
+    SKELETON.forEach(([a, b, c], i) => {
+      joint(a, _skA);
+      joint(b, _skB);
+      pos.setXYZ(i * 2, _skA.x, _skA.y, _skA.z);
+      pos.setXYZ(i * 2 + 1, _skB.x, _skB.y, _skB.z);
+      _skC.set(c);
+      col.setXYZ(i * 2, _skC.r, _skC.g, _skC.b);
+      col.setXYZ(i * 2 + 1, _skC.r, _skC.g, _skC.b);
+    });
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
+    const names: SkeletonJoint[] = ['pelvis', 'chest', 'head', 'armR.upper', 'armR.lower', 'armR.end', 'armL.upper', 'armL.lower', 'armL.end', 'legR.upper', 'legR.lower', 'legR.end', 'legL.upper', 'legL.lower', 'legL.end'];
+    names.forEach((n, i) => {
+      joint(n, _skA);
+      sk.dots.setMatrixAt(i, _skM.makeTranslation(_skA.x, _skA.y, _skA.z));
+    });
+    sk.dots.count = names.length;
+    sk.dots.instanceMatrix.needsUpdate = true;
+  }
+
   setVisible(v: boolean): void {
     this.body.visible = v;
     if (this.chain) this.chain.links.visible = v;
@@ -664,6 +741,7 @@ export class CharacterModel {
     this.updateSmears(dt);
     this.stepCloth(dt);
     this.stepChain(dt);
+    this.drawSkeleton();
 
     // hit flash / perilous telegraph / buff glow
     this.flashT = Math.max(0, this.flashT - dt * 8);

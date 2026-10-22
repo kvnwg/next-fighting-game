@@ -184,6 +184,12 @@ function shiftHands(p: ResolvedPose, d: THREE.Vector3, k = 1): void {
 // ------------------------------------------------------------------------------------ keys
 
 const BODY_CHANNELS = ['crouch', 'lean', 'twist', 'side', 'hipTwist', 'headPitch', 'step', 'back', 'width', 'lift'] as const;
+/** the channels the legs drive, which lead the torso through a move by HIP_LEAD (in s) */
+const LEG_CHANNELS = ['hipTwist', 'step', 'back', 'width', 'crouch', 'lift'] as const;
+const HIP_LEAD = 0.06;
+/** the blade trails the hand by WRIST_LAG (in s) over the last WRIST_WINDOW before each contact */
+const WRIST_LAG = 0.06;
+const WRIST_WINDOW = 0.22;
 const ROT_CHANNELS = ['spin', 'flip', 'roll', 'hop'] as const;
 
 /**
@@ -434,8 +440,15 @@ export class Animator {
   private movePose(def: MoveDef, s: number): MoveFrame {
     const st = this.style;
     const { body, rot } = evalKeys(def.keys, s + def.bodyLead);
+    // the kinetic chain, proximal to distal: the legs and hips move first (the step, the drop, the
+    // hip turn), the torso after them, the arm after that, and the blade last, whipping through.
+    // Torso twist is absolute, so leading the hips never moves the weapon
+    const legs = evalKeys(def.keys, s + def.bodyLead + HIP_LEAD).body;
+    for (const c of LEG_CHANNELS) body[c] = legs[c];
     const main = evalMotion(def.main, s, st.axis, body, st.guard.main)!;
+    this.wristLag(def, s, main, (t) => evalMotion(def.main, t, st.axis, body, st.guard.main));
     const off = def.off ? evalMotion(def.off, s, st.offAxis, body, st.guard.off) : st.guard.off ? cloneXf(st.guard.off) : null;
+    if (off && def.off) this.wristLag(def, s, off, (t) => evalMotion(def.off!, t, st.offAxis, body, st.guard.off));
     const free = def.free ? evalMotion(def.free, s, st.axis, body, null)!.pos : (st.guard.free ?? REST_LEFT).clone();
     let kickT: KickTarget | null = null;
     if (def.kick) {
@@ -448,6 +461,22 @@ export class Animator {
       }
     }
     return { pose: { body, main, off, free }, rot, kick: kickT };
+  }
+
+  /**
+   * The wrist: as the arm drives into a blow the blade trails behind the hand (its angle a step
+   * behind on its path), then snaps through to meet the hand exactly at contact, so the hit pose
+   * is the authored one and the last part of the swing is the fastest.
+   */
+  private wristLag(def: MoveDef, s: number, xf: WeaponXf, at: (t: number) => WeaponXf | null): void {
+    let w = 0;
+    for (const hit of def.impacts) {
+      const d = hit - s;
+      if (d > 0 && d < WRIST_WINDOW) w = Math.max(w, Math.sin((d / WRIST_WINDOW) * Math.PI) * 0.9);
+    }
+    if (w < 0.02) return;
+    const lagged = at(s - WRIST_LAG);
+    if (lagged) xf.quat.slerp(lagged.quat, w);
   }
 
   /**
