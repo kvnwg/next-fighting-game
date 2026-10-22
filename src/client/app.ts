@@ -971,6 +971,18 @@ class App {
         this.effects.flash(this.tmp.set(f.pos.x, f.pos.y + 2.4 * f.model.scale, f.pos.z), '#ff2a2a', 1.4, 0.3);
       }
       if (v.state === 'dodge' && v.elapsed < 200) audio.dodge(f.roster.char, v.dodgeKind ?? 'roll', { vol: vol * 0.8, pos: f.pos });
+      // the opponent starting an attack: their weapon glints the moment the windup begins, so you
+      // see it coming whatever the angle (white for a light, orange for a heavy, red if perilous)
+      if (v.state === 'attack' && v.attack && !v.attack.noHitbox && !f.isLocal && settings.parryCue) {
+        const me = this.local?.cf;
+        if (me && dist2D(me.pos.x, me.pos.z, f.pos.x, f.pos.z) < 14) {
+          const heavy = isHeavyKey(v.key) || v.key === 'sp';
+          const tip = f.weaponTip(new THREE.Vector3());
+          const c = v.attack.perilous ? '#ff3a2a' : heavy ? '#ffa02a' : '#ffffff';
+          this.effects.flash(tip, c, heavy || v.attack.perilous ? 1.0 : 0.7, 0.18);
+          this.effects.burst(tip, { count: heavy ? 8 : 5, color: [c, '#ffffff'], speed: 3, life: 0.2, size: 0.04, gravity: 0, drag: 4 });
+        }
+      }
     }
     if (v.state === 'attack' && v.attack && !v.attack.noHitbox) {
       if (v.elapsed >= v.windup - 30 && f.lastSwingSerial !== v.serial) {
