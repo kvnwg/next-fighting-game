@@ -206,21 +206,23 @@ export class CameraRig {
     const u = forward(this.yaw);
     const rx = -u.z;
     const rz = u.x;
-    // just off the line between you: ~15° up close (so your own back doesn't hide them), ~10° apart
+    // just off the line between you: ~24° up close (so your own back doesn't hide them), ~11° apart
     const close = THREE.MathUtils.smoothstep(d, 1.5, 7);
-    const phi = THREE.MathUtils.lerp(0.26, 0.17, close);
+    const phi = THREE.MathUtils.lerp(0.42, 0.2, close);
+    // and the whole view nudged over your right shoulder, so you stand a little left of centre
+    const sh = THREE.MathUtils.lerp(0.55, 0.3, close) * k;
     // about two body heights behind you, a little further when they're far off
     const boom = THREE.MathUtils.clamp(3.3 + d * 0.08, 3.4, 4.2) * k;
     const bx = -u.x * Math.cos(phi) + rx * Math.sin(phi);
     const bz = -u.z * Math.cos(phi) + rz * Math.sin(phi);
     // eye a little over head height, looking nearly level
-    const pos = new THREE.Vector3(player.x + bx * boom, player.y + 2.3 * k, player.z + bz * boom);
+    const pos = new THREE.Vector3(player.x + bx * boom + rx * sh, player.y + 2.3 * k, player.z + bz * boom + rz * sh);
     const subject = new THREE.Vector3(target.x, target.y + 1.2 * k, target.z);
     // only what's behind you pulls it in (it mustn't end up inside a tree or a wall). Something
     // between you and them doesn't move it at all: the prop dissolves instead (see G.uSee)
     this.constrain?.(_chest.set(player.x, player.y + 1.4 * k, player.z), pos);
     // look at them, at chest height
-    const look = new THREE.Vector3(player.x + u.x * d * 0.85, player.y + 1.3 * k, player.z + u.z * d * 0.85);
+    const look = new THREE.Vector3(player.x + u.x * d * 0.85 + rx * sh, player.y + 1.35 * k, player.z + u.z * d * 0.85 + rz * sh);
     return { pos, look, subject };
   }
 
