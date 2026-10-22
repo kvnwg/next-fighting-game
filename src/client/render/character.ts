@@ -145,6 +145,7 @@ const _cv = new THREE.Vector3();
 const _cf = new THREE.Vector3();
 const _cq = new THREE.Quaternion();
 const _cl1 = new THREE.Vector3();
+const _pole = new THREE.Vector3();
 const _cl2 = new THREE.Vector3();
 const _chainM = new THREE.Matrix4();
 const _chainA = new THREE.Vector3();
@@ -739,9 +740,15 @@ export class CharacterModel {
       _v.applyAxisAngle(UP, f.spin).applyMatrix4(_bodyInv);
       if (tuck > 0 && kickW < 0.5) _v.lerp(_kick.copy(side === 1 ? TUCK_L : TUCK_R).multiplyScalar(this.legK), tuck);
       _v.applyMatrix4(_m);
-      solveTwoBone(hip, _v, pole, d.thigh, d.shin, leg.upper.quaternion, leg.lower.quaternion);
-      // feet flat, rear foot turned out a little
+      // the knee tracks over the foot: it follows the foot's turn-out, and swings out over the toes
+      // as the stance widens (a horse stance), rather than always pointing straight ahead
       const rear = (side === 1) === (b.front === 'R');
+      const spread = Math.min(1, Math.max(0, ((_v.x - hip.x) * side) / ((d.thigh + d.shin) * 0.45)));
+      _pole.set(0, 0, 1).applyAxisAngle(UP, side * (rear ? 0.45 : 0.12) * 0.7);
+      _pole.x += side * spread * 0.9;
+      _pole.add(pole).normalize();
+      solveTwoBone(hip, _v, _pole, d.thigh, d.shin, leg.upper.quaternion, leg.lower.quaternion);
+      // feet flat, rear foot turned out a little
       _yaw.setFromAxisAngle(UP, f.spin + side * (rear ? 0.45 : 0.12));
       _qa.copy(this.hips.quaternion).invert().multiply(_yaw);
       _qb.copy(leg.upper.quaternion).multiply(leg.lower.quaternion).invert();
