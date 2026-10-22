@@ -619,6 +619,13 @@ export class Animator {
     // guard (a blade laid back over the shoulder) would swing on past the half turn and flip
     out.main.quat.copy(pushTurn(guard.main.quat, pose.main.quat, amount));
     if (out.off && guard.off && pose.off) out.off.quat.copy(pushTurn(guard.off.quat, pose.off.quat, amount));
+    // the grip is the chamber's own: pushing it past 1 would carry the second hand off the hilt
+    out.main.grip2 = pose.main.grip2;
+    out.main.hold2 = pose.main.hold2;
+    if (out.off && pose.off) {
+      out.off.grip2 = pose.off.grip2;
+      out.off.hold2 = pose.off.hold2;
+    }
     return out;
   }
 
