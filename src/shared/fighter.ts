@@ -516,7 +516,9 @@ export class Fighter {
    * or before your own attack recovery let you cancel.
    */
   private legalSince(kind: 'guard' | 'evade', now: number): number {
-    // a deflect press is never held back: it cuts into whatever the fighter is doing
+    // a deflect press is never held back: it cuts into whatever the fighter is doing (except the
+    // moment just after being hit)
+    if (kind === 'guard' && this.state === 'stagger') return this.guardLockEnd();
     if (kind === 'guard' && GUARD_ANYTIME.has(this.state)) return this.stateStart;
     switch (this.state) {
       case 'stagger':
@@ -533,11 +535,25 @@ export class Fighter {
     }
   }
 
+  /**
+   * Hit, there's a moment you can't deflect: short after a light, longer after a heavy (told apart
+   * by the stagger's length, which the client is sent too).
+   */
+  guardLockEnd(): number {
+    if (this.state !== 'stagger') return -Infinity;
+    return this.stateStart + (this.stateDur > COMBAT.staggerTime ? COMBAT.hitGuardLockHeavy : COMBAT.hitGuardLockLight);
+  }
+
   private clampPress(kind: 'guard' | 'evade', now: number, pressTime: number): number {
     return Math.min(now, Math.max(pressTime, this.legalSince(kind, now)));
   }
 
   pressBlock(now: number, pressTime = now): boolean {
+    // just hit: no deflecting yet. Held, the guard comes up (as a plain block) once it can
+    if (now < this.guardLockEnd()) {
+      this.blockHeld = true;
+      return false;
+    }
     pressTime = this.clampPress('guard', now, pressTime);
     this.blockHeld = true;
     const since = pressTime - this.lastBlockPress;
@@ -738,7 +754,7 @@ export class Fighter {
       const e2 = now - this.stateStart;
       if (
         this.state === 'idle' ||
-        (this.state === 'stagger' && e2 >= COMBAT.staggerDefendAfter) ||
+        (this.state === 'stagger' && now >= this.guardLockEnd()) ||
         (this.state === 'deflected' && e2 >= this.stateDur * COMBAT.deflectedDefendFrac)
       ) {
         this.setState('block', now);

@@ -42,8 +42,12 @@ export const COMBAT = {
   perilousDeflectMult: 1.4,
   mikiriPosture: 45,
 
-  // a hit stuns about as long as Dueling Grounds' (~250 ms)
+  // a hit stuns about as long as Dueling Grounds' (~250 ms); a heavy one a little longer
   staggerTime: 250,
+  staggerHeavyTime: 350,
+  /** Hit, you can't deflect for this long (ms): a moment after a light, longer after a heavy. */
+  hitGuardLockLight: 120,
+  hitGuardLockHeavy: 220,
   /** While staggered you may start guarding (and deflect) after this long. */
   staggerDefendAfter: 100,
   blockstunTime: 200,

@@ -2,7 +2,7 @@
  * Hit resolution. Given an attack that connected at time `t`, work out what the defender was doing
  * at that moment (from their lag-compensated defense timeline) and apply the result.
  */
-import { AttackDef, AttackKey } from './characters';
+import { AttackDef, AttackKey, isHeavyKey } from './characters';
 import { COMBAT } from './config';
 import { DefenseEvent, Fighter } from './fighter';
 import { DEG, Vec2, angleDiff, forward, yawTo } from './math';
@@ -286,7 +286,9 @@ export function applyHit(
         defender.force('broken', now, COMBAT.brokenTime);
         r.defenderBroken = true;
       } else if (outcome === 'hit') {
-        defender.force('stagger', now, COMBAT.staggerTime);
+        // a heavy blow staggers longer (and locks the guard out longer, see Fighter.guardLockEnd)
+        const heavyHit = isHeavyKey(key) || key === 'sp';
+        defender.force('stagger', now, heavyHit ? COMBAT.staggerHeavyTime : COMBAT.staggerTime);
       }
       if (outcome === 'hit') {
         r.pushDefender = COMBAT.hitKnockback + (atk.knockback ?? 0);

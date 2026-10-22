@@ -123,6 +123,21 @@ describe('hit resolution', () => {
     expect(D.state).toBe('idle');
   });
 
+  it('just hit, you cannot deflect for a moment: longer after a heavy than a light', () => {
+    for (const [key, lock] of [['l0', COMBAT.hitGuardLockLight], ['h', COMBAT.hitGuardLockHeavy]] as const) {
+      const { A, D } = duel();
+      A.startAttack(key, 1000);
+      const tHit = 1000 + A.atkWindup;
+      applyHit(A, D, A.attack!, key, 'hit', tHit, { distance: 2 });
+      expect(D.state).toBe('stagger');
+      expect(D.input('blockDown', tHit + lock - 30)).toBe(false);
+      expect(D.state).toBe('stagger');
+      // still held: the guard comes up once the lock is over
+      D.update(tHit + lock + 5);
+      expect(D.state).toBe('block');
+    }
+  });
+
   it('a jump is untouchable on the way up, and open on the way down and landing', () => {
     const log: DefenseEvent[] = [];
     pushDefense(log, { type: 'jump', t: 1000 });
