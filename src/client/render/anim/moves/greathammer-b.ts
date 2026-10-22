@@ -7,7 +7,7 @@
  * behind it; every one ends with the head in the floor ahead.
  */
 import { B, K, fx, mv, track } from '../author';
-import type { MoveDef } from '../author';
+import type { MoveDef, V3 } from '../author';
 import { CHEST, G2, GUARD_DIR, H, HIGH, LOW, OUT, OVER, REST, SHLD, aim, body, heave } from './greathammer-base';
 
 // The heavy chain follows the reference's big blows in order: the windmill slam (ref.mov 2.9-3.6 s),
@@ -304,3 +304,120 @@ export const WARDEN_B: Partial<Record<string, MoveDef>> = {
     trail: { life: 0.22, glow: 0.6 },
   }), meteor, G2),
 };
+
+// ------------------------------------------------------------------- the execution
+//
+// Earthsplitter. s runs in seconds here: t = s + 1.7, so the finishing blow at s = 0.45 lands at
+// 2.15 s. He shoulders the hammer and takes one heavy step; snaps their head round with a backhand
+// off the shoulder; carries it on round behind his left shoulder and holds it there, glaring down
+// at them; then heaves it straight up overhead on one leg, lets it fall back behind him, stamps
+// and crushes it down through them into the floor, and shoulders it again.
+
+/** the hammer rested on his right shoulder: the fists in front of the right chest, the haft back up over the shoulder */
+const SHOULDERED: V3 = [-0.12, 0.5, 0.26];
+const SHOULDER_DIR = aim(-168, 38);
+
+const earthsplitter = [
+  // shouldering it: the head swung up off the floor round his right side and onto the shoulder
+  H(-1.7, LOW, GUARD_DIR),
+  H(-1.5, [-0.08, 0.3, 0.36], aim(-15, -24)),
+  H(-1.33, [-0.16, 0.44, 0.32], aim(-80, 12)),
+  H(-1.18, [-0.14, 0.52, 0.28], aim(-140, 36)),
+  H(-1.05, SHOULDERED, SHOULDER_DIR),
+  H(-0.9, SHOULDERED, aim(-166, 36)),
+  // the backhand: off the shoulder, out to his right and flat across at their head
+  H(-0.82, [-0.2, 0.46, 0.3], aim(-100, 6)),
+  H(-0.75, [-0.06, 0.38, 0.46], aim(0, -16)),
+  H(-0.66, [0.02, 0.44, 0.4], aim(72, -2)),
+  // carried on round and up behind his left shoulder, the head beside the helm: held there,
+  // glaring down at them over it, breathing
+  H(-0.52, [-0.06, 0.56, 0.24], aim(128, 20)),
+  H(-0.4, [-0.17, 0.62, 0.16], aim(118, 28)),
+  H(-0.12, [-0.17, 0.64, 0.14], aim(122, 32)),
+  // heaved up over the left shoulder, straight up over his head at full stretch...
+  H(-0.02, [-0.06, 0.9, 0.18], aim(60, 78)),
+  H(0.06, [-0.05, 0.95, 0.18], aim(-20, 86)),
+  // ...and let fall back behind his right shoulder, the elbows bending: loaded
+  H(0.16, [-0.1, 0.95, 0.14], aim(-165, 45)),
+  H(0.24, [-0.13, 0.92, 0.1], aim(-160, 10)),
+  // the crush: over the top and down through them
+  H(0.33, [-0.08, 0.94, 0.26], aim(-10, 72)),
+  H(0.39, [-0.13, 0.76, 0.34], aim(3, 24)),
+  // on them: the head across their head and shoulders, still travelling down
+  H(0.45, [-0.16, 0.64, 0.33], aim(9, -24)),
+  // and on through them into the floor
+  H(0.51, [-0.1, 0.34, 0.46], aim(3, -36)),
+  H(0.56, [-0.04, 0.26, 0.48], aim(0, -38)),
+  // pulled up out of the crater and shouldered again
+  H(0.62, [-0.08, 0.3, 0.4], aim(-25, -28)),
+  H(0.7, [-0.15, 0.46, 0.32], aim(-95, 20)),
+  H(0.8, SHOULDERED, aim(-160, 36)),
+  H(1.0, SHOULDERED, SHOULDER_DIR),
+];
+
+export const WARDEN_EXECUTE: MoveDef = heave(mv({
+  keys: [
+    K(-1.7, body),
+    // shouldering it: turned right after the hammer, straightening tall, the weight back
+    K(-1.3, B({ ...body, twist: -0.45, hipTwist: -0.2, lean: 0.0, crouch: -0.06, step: 0.24, back: 0.3, width: 0.2, headPitch: 0.1 })),
+    // one heavy step at them, the weight rolling onto the lead foot, glaring down
+    K(-1.0, B({ ...body, twist: -0.35, hipTwist: -0.15, lean: 0.08, crouch: -0.1, step: 0.34, back: 0.32, width: 0.2, headPitch: 0.2 })),
+    K(-0.88, B({ ...body, twist: -0.55, hipTwist: -0.3, lean: 0.14, crouch: -0.16, step: 0.46, back: 0.34, width: 0.21, headPitch: 0.15 })),
+    // the backhand: hips left first, the trunk after, the arms straight at their head
+    K(-0.75, B({ ...body, twist: 0.25, hipTwist: 0.3, lean: 0.24, crouch: -0.2, step: 0.48, back: 0.34, width: 0.22, headPitch: -0.05 })),
+    K(-0.6, B({ ...body, twist: 0.75, hipTwist: 0.42, lean: 0.1, crouch: -0.14, step: 0.44, back: 0.34, width: 0.21, side: 0.06 })),
+    // turned left under the chambered hammer, risen, the chest open, breathing
+    K(-0.38, B({ ...body, twist: 0.6, hipTwist: 0.32, lean: -0.04, crouch: -0.08, step: 0.38, back: 0.36, width: 0.2, headPitch: 0.15 })),
+    K(-0.12, B({ ...body, twist: 0.55, hipTwist: 0.3, lean: -0.1, crouch: -0.05, step: 0.36, back: 0.36, width: 0.2, side: -0.03, headPitch: 0.1 })),
+    // heaved up: squared, up on the rear leg as the lead knee comes up, the back arched
+    K(0.06, B({ ...body, twist: 0.05, hipTwist: 0.04, lean: -0.26, crouch: 0.02, step: 0.26, back: 0.38, width: 0.18, headPitch: -0.4 }), { hop: 0.04 }),
+    K(0.22, B({ ...body, twist: -0.02, lean: -0.36, crouch: 0.03, step: 0.24, back: 0.4, width: 0.18, side: 0.02, headPitch: -0.45 }), { hop: 0.05 }),
+    // the stamp and the crush: the lead foot far out, the hips through, the trunk folded over the front thigh
+    K(0.34, B({ ...body, twist: 0.0, lean: 0.25, crouch: -0.2, step: 0.56, back: 0.44, width: 0.24, headPitch: -0.3 }), { hop: 0.02 }),
+    K(0.45, B({ ...body, twist: -0.06, lean: 0.42, crouch: -0.26, step: 0.62, back: 0.48, width: 0.26, headPitch: -0.3 }), { hop: 0 }),
+    K(0.56, B({ ...body, twist: -0.06, lean: 0.72, crouch: -0.38, step: 0.62, back: 0.5, width: 0.27, headPitch: -0.25 })),
+    // straightening slowly, turned a little right under the shouldered hammer, chest up
+    K(0.75, B({ ...body, twist: -0.3, hipTwist: -0.12, lean: 0.2, crouch: -0.16, step: 0.52, back: 0.42, width: 0.24, headPitch: -0.05 })),
+    K(1.0, B({ ...body, twist: -0.4, hipTwist: -0.18, lean: -0.06, crouch: -0.08, step: 0.46, back: 0.4, width: 0.23, headPitch: -0.12 })),
+  ],
+  main: { kind: 'hold' },
+  // the lead knee drawn up high under the raised hammer, then stamped far out into the blow
+  kick: {
+    foot: 'L',
+    from: -0.02,
+    to: 0.38,
+    path: track([
+      [0, [0.18, 0.04, 0.3]],
+      [0.35, [0.17, 0.46, 0.2]],
+      [0.7, [0.17, 0.5, 0.22]],
+      [1, [0.19, 0.12, 0.62]],
+    ]),
+  },
+  impacts: [-0.75, 0.45],
+  start: -1.7,
+  chamber: -0.95,
+  rest: 1.0,
+  end: 1.07,
+  lead: 0.04,
+  ghosts: [0.22, 0.5],
+  fx: [
+    fx(-1.6, 'dust', 'tip', 1.0),
+    fx(-1.42, 'quake', 'tip', 0.7),
+    fx(-0.92, 'stomp', 'feet', 1.1),
+    fx(-0.92, 'shake', 'root', 0.5),
+    fx(-0.75, 'flashline', 'tip', 1.0),
+    fx(-0.75, 'sparkle', 'tip', 1.0, '#ffffff'),
+    fx(-0.72, 'whirl', 'root', 0.9, '#ffe2b0'),
+    fx(-0.4, 'embers', 'root', 1.0),
+    fx(0.06, 'sparkle', 'tip', 1.0, '#ffd27a'),
+    fx(0.08, 'embers', 'root', 1.3),
+    fx(0.36, 'stomp', 'feet', 1.3),
+    fx(0.45, 'shockwave', 'tip', 2.2),
+    fx(0.45, 'quake', 'tip', 1.6),
+    fx(0.45, 'shake', 'root', 2.0),
+    fx(0.46, 'embers', 'root', 1.6),
+    fx(0.5, 'dust', 'tip', 1.5),
+    fx(0.62, 'dust', 'tip', 1.0),
+  ],
+  trail: { life: 0.28, glow: 0.8 },
+}), earthsplitter, G2);

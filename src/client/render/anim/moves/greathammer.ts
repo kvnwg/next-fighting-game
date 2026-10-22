@@ -9,7 +9,7 @@
 import { B, K, P, fx, line, mv } from '../author';
 import type { Style } from '../author';
 import { CHEST, G2, GUARD_DIR, H, LOW, OUT, OVER, REST, aim, body, heave, held } from './greathammer-base';
-import { WARDEN_B } from './greathammer-b';
+import { WARDEN_B, WARDEN_EXECUTE } from './greathammer-b';
 
 // The lights follow the reference's chain (ref.mov 5.4-5.9 s, 2.1-2.6 s and 3.0-3.6 s): a flat sweep
 // left to right that loops up toward his right shoulder, a backhand back across at the chest that
@@ -276,6 +276,10 @@ export const greathammer: Style = {
     // the heavy chain, the dash and backstep heavies and the air attacks
     ...WARDEN_B,
   },
+  // Earthsplitter: shouldered, a backhand off the shoulder, hoisted straight up on one leg and
+  // crushed down through them into the floor (greathammer-b.ts)
+  execute: WARDEN_EXECUTE,
+  executeReact: 'crumple',
   // War Cry: the hammer hoisted overhead in both hands, a wide stance, the head thrown back
   roar: mv({
     keys: [

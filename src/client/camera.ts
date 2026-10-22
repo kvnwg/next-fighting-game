@@ -374,7 +374,8 @@ export function introShots(me: ShotSubject, op: ShotSubject, end: CamPose): Shot
 /**
  * The execution's camera, timed to the paired animation: wide and low from the side as it begins,
  * over the kneeling victim's shoulder up at the executioner winding up, low and close from the
- * front quarter as the blow comes down, then pulling up and away as they go down.
+ * front quarter as the blow comes down (starting high, for a weapon raised overhead, and tilting
+ * down onto the blow), then pulling up and away as they go down.
  * `a` is the executioner, `d` the victim, `k` the bigger body scale.
  */
 export function executionShots(a: THREE.Vector3, d: THREE.Vector3, k: number): Shot[] {
@@ -393,7 +394,7 @@ export function executionShots(a: THREE.Vector3, d: THREE.Vector3, k: number): S
   return [
     { duration: s1, from: pose(at(mid, 5.6, -0.4, 0.45), at(mid, 0, 0, 1.0), 38), to: pose(at(mid, 4.9, 0.6, 0.6), at(mid, 0, 0, 1.0), 34) },
     { duration: s2 - s1, from: pose(at(D, 2.2, 2.5, 2.0), at(A, 0, 0, 1.35), 36, at(A, 0, 0, 1.2)), to: pose(at(D, 1.9, 2.1, 1.85), at(A, 0, 0, 1.45), 32, at(A, 0, 0, 1.2)) },
-    { duration: hit - s2 + 0.15, from: pose(at(mid, -4.6, -0.9, 0.55), at(mid, 0, 0.1, 1.0), 40), to: pose(at(mid, -4.0, -0.7, 0.5), at(mid, 0, 0.15, 0.95), 35) },
+    { duration: hit - s2 + 0.15, from: pose(at(mid, -4.6, -0.9, 0.55), at(mid, 0, 0.1, 1.45), 44), to: pose(at(mid, -4.0, -0.7, 0.5), at(mid, 0, 0.15, 0.95), 35) },
     { duration: COMBAT.executeTime / 1000 - hit - 0.15, from: pose(at(mid, 3.4, -0.6, 1.2), at(D, 0, 0, 0.6), 36), to: pose(at(mid, 6.2, -1.8, 3.2), at(D, 0, 0, 0.5), 44), via: at(mid, 5.2, 0.4, 2) },
   ];
 }
