@@ -73,72 +73,79 @@ const at = (s: number, k: GK): GK => [s, k[1], k[2], k[3], k[4]];
 
 const BOLT = '#ffe27a'; // the golden lightning that crackles along the glaive through the heavies
 
-// Piercing Step: drawn back along its line to the right hip, then driven out at their chest as the
-// front foot stamps, the left hand sliding back down the shaft to meet the right
+// Piercing Step: cocked high on the right, the right fist at the shoulder and the left at the chest
+// behind it, the shaft a long diagonal across the body with the blade raised far out above his
+// right shoulder; then brought down onto the line and driven out at their chest as the front
+// foot stamps
 const pierce = glaive([
-  at(-0.3, G),
-  [-0.08, [-0.33, 0.2, -0.12], [0.1, 0.12, 1], 0.4],
-  [0.45, [-0.3, 0.29, 0.4], [0.1, 0.15, 1], 0.15],
-  [1.07, [-0.33, 0.29, 0.43], [0.1, 0.13, 1], 0.15],
+  [-0.3, G_R, G_DIR, -0.3],
+  [-0.08, [-0.24, 0.6, 0.28], [-0.5, 0.8, -0.3], -0.3],
+  // swung upright out at his right side, so the butt drops past the outside of the hip
+  [0.02, [-0.45, 0.48, 0.18], [-0.12, 0.92, 0.36], -0.3],
+  [0.16, [-0.33, 0.26, -0.06], [0.1, 0.13, 1], -0.3],
+  [0.45, [-0.3, 0.29, 0.4], [0.1, 0.15, 1], -0.15],
+  [1.07, [-0.33, 0.29, 0.43], [0.1, 0.13, 1], -0.15],
 ]);
 
-// Rising Fang: the blade dropped low at the right and ripped up through them, then drawn straight
-// back and thrust level
+// Rising Fang: the blade dropped to the floor out at his left, the shaft slanting down across his
+// front, and ripped up through them; then drawn straight back and thrust level
 const fang = glaive([
-  at(-0.3, G),
-  [-0.08, [-0.35, 0.28, -0.03], [-0.45, -0.35, 0.8], 0.3],
-  [0.4, [-0.28, 0.25, 0.2], [0.05, 0.45, 0.9], 0.4],
+  [-0.3, G_R, G_DIR, 0.35],
+  [-0.08, [-0.15, 0.17, 0.28], [0.78, -0.18, 0.6], 0.35],
+  [0.4, [-0.28, 0.25, 0.2], [0.05, 0.45, 0.9], 0.35],
   [0.65, [-0.3, 0.23, 0.0], [0.1, 0.12, 1], 0.35],
   [0.9, [-0.3, 0.29, 0.38], [0.1, 0.14, 1], 0.15],
   [1.1, [-0.3, 0.29, 0.4], [0.1, 0.13, 1], 0.15],
 ]);
 
-// Flat Sweep: the blade dropped low at the left, the shaft laid across the hips, then swept flat
-// across them at the waist from their left to their right
+// Flat Sweep: the shaft laid level across the chest with the blade out wide at his left at
+// shoulder height, then swept flat across them from their left to their right
 const sweep = glaive([
   at(-0.9, G),
-  [-0.5, [-0.23, 0.25, 0.15], [0.7, -0.35, 0.6], 0.5],
-  [-0.12, [-0.2, 0.12, 0.25], [0.95, -0.12, 0.15], 0.5],
+  [-0.5, [-0.22, 0.32, 0.22], [0.75, 0.0, 0.65], 0.5],
+  [-0.12, [-0.2, 0.42, 0.3], [0.92, 0.14, 0.36], 0.5],
   [0.45, [-0.3, 0.25, 0.15], [0.05, 0.06, 1], 0.45],
   [0.75, [-0.15, 0.28, 0.35], [-0.45, 0.08, 0.9], 0.45],
   [1.07, [0.05, 0.32, 0.4], [-0.7, 0.1, 0.7], 0.45],
 ]);
 
-// Lunging Cut: raised up the right side, the left hand letting go and thrown out for balance, then
-// the glaive brought over the top in the right hand alone and laid out level into a deep lunge
+// Lunging Cut: raised straight up the right side, the blade standing high over his head in the
+// right hand alone while the left is thrown out for balance, then brought over the top and laid
+// out level into a deep lunge
 const H_END: GK = [1.07, [-0.1, 0.22, 0.8], [0.06, -0.33, 0.94], NaN];
 const lunge = glaive([
   at(-1.0, G),
   [-0.55, [-0.18, 0.28, 0.23], [-0.15, 0.95, 0.2], SP],
-  [-0.12, [-0.33, 0.9, -0.25], [-0.25, 0.55, -0.8], NaN],
+  [-0.12, [-0.33, 0.9, -0.2], [-0.05, 0.95, -0.3], NaN],
   [0.05, [-0.28, 0.85, 0.1], [-0.1, 0.95, 0.3], NaN],
   [0.22, [-0.2, 0.62, 0.45], [-0.05, 0.55, 0.85], NaN],
   [0.45, [-0.12, 0.33, 0.78], [0.0, 0.05, 1], NaN],
   H_END,
 ]);
 
-// Cross Cleave: the left hand back on the shaft and the blade cocked high over the left shoulder,
-// then cleaved down across them from their upper left to the floor at their right
+// Cross Cleave: the left hand back on the shaft and the blade cocked high and out wide over the
+// left shoulder, then cleaved down across them from their upper left to the floor at their right
 const H1_END: GK = [1.07, [-0.42, 0.2, 0.0], [-0.55, -0.3, 0.78], 0.35];
 const cross = glaive([
   [-1.0, H_END[1], H_END[2], NaN],
-  [-0.6, [-0.05, 0.45, 0.3], [0.2, 0.75, 0.2], SP],
-  [-0.12, [0.05, 0.5, 0.2], [0.4, 0.4, -0.82], 0.4],
+  [-0.6, [-0.05, 0.45, 0.3], [0.2, 0.75, 0.2], 0.4],
+  [-0.12, [0.08, 0.55, 0.18], [0.8, 0.55, -0.25], 0.4],
   [0.2, [-0.33, 0.35, 0.15], [0.1, 0.45, 0.9], 0.4],
   [0.45, [-0.38, 0.23, 0.08], [-0.15, 0.05, 1], 0.4],
   H1_END,
 ]);
 
 // Thunderclap: the left hand lets go and takes the shaft again behind the right, the glaive is
-// raised flat overhead with the blade out to the right, then brought down and round in the right
+// raised flat overhead with the blade out to the right and held there, a bar laid over his head,
+// then brought down and round in the right
 // hand while the left lets go once more and takes it again up toward the blade, and it is driven
 // into a low thrust
 const splitter = glaive([
   at(-1.4, H1_END),
   [-1.2, [-0.15, 0.5, 0.15], [-0.6, 0.3, 0.6], NaN],
-  [-1.0, [-0.05, 0.68, 0.3], [-0.95, -0.15, 0.15], -0.5],
-  [-0.55, [-0.06, 0.55, 0.32], [-0.95, 0.0, 0.1], -0.5],
-  [-0.12, [-0.15, 0.43, 0.25], [-0.75, 0.2, -0.63], -0.5],
+  [-1.0, [-0.05, 0.78, 0.3], [-0.95, 0.05, 0.2], -0.5],
+  [-0.55, [-0.06, 0.74, 0.3], [-0.95, 0.15, 0.1], -0.5],
+  [-0.12, [-0.1, 0.92, 0.18], [-0.9, 0.2, -0.38], -0.5],
   [0.0, [-0.15, 0.55, 0.3], [-0.85, 0.0, 0.5], NaN],
   [0.2, [-0.33, 0.33, 0.03], [-0.4, -0.05, 0.9], 0.3],
   [0.45, [-0.33, 0.25, 0.35], [0.1, 0.2, 1], 0.3],
@@ -164,23 +171,25 @@ const whirl = seq(
   0.08,
 );
 
-// Serpent Lunge: turned side-on and drawn back along its line, then shot out level at full
-// stretch, both hands slid back together near the butt
+// Serpent Lunge: turned side-on and cocked like a javelin, the right fist by the ear and the blade
+// raised high out to the right while the left arm aims at them; then brought onto the line, the left
+// hand takes it again, and it is shot out level at full stretch, both hands together near the butt
 const serpent = glaive([
-  [-0.4, [-0.3, 0.2, -0.05], [0.08, 0.08, 1], 0.3],
-  [-0.1, [-0.33, 0.2, -0.08], [0.08, 0.08, 1], 0.3],
+  [-0.4, [-0.3, 0.25, -0.05], [0.08, 0.08, 1], NaN],
+  [-0.1, [-0.42, 0.62, -0.12], [-0.5, 0.45, 0.72], NaN],
+  [0.15, [-0.36, 0.34, -0.05], [0.08, 0.1, 1], 0.2],
   [0.45, [-0.35, 0.3, 0.43], [0.08, 0.1, 1], 0.1],
   [1.07, [-0.35, 0.3, 0.45], [0.08, 0.08, 1], 0.1],
 ]);
 
-// Rising Dragon: the left hand lets go and the blade trails low behind on the right in the right
-// hand through the charge, the left arm pumping; it is swung round at the floor, the left hand
+// Rising Dragon: the left hand lets go and the blade trails low and wide out to the right in the
+// right hand through the charge, the left arm pumping; it is swung round at the floor, the left hand
 // takes the shaft behind the right, and it is ripped up through them
 const dragon = glaive([
   at(-1.0, G),
   [-0.8, [-0.3, 0.2, 0.1], [-0.3, -0.1, 0.9], NaN],
-  [-0.6, [-0.36, 0.12, 0.03], [-0.5, -0.25, -0.6], NaN],
-  [-0.12, [-0.43, 0.18, 0.0], [-0.6, -0.25, -0.35], NaN],
+  [-0.6, [-0.4, 0.15, 0.05], [-0.85, -0.2, 0.0], NaN],
+  [-0.12, [-0.46, 0.2, 0.02], [-0.92, -0.1, 0.15], NaN],
   [0.2, [-0.25, 0.3, 0.25], [-0.35, 0.1, 0.93], -0.35],
   [0.45, [0.12, 0.3, 0.45], [-0.35, 0.35, 0.87], -0.35],
   [1.07, [0.0, 0.5, 0.42], [0.25, 0.9, 0.35], -0.35],
@@ -194,29 +203,30 @@ const dragonFree = track([
   [0.12, [0.1, 0.3, 0.4]],
 ]);
 
-// Parting Sweep: the left hand lets go and the right swings the blade out wide on the right, the
+// Parting Sweep: the left hand lets go and is flung out to the left while the right swings the
+// blade up and out wide on the right at head height, the
 // left takes the shaft again up toward the blade and the two sweep it back across them to their
 // left while the feet give ground
 const parting = glaive([
-  at(-0.2, G),
-  [-0.06, [-0.43, 0.33, -0.03], [-0.85, 0.0, 0.5], NaN],
+  [-0.2, G_R, G_DIR, NaN],
+  [-0.06, [-0.45, 0.45, -0.14], [-0.8, 0.25, 0.55], NaN],
   [0.22, [-0.25, 0.33, -0.08], [-0.4, 0.05, 0.9], 0.35],
   [0.45, [-0.28, 0.38, 0.1], [0.05, 0.08, 1], 0.35],
   [1.07, [-0.2, 0.3, 0.23], [0.75, 0.05, 0.65], 0.4],
 ]);
 const partingFree = track([
   [-0.2, [-0.19, 0.32, 0.48]],
-  [-0.06, [0.35, 0.3, 0.25]],
+  [-0.06, [0.62, 0.48, 0.1]],
   [0.22, [-0.1, 0.3, 0.4]],
 ]);
 
 // Wheel Retreat: the blade raised straight up in front, wheeled back over the head and cocked high
-// over the left shoulder, then brought down across them as the feet give ground
+// up over the left shoulder, then brought down across them as the feet give ground
 const wheel = glaive([
   at(-1.4, G),
   [-1.0, [-0.23, 0.35, 0.25], [0.05, 1, 0.15]],
   [-0.6, [0.0, 0.73, 0.2], [0.8, 0.3, -0.5]],
-  [-0.12, [0.05, 0.5, 0.0], [0.4, 0.3, -0.87]],
+  [-0.12, [0.1, 0.55, 0.05], [0.55, 0.6, -0.58]],
   [0.15, [-0.15, 0.48, 0.42], [0.05, 0.5, 0.85]],
   [0.45, [-0.33, 0.28, 0.05], [-0.1, 0.1, 1]],
   [1.07, [-0.35, 0.4, -0.05], [-0.45, -0.35, 0.8], 0.35],
@@ -232,12 +242,13 @@ const skywheel = glaive([
   [1.07, [0.08, 0.32, 0.42], [-0.7, 0.05, 0.7], 0.45],
 ]);
 
-// Skyfall Plunge: in the air the glaive turned blade-down in both hands raised high, then the body
-// drops after it and it is plunged down into the floor in front
+// Skyfall Plunge: in the air the glaive turned blade-down in both hands raised over the head, the
+// shaft slanting across the front and the blade hung out wide at his left hip, then the body drops
+// after it and it is plunged down into the floor in front
 const plunge = glaive([
   at(-1.0, G),
-  [-0.5, [-0.15, 0.85, 0.15], [0.05, -0.95, 0.25]],
-  [-0.12, [-0.25, 0.86, 0.12], [0.0, -0.93, -0.2]],
+  [-0.5, [-0.18, 0.75, 0.25], [0.4, -0.75, 0.45], 0.35],
+  [-0.12, [-0.16, 0.84, 0.28], [0.55, -0.7, 0.45], 0.35],
   [0.45, [-0.35, 0.78, 0.25], [0.15, -0.55, 0.82], 0.3],
   [1.1, [-0.35, 0.78, 0.3], [0.15, -0.6, 0.79], 0.3],
 ]);
@@ -321,13 +332,14 @@ export const spear: Style = {
   // the shaft held level across the chest in both fists, the blade out to the left
   block: P(b({ crouch: -0.24, twist: -0.3, hipTwist: -0.3, lean: 0.05, step: 0.28, back: 0.34, width: 0.18 }), X([-0.25, 0.5, 0.3], [1, 0.2, 0.06], [0, 1, 0.3], 'x', 0.5, -0.3)),
   moves: {
-    // Piercing Step: the weight back and the body wound further right as it is drawn back, then
-    // the front foot stamps, the hips and trunk unwind behind it and the arms drive it out at
-    // their chest
+    // Piercing Step: the weight back and the trunk arched as it is cocked high on the right, then it
+    // comes down onto the line, the front foot stamps, the hips and trunk unwind behind it and the
+    // arms drive it out at their chest
     l0: mv({
       keys: [
         GUARD_KEY(-0.3),
-        K(-0.08, b({ twist: -1.0, hipTwist: -0.6, lean: -0.05, crouch: -0.26, step: 0.24, back: 0.42, headPitch: 0.05 })),
+        K(-0.08, b({ twist: -0.75, hipTwist: -0.5, lean: -0.15, side: 0.08, crouch: -0.24, step: 0.24, back: 0.46, headPitch: -0.05 })),
+        K(0.16, b({ twist: -0.95, hipTwist: -0.4, lean: 0.2, crouch: -0.33, step: 0.55, back: 0.47 })),
         K(0.45, b({ twist: -0.7, hipTwist: -0.25, lean: 0.42, crouch: -0.36, step: 0.72, back: 0.48 })),
         K(1.07, b({ twist: -0.8, hipTwist: -0.3, lean: 0.45, crouch: -0.36, step: 0.72, back: 0.48 })),
       ],
@@ -336,13 +348,13 @@ export const spear: Style = {
       start: -0.3,
       fx: [fx(0.4, 'dust', 'feet', 0.5), fx(0.45, 'sparkle', 'tip', 0.6)],
     }),
-    // Rising Fang: wound right and sunk low with the blade dropped at the right, then the hips lift
-    // and turn and it rips up through them; the hands draw it straight back and the front foot
+    // Rising Fang: squared up and sunk low with the blade dropped to the floor at the left, then the
+    // hips lift and turn right and it rips up through them; the hands draw it straight back and the front foot
     // stamps for a level thrust
     l1: mv({
       keys: [
         GUARD_KEY(-0.3),
-        K(-0.08, b({ twist: -1.3, hipTwist: -0.7, lean: 0.25, crouch: -0.36, step: 0.26, back: 0.44, side: 0.08 })),
+        K(-0.08, b({ twist: -0.1, hipTwist: -0.2, lean: 0.3, crouch: -0.38, step: 0.3, back: 0.44, side: -0.06 })),
         K(0.4, b({ twist: -1.1, hipTwist: -0.5, lean: 0.2, crouch: -0.28, step: 0.5, back: 0.46, headPitch: -0.05 })),
         K(0.65, b({ twist: -1.1, hipTwist: -0.6, lean: 0.1, crouch: -0.3, step: 0.45, back: 0.46 })),
         K(0.9, b({ twist: -0.8, hipTwist: -0.3, lean: 0.4, crouch: -0.36, step: 0.75, back: 0.5 })),
@@ -354,7 +366,7 @@ export const spear: Style = {
       end: 1.1,
       fx: [fx(0.4, 'sparkle', 'tip', 0.5), fx(0.85, 'dust', 'feet', 0.4), fx(0.9, 'sparkle', 'tip', 0.7)],
     }),
-    // Flat Sweep: the stance widens and the body winds left over the blade laid low at the left,
+    // Flat Sweep: the stance widens and the body winds left with the blade out wide at the left,
     // then the hips drive round to the right, the trunk follows and it is swept flat across them
     l2: mv({
       keys: [
@@ -506,6 +518,11 @@ export const spear: Style = {
         K(1.07, b({ twist: -0.8, hipTwist: -0.55, crouch: -0.5, lean: 0.48, step: 0.95, back: 0.62, width: 0.18 })),
       ],
       main: serpent,
+      free: track([
+        [-0.4, [0.3, 0.35, 0.4]],
+        [-0.1, [0.8, 0.55, 0.15]],
+        [0.12, [0.4, 0.45, 0.35]],
+      ]),
       impacts: [0.45],
       start: -0.4,
       chamber: -0.1,
@@ -606,7 +623,7 @@ export const spear: Style = {
       keys: [
         K(-1.0, body, { hop: 0, flip: 0 }),
         K(-0.5, b({ twist: -0.6, crouch: -0.05, lean: -0.1 }), { hop: 0.2 }),
-        K(-0.12, b({ twist: -0.7, crouch: 0.02, lean: -0.32, headPitch: -0.16, step: 0.25, back: 0.25 }), { hop: 0.36, flip: -0.03 }),
+        K(-0.12, b({ twist: -0.35, crouch: 0.02, lean: -0.32, headPitch: -0.16, step: 0.25, back: 0.25 }), { hop: 0.36, flip: -0.03 }),
         K(0.45, b({ twist: -0.93, hipTwist: -0.5, crouch: -0.6, lean: 0.25, step: 0.6, back: 0.5, width: 0.22 }), { hop: 0, flip: 0.02 }),
         K(1.1, b({ twist: -0.85, hipTwist: -0.45, crouch: -0.62, lean: 0.28, step: 0.6, back: 0.5, width: 0.2 }), { flip: 0 }),
       ],
