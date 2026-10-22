@@ -131,7 +131,7 @@ const rising = glide([
   [0.85, [-0.07, 0.48, 0.86], [0.08, 0.22, 1], UP],
   [1.1, [0.08, 0.7, 0.6], [0.55, 0.75, 0.4], UP],
 ]);
-const L1_TB = tb({ crouch: -0.3, lean: 0.08, step: 0.44, back: 0.46, twist: FT + 0.25, hipTwist: 0.45, side: 0.06 });
+const L1_TB = tb({ crouch: -0.3, lean: 0.08, step: 0.44, back: 0.46, twist: FT - 0.2, hipTwist: 0.2, side: 0.06 });
 
 // Coupé (ref 6.08-6.33 s and 8.25 s, the blade laid back, then cut down): the tell is the hand by
 // the right temple with the blade laid back over the shoulder, the weight back on straight-ish legs;
@@ -145,7 +145,7 @@ const coupe = glide([
   [0.85, [-0.08, 0.5, 0.86], [0.18, 0.05, 1]],
   [1.1, [0.08, 0.28, 0.66], [0.6, -0.6, 0.5]],
 ]);
-const L2_TB = tb({ crouch: -0.16, lean: -0.1, step: 0.38, back: 0.4, twist: FT + 0.2, headPitch: -0.04 });
+const L2_TB = tb({ crouch: -0.16, lean: -0.1, step: 0.38, back: 0.4, twist: FT - 0.2, headPitch: -0.04 });
 
 // ------------------------------------------------------------------------------------ heavies
 
@@ -153,11 +153,11 @@ const L2_TB = tb({ crouch: -0.16, lean: -0.1, step: 0.38, back: 0.4, twist: FT +
 // flèche at 9.0 s): the tell is the fencer drawn up tall with the blade stood straight up beside
 // the head, held; then the wrist wheels it back and down beside the right side and up in front,
 // the arm straightening on the way, and the deep lunge drives in after it
-const H_TELL: V3 = [-0.2, 0.74, 0.24];
+const H_TELL: V3 = [-0.24, 0.84, 0.12];
 const moulinet = glide(
   [
     [-1.3, GUARD_POS, GUARD_DIR],
-    [-0.6, H_TELL, [0.04, 1, 0.12], FWD],
+    [-0.6, H_TELL, [-0.08, 0.92, -0.38], FWD],
     [-0.3, [-0.26, 0.62, 0.14], [-0.1, 0.6, -0.8], FWD],
     [-0.05, [-0.3, 0.4, 0.22], [-0.15, -0.55, -0.8], FWD],
     [0.2, [-0.24, 0.32, 0.4], [-0.1, -0.9, 0.4], FWD],
@@ -167,25 +167,28 @@ const moulinet = glide(
   ],
   0.05,
 );
-const H_TB = tb({ ...TALL, twist: FT + 0.1 });
+// the pull-back: tall and arched back on the back leg, the right shoulder drawn back, the free arm
+// reaching forward high as the counterweight
+const H_TB = tb({ ...TALL, crouch: -0.08, lean: -0.14, step: 0.22, back: 0.3, twist: FT - 0.25, headPitch: 0.0 });
 
 // Tranchant (ref 7.58 s and 13.33-13.42 s, the level cut at head height): out of the lunge, the
 // tell is the hand carried back to the right at head height with the blade level and the body
 // wound to the right, the weight on the back leg; then the hips turn, the shoulders after them, and
 // the straight arm sweeps the blade level across their head as the front foot steps in
-const H1_TELL: V3 = [-0.42, 0.66, 0.2];
+const H1_TELL: V3 = [-0.5, 0.68, 0.02];
 const tranchant = glide(
   [
     [-1.0, [-0.06, 0.41, 0.94], [0.02, 0.0, 1]],
     [-0.55, [-0.22, 0.6, 0.5], [-0.4, 0.35, 0.85]],
-    [-0.2, H1_TELL, [-0.85, 0.25, 0.2]],
+    [-0.2, H1_TELL, [-0.75, 0.3, -0.55]],
     [0.4, [-0.3, 0.62, 0.62], [-0.55, 0.15, 0.85]],
     [0.85, [-0.08, 0.6, 0.86], [0.1, 0.08, 1]],
     [1.1, [0.2, 0.58, 0.62], [0.85, 0.05, 0.35]],
   ],
   0.05,
 );
-const H1_TB = tb({ crouch: -0.26, lean: -0.05, step: 0.4, back: 0.5, twist: FT + 0.35, hipTwist: 0.45 });
+// the pull-back: the hips and shoulders turned right away from them, the weight sat on the back leg
+const H1_TB = tb({ crouch: -0.3, lean: -0.12, side: 0.06, step: 0.36, back: 0.56, twist: FT - 0.35, hipTwist: 0.1 });
 
 // Grand Coupé (ref 1.83 s the salute, 6.08-6.17 s the blade laid back high, 6.25-6.42 s the cut down
 // into the wide crouch): the hilt to the chin, then the tell, the hand high over the head with the
@@ -194,13 +197,13 @@ const H1_TB = tb({ crouch: -0.26, lean: -0.05, step: 0.4, back: 0.5, twist: FT +
 // wide sitting crouch
 const SALUTE: V3 = [-0.03, 0.64, 0.3];
 const SALUTE_D: V3 = [0.02, 1, 0.06];
-const H2_HIGH: V3 = [-0.2, 1.0, 0.1];
+const H2_HIGH: V3 = [-0.22, 1.02, 0.0];
 const grand = glide(
   [
     [-1.2, [0.2, 0.58, 0.62], [0.85, 0.05, 0.35]],
     [-0.8, SALUTE, SALUTE_D, FWD],
     [-0.55, [-0.03, 0.66, 0.3], SALUTE_D, FWD],
-    [-0.25, H2_HIGH, [-0.2, 0.7, -0.68], FWD],
+    [-0.25, H2_HIGH, [-0.25, 0.45, -0.86], FWD],
     [0.25, [-0.18, 0.86, 0.5], [-0.2, 0.95, 0.25], FWD],
     [0.7, [-0.06, 0.5, 0.88], [0.12, -0.24, 1]],
     [1.1, [0.12, 0.12, 0.6], [0.55, -0.75, 0.35]],
@@ -208,7 +211,8 @@ const grand = glide(
   0.06,
 );
 const H2_HIT = 0.7;
-const H2_TB = tb({ crouch: -0.14, lean: -0.16, step: 0.3, back: 0.46, twist: FT + 0.25, hipTwist: 0.45, headPitch: -0.1 });
+// the pull-back: arched back on the back leg, the right shoulder drawn back, the blade laid down the back
+const H2_TB = tb({ crouch: -0.16, lean: -0.24, step: 0.28, back: 0.52, twist: FT - 0.3, hipTwist: 0.2, headPitch: -0.12 });
 
 // ------------------------------------------------------------------------------------ special and ability
 
@@ -216,7 +220,7 @@ const H2_TB = tb({ crouch: -0.14, lean: -0.16, step: 0.3, back: 0.46, twist: FT 
 // deepest lunge): the salute, then the tell, held long: the blade drawn back level beside the ear,
 // the weight sat on the back leg and the free hand stretched out aiming at them; then the arm
 // shoots out first and the deepest lunge follows it, too fast to see
-const SP_TELL: V3 = [-0.26, 0.62, 0.06];
+const SP_TELL: V3 = [-0.32, 0.66, -0.1];
 const coup = glide([
   [-1.0, GUARD_POS, GUARD_DIR],
   [-0.7, SALUTE, SALUTE_D, FWD],
@@ -226,8 +230,8 @@ const coup = glide([
   [0.85, [-0.05, 0.42, 0.98], LINE],
   [1.05, [-0.05, 0.41, 0.96], [0.02, 0.0, 1]],
 ]);
-const SP_TB = tb({ crouch: -0.3, lean: -0.12, step: 0.34, back: 0.5, twist: FT + 0.25, headPitch: 0.04 });
-const SP_HIT = tb({ crouch: -0.46, lean: 0.52, step: 0.62, back: 0.72, twist: FT + 0.2, headPitch: -0.1 });
+const SP_TB = tb({ crouch: -0.34, lean: -0.18, step: 0.32, back: 0.56, twist: FT - 0.25, headPitch: 0.04 });
+const SP_HIT = tb({ crouch: -0.46, lean: 0.52, step: 0.62, back: 0.72, twist: FT + 0.25, headPitch: -0.1 });
 
 // Flèche (ref 1.5 s and 12.8 s the point in line, 9.0 s and 15.5 s the low running thrust): the
 // tell is the arm shot straight out and the body tipped over the front foot, the back hand flung
@@ -266,7 +270,8 @@ const dive = glide([
   [0.85, [-0.04, 0.3, 1.0], [0.02, 0.0, 1]],
   [1.05, [-0.04, 0.28, 0.98], [0.02, -0.02, 1]],
 ]);
-const DH_TB = tb({ crouch: -0.3, lean: 0.4, step: 0.5, back: 0.48, twist: FT + 0.05, headPitch: -0.15 });
+// loaded like a sprinter: sunk on the back leg, the arm already straight, the torso tipped over
+const DH_TB = tb({ crouch: -0.38, lean: 0.34, step: 0.42, back: 0.56, twist: FT - 0.05, headPitch: -0.15 });
 const DIVE = tb({ crouch: -0.4, lean: 1.0, step: 0.36, back: 0.7, twist: FT, headPitch: -0.5, width: 0.1 });
 
 // Retreating Cut (ref 6.67-6.75 s, recovering backwards into the parry): the tell is a backhand
@@ -291,13 +296,13 @@ const wheel = glide(
     [-1.3, GUARD_POS, GUARD_DIR],
     [-1.0, [-0.2, 0.36, 0.5], [0.04, 0.2, 1]],
     [0.2, [-0.18, 0.42, 0.52], [0.03, 0.12, 1]],
-    [0.45, [-0.26, 0.72, 0.42], [-0.3, 0.9, 0.3], FWD],
+    [0.45, [-0.3, 0.82, 0.24], [-0.35, 0.75, -0.55], FWD],
     [0.85, [-0.08, 0.48, 0.86], [0.16, 0.04, 1]],
     [1.1, [0.08, 0.24, 0.62], [0.6, -0.62, 0.46]],
   ],
   0.06,
 );
-const BH_COIL = tb({ crouch: -0.36, lean: 0.15, side: 0.3, step: 0.4, back: 0.5, twist: FT + 0.2 });
+const BH_COIL = tb({ crouch: -0.42, lean: 0.2, side: 0.36, step: 0.4, back: 0.52, twist: FT + 0.2 });
 const SIT = tb({ crouch: -0.34, step: 0.55, back: 0.55, width: 0.1, lean: 0.1 });
 
 // Aerial Sweep (ref 5.58-5.83 s, diving out of the flip with the arms spread and the blade swept):
@@ -321,29 +326,29 @@ const plunge = glide([
   [-1.0, GUARD_POS, GUARD_DIR],
   [-0.85, [-0.2, 0.36, 0.34], [0.02, 0.2, 1]],
   [-0.4, [-0.18, 0.38, 0.34], [0.02, 0.2, 1]],
-  [-0.2, [-0.14, 0.98, 0.14], [0.0, -0.6, 0.8]],
+  [-0.2, [-0.16, 1.04, 0.04], [0.0, -0.6, 0.8]],
   [0.85, [-0.1, 0.3, 0.6], [0.0, -0.42, 0.9]],
   [1.1, [-0.1, 0.28, 0.58], [0.0, -0.46, 0.88]],
 ]);
-const JH_TB = tb({ crouch: 0.0, lean: -0.16, step: 0.24, back: 0.2, twist: FT - 0.2, headPitch: 0.28 });
+const JH_TB = tb({ crouch: 0.0, lean: -0.26, step: 0.24, back: 0.2, twist: FT - 0.25, headPitch: 0.3 });
 
 // ------------------------------------------------------------------------------------ execution
 
 // Execution, Coup de Grâce Finale: s is the time in seconds (the blow lands at 2.15 s). Over the
 // kneeling victim the Duelist draws himself up and salutes them, hilt to the chin (ref 1.83 s); then,
 // the arm out long and only the wrist moving, the point flicks a Z across their face and chest;
-// then the coup de grâce tell (ref 1.42 s and 4.17 s): the blade drawn back level by the ear, the
-// weight sat deep on the back leg, the free hand stretched out aiming at their heart, held while
-// the body coils a little deeper; then the arm shoots straight first, and only after it the
-// deepest lunge of all (ref 7.83 s) runs them through. He holds them on the point, pushes back off
+// each flick pulled back before it snaps; then the coup de grâce tell (ref 1.42 s and 4.17 s), the
+// pull-back as far as it goes: the hand drawn past the ear with the elbow folded and the point level
+// on them, the right shoulder drawn back, the trunk arched, the whole weight sat on the back leg and
+// the free hand stretched out aiming at their heart, held while the body coils deeper still; then
+// slow out of it, the arm whips straight first, and only after it the deepest lunge of all
+// (ref 7.83 s) runs them through and the body sinks on into it. He holds them on the point, pushes back off
 // the front foot to draw it out, flicks the blood off the blade and salutes again over the body.
 const EXEC_HIT = 2.15;
 const X_SALUTE: V3 = [-0.03, 0.66, 0.3];
-// the flourish: the hand out at their face height, the arm long, only the wrist turning
-const Z_HAND: V3 = [-0.1, 0.56, 0.74];
-const X_TELL: V3 = [-0.28, 0.64, 0.04];
+const X_TELL: V3 = [-0.32, 0.66, -0.1];
 const X_IN: V3 = [-0.05, 0.5, 1.02];
-// run through the heart: the point a little downhill at a kneeling chest
+// run through the heart: the point nearly level at a kneeling chest
 const X_IN_D: V3 = [0.02, -0.07, 1];
 const execBlade = glide(
   [
@@ -353,24 +358,28 @@ const execBlade = glide(
     // the salute: the hilt to the chin, the blade straight up before the face, breathing
     [0.55, X_SALUTE, SALUTE_D, FWD],
     [0.84, [-0.03, 0.68, 0.31], [0.02, 1, 0.1], FWD],
-    // the Z: lowered on to them, then three wrist flicks, right to left high, down across, and
-    // right to left low (the hand drifts a hand's width, the point travels a metre)
-    [0.92, Z_HAND, [-0.55, 0.18, 0.82]],
-    [1.0, [-0.06, 0.57, 0.76], [0.5, 0.2, 0.84]],
-    [1.12, [-0.1, 0.5, 0.75], [-0.5, -0.3, 0.82]],
-    [1.24, [-0.06, 0.48, 0.76], [0.5, -0.3, 0.82]],
-    // drawn back into the tell, the point coming level on their heart, coiling
+    // the Z: before each flick the hand draws back a hand's width and the wrist cocks the point the
+    // other way, then it snaps across: right to left high, down across, right to left low
+    [0.93, [-0.18, 0.62, 0.58], [-0.78, 0.32, 0.54]],
+    [1.0, [-0.05, 0.57, 0.79], [0.55, 0.2, 0.82]],
+    [1.06, [-0.03, 0.64, 0.66], [0.72, 0.48, 0.5]],
+    [1.12, [-0.12, 0.5, 0.79], [-0.5, -0.3, 0.82]],
+    [1.18, [-0.18, 0.47, 0.64], [-0.78, -0.25, 0.58]],
+    [1.24, [-0.04, 0.48, 0.79], [0.5, -0.3, 0.82]],
+    // drawn right back into the tell, the hand past the ear with the elbow folded, the point level
+    // on their heart, and coiling a little further through the hold
     [1.48, X_TELL, [0.04, 0.0, 1]],
-    [1.86, [-0.3, 0.64, -0.01], [0.04, 0.0, 1]],
-    // the arm goes first: straight before the feet move
-    [1.98, [-0.08, 0.5, 0.82], [0.03, -0.08, 1]],
+    [1.86, [-0.35, 0.68, -0.17], [0.04, 0.01, 1]],
+    // the release: slow out of the coil, then the arm whips straight (before the feet go)
+    [1.92, [-0.3, 0.64, 0.02], [0.04, 0.0, 1]],
+    [1.98, [-0.09, 0.52, 0.8], [0.03, -0.05, 1]],
     [EXEC_HIT, X_IN, X_IN_D],
-    // held on the point, leaning in
-    [2.4, [-0.05, 0.49, 1.04], X_IN_D],
+    // driven on through them as the body sinks into the lunge
+    [2.4, [-0.05, 0.47, 1.08], X_IN_D],
     // drawn out as the front foot pushes back
     [2.52, [-0.14, 0.5, 0.56], [0.03, -0.05, 1]],
-    // flicked clean: a snap of the wrist down and out to the right
-    [2.62, [-0.32, 0.26, 0.36], [-0.5, -0.62, 0.6]],
+    // flicked clean: a snap of the wrist down and out to the right, its weight turning the body
+    [2.62, [-0.34, 0.24, 0.34], [-0.55, -0.62, 0.56]],
     // and the salute again over the body
     [2.78, X_SALUTE, SALUTE_D, FWD],
     [3.0, [-0.03, 0.68, 0.3], SALUTE_D, FWD],
@@ -378,8 +387,10 @@ const execBlade = glide(
   0.03,
 );
 const X_TALL = tb({ crouch: -0.04, lean: -0.04, step: 0.2, back: 0.18, width: 0.08, twist: FT - 0.1, hipTwist: 0.3, headPitch: 0.22 });
-const X_COIL = tb({ crouch: -0.32, lean: -0.14, step: 0.36, back: 0.56, twist: FT + 0.28, headPitch: 0.06 });
-const X_LUNGE = tb({ crouch: -0.47, lean: 0.56, step: 0.66, back: 0.74, twist: FT + 0.18, headPitch: -0.02, width: 0.09 });
+// the pull-back: the whole weight sat on the back leg, the trunk arched back, the right shoulder
+// drawn back (the chest turned square) so the drive can throw it forward
+const X_COIL = tb({ crouch: -0.36, lean: -0.2, side: 0.04, step: 0.3, back: 0.58, twist: FT - 0.3, hipTwist: 0.15, headPitch: 0.08 });
+const X_LUNGE = tb({ crouch: -0.47, lean: 0.56, step: 0.66, back: 0.74, twist: FT + 0.28, hipTwist: 0.45, headPitch: -0.02, width: 0.09 });
 
 // ------------------------------------------------------------------------------------ entrance
 
@@ -446,8 +457,8 @@ export const rapier: Style = {
       keys: [
         K(-0.5, body),
         ...hold(0.0, 0.1, L1_TB),
-        K(0.72, tb({ crouch: -0.3, lean: 0.22, step: 0.6, back: 0.6, twist: FT - 0.15, hipTwist: 0.2, side: -0.04 })),
-        K(1.1, tb({ crouch: -0.3, lean: 0.18, step: 0.6, back: 0.6, twist: FT - 0.32, hipTwist: 0.1, side: -0.06, headPitch: -0.06 })),
+        K(0.72, tb({ crouch: -0.3, lean: 0.22, step: 0.6, back: 0.6, twist: FT + 0.12, hipTwist: 0.42, side: -0.04 })),
+        K(1.1, tb({ crouch: -0.3, lean: 0.18, step: 0.6, back: 0.6, twist: FT + 0.3, hipTwist: 0.45, side: -0.06, headPitch: -0.06 })),
       ],
       main: rising,
       free: track([[-0.5, F_GUARD], [0.0, [0.6, 0.62, 0.0]], [0.85, F_BACK], [1.1, [0.66, 0.28, -0.3]]]),
@@ -466,8 +477,8 @@ export const rapier: Style = {
       keys: [
         K(-0.5, body),
         ...hold(0.0, 0.1, L2_TB),
-        K(0.72, tb({ crouch: -0.32, lean: 0.3, step: 0.6, back: 0.62, twist: FT - 0.1, headPitch: -0.04 })),
-        K(1.1, tb({ crouch: -0.33, lean: 0.32, step: 0.6, back: 0.62, twist: FT - 0.3 })),
+        K(0.72, tb({ crouch: -0.32, lean: 0.3, step: 0.6, back: 0.62, twist: FT + 0.1, headPitch: -0.04 })),
+        K(1.1, tb({ crouch: -0.33, lean: 0.32, step: 0.6, back: 0.62, twist: FT + 0.28 })),
       ],
       main: coupe,
       free: track([[-0.5, F_GUARD], [0.0, [0.6, 0.3, -0.16]], [0.85, F_BACK]]),
@@ -490,10 +501,11 @@ export const rapier: Style = {
         // still loading on the back leg as the arm straightens
         K(0.4, tb({ crouch: -0.28, lean: 0.12, step: 0.42, back: 0.5, twist: FT + 0.1 })),
         K(0.93, DEEP),
-        K(1.1, DEEP),
+        // the body sinks into it after the touch
+        K(1.1, tb({ ...DEEP, crouch: -0.5, lean: 0.56 })),
       ],
       main: moulinet,
-      free: track([[-1.3, F_GUARD], [-0.6, F_HIGH], [-0.42, F_HIGH], [0.2, F_GUARD], [0.85, F_BACK]]),
+      free: track([[-1.3, F_GUARD], [-0.6, [0.2, 0.72, 0.34]], [-0.42, [0.2, 0.72, 0.34]], [0.2, F_GUARD], [0.85, F_BACK]]),
       impacts: [0.85],
       start: -1.3,
       chamber: -0.6,
@@ -510,9 +522,10 @@ export const rapier: Style = {
         K(-1.0, DEEP),
         K(-0.55, tb({ crouch: -0.24, lean: 0.05, step: 0.44, back: 0.44, twist: FT + 0.1 })),
         ...hold(-0.2, -0.08, H1_TB),
-        K(0.4, tb({ crouch: -0.3, lean: 0.15, step: 0.5, back: 0.56, twist: FT + 0.15, hipTwist: 0.2 })),
-        K(0.85, tb({ crouch: -0.34, lean: 0.3, step: 0.62, back: 0.62, twist: FT - 0.1, hipTwist: 0.05, side: -0.05 })),
-        K(1.1, tb({ crouch: -0.34, lean: 0.26, step: 0.62, back: 0.62, twist: FT - 0.36, hipTwist: -0.05, side: -0.08 })),
+        K(0.4, tb({ crouch: -0.3, lean: 0.15, step: 0.5, back: 0.56, twist: FT - 0.12, hipTwist: 0.3 })),
+        K(0.85, tb({ crouch: -0.36, lean: 0.32, step: 0.62, back: 0.62, twist: FT + 0.12, hipTwist: 0.45, side: -0.05 })),
+        // carried round by the blade, the knees giving
+        K(1.1, tb({ crouch: -0.42, lean: 0.3, step: 0.62, back: 0.62, twist: FT + 0.38, hipTwist: 0.5, side: -0.08 })),
       ],
       main: tranchant,
       free: track([[-1.0, F_BACK], [-0.55, F_GUARD], [-0.2, [0.12, 0.52, 0.4]], [0.4, F_GUARD], [0.85, F_BACK], [1.1, [0.7, 0.5, -0.16]]]),
@@ -533,9 +546,10 @@ export const rapier: Style = {
         K(-0.8, tb({ ...TALL, twist: FT + 0.05, headPitch: -0.12 })),
         K(-0.55, tb({ ...TALL, twist: FT + 0.05, headPitch: -0.1 })),
         ...hold(-0.25, -0.12, H2_TB),
-        K(0.25, tb({ crouch: -0.2, lean: 0.05, step: 0.36, back: 0.4, twist: FT + 0.1, hipTwist: 0.2 })),
-        K(H2_HIT - 0.12, tb({ crouch: -0.4, lean: 0.34, step: 0.62, back: 0.66, twist: FT - 0.2, hipTwist: 0.15, width: 0.12 })),
-        K(1.1, tb({ crouch: -0.42, lean: 0.28, step: 0.6, back: 0.66, twist: FT - 0.42, hipTwist: 0.05, width: 0.14, headPitch: -0.08 })),
+        K(0.25, tb({ crouch: -0.2, lean: 0.0, step: 0.36, back: 0.44, twist: FT - 0.12, hipTwist: 0.3 })),
+        K(H2_HIT - 0.12, tb({ crouch: -0.4, lean: 0.36, step: 0.62, back: 0.66, twist: FT + 0.1, hipTwist: 0.45, width: 0.12 })),
+        // the cut drags the body down and round into the wide crouch
+        K(1.1, tb({ crouch: -0.48, lean: 0.36, step: 0.6, back: 0.66, twist: FT + 0.34, hipTwist: 0.5, width: 0.14, headPitch: -0.08 })),
       ],
       main: grand,
       free: track([[-1.2, F_BACK], [-0.8, [0.2, 0.05, -0.28]], [-0.55, [0.2, 0.05, -0.28]], [-0.25, [0.1, 0.62, 0.36]], [H2_HIT, [0.6, 0.4, -0.2]], [1.1, [0.62, 0.62, -0.2]]]),
@@ -583,7 +597,7 @@ export const rapier: Style = {
         ...hold(-0.1, 0.02, DH_TB),
         K(0.5, tb({ crouch: -0.36, lean: 0.72, step: 0.4, back: 0.66, twist: FT, headPitch: -0.32 }), { hop: 0.1 }),
         K(0.85, DIVE, { hop: 0.05 }),
-        K(1.05, DIVE, { hop: 0 }),
+        K(1.05, tb({ ...DIVE, crouch: -0.47, lean: 1.05 }), { hop: 0 }),
       ],
       main: dive,
       free: track([[-0.6, F_GUARD], [-0.1, F_BACK], [0.85, [0.62, 0.12, -0.4]]]),
@@ -626,8 +640,10 @@ export const rapier: Style = {
         K(-0.3, tb({ crouch: -0.1, lean: 0.0, step: 0.3, back: 0.3, width: 0.2 }), { roll: -0.5, hop: 0.55 }),
         K(0.0, tb({ crouch: -0.2, step: 0.4, back: 0.4, width: 0.16 }), { roll: -0.8, hop: 0.3 }),
         K(0.3, SIT, { roll: -1, hop: 0 }),
-        K(0.85, tb({ ...SIT, lean: 0.24, twist: FT - 0.12, crouch: -0.36 })),
-        K(1.1, tb({ ...SIT, lean: 0.22, twist: FT - 0.3, crouch: -0.34 })),
+        // out of the landing the blade goes right back over the shoulder, the chest turned away
+        K(0.5, tb({ ...SIT, lean: -0.06, twist: FT - 0.3, crouch: -0.3 })),
+        K(0.85, tb({ ...SIT, lean: 0.26, twist: FT + 0.1, crouch: -0.38 })),
+        K(1.1, tb({ ...SIT, lean: 0.24, twist: FT + 0.3, crouch: -0.44 })),
       ],
       main: wheel,
       // reaching for the floor on the left, planted through the wheel, then up for balance
@@ -670,8 +686,9 @@ export const rapier: Style = {
         K(-0.6, tb({ crouch: -0.04, lean: 0.3, step: 0.2, back: 0.2 }), { flip: 0.5, hop: 0.55 }),
         K(-0.3, JH_TB, { flip: 1, hop: 0.4 }),
         K(-0.15, JH_TB, { hop: 0.36 }),
-        K(0.85, tb({ crouch: -0.48, lean: 0.4, step: 0.5, back: 0.5, width: 0.16, twist: FT + 0.05, headPitch: 0.15 }), { hop: 0 }),
-        K(1.1, tb({ crouch: -0.48, lean: 0.38, step: 0.5, back: 0.5, width: 0.16, twist: FT + 0.05 })),
+        K(0.85, tb({ crouch: -0.5, lean: 0.42, step: 0.5, back: 0.5, width: 0.16, twist: FT + 0.05, headPitch: 0.15 }), { hop: 0 }),
+        // the landing soaks in: the knees give and the weight sinks
+        K(1.1, tb({ crouch: -0.56, lean: 0.46, step: 0.5, back: 0.5, width: 0.16, twist: FT + 0.05 })),
       ],
       main: plunge,
       free: track([[-1.0, F_GUARD], [-0.85, [0.3, 0.3, 0.3]], [-0.4, [0.3, 0.3, 0.3]], [-0.2, [0.5, 0.62, 0.1]], [0.85, [0.6, 0.2, -0.2]]]),
@@ -693,9 +710,9 @@ export const rapier: Style = {
         K(-0.45, tb({ ...TALL, twist: FT - 0.15, headPitch: -0.1 })),
         ...hold(-0.15, -0.02, SP_TB),
         // the arm goes first: the feet stay sat back while it straightens
-        K(0.4, tb({ crouch: -0.32, lean: 0.08, step: 0.38, back: 0.52, twist: FT + 0.15 })),
+        K(0.4, tb({ crouch: -0.34, lean: 0.06, step: 0.36, back: 0.56, twist: FT + 0.05 })),
         K(0.93, SP_HIT),
-        K(1.1, SP_HIT),
+        K(1.1, tb({ ...SP_HIT, crouch: -0.53, lean: 0.6 })),
       ],
       main: coup,
       // behind the back for the salute, then stretched out along the line, aiming
@@ -750,20 +767,28 @@ export const rapier: Style = {
       K(0.32, X_TALL),
       K(0.55, tb({ ...X_TALL, headPitch: 0.12, lean: -0.06 })),
       K(0.84, tb({ ...X_TALL, headPitch: 0.14, lean: -0.05 })),
-      // a small advance into the flourish, sitting into the stance
-      K(0.94, tb({ crouch: -0.2, lean: 0.06, step: 0.44, back: 0.36, twist: FT + 0.05, headPitch: 0.1 })),
-      K(1.24, tb({ crouch: -0.22, lean: 0.08, step: 0.46, back: 0.38, twist: FT + 0.02, headPitch: 0.12 })),
-      // sat back deep into the tell, and coiling deeper through the held aim
+      // a small advance into the flourish, sitting into the stance; each flick's pull-back rocks the
+      // weight back a touch and each flick rocks it forward
+      K(0.93, tb({ crouch: -0.2, lean: 0.0, step: 0.42, back: 0.38, twist: FT - 0.05, headPitch: 0.1 })),
+      K(1.0, tb({ crouch: -0.22, lean: 0.1, step: 0.46, back: 0.38, twist: FT + 0.08, headPitch: 0.12 })),
+      K(1.06, tb({ crouch: -0.21, lean: 0.02, step: 0.46, back: 0.4, twist: FT - 0.02, headPitch: 0.1 })),
+      K(1.12, tb({ crouch: -0.23, lean: 0.1, step: 0.46, back: 0.4, twist: FT + 0.08, headPitch: 0.12 })),
+      K(1.18, tb({ crouch: -0.22, lean: 0.02, step: 0.46, back: 0.42, twist: FT - 0.04, headPitch: 0.1 })),
+      K(1.24, tb({ crouch: -0.24, lean: 0.1, step: 0.46, back: 0.42, twist: FT + 0.06, headPitch: 0.12 })),
+      // sat right back into the tell, and coiling deeper through the held aim, breathing
       K(1.48, X_COIL),
-      K(1.86, tb({ ...X_COIL, crouch: -0.35, back: 0.6, lean: -0.16 })),
-      // the arm extends: the feet are still planted
-      K(1.97, tb({ ...X_COIL, crouch: -0.34, lean: 0.0, back: 0.6 })),
+      K(1.68, tb({ ...X_COIL, crouch: -0.38, lean: -0.22 })),
+      K(1.86, tb({ ...X_COIL, crouch: -0.4, back: 0.6, lean: -0.24, twist: FT - 0.34 })),
+      // the arm extends and the shoulder comes through: the feet are still planted
+      K(1.97, tb({ ...X_COIL, crouch: -0.38, lean: 0.02, back: 0.6, twist: FT + 0.1, hipTwist: 0.3 })),
       // the front foot kicks out and the back leg drives straight
       K(EXEC_HIT, X_LUNGE),
-      K(2.4, tb({ ...X_LUNGE, lean: 0.6, crouch: -0.48 })),
+      // the body sinks on into it: the front knee gives, the hips drop
+      K(2.4, tb({ ...X_LUNGE, lean: 0.64, crouch: -0.52 })),
       // pushed back off the front foot, drawing it out, rising
-      K(2.55, tb({ crouch: -0.2, lean: 0.04, step: 0.4, back: 0.42, twist: FT + 0.05, headPitch: 0.1 })),
-      K(2.64, tb({ crouch: -0.14, lean: -0.02, step: 0.3, back: 0.3, twist: FT - 0.05, headPitch: 0.16 })),
+      K(2.55, tb({ crouch: -0.22, lean: 0.04, step: 0.4, back: 0.42, twist: FT + 0.05, headPitch: 0.1 })),
+      // the flick's momentum turns the chest away
+      K(2.64, tb({ crouch: -0.16, lean: -0.02, side: -0.05, step: 0.3, back: 0.3, twist: FT - 0.2, headPitch: 0.16 })),
       // heels together, chin up, the salute; then the small bow of the head
       K(2.8, tb({ ...X_TALL, headPitch: -0.06 })),
       K(3.0, tb({ ...X_TALL, headPitch: 0.2, lean: 0.04 })),
@@ -778,7 +803,7 @@ export const rapier: Style = {
       [0.98, F_GUARD],
       [1.24, [0.62, 0.5, -0.02]],
       [1.5, F_AIM],
-      [1.86, [-0.06, 0.58, 0.38]],
+      [1.86, [-0.1, 0.6, 0.42]],
       [2.02, F_GUARD],
       [EXEC_HIT, F_BACK],
       [2.4, F_BACK],
