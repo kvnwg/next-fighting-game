@@ -339,7 +339,9 @@ export function executeBlow(attacker: Fighter, defender: Fighter, now: number): 
   const dealt = Math.min(defender.hp, Math.round(amount));
   defender.hp -= dealt;
   defender.lastDamageAt = now;
+  // both walk away from an execution with their guard whole again
   defender.posture = 0;
+  attacker.posture = 0;
   let healed = 0;
   const ls = attacker.mods.lifesteal ?? 0;
   if (ls > 0 && dealt > 0) {

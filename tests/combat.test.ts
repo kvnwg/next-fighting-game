@@ -157,10 +157,13 @@ describe('hit resolution', () => {
     // locked in: neither can act until it plays out
     expect(D.input('dodge', t2 + 100)).toBe(false);
     expect(A.input('light', t2 + 100)).toBe(false);
+    A.posture = 40;
     const blow = executeBlow(A, D, t2 + COMBAT.executeHitAt);
     expect(blow.damage).toBe(Math.round(D.maxHp * COMBAT.executeDamage));
     expect(D.hp).toBe(D.maxHp - blow.damage);
+    // both come out of it with their posture reset
     expect(D.posture).toBe(0);
+    expect(A.posture).toBe(0);
     // survived it: floored afterwards
     D.update(t2 + COMBAT.executeTime + 1);
     expect(D.state).toBe('knockdown');
