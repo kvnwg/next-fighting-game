@@ -60,8 +60,8 @@ const nail = (side: 1 | -1): Motion => {
   const x = side;
   return keyed(
     [
-      g(-0.6, [x * 0.2, 0.92, 0.18], [x * 0.1, 0.62, 0.78]),
-      g(-0.05, [x * 0.2, 0.98, 0.14], [x * 0.08, 0.7, 0.7]),
+      g(-0.6, [x * 0.2, 0.94, 0.02], [x * 0.08, 0.85, -0.3]),
+      g(-0.05, [x * 0.2, 0.96, -0.08], [x * 0.06, 0.85, -0.5]),
       g(0.2, [x * 0.16, 0.5, 0.5], [x * 0.04, -0.4, 0.92]),
       g(0.45, [x * 0.14, -0.1, 0.5], [x * 0.03, -0.96, 0.25]),
       g(1.07, [x * 0.14, -0.12, 0.52], [x * 0.03, -0.96, 0.25]),
@@ -77,53 +77,71 @@ const EXEC_CUT2 = 0.66;
 const EXEC_HIT = 2.15;
 const EXEC_BODY = [
   K(0.0, B({ ...body, crouch: -0.12, lean: 0.1 }), { spin: 0, hop: 0 }),
-  // the flick: weight sits back, the wrists snap the points down and out
-  K(0.16, B({ ...body, crouch: -0.18, lean: 0.06, twist: 0, step: 0.2, back: 0.3, headPitch: 0.1 })),
-  // down into the smoke, coiled to the right
-  K(0.3, B({ ...body, crouch: -0.36, lean: 0.32, twist: -0.4, hipTwist: -0.2, step: 0.26, back: 0.3, width: 0.2 }), { spin: 0 }),
+  // the flick: the fists cocked up beside the chest, weight rocked back, then the wrists snap the
+  // points down and out
+  K(0.08, B({ ...body, crouch: -0.1, lean: -0.04, twist: 0, step: 0.2, back: 0.3, headPitch: 0.1 })),
+  K(0.16, B({ ...body, crouch: -0.22, lean: 0.1, twist: 0, step: 0.2, back: 0.3, headPitch: 0.1 })),
+  // down into the smoke and wound right round to the right, the weight on the right foot, the
+  // arms wrapped up on that side: the coil for the turn
+  K(0.3, B({ ...body, crouch: -0.42, lean: 0.34, twist: -0.75, hipTwist: -0.32, side: 0.08, step: 0.24, back: 0.32, width: 0.21 }), { spin: 0 }),
   // the whirl, side-bent so the arms open on the diagonal
   K(EXEC_CUT1, B({ ...body, crouch: -0.28, lean: 0.24, twist: 0, side: -0.26, step: 0.22, back: 0.24, width: 0.17 }), { spin: 0.25 }),
-  K(EXEC_CUT2, B({ ...body, crouch: -0.28, lean: 0.24, twist: 0, side: -0.26, step: 0.22, back: 0.24, width: 0.17 }), { spin: 0.75 }),
-  K(0.8, B({ ...body, crouch: -0.34, lean: 0.3, twist: 0, step: 0.3, back: 0.3, width: 0.2 }), { spin: 1 }),
-  // rising slowly, tall onto the toes, chest arched back: the fangs raised
-  K(1.15, B({ ...body, crouch: -0.12, lean: 0.0, twist: -0.1, step: 0.22, back: 0.26, width: 0.15, headPitch: 0.05 })),
-  K(1.6, B({ ...body, crouch: 0.02, lean: -0.16, twist: -0.12, step: 0.22, back: 0.26, width: 0.14, headPitch: 0.12 })),
-  // breathing at the top, then the legs sink deep under the raised fists to load the spring
-  K(1.72, B({ ...body, crouch: -0.1, lean: -0.12, twist: -0.12, step: 0.24, back: 0.3, width: 0.15, headPitch: 0.12 })),
-  K(1.92, B({ ...body, crouch: -0.44, lean: 0.18, twist: 0, step: 0.3, back: 0.36, width: 0.18, headPitch: 0.1 }), { hop: 0 }),
-  // the pounce: off both feet, the body pitched out flat over them and the fists brought over the
-  // hood and down, so both points come down from above into the hollows of the collarbones
-  K(2.04, B({ ...body, crouch: -0.12, lean: 0.75, twist: 0, step: 0.46, back: 0.5, width: 0.15, headPitch: 0.3 }), { hop: 0.26 }),
+  // the arms gathered in for an instant, a little pull before the second blade is flung out
+  K(0.56, B({ ...body, crouch: -0.32, lean: 0.28, twist: -0.2, side: -0.1, step: 0.22, back: 0.24, width: 0.17 }), { spin: 0.5 }),
+  K(EXEC_CUT2, B({ ...body, crouch: -0.28, lean: 0.24, twist: 0.1, side: -0.26, step: 0.22, back: 0.24, width: 0.17 }), { spin: 0.75 }),
+  // the turn's momentum caught in the knees
+  K(0.8, B({ ...body, crouch: -0.4, lean: 0.34, twist: 0.1, step: 0.3, back: 0.3, width: 0.2 }), { spin: 1 }),
+  // rising slowly, tall onto the toes, the weight drawn back over the rear foot and the chest
+  // arched further and further back: the fangs raised as far behind the hood as the arms go
+  K(1.15, B({ ...body, crouch: -0.12, lean: -0.04, twist: -0.1, step: 0.2, back: 0.3, width: 0.15, headPitch: 0.05 })),
+  K(1.5, B({ ...body, crouch: 0.02, lean: -0.3, twist: -0.12, step: 0.18, back: 0.36, width: 0.14, headPitch: 0.15 })),
+  // the held beat at full stretch, still breathing
+  K(1.8, B({ ...body, crouch: 0.0, lean: -0.36, twist: -0.12, step: 0.18, back: 0.38, width: 0.14, headPitch: 0.18 })),
+  // the legs sink under the raised fists to load the spring, the arch held
+  K(1.95, B({ ...body, crouch: -0.44, lean: -0.12, twist: -0.04, step: 0.24, back: 0.4, width: 0.18, headPitch: 0.15 }), { hop: 0 }),
+  // the pounce, legs first: off both feet, the hips and chest pitch out over them while the arms
+  // are still back, then the fists whip over the hood and down, so both points come down from
+  // above into the hollows of the collarbones
+  K(2.04, B({ ...body, crouch: -0.12, lean: 0.55, twist: 0, step: 0.46, back: 0.5, width: 0.15, headPitch: 0.3 }), { hop: 0.24 }),
   K(EXEC_HIT, B({ ...body, crouch: -0.12, lean: 1.18, twist: 0.02, step: 0.5, back: 0.66, width: 0.15, headPitch: 0.55 }), { hop: 0.32 }),
+  // the mass carries on down into the blades
+  K(2.24, B({ ...body, crouch: -0.16, lean: 1.26, twist: 0.02, step: 0.54, back: 0.62, width: 0.15, headPitch: 0.5 }), { hop: 0.24 }),
   // hung on the blades while they stiffen, then the feet come down under
-  K(2.32, B({ ...body, crouch: -0.2, lean: 1.0, twist: 0.02, step: 0.56, back: 0.56, width: 0.16, headPitch: 0.45 }), { hop: 0.16 }),
-  // landed, ripping both blades out with a push off the chest, a half step back
-  K(2.46, B({ ...body, crouch: -0.42, lean: 0.45, twist: 0, step: 0.56, back: 0.42, width: 0.2, headPitch: 0.15 }), { hop: 0 }),
-  K(2.62, B({ ...body, crouch: -0.28, lean: 0.24, twist: 0, step: 0.44, back: 0.36, width: 0.19, headPitch: 0.15 })),
+  K(2.34, B({ ...body, crouch: -0.24, lean: 1.0, twist: 0.02, step: 0.56, back: 0.56, width: 0.16, headPitch: 0.45 }), { hop: 0.12 }),
+  // landed heavy, the knees giving, ripping both blades out with a push off the chest
+  K(2.48, B({ ...body, crouch: -0.5, lean: 0.5, twist: 0, step: 0.56, back: 0.42, width: 0.21, headPitch: 0.15 }), { hop: 0 }),
+  K(2.64, B({ ...body, crouch: -0.32, lean: 0.26, twist: 0, step: 0.44, back: 0.36, width: 0.19, headPitch: 0.15 })),
   K(3.0, B({ ...body, crouch: -0.14, lean: 0.12, twist: 0, step: 0.34, back: 0.3, width: 0.18, headPitch: 0.2 })),
 ];
 // the right hand ([s, fist, point]) in the body's frame (unpitched by the lean, so the pounce can
 // be aimed at where the kneeling man is); the left mirrors it across x
 const EXEC_R: [number, V3, V3][] = [
   [0.0, G_R[0], G_R[1]],
-  [0.08, [-0.4, 0.3, 0.3], [-0.3, 0.4, 0.86]],
-  [0.16, [-0.46, 0.06, 0.24], [-0.55, -0.6, 0.58]],
-  [0.3, [-0.44, 0.14, 0.12], [-0.5, -0.45, 0.74]],
+  // cocked up by the chest, then the flick
+  [0.08, [-0.4, 0.44, 0.22], [-0.3, 0.85, 0.42]],
+  [0.16, [-0.48, 0.04, 0.24], [-0.55, -0.62, 0.56]],
+  // wrapped back behind the right hip for the coil
+  [0.3, [-0.44, 0.24, -0.2], [-0.45, -0.8, -0.1]],
   // flung out high on the diagonal for the whirl
   [EXEC_CUT1, [-0.66, 0.74, 0.2], [-0.78, 0.45, 0.44]],
+  [0.56, [-0.4, 0.56, 0.16], [-0.6, 0.6, 0.5]],
   [EXEC_CUT2, [-0.66, 0.74, 0.18], [-0.78, 0.45, 0.42]],
-  [0.8, [-0.4, 0.3, 0.34], [-0.3, -0.2, 0.93]],
-  // raised high beside the hood, the point up and back
-  [1.15, [-0.3, 0.78, 0.16], [-0.1, 0.8, 0.6]],
-  [1.6, [-0.24, 1.0, 0.12], [-0.05, 0.92, 0.38]],
-  [1.92, [-0.26, 1.0, 0.08], [-0.05, 0.94, 0.3]],
-  // over the hood and down, the wrist snapping the point down into the collarbone
-  [2.04, [-0.2, 0.92, 0.52], [-0.02, 0.45, 0.89]],
+  [0.8, [-0.42, 0.28, 0.34], [-0.3, -0.25, 0.92]],
+  // raised high and drawn back behind the hood, the elbows cocked, the point up
+  [1.15, [-0.3, 0.8, 0.12], [-0.1, 0.85, 0.5]],
+  [1.5, [-0.26, 1.0, -0.06], [-0.06, 0.98, 0.18]],
+  [1.8, [-0.26, 1.0, -0.12], [-0.06, 0.99, 0.1]],
+  [1.95, [-0.26, 0.98, -0.1], [-0.06, 0.99, 0.12]],
+  // still back as the body launches, then over the hood and down, the wrist snapping the point
+  // down into the collarbone
+  [2.04, [-0.22, 1.0, 0.24], [-0.03, 0.85, 0.52]],
+  [2.1, [-0.18, 0.68, 0.7], [-0.01, 0.15, 0.99]],
   [EXEC_HIT, [-0.13, 0.08, 0.95], [0.04, -0.32, 0.95]],
-  [2.32, [-0.13, 0.05, 0.93], [0.04, -0.34, 0.94]],
+  [2.24, [-0.13, 0.0, 0.92], [0.04, -0.4, 0.92]],
+  [2.34, [-0.13, 0.02, 0.92], [0.04, -0.38, 0.92]],
   // ripped out and flicked clean, out low to the side
-  [2.46, [-0.3, 0.3, 0.6], [-0.4, 0.2, 0.9]],
-  [2.6, [-0.52, 0.12, 0.26], [-0.7, -0.6, 0.38]],
+  [2.48, [-0.3, 0.3, 0.6], [-0.4, 0.2, 0.9]],
+  [2.62, [-0.54, 0.1, 0.26], [-0.7, -0.62, 0.36]],
   [3.0, [-0.5, 0.1, 0.24], [-0.6, -0.7, 0.38]],
 ];
 const mirror = (ks: [number, V3, V3][], swap: Record<number, [V3, V3]> = {}): [number, V3, V3][] =>
@@ -133,6 +151,9 @@ const EXEC_L = mirror(EXEC_R, {
   0: [G_L[0], G_L[1]],
   [EXEC_CUT1]: [[0.6, 0.12, 0.16], [0.78, -0.45, 0.44]],
   [EXEC_CUT2]: [[0.6, 0.12, 0.14], [0.78, -0.45, 0.42]],
+  // in the coil the left is wrapped across the belly toward the right hip
+  0.3: [[-0.06, 0.22, 0.3], [-0.8, -0.3, 0.5]],
+  0.56: [[0.3, 0.3, 0.2], [0.6, -0.3, 0.74]],
 });
 
 // Entrance blades: sheathed-looking along the forearms, drawn from the right thigh and the small
@@ -254,27 +275,38 @@ export const daggers: Style = {
     h: mv({
       keys: [
         K(-0.75, B({ ...body, crouch: -0.24, lean: 0.24 }), { hop: 0 }),
-        K(-0.15, B({ ...body, crouch: 0.0, lean: -0.14, twist: -0.22, step: 0.24, back: 0.22, headPitch: 0.15 }), { hop: 0.12 }),
-        K(0.45, B({ ...body, crouch: -0.46, lean: 0.88, twist: 0.08, step: 0.66, back: 0.56, headPitch: -0.35 }), { hop: 0 }),
-        K(1.07, B({ ...body, crouch: -0.5, lean: 0.92, twist: 0.08, step: 0.66, back: 0.58, headPitch: -0.3 })),
+        // the pull: tall on the rear foot, the chest arched right back, both fists drawn back
+        // behind the hood with the elbows cocked
+        K(-0.15, B({ ...body, crouch: 0.02, lean: -0.34, twist: -0.25, step: 0.2, back: 0.34, headPitch: 0.22 }), { hop: 0.1 }),
+        // the drive, legs and hips first: the front foot reaches and the chest pitches over while
+        // the arms are still back
+        K(0.12, B({ ...body, crouch: -0.2, lean: 0.4, twist: -0.05, step: 0.5, back: 0.46, headPitch: -0.1 }), { hop: 0.06 }),
+        K(0.45, B({ ...body, crouch: -0.46, lean: 0.9, twist: 0.08, step: 0.66, back: 0.56, headPitch: -0.35 }), { hop: 0 }),
+        // the mass carries on down, the knees giving, the momentum dragging the chest round
+        K(0.75, B({ ...body, crouch: -0.56, lean: 1.0, twist: 0.16, step: 0.68, back: 0.58, headPitch: -0.3 })),
+        K(1.07, B({ ...body, crouch: -0.58, lean: 0.94, twist: 0.18, step: 0.68, back: 0.6, headPitch: -0.25 })),
       ],
       main: right(
         [
           at(-0.75, G_R),
-          [-0.15, [-0.24, 0.96, 0.18], [0.08, 0.62, 0.78]],
-          [0.15, [-0.2, 0.74, 0.5], [0.04, 0.05, 1]],
+          [-0.15, [-0.24, 0.98, -0.12], [0.05, 0.9, -0.42]],
+          [0.12, [-0.22, 0.94, 0.12], [0.06, 0.94, 0.3]],
+          [0.28, [-0.2, 0.74, 0.5], [0.04, 0.05, 1]],
           [0.45, [-0.14, 0.54, 0.5], [0.02, 0.72, 0.7]],
-          [1.07, [-0.14, 0.5, 0.5], [0.02, 0.6, 0.8]],
+          [0.75, [-0.12, 0.42, 0.54], [0.02, 0.45, 0.9]],
+          [1.07, [-0.12, 0.4, 0.52], [0.02, 0.4, 0.92]],
         ],
         0.04,
       ),
       off: left(
         [
           at(-0.75, G_L),
-          [-0.15, [0.18, 0.9, 0.24], [-0.1, 0.62, 0.78]],
-          [0.15, [0.16, 0.66, 0.5], [-0.04, 0.0, 1]],
+          [-0.15, [0.2, 0.94, -0.1], [-0.05, 0.9, -0.42]],
+          [0.12, [0.18, 0.9, 0.12], [-0.06, 0.94, 0.3]],
+          [0.28, [0.16, 0.66, 0.5], [-0.04, 0.0, 1]],
           [0.45, [0.2, 0.3, 0.44], [0.1, 0.2, 0.97]],
-          [1.07, [0.22, 0.26, 0.42], [0.1, 0.1, 0.99]],
+          [0.75, [0.22, 0.22, 0.44], [0.1, 0.0, 1]],
+          [1.07, [0.24, 0.2, 0.42], [0.1, -0.05, 0.99]],
         ],
         0.04,
       ),
@@ -292,24 +324,30 @@ export const daggers: Style = {
     // straight into them, the left flung back behind for balance
     h1: mv({
       keys: [
-        K(-0.4, B({ ...body, crouch: -0.14, lean: 0.12, twist: -0.4, hipTwist: -0.15, step: 0.3, back: 0.3, headPitch: 0.1 })),
-        K(0.05, B({ ...body, crouch: -0.36, lean: 0.5, twist: -0.1, step: 0.55, back: 0.5, headPitch: -0.1 })),
+        // the pull: the weight right back over the rear foot, the hips and shoulders wound round to
+        // the right, the right fist drawn back behind the hip and the left raised back over the hood
+        K(-0.4, B({ ...body, crouch: -0.12, lean: -0.06, twist: -0.75, hipTwist: -0.3, step: 0.24, back: 0.36, headPitch: 0.12 })),
+        // the drive: the front foot reaches out long and the hips unwind before the arm comes
+        K(0.05, B({ ...body, crouch: -0.36, lean: 0.5, twist: -0.25, hipTwist: 0, step: 0.55, back: 0.5, headPitch: -0.1 })),
         K(0.45, B({ ...body, crouch: -0.6, lean: 1.0, twist: 0.3, hipTwist: 0.1, step: 0.9, back: 0.78, width: 0.17, headPitch: -0.55 })),
-        K(1.07, B({ ...body, crouch: -0.6, lean: 0.96, twist: 0.3, hipTwist: 0.1, step: 0.9, back: 0.78, width: 0.17, headPitch: -0.5 })),
+        // the stab carried on through, the front knee taking the weight and the chest turned on
+        K(0.75, B({ ...body, crouch: -0.66, lean: 1.06, twist: 0.42, hipTwist: 0.14, step: 0.92, back: 0.8, width: 0.17, headPitch: -0.5 })),
+        K(1.07, B({ ...body, crouch: -0.66, lean: 0.98, twist: 0.44, hipTwist: 0.14, step: 0.92, back: 0.8, width: 0.17, headPitch: -0.45 })),
       ],
       main: right(
         [
-          [-0.4, [-0.4, 0.16, -0.08], [-0.2, -0.5, 0.84]],
-          [0.05, [-0.38, 0.26, -0.06], [0.05, 0.35, 0.94]],
+          [-0.4, [-0.42, 0.18, -0.3], [-0.15, -0.45, 0.88]],
+          [0.05, [-0.4, 0.24, -0.12], [0.05, 0.3, 0.95]],
           [0.45, [-0.16, 0.42, 0.54], [0.05, 0.6, 0.8]],
-          [1.07, [-0.16, 0.42, 0.55], [0.05, 0.58, 0.81]],
+          [0.75, [-0.12, 0.4, 0.62], [0.05, 0.5, 0.86]],
+          [1.07, [-0.12, 0.4, 0.6], [0.05, 0.48, 0.88]],
         ],
         0.03,
         { body: true },
       ),
       off: left(
         [
-          [-0.4, [0.2, 1.0, 0.2], [-0.9, 0.12, 0.42]],
+          [-0.4, [0.18, 0.98, 0.0], [-0.8, 0.35, -0.2]],
           [-0.1, [0.1, 0.62, 0.5], [-0.4, -0.5, 0.77]],
           [0.15, [0.34, 0.16, 0.24], [0.3, -0.6, 0.74]],
           [0.45, [0.4, 0.34, -0.3], [0.45, -0.1, -0.89]],
@@ -332,15 +370,20 @@ export const daggers: Style = {
     h2: mv({
       keys: [
         K(-1.2, B({ ...body, crouch: -0.3, lean: 0.3, step: 0.3, back: 0.34 }), { spin: 0, hop: 0 }),
-        K(-0.2, B({ ...body, crouch: 0.0, lean: -0.08, twist: -0.35, hipTwist: -0.2, step: 0.24, back: 0.26, headPitch: 0.15 }), { spin: 0, hop: 0.06 }),
-        K(0.45, B({ ...body, crouch: -0.3, lean: 0.4, twist: 0.25, hipTwist: 0.15, step: 0.42, back: 0.36, width: 0.2 }), { spin: 0, hop: 0 }),
+        // the pull: reared up tall on the rear foot, chest arched, wound round to the right with the
+        // left fist drawn back over the right side of the hood and the right fist back behind the hip
+        K(-0.2, B({ ...body, crouch: 0.02, lean: -0.22, twist: -0.6, hipTwist: -0.3, step: 0.2, back: 0.34, headPitch: 0.18 }), { spin: 0, hop: 0.06 }),
+        // the hips unwind first, the chest after, the arm last
+        K(0.2, B({ ...body, crouch: -0.16, lean: 0.16, twist: -0.1, hipTwist: 0.1, step: 0.36, back: 0.36, width: 0.19 }), { spin: 0, hop: 0.02 }),
+        K(0.45, B({ ...body, crouch: -0.32, lean: 0.42, twist: 0.3, hipTwist: 0.15, step: 0.42, back: 0.36, width: 0.2 }), { spin: 0, hop: 0 }),
         K(0.55, B({ ...body, crouch: -0.32, lean: 0.3, twist: 0, step: 0.3, back: 0.3, width: 0.2 }), { spin: 0.04 }),
         K(0.75, B({ ...body, crouch: -0.34, lean: 0.28, twist: 0, side: -0.12, step: 0.3, back: 0.3, width: 0.22 }), { spin: 0.25 }),
-        K(1.1, B({ ...body, crouch: -0.4, lean: 0.36, twist: 0, step: 0.38, back: 0.4, width: 0.22 }), { spin: 1.0 }),
+        // the turn caught in the knees, the arms still dragging round
+        K(1.1, B({ ...body, crouch: -0.48, lean: 0.4, twist: 0.12, step: 0.38, back: 0.42, width: 0.23 }), { spin: 1.0 }),
       ],
       main: right([
         at(-1.2, G_R),
-        [-0.2, [-0.4, 0.14, 0.0], [-0.3, -0.55, 0.78]],
+        [-0.2, [-0.42, 0.14, -0.22], [-0.3, -0.9, -0.3]],
         [0.45, [-0.5, 0.22, 0.12], [-0.6, -0.4, 0.7]],
         [0.55, [-0.66, 0.56, 0.12], [-0.92, 0.1, 0.38]],
         [0.75, [-0.68, 0.56, 0.1], [-0.92, 0.1, 0.36]],
@@ -348,8 +391,9 @@ export const daggers: Style = {
       ]),
       off: left([
         at(-1.2, G_L),
-        [-0.2, [0.2, 1.0, 0.16], [-0.85, 0.2, 0.48]],
-        [0.15, [0.14, 0.66, 0.5], [-0.3, -0.45, 0.84]],
+        [-0.2, [0.08, 0.98, -0.06], [-0.75, 0.6, -0.25]],
+        [0.2, [0.12, 0.8, 0.36], [-0.4, 0.2, 0.9]],
+        [0.32, [0.16, 0.6, 0.5], [-0.2, -0.45, 0.87]],
         [0.45, [0.34, 0.22, 0.42], [0.3, -0.7, 0.65]],
         [0.55, [0.6, 0.16, 0.16], [0.8, -0.45, 0.4]],
         [1.1, [0.6, 0.2, 0.2], [0.8, -0.35, 0.48]],
@@ -378,24 +422,30 @@ export const daggers: Style = {
     sp: mv({
       keys: [
         K(-1.0, B({ ...body, crouch: -0.36, lean: 0.4, twist: 0 }), { flip: 0, hop: 0, spin: 0 }),
-        K(-0.6, B({ ...body, crouch: -0.5, lean: 0.7, twist: 0, step: 0.4, back: 0.5, headPitch: -0.3 }), { flip: 0.02, hop: 0 }),
+        // the load: sunk deep, the weight back on the heels and the arms swept right back behind
+        K(-0.6, B({ ...body, crouch: -0.6, lean: 0.8, twist: 0, step: 0.36, back: 0.56, headPitch: -0.2 }), { flip: 0.02, hop: 0 }),
+        K(-0.42, B({ ...body, crouch: -0.62, lean: 0.84, twist: 0, step: 0.36, back: 0.56, headPitch: -0.25 }), { flip: 0.03, hop: 0 }),
         K(-0.3, B({ ...body, crouch: -0.2, lean: 0.4, twist: 0, step: 0.2, back: 0.3, headPitch: -0.3 }), { flip: 0.14, hop: 0.3, spin: 0 }),
         K(0.0, B({ ...body, crouch: -0.15, lean: 0.05, twist: 0, step: 0.12, back: 0.2, headPitch: -0.4 }), { flip: 0.24, hop: 0.42 }),
         K(0.45, B({ ...body, crouch: -0.15, lean: 0.05, twist: 0, step: 0.12, back: 0.2, headPitch: -0.4 }), { flip: 0.25, hop: 0.36, spin: 1 }),
         K(1.07, B({ ...body, crouch: -0.2, lean: 0.1, twist: 0, step: 0.2, back: 0.24, headPitch: -0.3 }), { flip: 0.2, hop: 0.25 }),
-        K(1.5, B({ ...body, crouch: -0.4, lean: 0.4, twist: 0, step: 0.36, back: 0.4, width: 0.2 }), { flip: 0, hop: 0 }),
+        // landed heavy: the knees give and the weight sinks before it settles
+        K(1.3, B({ ...body, crouch: -0.56, lean: 0.52, twist: 0, step: 0.4, back: 0.44, width: 0.21 }), { flip: 0, hop: 0 }),
+        K(1.5, B({ ...body, crouch: -0.42, lean: 0.4, twist: 0, step: 0.36, back: 0.4, width: 0.2 }), { flip: 0, hop: 0 }),
       ],
       main: right([
         [-1.0, [-0.36, 0.12, -0.08], [-0.3, -0.5, 0.8]],
-        [-0.6, [-0.42, 0.18, -0.2], [-0.2, -0.2, 0.96]],
-        [-0.25, [-0.16, 0.92, 0.26], [0.05, 1, -0.05]],
+        [-0.6, [-0.36, 0.3, -0.36], [-0.25, -0.85, -0.45]],
+        [-0.42, [-0.36, 0.32, -0.38], [-0.25, -0.85, -0.45]],
+        [-0.2, [-0.16, 0.92, 0.26], [0.05, 1, -0.05]],
         [1.07, [-0.16, 0.94, 0.26], [0.05, 1, -0.05]],
         [1.5, [-0.34, 0.16, 0.26], [-0.3, -0.3, 0.9]],
       ]),
       off: left([
         [-1.0, [0.36, 0.12, -0.08], [0.3, -0.5, 0.8]],
-        [-0.6, [0.42, 0.18, -0.2], [0.2, -0.2, 0.96]],
-        [-0.25, [0.16, 0.92, 0.28], [-0.05, 1, -0.05]],
+        [-0.6, [0.36, 0.3, -0.36], [0.25, -0.85, -0.45]],
+        [-0.42, [0.36, 0.32, -0.38], [0.25, -0.85, -0.45]],
+        [-0.2, [0.16, 0.92, 0.28], [-0.05, 1, -0.05]],
         [1.07, [0.16, 0.94, 0.28], [-0.05, 1, -0.05]],
         [1.5, [0.32, 0.16, 0.28], [0.3, -0.3, 0.9]],
       ]),
@@ -463,20 +513,24 @@ export const daggers: Style = {
     // like a drill bit
     dh: mv({
       keys: [
-        K(-0.6, B({ ...body, crouch: -0.4, lean: 0.6, twist: 0, step: 0.4, back: 0.46 }), { flip: 0, hop: 0, spin: 0 }),
+        // the load: sunk low with the arms swept back behind, the weight on the rear foot
+        K(-0.6, B({ ...body, crouch: -0.52, lean: 0.72, twist: 0, step: 0.36, back: 0.54 }), { flip: 0, hop: 0, spin: 0 }),
+        K(-0.46, B({ ...body, crouch: -0.56, lean: 0.76, twist: 0, step: 0.36, back: 0.54, headPitch: -0.2 }), { flip: 0.01, hop: 0, spin: 0 }),
         K(-0.2, B({ ...body, crouch: -0.2, lean: 0.25, twist: 0, step: 0.2, back: 0.3, headPitch: -0.4 }), { flip: 0.17, hop: 0.26, spin: 0 }),
         K(0.45, B({ ...body, crouch: -0.2, lean: 0.2, twist: 0, step: 0.2, back: 0.3, headPitch: -0.4 }), { flip: 0.2, hop: 0.26, spin: 1 }),
         K(0.75, B({ ...body, crouch: -0.24, lean: 0.25, twist: 0, step: 0.3, back: 0.36, headPitch: -0.3 }), { flip: 0.14, hop: 0.14 }),
-        K(1.07, B({ ...body, crouch: -0.4, lean: 0.45, twist: 0, step: 0.48, back: 0.5, width: 0.21 }), { flip: 0, hop: 0 }),
+        K(1.07, B({ ...body, crouch: -0.5, lean: 0.5, twist: 0, step: 0.48, back: 0.5, width: 0.22 }), { flip: 0, hop: 0 }),
       ],
       main: right([
-        [-0.6, [-0.38, 0.14, -0.1], [-0.3, -0.5, 0.8]],
+        [-0.6, [-0.36, 0.28, -0.34], [-0.25, -0.85, -0.45]],
+        [-0.46, [-0.36, 0.3, -0.36], [-0.25, -0.85, -0.45]],
         [-0.2, [-0.3, 0.9, 0.2], [-0.25, 0.97, 0.0]],
         [0.6, [-0.3, 0.9, 0.2], [-0.25, 0.97, 0.0]],
         [1.07, [-0.4, 0.46, 0.38], [-0.45, 0.1, 0.89]],
       ]),
       off: left([
-        [-0.6, [0.38, 0.14, -0.1], [0.3, -0.5, 0.8]],
+        [-0.6, [0.36, 0.28, -0.34], [0.25, -0.85, -0.45]],
+        [-0.46, [0.36, 0.3, -0.36], [0.25, -0.85, -0.45]],
         [-0.2, [0.3, 0.9, 0.2], [0.25, 0.97, 0.0]],
         [0.6, [0.3, 0.9, 0.2], [0.25, 0.97, 0.0]],
         [1.07, [0.4, 0.46, 0.38], [0.45, 0.1, 0.89]],
@@ -527,17 +581,22 @@ export const daggers: Style = {
     bh: mv({
       keys: [
         K(-0.5, B({ ...body, crouch: -0.26, lean: 0.24 })),
-        K(-0.05, B({ ...body, crouch: -0.56, lean: 0.36, twist: -0.4, hipTwist: -0.2, step: 0.3, back: 0.4, width: 0.3, headPitch: 0.1 })),
+        // the pull: sunk into the wide squat with the weight on the rear leg, the hips and shoulders
+        // wound right round, the right fist drawn back behind the hip, the left reaching forward
+        K(-0.05, B({ ...body, crouch: -0.58, lean: 0.3, twist: -0.75, hipTwist: -0.3, step: 0.24, back: 0.5, width: 0.3, headPitch: 0.1 })),
+        // the hips unwind first as the front leg shoots out
+        K(0.2, B({ ...body, crouch: -0.6, lean: 0.45, twist: -0.2, hipTwist: 0.05, step: 0.6, back: 0.54, width: 0.29, side: 0.05, headPitch: -0.1 })),
         K(0.45, B({ ...body, crouch: -0.62, lean: 0.55, twist: 0.3, hipTwist: 0.1, step: 0.68, back: 0.56, width: 0.28, side: 0.1, headPitch: -0.2 })),
-        K(1.07, B({ ...body, crouch: -0.62, lean: 0.52, twist: 0.36, hipTwist: 0.1, step: 0.68, back: 0.56, width: 0.28, side: 0.1, headPitch: -0.15 })),
+        // the sweep drags the chest on round, the weight settling lower
+        K(1.07, B({ ...body, crouch: -0.66, lean: 0.52, twist: 0.5, hipTwist: 0.14, step: 0.68, back: 0.56, width: 0.28, side: 0.12, headPitch: -0.15 })),
       ],
       main: right(
         [
           [-0.5, [-0.36, 0.14, 0.2], [-0.3, -0.45, 0.84]],
-          [-0.05, [-0.5, 0.1, 0.16], [-0.2, -0.96, 0.2]],
-          [0.15, [-0.46, 0.0, 0.42], [-0.4, -0.2, 0.9]],
+          [-0.05, [-0.5, 0.14, -0.24], [-0.3, -0.9, -0.3]],
+          [0.2, [-0.46, 0.0, 0.38], [-0.4, -0.2, 0.9]],
           [0.45, [-0.1, -0.02, 0.56], [0.45, -0.25, 0.86]],
-          [1.07, [0.18, 0.0, 0.48], [0.9, -0.2, 0.38]],
+          [1.07, [0.26, 0.0, 0.42], [0.95, -0.2, 0.22]],
         ],
         0.03,
         { body: true },
@@ -545,7 +604,7 @@ export const daggers: Style = {
       off: left(
         [
           [-0.5, [0.32, 0.16, 0.26], [0.35, -0.32, 0.88]],
-          [-0.05, [0.48, 0.3, 0.1], [0.8, -0.3, 0.5]],
+          [-0.05, [0.36, 0.42, 0.36], [0.5, 0.35, 0.79]],
           [0.45, [0.4, 0.9, 0.0], [0.3, 0.9, 0.3]],
           [1.07, [0.38, 0.88, 0.0], [0.3, 0.9, 0.3]],
         ],
@@ -599,10 +658,15 @@ export const daggers: Style = {
     // high, then folded over in a dive straight down onto them, both blades nailed into the ground
     jh: mv({
       keys: [
-        K(-0.6, B({ ...body, crouch: -0.06, lean: -0.2, twist: 0, headPitch: 0.2, width: 0.14 }), { hop: 0.3, flip: -0.04 }),
-        K(-0.05, B({ ...body, crouch: -0.02, lean: -0.3, twist: 0, headPitch: 0.25, width: 0.14 }), { hop: 0.4, flip: -0.05 }),
+        // the pull: arched right back in the air, both fists drawn back behind the hood
+        K(-0.6, B({ ...body, crouch: -0.06, lean: -0.32, twist: 0, headPitch: 0.25, width: 0.14 }), { hop: 0.3, flip: -0.05 }),
+        K(-0.05, B({ ...body, crouch: -0.02, lean: -0.45, twist: 0, headPitch: 0.3, width: 0.14 }), { hop: 0.4, flip: -0.07 }),
+        // the fold: the hips and chest jack forward before the arms come over
+        K(0.2, B({ ...body, crouch: -0.3, lean: 0.55, twist: 0, step: 0.26, back: 0.26, width: 0.2, headPitch: -0.05 }), { hop: 0.18, flip: 0 }),
         K(0.45, B({ ...body, crouch: -0.56, lean: 1.0, twist: 0, step: 0.36, back: 0.36, width: 0.25, headPitch: -0.2 }), { hop: 0, flip: 0.04 }),
-        K(1.07, B({ ...body, crouch: -0.54, lean: 0.95, twist: 0, step: 0.36, back: 0.36, width: 0.25, headPitch: -0.15 }), { flip: 0 }),
+        // the landing absorbed: the knees give and the hips sink over the planted blades
+        K(0.75, B({ ...body, crouch: -0.64, lean: 1.0, twist: 0, step: 0.38, back: 0.38, width: 0.26, headPitch: -0.15 }), { flip: 0.02 }),
+        K(1.07, B({ ...body, crouch: -0.6, lean: 0.95, twist: 0, step: 0.38, back: 0.38, width: 0.26, headPitch: -0.12 }), { flip: 0 }),
       ],
       main: nail(-1),
       off: nail(1),
