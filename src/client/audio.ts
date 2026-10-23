@@ -10,6 +10,7 @@ import { LEGACY_LEVEL, Sfx, legacy } from './audio/legacy';
 import { loadSamples } from './audio/samples';
 import { LEVEL, WET } from './audio/levels';
 import { Mixer, Voice } from './audio/mixer';
+import { Bed, Music } from './audio/music';
 import { Profile, profile } from './audio/profiles';
 import * as R from './audio/recipes';
 import type { Out } from './audio/synth';
@@ -103,9 +104,34 @@ class AudioEngine {
       this.mix = new Mixer(this.ctx);
       void loadSamples(this.ctx);
       this.mix.setRoom(this.roomId);
+      this.tunes = new Music(this.ctx);
+      this.tunes.attach(this.mix.master);
+      this.tunes.setVolume(settings.music);
+      if (this.bed) this.tunes.play(this.bed);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
+    this.tunes?.prime();
     this.setVolume(settings.volume);
+  }
+
+  private tunes: Music | null = null;
+  private bed: Bed | null = null;
+
+  /** Start a music bed (the fighter select, the fight), or fade the music out with null. */
+  music(bed: Bed | null, fade = 2): void {
+    this.bed = bed;
+    if (!this.tunes) return;
+    if (bed) this.tunes.play(bed);
+    else this.tunes.stop(fade);
+  }
+
+  /** Under an execution. */
+  musicDuck(on: boolean): void {
+    this.tunes?.duck(on);
+  }
+
+  setMusicVolume(v: number): void {
+    this.tunes?.setVolume(v);
   }
 
   private volume = settings.volume;

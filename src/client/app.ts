@@ -119,6 +119,7 @@ class App {
           if (this.map) this.loadMap(this.map);
         }
         audio.setVolume(settings.volume);
+        audio.setMusicVolume(settings.music);
         saveSettings();
       },
       onModalChange: (open) => {
@@ -254,6 +255,7 @@ class App {
       this.kind = null;
       this.ui.setCharsLocked(false);
       this.match = null;
+      audio.music(null, 1);
       this.cam.stopShots();
       this.endEntrances();
       this.select.hide();
@@ -303,17 +305,20 @@ class App {
         this.touch?.cancel();
         audio.play('matchFound');
       }
+      audio.music('select');
       this.select.show(m);
       if (this.local) this.local.frozen = true;
     });
     n.on('selectCancel', (m) => {
       this.select.hide();
+      audio.music(null, 1);
       if (this.local && this.kind === 'lobby') this.local.frozen = false;
       this.ui.toast(m.reason, 'warn');
     });
     n.on('result', (m) => {
       this.ui.showResult(m, this.profile);
       audio.play(m.won ? 'victory' : 'defeat');
+      audio.music(null, 3);
       platform.gameplayStop();
       // a ranked promotion is the rare moment CrazyGames' celebration is for
       if (m.before && m.after && rankOf(m.after.mmr, m.after.placements).label !== rankOf(m.before.mmr, m.before.placements).label && (m.delta ?? 0) > 0) platform.happytime();
@@ -388,6 +393,7 @@ class App {
     this.ui.setDeath(null);
     if (m.kind === 'lobby') {
       this.match = null;
+      audio.music(null, 1.5);
       this.ui.setMatch(null, 0);
       this.net.send({ t: 'leaderboard' });
     } else {
@@ -447,6 +453,8 @@ class App {
     const changed = !prev || prev.phase !== m.phase || prev.round !== m.round;
     if (!changed) return;
     if (this.local) this.local.frozen = m.phase === 'intro' || m.phase === 'countdown';
+    // the fight's music starts as they walk into the ring and runs to the result
+    if (m.phase === 'intro' || m.phase === 'countdown' || m.phase === 'fight') audio.music('combat');
     const oppId = m.players[m.you === 0 ? 1 : 0].id;
     switch (m.phase) {
       case 'intro': {
@@ -1105,6 +1113,7 @@ class App {
    */
   private startExecution(a: ClientFighter, d: ClientFighter): void {
     this.exec = { a, d, t: 0, start: this.net.serverNow(), hitDone: false };
+    audio.musicDuck(true);
     this.ui.setCinematic(true);
     // laid out the way the server stands them (the victim straight ahead at the execution distance),
     // not from where the two are drawn this frame: they're still sliding into place
@@ -1130,6 +1139,7 @@ class App {
       dark = Math.min(1, ex.t / 350) * (1 - Math.max(0, Math.min(1, (ex.t - (T - 450)) / 450)));
       if (ex.t >= T || !this.fighters.has(ex.a.id) || !this.fighters.has(ex.d.id)) {
         this.exec = null;
+        audio.musicDuck(false);
         this.cam.stopShots();
         if (!this.intro) this.ui.setCinematic(false);
       }

@@ -6,6 +6,7 @@ import { PLACEMENT_MATCHES, RankInfo, TIERS, rankOf } from '../shared/ranks';
 import { CANCELS, CANCEL_NAMES, CancelInto, CancelWindow, MoveClass } from '../shared/cancels';
 import { LobbyBar } from './lobbybar';
 import { ICON, IconName, icon, pixelSVG, recolor } from './pixelicons';
+import { TRACKS } from './audio/music';
 import { settings } from './settings';
 
 const h = (html: string): HTMLElement => {
@@ -94,6 +95,13 @@ interface Floater {
 }
 
 /** The cancel table (shared/cancels.ts) as the help screen shows it. */
+/** Every song's credit, as its licence asks. */
+function musicCredits(): string {
+  return [...TRACKS.select, ...TRACKS.combat]
+    .map((t) => `<li>"${t.title}" by ${t.artist} · <a href="${t.link}" target="_blank" rel="noopener">${t.licence}</a> · via BreakingCopyright</li>`)
+    .join('');
+}
+
 function cancelTable(): string {
   const cols: [CancelInto, string][] = [['light', 'Light'], ['heavy', 'Heavy'], ['special', 'Special'], ['dodge', 'Dodge'], ['guard', 'Guard'], ['jump', 'Jump']];
   const cell = (w: CancelWindow | undefined) => (!w ? '<td class="muted">—</td>' : `<td>${w.onContact ? 'on hit' : (w.from ?? 0) > 0.05 ? 'late' : '✓'}</td>`);
@@ -882,11 +890,14 @@ export class UI {
           <label>${icon('screen')}Graphics <select id="set-gfx">${(['auto', 'low', 'medium', 'high', 'ultra'] as const).map((q) => `<option value="${q}" ${settings.graphics === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}</select></label>
           <label>${icon('mouse')}${this.touch ? 'Look' : 'Mouse'} sensitivity <input type="range" min="0.2" max="3" step="0.1" id="set-sens" value="${settings.sensitivity}"><span id="set-sens-v">${settings.sensitivity}</span></label>
           <label>${icon('speaker')}Volume <input type="range" min="0" max="1" step="0.05" id="set-vol" value="${settings.volume}"></label>
+          <label>${icon('speaker')}Music <input type="range" min="0" max="1" step="0.05" id="set-music" value="${settings.music}"></label>
           <label>${icon('sparkle')}<input type="checkbox" id="set-cue" ${settings.parryCue ? 'checked' : ''}> Weapon glint before a hit lands</label>
           <label>${icon('updown')}<input type="checkbox" id="set-inv" ${settings.invertY ? 'checked' : ''}> Invert ${this.touch ? 'look' : 'mouse'} Y</label>
           <label>${icon('camera')}<input type="checkbox" id="set-shake" ${settings.reduceShake ? 'checked' : ''}> Reduce camera shake</label>
           <label>${icon('gauge')}<input type="checkbox" id="set-fps" ${settings.showFps ? 'checked' : ''}> Show FPS</label>
         </div>
+        ${iconHead('speaker', 'Music')}
+        <ul class="credits">${musicCredits()}</ul>
       </div>`,
       true,
       '心得',
@@ -907,6 +918,7 @@ export class UI {
       this.modal.querySelector('#set-sens-v')!.textContent = el.value;
     });
     bind('#set-vol', (el) => (settings.volume = Number(el.value)));
+    bind('#set-music', (el) => (settings.music = Number(el.value)));
     bind('#set-cue', (el) => (settings.parryCue = el.checked));
     bind('#set-inv', (el) => (settings.invertY = el.checked));
     bind('#set-shake', (el) => (settings.reduceShake = el.checked));

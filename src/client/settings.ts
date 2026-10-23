@@ -12,6 +12,8 @@ export interface Settings {
   sensitivity: number;
   invertY: boolean;
   volume: number;
+  /** the music, under the master volume */
+  music: number;
   /** flash on weapons just before an attack lands */
   parryCue: boolean;
   /** calmer camera: smaller shakes, no punch-ins */
@@ -29,6 +31,7 @@ const DEFAULTS: Settings = {
   sensitivity: 1,
   invertY: false,
   volume: 0.7,
+  music: 0.6,
   parryCue: true,
   reduceShake: false,
   showFps: false,

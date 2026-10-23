@@ -446,6 +446,8 @@ h4.ih .pi { width: 20px; height: 20px; }
 .keys td:first-child { font-weight: 700; font-size: 13px; letter-spacing: 0.08em; color: var(--gold); white-space: nowrap; padding-top: 5px; }
 .kanji { color: #fff; background: var(--red); padding: 0 6px; font-family: var(--jp); font-weight: 800; }
 .maps { font-size: 15px; line-height: 1.5; margin: 0; padding-left: 18px; color: #dcd8d0; }
+.credits { font-size: 13px; line-height: 1.6; margin: 0; padding-left: 18px; color: #b9b4aa; }
+.credits a { color: #e0c48a; }
 .settings { display: flex; flex-direction: column; gap: 10px; font-size: 16px; letter-spacing: 0.04em; }
 .settings label { display: flex; align-items: center; gap: 12px; }
 .settings label .pi { width: 20px; height: 20px; }
