@@ -60,10 +60,10 @@ export const forgeRecipe: MapRecipe = {
   propStyle: 'ash',
   look: {
     sky: { zenith: '#000000', horizon: '#000000', none: true },
-    light: { dir: [0.3, 1, 0.35], color: '#ffc29a', intensity: 2.6 },
-    hemi: { sky: '#f0a880', ground: '#7a3a22', intensity: 2.6 },
+    light: { dir: [0.3, 1, 0.35], color: '#ffc29a', intensity: 3.3 },
+    hemi: { sky: '#f0a880', ground: '#7a3a22', intensity: 3.1 },
     fog: { color: '#5a2414', sun: '#9a3a18', density: 0.006, falloff: 0.001, glow: 2 },
-    grade: { exposure: 1.5, contrast: 1.05, saturation: 1.1, gain: '#fff4ec', lift: '#1e0e0a', rays: 0, bloom: 0.95, bloomThreshold: 0.8 },
+    grade: { exposure: 1.8, contrast: 1.04, saturation: 1.1, gain: '#fff4ec', lift: '#2a1610', rays: 0, bloom: 0.95, bloomThreshold: 0.8 },
     wind: { dir: [0.3, 1], strength: 0.4, gust: 0.4 },
     rim: { color: '#ffb080', strength: 0.9 },
     lit: true,

@@ -17,7 +17,9 @@ const SOIL = [hex('#6a4a3a'), hex('#5c4032'), hex('#7a5644')];
 const TURF = [hex('#6a8a44'), hex('#7a9a4c'), hex('#5e7e3c')];
 const VINES = [hex('#4a6a34'), hex('#5a7a3c'), hex('#3e5a2c')];
 
-const SUN_DISC: [number, number, number] = [0, 0.035, 1];
+// setting off to the side, well out of the line the fight looks along (it used to set
+// straight behind the gate, in your eyes)
+const SUN_DISC: [number, number, number] = [-0.86, 0.1, 0.5];
 
 /** Beams under the span, rope rails between the posts, and a broken end hanging into the void. */
 function bridgeFrame(): THREE.Group {
@@ -75,12 +77,14 @@ function bridgeFrame(): THREE.Group {
 export const bridgeRecipe: MapRecipe = {
   propStyle: 'moss',
   look: {
-    sky: { zenith: '#232460', horizon: '#ff9a62', band: '#d85a86', bandAmount: 0.85, below: '#4a3266', glow: 1.3, discSize: 0.045 },
-    light: { dir: [-0.15, 0.32, 1], color: '#ffae6a', intensity: 2.8 },
+    sky: { zenith: '#232460', horizon: '#ff9a62', band: '#d85a86', bandAmount: 0.85, below: '#4a3266', glow: 0.9, discSize: 0.04 },
+    // the sun high and off to the side, out of the line between the fighters (it used to sit
+    // low behind the gate, straight in your eyes)
+    light: { dir: [-0.86, 0.6, 0.5], color: '#ffae6a', intensity: 2.8 },
     disc: SUN_DISC,
     hemi: { sky: '#8c86d8', ground: '#5a3c5a', intensity: 1.4 },
-    fog: { color: '#c8889a', sun: '#ffbe7a', density: 0.0022, falloff: 0.01, base: -10, glow: 5 },
-    grade: { exposure: 1.04, contrast: 1.08, saturation: 1.1, gain: '#fff6ee', lift: '#1a1438', rays: 0.9, rayColor: '#ffc88a', bloom: 0.6 },
+    fog: { color: '#c8889a', sun: '#ffbe7a', density: 0.0022, falloff: 0.01, base: -10, glow: 2.5 },
+    grade: { exposure: 1.04, contrast: 1.08, saturation: 1.1, gain: '#fff6ee', lift: '#1a1438', rays: 0.3, rayColor: '#ffc88a', bloom: 0.45 },
     wind: { dir: [-1, 0.25], strength: 1.1, gust: 0.8 },
     rim: { color: '#ffc890', strength: 0.85 },
     clouds: [
