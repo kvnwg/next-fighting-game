@@ -264,7 +264,8 @@ class AudioEngine {
    * scrape, the Monk's breath and the stomps have (layered) recordings of their own.
    */
   entrance(char: CharacterId, name: Sfx, volume = 1): void {
-    const swing = char === 'reaper' ? 'reaper_swing' : char === 'duelist' ? 'duelist_swing' : char === 'lancer' ? 'lancer_swing' : 'ronin_swing';
+    // the Wraith's entrance keeps his old dark whoosh
+    const swing = char === 'reaper' ? 'reaper_swing' : char === 'duelist' ? 'duelist_swing' : char === 'lancer' ? 'lancer_swing' : char === 'juggernaut' ? 'juggernaut_swing' : 'ronin_swing';
     const shine = char === 'paladin' ? 'paladin_shimmer' : char === 'monk' ? 'monk_glitter' : null;
     const INTRO: Partial<Record<Sfx, [string | string[] | null, number, number?]>> = {
       whoosh: [swing, 1.2],

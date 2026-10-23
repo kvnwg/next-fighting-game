@@ -484,10 +484,12 @@ export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void
   // one clang for everyone: a take of the recorded clash, or the synthesised one (clang.ts) until
   // the recordings have decoded. Back-to-back deflects climb a little in pitch and level.
   void a;
-  // the Knight's deflect is his own: a single-handed sword hit, not the shared clang
+  // the Knight's deflect is his own: a sword hit ringing off his shield, not the shared clang
   const shield = d.id === 'paladin' ? sampleFor(o.ctx, 'paladin_parry') : null;
   if (shield) {
     playSample(o, shield, sampleGain('paladin_parry') * (s.heavy ? 1.15 : 1), jit(1, 0.04));
+    const ring = sampleFor(o.ctx, 'paladin_shield');
+    if (ring) playSample(o, ring, sampleGain('paladin_shield') * (s.heavy ? 1.15 : 1), jit(1, 0.04));
     // and a breath of the holy light off the shield
     const holy = sampleFor(o.ctx, 'paladin_holy');
     if (holy) playSample(o, holy, sampleGain('paladin_holy') * 0.4, jit(1.1, 0.03), 0.02, 0.5);
@@ -516,9 +518,8 @@ interface SampleSet {
   /** more heavy-swing layers stacked on top: one of `heavyExtra` (picked at random), and `heavyShimmer` */
   heavyExtra?: string[];
   heavyShimmer?: string;
-  /** the swing takes' level and how far into them to start (where the whoosh has built) */
+  /** the swing takes' level */
   swingGain?: number;
-  swingOffset?: number;
   swingLayer?: string;
   heavySwingLayer?: string;
   hit?: string[];
@@ -535,15 +536,16 @@ const SAMPLE_SETS: Record<string, SampleSet> = {
   // the katana's swooshes (weightier) with a holy glow on heavies; every cut lands with a radiant impact
   // heavies stack the glow, a dark or a fiery whoosh and the holy shimmer; hits ring out pure
   paladin: { swing: ['ronin_swing'], swingGain: 1.5, heavySwingLayer: 'paladin_glow', heavyExtra: ['paladin_darkwhoosh', 'paladin_firewhoosh'], heavyShimmer: 'paladin_shimmer', hitGain: 0.75, hitLayer: 'paladin_impact', heavyHitLayer: 'paladin_shimmer' },
-  // dark whooshes for the sickle
-  reaper: { swing: ['reaper_swing'], swingOffset: 0.06, hitGain: 0.78 },
-  shade: { hitGain: 0.78 },
-  // a hammer lands harder than a sword
-  juggernaut: { hitGain: 1.4 },
-  // the Monk keeps his own (synthesised) sounds, with crystal glitter on his heavies
-  monk: { heavySwingLayer: 'monk_glitter' },
+  // the scythe: cloth and metal swooshes, an axe's swing, a heavy sword's slow one
+  reaper: { swing: ['reaper_scythe'], hitGain: 0.78 },
+  // knife shings, slicing the air
+  shade: { swing: ['shade_swing'], hitGain: 0.78 },
+  // deep, heavy hammer whooshes; and a hammer lands harder than a sword
+  juggernaut: { swing: ['juggernaut_swing'], hitGain: 1.4 },
+  // dry punch whooshes (crystal glitter on his heavies), and crisp punches landing
+  monk: { swing: ['monk_swing'], heavySwingLayer: 'monk_glitter', hit: ['monk_punch'] },
 };
-/** Every fighter's hit (bar the Monk's), unless their set names their own: the Ronin's brutal bloody slash. */
+/** Every fighter's hit, unless their set names their own: the Ronin's brutal bloody slash (or one of its takes). */
 const DEFAULT_HIT = ['ronin_hit'];
 
 function recordedSwing(o: Out, p: Profile, s: SwingOpts): boolean {
@@ -574,19 +576,24 @@ function recordedSwing(o: Out, p: Profile, s: SwingOpts): boolean {
   const rec = sampleFor(o.ctx, take);
   if (!rec) return false;
   const thrust = s.anim === 'thrust' || s.anim === 'charge';
-  playSample(o, rec, sampleGain(take) * (set.swingGain ?? 1) * (s.heavy ? 1.15 : 1), jit(1, 0.04) * (s.heavy ? 0.86 : thrust ? 1.08 : 1), 0, set.swingOffset ?? 0);
+  playSample(o, rec, sampleGain(take) * (set.swingGain ?? 1) * (s.heavy ? 1.15 : 1), jit(1, 0.04) * (s.heavy ? 0.86 : thrust ? 1.08 : 1));
   const layer = set.swingLayer && sampleFor(o.ctx, set.swingLayer);
   if (layer) playSample(o, layer, sampleGain(set.swingLayer!) * (s.heavy ? 1.3 : 1), jit(1, 0.06), 0.02);
   return true;
 }
 
 function recordedHit(o: Out, a: Profile, s: HitOpts): boolean {
-  // the Monk (who has a set, but no hit in it) keeps his; everyone else cuts with their own
-  // takes or the default slice. A shield bash is no cut: it keeps its synthesised thud
+  // a shield bash is no cut: it lands with the shield's own clang (any other bash keeps its
+  // synthesised thud)
+  if (s.anim === 'bash') {
+    const bash = a.guard === 'shield' ? sampleFor(o.ctx, 'paladin_bash') : null;
+    if (!bash) return false;
+    playSample(o, bash, sampleGain('paladin_bash') * (s.heavy ? 1.2 : 1), jit(1, 0.04) * (s.heavy ? 0.9 : 1), 0, 0.04);
+    return true;
+  }
+  // everyone else cuts with their own takes or the default slice, and the Monk punches with his
   const set = SAMPLE_SETS[a.id] ?? {};
-  const pool = set.hit ?? (a.id === 'monk' ? null : DEFAULT_HIT);
-  if (!pool || s.anim === 'bash') return false;
-  const take = pick(pool);
+  const take = pick(set.hit ?? DEFAULT_HIT);
   const rec = sampleFor(o.ctx, take);
   if (!rec) return false;
   const h = (s.heavy ? 1.2 : 1) * (s.armor ? 0.75 : 1) * (s.backstab ? 1.1 : 1);
@@ -608,8 +615,11 @@ const SAMPLE_GAIN: Record<string, number> = {
   // screen's whoosh sits 4 dB under its shing and the Wraith's scrape is level with the unsheathe;
   // the entrance stomp keeps the level of the Knight's deflect it replaces
   ui_click: 0.1, match_found: 0.16, countdown: 0.18, start_screech: 0.91, start_confirm: 0.91, victory_fanfare: 0.15, victory_piano: 0.15, defeat: 0.15, blade_draw: 0.39, blade_shing: 0.44, heavy_whoosh: 0.44, glass_tink: 0.72, riser_chime: 1.57, juggernaut_slam: 1.32, juggernaut_thud: 1.32, juggernaut_boom: 0.5, juggernaut_rubble: 0.5, ronin_taiko: 0.75, ronin_flute: 0.75, ronin_wind_howl: 0.2, ronin_wind_sweep: 0.2, monk_breath: 0.52, reaper_scrape: 0.18, reaper_groan: 0.18, entrance_stomp: 0.32,
-  // the Knight's deflect, at the level of the shield thud it replaces
-  paladin_parry: 0.24,
+  // the Knight's deflect (the sword hit and the shield ring together), at the level of the shield thud
+  // it replaced; his shield bash; the Warden's step (at the level of the gravel step he had); and the
+  // swings and the Monk's punches, each pool matched to the swing or hit it replaces (the Wraith's to
+  // his old recorded swing)
+  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
@@ -866,6 +876,12 @@ const FEET_GAIN: Record<Profile['feet'], number> = { heavyPlate: 0.8, plate: 1.1
 /** One footfall: the body's weight, the sole, the gear on them, and the floor under them. */
 export function footstep(o: Out, p: Profile, s: { speed: number; floor: Floor }): void {
   const run = clamp(s.speed / 5, 0.4, 1.3);
+  // the Warden's own heavy, debris-scattering step, on any floor (muffled on earth)
+  const own = p.id === 'juggernaut' ? sampleFor(o.ctx, 'juggernaut_step') : null;
+  if (own) {
+    playSample(s.floor === 'earth' ? filtered(o, 'lowpass', 2600) : o, own, sampleGain('juggernaut_step') * run * (s.floor === 'earth' ? 0.9 : 1), jit(1, 0.06));
+    return;
+  }
   // a recorded step for the floor, if there is one: gravel on stone (and, softer, on earth),
   // a crunch on snow and ice; a heavier body lands lower and harder
   const take = s.floor === 'snow' ? 'step_snow' : s.floor === 'stone' || s.floor === 'earth' ? 'step_stone' : null;
