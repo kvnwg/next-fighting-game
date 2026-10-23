@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { AttackKey, CHARACTERS, CharacterId, executeSpacing, getAttack, isHeavyKey } from '../shared/characters';
 import { COMBAT, MATCH, PLAYER_RADIUS } from '../shared/config';
-import { MAPS, LOBBY_MAP, MapDef, inSafeZone } from '../shared/maps';
+import { MAPS, LOBBY_MAP, MapDef, hazardAt, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RingView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
@@ -434,6 +434,7 @@ class App {
       return;
     }
     const f = new ClientFighter(r, r.id === this.myId, this.scene);
+    f.lavaAt = (x, z) => !!hazardAt(this.map, x, z);
     this.fighters.set(r.id, f);
   }
 

@@ -7,6 +7,7 @@ import { AttackDef, CHARACTERS, CharacterId, getAttack, isHeavyKey } from '../sh
 import { INTERP_DELAY_MS } from '../shared/config';
 import { Fighter, FighterState } from '../shared/fighter';
 import { angleDiff, forward } from '../shared/math';
+import { LAVA_SURFACE } from '../shared/maps';
 import { FighterSnap, RosterEntry } from '../shared/protocol';
 import type { DodgeKind } from './render/anim/animator';
 import type { FxAnchor, FxCue } from './render/anim/author';
@@ -110,6 +111,10 @@ export class ClientFighter {
   private freezeTotal = 1;
   private lagMs = 0;
   private lagKey = '';
+
+  /** Whether (x, z) is in a lava pool (set by the app for the current map). */
+  lavaAt: ((x: number, z: number) => boolean) | null = null;
+  private wade = 0;
 
   constructor(
     roster: RosterEntry,
@@ -331,6 +336,10 @@ export class ClientFighter {
     } else if (ent && serverNow >= ent.start + ent.dur) this.entrance = null;
     const waiting = !!ent && serverNow < ent.start;
     this.model.root.position.copy(this.pos);
+    // into a lava pool: sunk to the shins, until the burn throws them out
+    const wade = this.pos.y < 0.25 && this.lavaAt?.(this.pos.x, this.pos.z) ? LAVA_SURFACE - 0.14 : 0;
+    this.wade += (wade - this.wade) * (1 - Math.exp(-dt * 14));
+    this.model.root.position.y += this.wade;
     // the body turns smoothly (~40 ms) even when the facing jumps (an attack aimed at the target)
     if (!this.visInit) {
       this.visYaw = this.yaw;

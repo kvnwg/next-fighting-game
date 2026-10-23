@@ -35,6 +35,8 @@ interface PendingHit {
 const MOVE_BURST = 3;
 /** Highest a jump or vault can legitimately take you. */
 const MAX_AIR_HEIGHT = 1.8;
+/** A lava burn at most this often (ms), however long you stay in or keep landing back in it. */
+const LAVA_BURN_EVERY = 500;
 
 let instanceCounter = 0;
 
@@ -576,7 +578,7 @@ export abstract class Instance {
     });
   }
 
-  protected environment(now: number, dt: number): void {
+  protected environment(now: number, _dt: number): void {
     for (const f of this.fighters.values()) {
       if (!f.isAlive()) continue;
       if (f.y < FALL_DEATH_Y) {
@@ -585,14 +587,25 @@ export abstract class Instance {
       }
       if (f.y < 0.2 && this.map.hazards.length) {
         const h = hazardAt(this.map, f.x, f.z);
-        if (h && this.environmentHurts(f)) {
-          f.hp -= h.dps * dt;
+        // a burn, and thrown back out onto the stone; it burns again only if you're still in it
+        if (h && this.environmentHurts(f) && now - f.lastHazardFx > LAVA_BURN_EVERY) {
+          f.lastHazardFx = now;
+          f.hp -= h.burn;
           f.lastDamageAt = now;
-          if (now - f.lastHazardFx > 400) {
-            f.lastHazardFx = now;
-            this.fx.push({ k: 'lava', d: f.id, x: f.x, y: f.y + 0.3, z: f.z, dmg: Math.round(h.dps * 0.4) });
+          this.fx.push({ k: 'lava', d: f.id, x: f.x, y: f.y + 0.3, z: f.z, dmg: h.burn });
+          if (f.hp <= 0) {
+            this.killByEnvironment(f, 'lava', now);
+            continue;
           }
-          if (f.hp <= 0) this.killByEnvironment(f, 'lava', now);
+          if (h.shape.type === 'circle') {
+            const s = h.shape;
+            const dx = f.x - s.x;
+            const dz = f.z - s.z;
+            const d = Math.hypot(dx, dz);
+            const a = d > 0.05 ? Math.atan2(dx, dz) : Math.random() * Math.PI * 2;
+            const out = s.r + 0.9;
+            this.shove(f, s.x + Math.sin(a) * out - f.x, s.z + Math.cos(a) * out - f.z);
+          }
         }
       }
     }

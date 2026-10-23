@@ -45,9 +45,15 @@ export interface Prop {
 export interface Hazard {
   type: 'lava';
   shape: Shape;
-  /** Damage per second while standing in it. */
-  dps: number;
+  /**
+   * Damage each time it catches you. A touch burns once and throws you back out onto the stone:
+   * it takes being knocked in again and again to die in it.
+   */
+  burn: number;
 }
+
+/** How far below the floor a lava pool's surface lies (fighters wade in that deep). */
+export const LAVA_SURFACE = -0.34;
 
 export type Weather = 'petals' | 'snow' | 'embers' | 'rain' | 'fireflies' | 'leaves' | 'pollen';
 export type GroundTex = 'grass' | 'stone' | 'snow' | 'obsidian' | 'planks' | 'moss' | 'tiles' | 'sand' | 'path';
@@ -432,10 +438,10 @@ const forge: MapDef = {
   ],
   decals: [{ shape: { type: 'rect', x: 0, z: 0, hw: 3, hd: 15 }, tex: 'stone' }],
   hazards: [
-    { type: 'lava', shape: { type: 'circle', x: 10.5, z: 10.5, r: 3.4 }, dps: 44 },
-    { type: 'lava', shape: { type: 'circle', x: -10.5, z: 10.5, r: 3.4 }, dps: 44 },
-    { type: 'lava', shape: { type: 'circle', x: 10.5, z: -10.5, r: 3.4 }, dps: 44 },
-    { type: 'lava', shape: { type: 'circle', x: -10.5, z: -10.5, r: 3.4 }, dps: 44 },
+    { type: 'lava', shape: { type: 'circle', x: 10.5, z: 10.5, r: 3.4 }, burn: 16 },
+    { type: 'lava', shape: { type: 'circle', x: -10.5, z: 10.5, r: 3.4 }, burn: 16 },
+    { type: 'lava', shape: { type: 'circle', x: 10.5, z: -10.5, r: 3.4 }, burn: 16 },
+    { type: 'lava', shape: { type: 'circle', x: -10.5, z: -10.5, r: 3.4 }, burn: 16 },
   ],
   theme: {
     skyTop: '#1a0a08',

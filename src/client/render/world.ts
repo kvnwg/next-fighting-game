@@ -4,7 +4,7 @@
  * gameplay props as voxel models, grass, ambient particles, water and lava.
  */
 import * as THREE from 'three';
-import { MapDef, PropKind, Shape } from '../../shared/maps';
+import { LAVA_SURFACE, MapDef, PropKind, Shape } from '../../shared/maps';
 import { LeaderboardEntry } from '../../shared/protocol';
 import { rankOf } from '../../shared/ranks';
 import { G } from './gfx/globals';
@@ -16,7 +16,8 @@ import { CloudLayer, Sky } from './gfx/sky';
 import { buildTrees, TreeKind, TreePlacement } from './gfx/trees';
 import { propParts, propVariants, sceneryParts, SceneryKind } from './gfx/voxprops';
 import { Water } from './gfx/water';
-import { glowMaterial, worldMaterial } from './maps/kit';
+import { glowMaterial, mixHex, worldMaterial } from './maps/kit';
+import { VoxelVolume, hex, meshVoxels } from './gfx/voxel';
 import { BuildContext, Look, MapRecipe, PropPlacement } from './maps/look';
 import { RECIPES } from './maps/recipes';
 import { DETAIL_LAYER, FX_LAYER, GameRenderer, defaultGrade } from './renderer';
@@ -63,14 +64,19 @@ void main() {
   vec2 cell = floor(vWorldPos.xz / 0.25);
   float t = uTime;
   float n = noise(cell * 0.18 + vec2(t * 0.22, t * 0.15)) * 0.6 + noise(cell * 0.45 - vec2(t * 0.3, -t * 0.2)) * 0.4;
-  vec3 crust = vec3(0.09, 0.025, 0.02);
-  vec3 hot = vec3(5.0, 1.2, 0.18);
-  vec3 c = mix(crust, hot, smoothstep(0.38, 0.7, n));
+  // mostly a dark cooling crust with hot veins, so the pool reads as a pit of lava and the
+  // bubbles bursting out of it show
+  vec3 crust = vec3(0.12, 0.03, 0.02);
+  vec3 hot = vec3(4.2, 0.95, 0.14);
+  vec3 c = mix(crust, hot, smoothstep(0.46, 0.76, n));
   c += vec3(3.0, 1.6, 0.4) * pow(max(n - 0.55, 0.0) * 2.2, 3.0);
   gl_FragColor = vec4(c, 1.0);
 }`;
 
 const MAX_LIGHTS = 8;
+/** a lava pit's walls: cooled rock up top, glowing where they meet the lava */
+const PIT_ROCK = [hex('#3a2c28'), hex('#2f2421')];
+const PIT_HOT = hex('#d0521c');
 const SCENERY = new Set<string>(['pagoda', 'archBridge', 'lilyPads', 'steppingStones', 'gardenRock', 'arch', 'altar', 'reeds', 'jetty', 'petalRaft']);
 const TREE_KINDS: Partial<Record<PropKind, TreeKind>> = { sakura: 'sakura', pine: 'pine', deadTree: 'deadTree', bamboo: 'bamboo', bush: 'bush' };
 /** collider-ish radius per prop kind, to keep scenery off the props */
@@ -349,11 +355,97 @@ export class MapView {
       const mat = new THREE.ShaderMaterial({ uniforms: { uTime: G.uTime }, vertexShader: LAVA_VERT, fragmentShader: LAVA_FRAG });
       const geo = shapeGeometry(h.shape);
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.y = -0.06;
+      // sunk into a pit, so it reads as a hole full of lava and not a painted floor
+      mesh.position.y = LAVA_SURFACE;
       this.group.add(mesh);
       this.disposables.push(mat);
-      if (h.shape.type === 'circle') this.lights.push({ x: h.shape.x, y: 0.8, z: h.shape.z, color: '#ff6a20', intensity: 12, distance: h.shape.r * 3.2 });
+      if (h.shape.type === 'circle') {
+        this.lights.push({ x: h.shape.x, y: 0.6, z: h.shape.z, color: '#ff6a20', intensity: 14, distance: h.shape.r * 3.4 });
+        this.lavaPit(h.shape);
+        this.lavaBubbles(h.shape);
+      }
     }
+  }
+
+  /** A pool's sides: rock going down from the floor to the lava, glowing hotter toward it. */
+  private lavaPit(s: { x: number; z: number; r: number }): void {
+    const v = 0.25;
+    const layer = 0.12;
+    const bottom = LAVA_SURFACE - 0.1;
+    const rows = Math.ceil(-bottom / layer);
+    const n = Math.ceil(((s.r + 0.5) * 2) / v);
+    const vol = new VoxelVolume(n, rows, n, [v, layer, v], [s.x - (n * v) / 2, bottom, s.z - (n * v) / 2]);
+    vol.fill({ min: [s.x - s.r - 0.5, bottom, s.z - s.r - 0.5], max: [s.x + s.r + 0.5, -0.01, s.z + s.r + 0.5] }, (px, _py, pz, x, y, z) => {
+      const d = Math.hypot(px - s.x, pz - s.z);
+      if (d < s.r - 0.14 || d > s.r + 0.3) return null;
+      const k = y / Math.max(1, rows - 1);
+      const jit = Math.abs(Math.sin(x * 12.99 + y * 7.1 + z * 78.2) * 43758.5) % 1;
+      return mixHex(PIT_HOT, PIT_ROCK[jit < 0.5 ? 0 : 1], Math.min(1, k * 1.3));
+    });
+    const m = new THREE.Mesh(meshVoxels(vol, { jitter: 0.04 }), worldMaterial());
+    m.receiveShadow = true;
+    this.group.add(m);
+  }
+
+  /** Bubbles that swell out of a pool and burst, flinging drops of lava. */
+  private lavaBubbles(s: { x: number; z: number; r: number }): void {
+    const N = Math.max(4, Math.round(s.r * 2));
+    const DROPS = 4;
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(4.2, 1.15, 0.2) });
+    const crust = new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(3.2, 0.8, 0.12) });
+    const box = new THREE.BoxGeometry(1, 1, 1);
+    const bubbles = new THREE.InstancedMesh(box, crust, N);
+    const drops = new THREE.InstancedMesh(box, mat, N * DROPS);
+    for (const im of [bubbles, drops]) {
+      im.frustumCulled = false;
+      im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      this.group.add(im);
+    }
+    this.disposables.push(mat, crust, box);
+    const spot = () => {
+      const a = Math.random() * Math.PI * 2;
+      const d = Math.sqrt(Math.random()) * (s.r - 0.5);
+      return { x: s.x + Math.sin(a) * d, z: s.z + Math.cos(a) * d };
+    };
+    const bs = Array.from({ length: N }, () => ({ ...spot(), start: Math.random() * 2, dur: 1, size: 0.2 }));
+    const ds = Array.from({ length: N * DROPS }, () => ({ x: 0, y: -9, z: 0, vx: 0, vy: 0, vz: 0, t0: -9 }));
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const p = new THREE.Vector3();
+    const sc = new THREE.Vector3();
+    this.animators.push((t) => {
+      bs.forEach((b, i) => {
+        let k = (t - b.start) / b.dur;
+        if (k >= 1) {
+          // burst: drops fly out, and the next bubble rises somewhere else a moment later
+          for (let j = 0; j < DROPS; j++) {
+            const d = ds[i * DROPS + j];
+            const a = Math.random() * Math.PI * 2;
+            const sp = 0.6 + Math.random() * 1.2;
+            Object.assign(d, { x: b.x, y: LAVA_SURFACE + b.size * 0.3, z: b.z, vx: Math.sin(a) * sp, vy: 2.2 + Math.random() * 2, vz: Math.cos(a) * sp, t0: t });
+          }
+          Object.assign(b, spot(), { start: t + Math.random() * 0.8, dur: 0.9 + Math.random() * 0.9, size: 0.16 + Math.random() * 0.24 });
+          k = 0;
+        }
+        // swells slowly, then gives way all at once
+        const g = k < 0 ? 0 : k < 0.88 ? Math.pow(k / 0.88, 0.7) : 1 - (k - 0.88) / 0.12;
+        const r = b.size * g;
+        sc.set(r * 1.4, r, r * 1.4);
+        p.set(b.x, LAVA_SURFACE + r * 0.25, b.z);
+        bubbles.setMatrixAt(i, m.compose(p, q, sc));
+      });
+      ds.forEach((d, i) => {
+        const age = t - d.t0;
+        const y = d.y + d.vy * age - 4.9 * age * age;
+        const live = age >= 0 && age < 1.2 && y > LAVA_SURFACE;
+        const r = live ? 0.07 * (1 - age / 1.2) + 0.02 : 0;
+        sc.set(r, r, r);
+        p.set(d.x + d.vx * age, live ? y : LAVA_SURFACE - 1, d.z + d.vz * age);
+        drops.setMatrixAt(i, m.compose(p, q, sc));
+      });
+      bubbles.instanceMatrix.needsUpdate = true;
+      drops.instanceMatrix.needsUpdate = true;
+    });
   }
 
   private buildSafeZone(): void {
