@@ -123,6 +123,8 @@ class AudioEngine {
     if (!this.tunes) return;
     if (bed) this.tunes.play(bed);
     else this.tunes.stop(fade);
+    // the fight's first song loads while the fighters are picked
+    if (bed === 'select') this.tunes.cue('combat');
   }
 
   /** Under an execution. */

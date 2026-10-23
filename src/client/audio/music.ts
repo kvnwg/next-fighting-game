@@ -69,93 +69,120 @@ function shuffled(n: number): number[] {
   return a;
 }
 
+/** One <audio> element and its fader. Two of them crossfade, and the idle one loads ahead. */
+interface Deck {
+  el: HTMLAudioElement;
+  gain: GainNode;
+  bed: Bed | null;
+  track: Track | null;
+}
+
 export class Music {
-  private el: HTMLAudioElement | null = null;
-  private gain: GainNode | null = null;
+  private decks: Deck[] = [];
+  /** the deck that is (or was last) sounding */
+  private on = 0;
   private bed: Bed | null = null;
-  private track: Track | null = null;
   private volume = 0.6;
   private ducked = false;
   private queue: Partial<Record<Bed, number[]>> = {};
+  /** a song already loading on the idle deck for when its bed starts */
+  private cued: { bed: Bed; track: Track } | null = null;
   /** bumped by every change, so a fade-out's pause can't land on what came after it */
   private epoch = 0;
 
   constructor(private readonly ctx: AudioContext) {}
 
-  /** The <audio> element and its route into the mix (once, on the first unlock). */
+  /** The <audio> elements and their route into the mix (once, on the first unlock). */
   attach(dest: AudioNode): void {
-    if (this.el) return;
-    const el = new Audio();
-    el.preload = 'auto';
-    el.addEventListener('ended', () => {
-      // the next song in the bed rather than the same one again
-      if (this.bed) this.load(this.bed);
-    });
-    const g = this.ctx.createGain();
-    g.gain.value = 0;
-    this.ctx.createMediaElementSource(el).connect(g).connect(dest);
-    this.el = el;
-    this.gain = g;
+    if (this.decks.length) return;
+    for (let i = 0; i < 2; i++) {
+      const el = new Audio();
+      el.preload = 'auto';
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0;
+      this.ctx.createMediaElementSource(el).connect(gain).connect(dest);
+      const d: Deck = { el, gain, bed: null, track: null };
+      // at a song's end, the next one in the bed (rather than the same one again)
+      el.addEventListener('ended', () => {
+        if (this.decks[this.on] === d && this.bed && d.bed === this.bed) this.load(d, this.bed, this.next(this.bed));
+      });
+      this.decks.push(d);
+    }
   }
 
   /**
    * Called from a user gesture: iOS only lets an element play from code once it has played from a
-   * touch, so it is started and stopped here (silently: the gain is at nothing).
+   * touch, so each is started and stopped here (silently: their faders are at nothing).
    */
   prime(): void {
-    const el = this.el;
-    if (!el || !el.paused || this.bed) return;
-    if (!el.src) el.src = SILENCE;
-    el.play().then(
-      () => {
-        if (!this.bed) el.pause();
-      },
-      () => {},
-    );
+    for (const d of this.decks) {
+      if (!d.el.paused || d.bed) continue;
+      if (!d.el.src) d.el.src = SILENCE;
+      d.el.play().then(
+        () => {
+          if (!d.bed) d.el.pause();
+        },
+        () => {},
+      );
+    }
   }
 
   setVolume(v: number): void {
     this.volume = v;
-    this.ramp(0.15);
+    this.fade(this.decks[this.on], 0.15);
   }
 
-  /** Start a bed (fading in), or keep it if it is already playing. */
+  /** Start a bed (crossfading from whatever plays), or keep it if it is already playing. */
   play(bed: Bed): void {
-    if (this.bed === bed || !this.el) return;
+    if (this.bed === bed || !this.decks.length) return;
     if (!this.tracks(bed).length) return this.stop();
-    const from = this.bed;
+    if (!this.bed) this.ducked = false;
     this.bed = bed;
-    const e = ++this.epoch;
-    const start = () => {
-      if (e !== this.epoch) return;
-      this.load(bed);
-      this.ramp(1.2, true);
-    };
-    if (!from) this.ducked = false;
-    // nothing sounding (or only the priming blip): straight in
-    if (this.el.paused || this.el.src === SILENCE) return start();
-    // out of whatever is still playing (another bed, or one fading out) quickly, then in
-    const g = this.gain!;
-    g.gain.cancelScheduledValues(this.ctx.currentTime);
-    g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.12);
-    setTimeout(start, 450);
+    this.epoch++;
+    const out = this.decks[this.on];
+    // the song loading ahead on the idle deck, or the bed's next
+    const track = this.cued?.bed === bed ? this.cued.track : this.next(bed);
+    this.cued = null;
+    let i = 1 - this.on;
+    // nothing sounding on the current deck (not even a fade-out): it can take the song itself
+    if (out.el.paused && this.decks[i].track !== track) i = this.on;
+    const d = this.decks[i];
+    if (d !== out) this.release(out, 0.25);
+    this.on = i;
+    if (d.track === track && d.el.src.endsWith(track.file)) {
+      d.bed = bed;
+      d.el.currentTime = 0;
+      d.el.play().catch(() => {});
+    } else this.load(d, bed, track);
+    this.fade(d, 1.2, true);
+  }
+
+  /** Have the next song of a bed loading on the idle deck, so it starts the moment it is wanted. */
+  cue(bed: Bed): void {
+    if (!this.decks.length || this.cued?.bed === bed || this.bed === bed || !this.tracks(bed).length) return;
+    const d = this.decks[1 - this.on];
+    // still fading out: once it has stopped
+    if (!d.el.paused) return void setTimeout(() => this.cue(bed), 1000);
+    const track = this.next(bed);
+    this.cued = { bed, track };
+    d.bed = null;
+    d.track = track;
+    d.el.src = `music/${track.file}`;
+    d.el.load();
   }
 
   /** Fade out and stop. */
   stop(fade = 2): void {
     if (!this.bed) return;
     this.bed = null;
-    const e = ++this.epoch;
-    this.ramp(fade / 3);
-    setTimeout(() => {
-      if (e === this.epoch) this.el?.pause();
-    }, fade * 1000);
+    this.epoch++;
+    this.release(this.decks[this.on], fade / 3);
   }
 
   duck(on: boolean): void {
     if (on === this.ducked) return;
     this.ducked = on;
-    this.ramp(on ? 0.12 : 0.6);
+    this.fade(this.decks[this.on], on ? 0.12 : 0.6);
   }
 
   get playing(): Bed | null {
@@ -167,26 +194,45 @@ export class Music {
     return TRACKS[bed].filter((t) => t.commercial || platform.env !== 'crazygames');
   }
 
-  private load(bed: Bed): void {
-    const el = this.el!;
+  /** The bed's next song: through all of them in a shuffled order, then a new order. */
+  private next(bed: Bed): Track {
     const list = this.tracks(bed);
     let q = this.queue[bed];
     if (!q || !q.length) q = this.queue[bed] = shuffled(list.length);
-    this.track = list[q.shift()!];
-    el.src = `music/${this.track.file}`;
-    el.currentTime = 0;
-    el.play().catch(() => {});
+    return list[q.shift()! % list.length];
   }
 
-  /** Glide the level to where it should be now (from silence when `fromZero`). */
-  private ramp(tau: number, fromZero = false): void {
-    const g = this.gain;
-    if (!g) return;
+  private load(d: Deck, bed: Bed, track: Track): void {
+    d.bed = bed;
+    d.track = track;
+    d.el.src = `music/${track.file}`;
+    d.el.currentTime = 0;
+    d.el.play().catch(() => {});
+  }
+
+  /** Fade a deck out and pause it, unless something has taken it over by then. */
+  private release(d: Deck, tau: number): void {
+    const e = this.epoch;
     const now = this.ctx.currentTime;
-    const to = this.bed ? LEVEL * BED_LEVEL[this.bed] * this.volume * (this.ducked ? DUCK : 1) : 0;
-    g.gain.cancelScheduledValues(now);
-    if (fromZero) g.gain.setValueAtTime(0, now);
-    else g.gain.setValueAtTime(g.gain.value, now);
-    g.gain.setTargetAtTime(to, now, tau);
+    d.gain.gain.cancelScheduledValues(now);
+    d.gain.gain.setValueAtTime(d.gain.gain.value, now);
+    d.gain.gain.setTargetAtTime(0, now, tau);
+    d.bed = null;
+    setTimeout(
+      () => {
+        if (e === this.epoch || this.decks[this.on] !== d) d.el.pause();
+      },
+      tau * 3000 + 100,
+    );
+  }
+
+  /** Glide a deck to where its level should be now (from silence when `fromZero`). */
+  private fade(d: Deck | undefined, tau: number, fromZero = false): void {
+    if (!d) return;
+    const now = this.ctx.currentTime;
+    const to = this.bed && d.bed === this.bed ? LEVEL * BED_LEVEL[this.bed] * this.volume * (this.ducked ? DUCK : 1) : 0;
+    d.gain.gain.cancelScheduledValues(now);
+    d.gain.gain.setValueAtTime(fromZero ? 0 : d.gain.gain.value, now);
+    d.gain.gain.setTargetAtTime(to, now, tau);
   }
 }
