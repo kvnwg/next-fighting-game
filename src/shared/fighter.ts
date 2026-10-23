@@ -740,6 +740,8 @@ export class Fighter {
       case 'broken':
         if (e >= this.stateDur) {
           this.posture = this.maxPosture * COMBAT.brokenRecoverPosture;
+          // the wait before it refills starts now, not from the blow that broke them
+          this.lastPostureDamageAt = now;
           this.toNeutral(now);
         }
         break;
