@@ -140,10 +140,13 @@ export const CARRY: Partial<Record<WeaponKind, Carry>> = {
     bend: 0.05,
   },
   // Warden: the hammer slung up on his right shoulder in one fist, its head riding behind him; the
-  // left arm hangs out from his bulk and swings big against the legs; head down, glowering
+  // left arm hangs out from his bulk and swings big against the legs; head down, glowering. His
+  // breastplate fills torso space out to about x ±0.32 and z 0.22 at the shoulders (in these
+  // reference units), so the fist is held out in front of the right shoulder, past the plate's
+  // corner, with the elbow down at his side: any closer in and the forearm sinks into his chest
   greathammer: {
     body: { lean: 0.16, twist: 0, hipTwist: 0, side: 0, headPitch: 0.06 },
-    main: X([-0.24, 0.48, 0.2], [-0.06, 0.36, -0.93], [0, 1, 0.36], 'x'),
+    main: X([-0.36, 0.4, 0.31], [-0.04, 0.5, -0.87], [0, 0.87, 0.5], 'x'),
     free: [0.44, 0.06, 0.05],
     swingR: 0.03,
     swingL: 0.36,
