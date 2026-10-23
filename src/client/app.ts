@@ -715,6 +715,29 @@ class App {
         // knocked the way the blade went: + travels toward the defender's left
         if (d) d.model.react('hit', { side: Math.max(-1, Math.min(1, swing.x * Math.cos(d.yaw) - swing.z * Math.sin(d.yaw))), heavy });
         if (meA) this.cam.shake(heavy ? 0.2 : 0.13, heavy ? 0.24 : 0.16);
+        // the attacker's signature on the blow
+        if (a && d) {
+          const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.15 * d.model.scale, d.pos.z);
+          switch (a.roster.char) {
+            case 'lancer':
+              // lightning crawling over them
+              for (let i = 0; i < (heavy ? 6 : 3); i++) {
+                const off = () => new THREE.Vector3((Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 0.9).multiplyScalar(d.model.scale);
+                this.effects.arc(chest.clone().add(off()), chest.clone().add(off()), '#8fd0ff', 5, 0.12, 0.1 + Math.random() * 0.08);
+              }
+              this.effects.burst(pos, { count: heavy ? 22 : 12, color: ['#bfe6ff', '#ffffff', '#6fb8ff'], speed: 7, life: 0.3, size: 0.035, gravity: 0, drag: 4, stretch: 0.08 });
+              break;
+            case 'paladin':
+              // a burst of holy light
+              this.effects.flash(pos, '#fff0b0', heavy ? 1.6 : 1.1, 0.18);
+              this.effects.burst(pos, { count: heavy ? 26 : 14, color: ['#ffe08a', '#fff6d0', '#ffffff'], speed: 4, up: 1.5, life: 0.7, size: 0.035, gravity: -0.6, drag: 2 });
+              break;
+            case 'ronin':
+              // smoke bursting off the cut
+              this.effects.burst(pos, { count: heavy ? 14 : 8, color: ['#f4f4f6', '#d6d8dd', '#b8bbc3'], speed: 1.6, up: 0.6, life: 1.1, size: 0.07, gravity: -0.2, drag: 2, grow: 3 });
+              break;
+          }
+        }
         break;
       case 'deathblow':
         // the execution begins: the strike that caught them broken locks the pair in
@@ -838,6 +861,76 @@ class App {
         color(),
         f.model.swingMain ? { ...opts, life: aura.life * 0.6 } : opts,
       );
+    }
+  }
+
+  /** Per-fighter signature particles: the Lancer's lightning, the Ronin's smoke trail, the Knight's holy light. */
+  private sigState = new Map<string, { arc: number; step: string | null; dodge: number }>();
+
+  private signatureFx(f: ClientFighter, dt: number): void {
+    if (dt <= 0 || !f.model.root.visible) return;
+    if (f.pos.distanceToSquared(this.renderer.camera.position) > 40 * 40) return;
+    let st = this.sigState.get(f.id);
+    if (!st) this.sigState.set(f.id, (st = { arc: 0, step: null, dodge: -1 }));
+    const fx = this.effects;
+    const k = f.model.scale;
+    const swing = f.model.swingMain;
+    const base = this.tmp2;
+    const tip = this.tmp3;
+    f.model.weaponTips(base, tip);
+    const along = (t: number, out = new THREE.Vector3()) => out.copy(base).lerp(tip, t);
+    const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+    // everyone: a puff of dust as a foot lands, and as a dodge kicks off
+    const ff = f.model.frame?.footfall ?? null;
+    if (ff && ff !== st.step && !f.airborne) fx.dust(this.tmp.set(f.pos.x, f.pos.y + 0.05, f.pos.z), 0.35 * k);
+    st.step = ff;
+    const v = f.view(this.net.serverNow());
+    if (v.state === 'dodge' && st.dodge !== v.serial) {
+      st.dodge = v.serial;
+      fx.dust(this.tmp.set(f.pos.x, f.pos.y + 0.05, f.pos.z), 0.9 * k);
+    }
+    switch (f.roster.char) {
+      case 'lancer': {
+        // sparks crawling up the spear, and arcs jumping along it now and then (all the time as it swings)
+        const sparks = Math.round((swing ? 70 : 16) * dt + Math.random());
+        for (let i = 0; i < sparks; i++) {
+          const p = along(rnd(0.15, 1));
+          fx.emit(p.x, p.y, p.z, rnd(-1, 1), rnd(-0.5, 1.5), rnd(-1, 1), Math.random() < 0.5 ? '#bfe6ff' : '#ffffff', { life: 0.16, size: 0.028, gravity: 0, drag: 6, stretch: 0.04 });
+        }
+        st.arc -= dt;
+        if (st.arc <= 0) {
+          st.arc = swing ? 0.04 : rnd(0.25, 0.8);
+          const a = along(rnd(0.1, 0.5));
+          const b = along(rnd(0.6, 1)).add(new THREE.Vector3(rnd(-0.3, 0.3), rnd(-0.2, 0.35), rnd(-0.3, 0.3)).multiplyScalar(k));
+          fx.arc(a, b, '#8fd0ff', 5, 0.12 * k, swing ? 0.07 : 0.09);
+        }
+        break;
+      }
+      case 'ronin': {
+        // the cut leaves a ribbon of smoke along the blade's path, drifting and spreading as it hangs
+        if (swing) {
+          for (let i = 0; i < Math.round(110 * dt + Math.random()); i++) {
+            const p = along(rnd(0.25, 1));
+            const c = ['#f4f4f6', '#dcdde2', '#c4c6cd', '#a9acb5'][Math.floor(Math.random() * 4)];
+            fx.emit(p.x, p.y, p.z, rnd(-0.15, 0.15), rnd(0.05, 0.3), rnd(-0.15, 0.15), c, { life: rnd(0.9, 1.4), size: 0.06 * k, gravity: -0.12, drag: 1.6, grow: 3.4 });
+          }
+        }
+        break;
+      }
+      case 'paladin': {
+        // motes of holy light drifting up around him, and the blade glittering (far more as it swings)
+        if (Math.random() < 10 * dt) {
+          const ang = Math.random() * Math.PI * 2;
+          const r = rnd(0.3, 0.75) * k;
+          fx.emit(f.pos.x + Math.cos(ang) * r, f.pos.y + rnd(0.1, 1.9) * k, f.pos.z + Math.sin(ang) * r, 0, rnd(0.25, 0.55), 0, Math.random() < 0.5 ? '#ffe08a' : '#fff6d0', { life: rnd(1.2, 2), size: 0.03, gravity: -0.15, drag: 0.6 });
+        }
+        const glints = Math.round((swing ? 80 : 7) * dt + Math.random() * (swing ? 1 : 0.3));
+        for (let i = 0; i < glints; i++) {
+          const p = along(rnd(0.1, 1));
+          fx.emit(p.x, p.y, p.z, rnd(-0.3, 0.3), rnd(0, 0.6), rnd(-0.3, 0.3), Math.random() < 0.6 ? '#fff2b0' : '#ffd86a', { life: swing ? rnd(0.4, 0.7) : 0.35, size: 0.032, gravity: -0.3, drag: 3 });
+        }
+        break;
+      }
     }
   }
 
@@ -1098,6 +1191,7 @@ class App {
       this.stateCues(f, now);
       this.moveFx(f);
       this.auraFx(f, dt);
+      this.signatureFx(f, dt);
     }
 
     // grass parts around the fighters nearest the camera

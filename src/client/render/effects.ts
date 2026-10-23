@@ -464,6 +464,26 @@ export class Effects {
     }
   }
 
+  /**
+   * A jagged electric arc from a to b: kinked segments with a white core inside a blue glow,
+   * flickering out in a few frames.
+   */
+  arc(a: THREE.Vector3, b: THREE.Vector3, color = '#8fd0ff', kinks = 5, jitter = 0.14, life = 0.08, width = 0.025): void {
+    const pts = [a.clone()];
+    for (let i = 1; i < kinks; i++) {
+      const p = a.clone().lerp(b, i / kinks);
+      p.x += (Math.random() - 0.5) * 2 * jitter;
+      p.y += (Math.random() - 0.5) * 2 * jitter;
+      p.z += (Math.random() - 0.5) * 2 * jitter;
+      pts.push(p);
+    }
+    pts.push(b.clone());
+    for (let i = 0; i < pts.length - 1; i++) {
+      this.beam(pts[i], pts[i + 1], color, width * 2.4, life);
+      this.beam(pts[i], pts[i + 1], '#ffffff', width * 0.7, life * 0.8);
+    }
+  }
+
   /** A shatter: white and red shards flung out in every direction. */
   shatter(pos: THREE.Vector3, scale = 1): void {
     for (let i = 0; i < 46 * scale; i++) {

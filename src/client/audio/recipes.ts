@@ -488,6 +488,9 @@ export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void
   const shield = d.id === 'paladin' ? sampleFor(o.ctx, 'paladin_deflect') : null;
   if (shield) {
     playSample(o, shield, sampleGain('paladin_deflect') * (s.heavy ? 1.15 : 1), jit(1, 0.04));
+    // and a breath of the holy light off the shield
+    const holy = sampleFor(o.ctx, 'paladin_holy');
+    if (holy) playSample(o, holy, sampleGain('paladin_holy') * 0.4, jit(1.1, 0.03), 0.02, 0.5);
     return;
   }
   const buf = sampleFor(o.ctx, 'deflect');
@@ -531,8 +534,8 @@ const SAMPLE_SETS: Record<string, SampleSet> = {
   shade: { hitGain: 0.78 },
   // a hammer lands harder than a sword
   juggernaut: { hitGain: 1.4 },
-  // the Monk keeps his own (synthesised) sounds
-  monk: {},
+  // the Monk keeps his own (synthesised) sounds, with crystal glitter on his heavies
+  monk: { heavySwingLayer: 'monk_glitter' },
 };
 /** Every fighter's hit (bar the Monk's), unless their set names their own: the Ronin's brutal bloody slash. */
 const DEFAULT_HIT = ['ronin_hit'];
@@ -548,7 +551,12 @@ function recordedSwing(o: Out, p: Profile, s: SwingOpts): boolean {
     }
   }
   const set = SAMPLE_SETS[p.id];
-  if (!set?.swing) return false;
+  if (!set) return false;
+  // the heavy layer swells a beat ahead, so start it part way in (it plays over a synthesised
+  // swing too, for a fighter with no recorded swing of their own)
+  const heavy = s.heavy && set.heavySwingLayer ? sampleFor(o.ctx, set.heavySwingLayer) : null;
+  if (heavy) playSample(o, heavy, sampleGain(set.heavySwingLayer!), jit(1, 0.04), 0, 0.14);
+  if (!set.swing) return false;
   const take = pick(set.swing);
   const rec = sampleFor(o.ctx, take);
   if (!rec) return false;
@@ -556,9 +564,6 @@ function recordedSwing(o: Out, p: Profile, s: SwingOpts): boolean {
   playSample(o, rec, sampleGain(take) * (set.swingGain ?? 1) * (s.heavy ? 1.15 : 1), jit(1, 0.04) * (s.heavy ? 0.86 : thrust ? 1.08 : 1), 0, set.swingOffset ?? 0);
   const layer = set.swingLayer && sampleFor(o.ctx, set.swingLayer);
   if (layer) playSample(o, layer, sampleGain(set.swingLayer!) * (s.heavy ? 1.3 : 1), jit(1, 0.06), 0.02);
-  // the heavy layer swells a beat ahead, so start it part way in
-  const heavy = s.heavy && set.heavySwingLayer ? sampleFor(o.ctx, set.heavySwingLayer) : null;
-  if (heavy) playSample(o, heavy, sampleGain(set.heavySwingLayer!), jit(1, 0.04), 0, 0.14);
   return true;
 }
 
@@ -582,7 +587,7 @@ function recordedHit(o: Out, a: Profile, s: HitOpts): boolean {
 }
 
 /** The other recordings' levels in the mix, each matched (by rendered loudness) to the synthesised sound it replaces. */
-const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12, lancer_spark: 0.07, lancer_bolt: 0.13, paladin_glow: 0.22, paladin_impact: 0.2, reaper_swing: 0.2, paladin_deflect: 0.52, ronin_unsheathe: 0.4 };
+const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12, lancer_spark: 0.07, lancer_bolt: 0.13, paladin_glow: 0.22, paladin_impact: 0.2, reaper_swing: 0.2, paladin_deflect: 0.52, ronin_unsheathe: 0.4, monk_glitter: 0.18, paladin_holy: 0.35 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 /** the recorded lightning strike as the Lancer's lightning cue (louder than under a hit) */
 const BOLT_CUE_GAIN = 0.3;
@@ -793,9 +798,12 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       ring(o, MAT.gong, 0.32, { decay: 1, delay: 0.01 });
       ring(o, MAT.bronze, 0.18, { decay: 1 });
       break;
-    case 'rites':
-      // the greatsword brought down, and a bell tolls for them
+    case 'rites': {
+      // the greatsword brought down, and a bell tolls for them (and the holy spell rings out)
       hit(o, a, d, { heavy: true, anim: 'overhead' });
+      const holy = sampleFor(o.ctx, 'paladin_holy');
+      if (holy) playSample(o, holy, sampleGain('paladin_holy') * 1.3, 0.95, 0, 0.45);
+    }
       ring(o, MAT.greatsword, 0.38, { decay: 1.8 });
       ring(o, MAT.bell, 0.32, { delay: 0.05 });
       noise(o, { type: 'highpass', f: 6000, dur: 1.5, gain: 0.08, a: 0.05, delay: 0.05 });
@@ -998,7 +1006,15 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
       rattle(o, { count: 10, spread: 0.15, fLo: 2200, fHi: 6000, decay: 0.05 }, { gain: 0.4, delay: 0.45, type: 'highpass', f: 1800 });
       return true;
     }
-    case 'holy':
+    case 'holy': {
+      // the recorded holy spell, if there is one
+      const holy = sampleFor(o.ctx, 'paladin_holy');
+      if (holy) {
+        playSample(o, holy, sampleGain('paladin_holy') * Math.min(1.4, k), jit(1, 0.02), 0, 0.3);
+        return true;
+      }
+    }
+    // falls through to the synthesised one
       ring(o, MAT.bell, 0.12, { pitch: 2, decay: 0.6 });
       noise(o, { type: 'highpass', f: 6000, dur: 1.2, gain: 0.08, shape: SHAPES.swing(0.2, 1.5) });
       osc(o, { f: 880, dur: 0.8, gain: 0.03, shape: SHAPES.swing(0.3, 1.5) });
