@@ -87,6 +87,18 @@ export interface SwingOpts {
  * if the blow lands, so a miss sounds like a miss: the whole whoosh carrying on through nothing.
  */
 export function swing(o0: Out, p: Profile, s: SwingOpts = {}): void {
+  // a recorded swing for this fighter, if there is one: heavies slower and lower
+  // (the Lancer swings the glaive's own whoosh or the katana's, with the spear's lightning
+  // crackling behind it)
+  const take = p.id === 'lancer' ? (chance(0.5) ? 'lancer_swing' : 'ronin_swing') : `${p.id}_swing`;
+  const rec = sampleFor(o0.ctx, take);
+  if (rec) {
+    const thrust = s.anim === 'thrust' || s.anim === 'charge';
+    playSample(o0, rec, sampleGain(take) * (s.heavy ? 1.15 : 1), jit(1, 0.04) * (s.heavy ? 0.86 : thrust ? 1.08 : 1));
+    const zap = p.lightning ? sampleFor(o0.ctx, 'lancer_zap') : null;
+    if (zap) playSample(o0, zap, sampleGain('lancer_zap') * (s.heavy ? 1.3 : 1), jit(1, 0.06), 0.02);
+    return;
+  }
   const voice = VOICES[p.id]?.swing;
   if (voice) voice(o0, p, s);
   else BASE.swing(o0, p, s);
@@ -190,6 +202,14 @@ function tell(o: Out, a: Profile, h: number): void {
 
 /** A clean hit: what the attacker's weapon does to what the defender is wearing. */
 export function hit(o: Out, a: Profile, d: Profile, s: HitOpts = {}): void {
+  // a recorded hit for this weapon, if there is one: heavies lower and harder. Started a little
+  // into the clip, where it has swelled, so it lands with the blow
+  const rec = sampleFor(o.ctx, `${a.id}_hit`);
+  if (rec) {
+    const h = (s.heavy ? 1.2 : 1) * (s.armor ? 0.75 : 1) * (s.backstab ? 1.1 : 1);
+    playSample(o, rec, sampleGain(`${a.id}_hit`) * h, jit(1, 0.04) * (s.heavy ? 0.88 : 1), 0, 0.04);
+    return;
+  }
   const voice = VOICES[a.id]?.hit;
   if (voice) voice(o, a, d, s);
   else BASE.hit(o, a, d, s);
@@ -455,6 +475,12 @@ export interface GuardOpts {
 
 /** A held block: a dull, damped clash and the weight of it. */
 export function block(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
+  // the recorded block, for everyone
+  const rec = sampleFor(o.ctx, 'block');
+  if (rec) {
+    playSample(o, rec, sampleGain('block') * (s.heavy ? 1.15 : 1), jit(1, 0.04) * (s.heavy ? 0.9 : 1));
+    return;
+  }
   const voice = VOICES[d.id]?.block;
   if (voice) voice(o, a, d, s);
   else BASE.block(o, a, d, s);
@@ -486,6 +512,9 @@ export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void
 
 /** The recorded deflect's level in the mix, matched to the synthesised one's loudness. */
 const DEFLECT_GAIN = 1.6;
+/** The other recordings' levels in the mix, each matched (by rendered loudness) to the synthesised sound it replaces. */
+const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12 };
+const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
 function deflectBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
   const st = striker(a, s.anim, !!s.heavy);

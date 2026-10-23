@@ -3,13 +3,13 @@
  * asynchronously the first time an audio context asks for them; until they are ready a recipe
  * falls back to its synthesised version.
  */
-import { DEFLECT } from './samples/data';
+import { SAMPLES } from './samples/data';
 import { Out, bump, pick } from './synth';
 
-const RAW = { deflect: DEFLECT } as const;
-export type SampleName = keyof typeof RAW;
+/** e.g. 'deflect', 'block', 'ronin_swing', 'ronin_hit' (see samples/data.ts) */
+export type SampleName = string;
 
-const decoded = new WeakMap<BaseAudioContext, Partial<Record<SampleName, AudioBuffer[]>>>();
+const decoded = new WeakMap<BaseAudioContext, Record<SampleName, AudioBuffer[]>>();
 const pending = new WeakMap<BaseAudioContext, Promise<void>>();
 
 function bytes(b64: string): ArrayBuffer {
@@ -23,11 +23,11 @@ function bytes(b64: string): ArrayBuffer {
 export function loadSamples(ctx: BaseAudioContext): Promise<void> {
   let p = pending.get(ctx);
   if (!p) {
-    const table: Partial<Record<SampleName, AudioBuffer[]>> = {};
+    const table: Record<SampleName, AudioBuffer[]> = {};
     decoded.set(ctx, table);
     p = Promise.all(
-      (Object.keys(RAW) as SampleName[]).map(async (name) => {
-        const bufs = await Promise.all(RAW[name].map((b) => ctx.decodeAudioData(bytes(b)).catch(() => null)));
+      Object.keys(SAMPLES).map(async (name) => {
+        const bufs = await Promise.all(SAMPLES[name].map((b) => ctx.decodeAudioData(bytes(b)).catch(() => null)));
         table[name] = bufs.filter((b): b is AudioBuffer => !!b);
       }),
     ).then(() => undefined);
@@ -36,15 +36,20 @@ export function loadSamples(ctx: BaseAudioContext): Promise<void> {
   return p;
 }
 
-/** One take of the named sample, if it has decoded for this context. */
+/** One take of the named sample, if there is one and it has decoded for this context. */
 export function sampleFor(ctx: BaseAudioContext, name: SampleName): AudioBuffer | null {
-  const list = decoded.get(ctx)?.[name];
-  if (!list) void loadSamples(ctx);
+  if (!SAMPLES[name]) return null;
+  const table = decoded.get(ctx);
+  if (!table) void loadSamples(ctx);
+  const list = table?.[name];
   return list && list.length ? pick(list) : null;
 }
 
-/** Play a decoded sample into `o`: at a gain, sped up or slowed by `rate` (which shifts its pitch too). */
-export function playSample(o: Out, buf: AudioBuffer, gain: number, rate = 1, delay = 0): void {
+/**
+ * Play a decoded sample into `o`: at a gain, sped up or slowed by `rate` (which shifts its pitch
+ * too), starting `offset` seconds into it.
+ */
+export function playSample(o: Out, buf: AudioBuffer, gain: number, rate = 1, delay = 0, offset = 0): void {
   const src = o.ctx.createBufferSource();
   src.buffer = buf;
   src.playbackRate.value = rate;
@@ -52,6 +57,6 @@ export function playSample(o: Out, buf: AudioBuffer, gain: number, rate = 1, del
   g.gain.value = gain;
   src.connect(g).connect(o.dest);
   const t = o.t + delay;
-  src.start(t);
-  bump(o, t + buf.duration / rate + 0.02);
+  src.start(t, offset);
+  bump(o, t + (buf.duration - offset) / rate + 0.02);
 }
