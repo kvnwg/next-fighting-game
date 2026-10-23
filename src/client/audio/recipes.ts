@@ -619,10 +619,11 @@ const SAMPLE_GAIN: Record<string, number> = {
   // it replaced; his shield bash; the Warden's step (at the level of the gravel step he had); the vanish
   // and the jump (at the roll dodge's level: the synthesised ones are near silent), the blink, the body
   // falling (matched to the synthesised fall without its weapon drop), the buff, and the lava burn (level
-  // with a blade hit landing: the synthesised burn is near silent); and the
+  // with a blade hit landing: the synthesised burn is near silent), the Warden's hammer shockwave (matched
+  // to the synthesised slam at his usual size); and the
   // swings and the Monk's punches, each pool matched to the swing or hit it replaces (the Wraith's to
   // his old recorded swing)
-  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, jump: 0.31, bodyfall: 0.57, buff_shimmer: 0.28, buff_fire: 0.28, lava_burn: 0.43, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
+  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, jump: 0.31, bodyfall: 0.57, buff_shimmer: 0.28, buff_fire: 0.28, lava_burn: 0.43, juggernaut_crash: 0.9, juggernaut_punch: 0.9, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
@@ -777,6 +778,12 @@ export function groundSlam(o: Out, scale: number, iron: boolean): void {
   if (iron) ring(o, MAT.hammer, 0.2, { decay: 1, pitch: 0.95 });
 }
 
+/** A hammer slamming the ground: the Warden's recorded crash and punch, or the synthesised slam. */
+function hammerSlam(o: Out, p: Profile, scale: number): void {
+  if (p.id === 'juggernaut' && playLayers(o, ['juggernaut_crash', 'juggernaut_punch'], Math.min(1.2, scale) / 1.2)) return;
+  groundSlam(o, scale, p.edge === 'blunt');
+}
+
 /** The execution's finishing blow: a cinematic hit, different for every weapon. */
 export function execFinish(o: Out, a: Profile, d: Profile): void {
   // the cinematic under every one: a crack, a deep drop and the air rushing out
@@ -799,7 +806,7 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       break;
     case 'crush':
       hit(o, a, d, { heavy: true, anim: 'slam' });
-      groundSlam(at(o, 0.02), 2, true);
+      hammerSlam(at(o, 0.02), a, 2);
       ring(o, MAT.hammer, 0.45, { decay: 1.6 });
       break;
     case 'pierce':
@@ -1042,7 +1049,7 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
   const k = clamp(scale, 0.3, 2.5);
   switch (kind) {
     case 'shockwave':
-      groundSlam(o, k, p.edge === 'blunt');
+      hammerSlam(o, p, k);
       return true;
     case 'stomp':
       stompLayer(o, p, Math.min(1.2, k * 0.8));
