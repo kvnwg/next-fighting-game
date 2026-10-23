@@ -57,10 +57,27 @@ function staticHandler(dir: string | undefined): http.RequestListener {
     }
     if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(root, 'index.html');
     const ext = path.extname(file);
-    res.writeHead(200, {
+    const size = fs.statSync(file).size;
+    const head = {
       'content-type': MIME[ext] ?? 'application/octet-stream',
-      'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
-    });
+      // only the build's hashed files never change; the music and the like keep their names
+      'cache-control': ext === '.html' ? 'no-cache' : url.pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+      'accept-ranges': 'bytes',
+    };
+    // a byte range (Safari won't play a song without them)
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
+    if (range && (range[1] || range[2])) {
+      const start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
+      const end = range[1] && range[2] ? Math.min(size - 1, Number(range[2])) : size - 1;
+      if (start > end || start >= size) {
+        res.writeHead(416, { 'content-range': `bytes */${size}` }).end();
+        return;
+      }
+      res.writeHead(206, { ...head, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 });
+      fs.createReadStream(file, { start, end }).pipe(res);
+      return;
+    }
+    res.writeHead(200, { ...head, 'content-length': size });
     fs.createReadStream(file).pipe(res);
   };
 }
