@@ -219,7 +219,7 @@ export const lobbyRecipe: MapRecipe = {
       tip: '#8cc152',
       dryTip: '#c9c46a',
       bloom: ['#f5d24a', '#ffffff', '#f49ac0', '#a98ee8'],
-      height: 0.6,
+      height: 0.5,
     });
     ctx.particles({ kind: 'dust', count: 360, center: new THREE.Vector3(0, 3, 0), size: new THREE.Vector3(40, 6, 40), scale: 0.025, colors: ['#fff8d8', '#fff2c0'], seed: 42 });
     ctx.particles({ kind: 'petals', count: 260, center: new THREE.Vector3(0, 6, 0), size: new THREE.Vector3(40, 12, 40), scale: 0.07, colors: ['#f7a8c6', '#fbbdd2', '#fff0f5'], seed: 43 });

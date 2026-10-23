@@ -1,13 +1,13 @@
 /**
- * A meadow of real blades: tapered, curved strips grown on the GPU around the camera, so a field
- * can be thick without a million instances on the CPU. Each blade's place is a cell of a grid
- * fixed to the world (it never swims as the camera moves); a mask texture says how thick the grass
- * grows where (none on paths and paving), how dry it is, and where flowers are. A second, coarser
- * grid of wider tufts carries the field out to the middle distance.
+ * A meadow of voxel grass: each blade a little stack of blocks, grown on the GPU around the camera
+ * so a field can be thick without a million instances on the CPU. Each blade's place is a cell of
+ * a grid fixed to the world (it never swims as the camera moves); a mask texture says how thick
+ * the grass grows where (none on paths and paving), how dry it is, and where flowers are. A second,
+ * coarser grid of chunkier blades carries the field out to the middle distance.
  *
- * Wind rolls across in waves you can watch travel (the blades bending over show their lighter
- * side), the tips flutter, blades glow when the sun is behind them, roots sit in shadow, and
- * fighters walking through push them aside.
+ * Wind rolls across in waves you can watch travel: each block of a blade shifts whole, so they bend
+ * in steps, like everything else in the world. Bent over, they show their paler side; they glow
+ * when the sun is behind them, the lower blocks sit in shade, and fighters push through them.
  */
 import * as THREE from 'three';
 import { patchMaterial } from './materials';
@@ -33,30 +33,42 @@ export interface MeadowOptions {
 
 /** Spacing (m) and reach (m) of the near and far grids, per quality tier. */
 const TIERS = {
-  low: { near: [0.26, 12], far: [0.8, 34] },
-  medium: { near: [0.18, 16], far: [0.55, 45] },
-  high: { near: [0.13, 20], far: [0.42, 58] },
-  ultra: { near: [0.1, 22], far: [0.36, 66] },
+  low: { near: [0.34, 10], far: [1.0, 28] },
+  medium: { near: [0.26, 14], far: [0.75, 40] },
+  high: { near: [0.2, 18], far: [0.6, 50] },
+  ultra: { near: [0.17, 20], far: [0.5, 56] },
 } as const;
 
-/** One blade: two columns of vertices tapering to a tip; x = side (-1, 1, 0 at the tip), y = 0..1 up it. */
+/**
+ * One blade: a stack of unit blocks (x and z -0.5..0.5, y from the block's index to the one above,
+ * so position.y counts blocks), each with its four sides and a top. aSeg is the block's index.
+ */
 function bladeGeometry(segments: number): THREE.InstancedBufferGeometry {
   const pos: number[] = [];
+  const nor: number[] = [];
+  const seg: number[] = [];
   const idx: number[] = [];
-  for (let i = 0; i < segments; i++) {
-    const t = i / segments;
-    pos.push(-1, t, 0, 1, t, 0);
+  const face = (k: number, corners: number[][], n: number[]) => {
+    const b = pos.length / 3;
+    for (const c of corners) {
+      pos.push(c[0], c[1] + k, c[2]);
+      nor.push(n[0], n[1], n[2]);
+      seg.push(k);
+    }
+    idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+  };
+  const h = 0.5;
+  for (let k = 0; k < segments; k++) {
+    face(k, [[h, 0, h], [h, 0, -h], [h, 1, -h], [h, 1, h]], [1, 0, 0]);
+    face(k, [[-h, 0, -h], [-h, 0, h], [-h, 1, h], [-h, 1, -h]], [-1, 0, 0]);
+    face(k, [[-h, 0, h], [h, 0, h], [h, 1, h], [-h, 1, h]], [0, 0, 1]);
+    face(k, [[h, 0, -h], [-h, 0, -h], [-h, 1, -h], [h, 1, -h]], [0, 0, -1]);
+    face(k, [[-h, 1, h], [h, 1, h], [h, 1, -h], [-h, 1, -h]], [0, 1, 0]);
   }
-  pos.push(0, 1, 0);
-  for (let i = 0; i < segments - 1; i++) {
-    const a = i * 2;
-    idx.push(a, a + 1, a + 3, a, a + 3, a + 2);
-  }
-  const top = (segments - 1) * 2;
-  idx.push(top, top + 1, top + 2);
   const g = new THREE.InstancedBufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('aSeg', new THREE.Float32BufferAttribute(seg, 1));
   g.setAttribute('color', new THREE.Float32BufferAttribute(pos.map(() => 1), 3));
   g.setIndex(idx);
   return g;
@@ -91,6 +103,8 @@ uniform vec4 uMeadowBox;
 uniform vec4 uMeadowGrid;
 uniform float uMeadowInner;
 uniform float uMeadowWide;
+uniform float uMeadowSegs;
+attribute float aSeg;
 uniform vec3 uBladeRoot;
 uniform vec3 uBladeTip;
 uniform vec3 uBladeDry;
@@ -133,12 +147,10 @@ vec3 bladeColor;
   // (smoothstep's edges always ascending: the other way round is undefined, and NaN on some GPUs)
   float edge = (1.0 - smoothstep(R * 0.82, R, dist)) * (uMeadowInner > 0.0 ? smoothstep(uMeadowInner * 0.78, uMeadowInner, dist) : 1.0);
   float alive = (r2.x < dens * keep ? 1.0 : 0.0) * edge;
-  float flower = step(1.0 - mask.b * 0.22, r2.y) * alive;
-  float height = (0.55 + r2.y * 0.75) * mix(0.55, 1.0, dens) * uMeadowGrid.w * alive * mix(0.4, 1.0, edge) * (1.0 + flower * 0.25);
-  float width = (0.022 + r.x * 0.02) * (1.0 + (1.0 - keep) * 1.3) * uMeadowWide;
-  float facing = r.y * 6.2832;
-  vec2 fdir = vec2(cos(facing), sin(facing));
-  vec2 side = vec2(-fdir.y, fdir.x);
+  float flower = step(1.0 - mask.b * 0.07, r2.y) * alive;
+  float height = (0.6 + r2.y * 0.7) * mix(0.55, 1.0, dens) * uMeadowGrid.w * alive * mix(0.4, 1.0, edge) * (1.0 + flower * 0.2);
+  float width = (0.07 + r.x * 0.03) * (1.0 + (1.0 - keep) * 0.8) * uMeadowWide;
+  vec2 fdir = normalize(r - 0.5 + 1e-3);
 
   // wind: long gust fronts rolling along it, a quicker ripple, and the tips' flutter
   vec2 wd = normalize(uWind.xy + 1e-4);
@@ -161,28 +173,30 @@ vec3 bladeColor;
     float k = 1.0 - smoothstep(p.w * 0.3, p.w * 1.3, d);
     off += away / max(d, 1e-3) * k * 1.4;
   }
-  float h = position.y;
-  float curve = h * (0.35 + h * 0.65);
+  // each block moves whole, by how far up the blade its middle is: the blade bends in steps
+  float n = uMeadowSegs;
+  float h = (aSeg + 0.5) / n;
+  float curve = h * h;
   // a bent blade is shorter, not longer
-  float sag = 1.0 / (1.0 + dot(off, off) * 0.45);
-  bladePos = vec3(root.x, 0.0, root.y);
-  // full width most of the way up, then narrowing to the tip
-  bladePos.xz += side * position.x * width * (1.0 - h * h * 0.9);
+  float sag = 1.0 / (1.0 + dot(off, off) * 0.35);
+  float block = height / n;
+  bladePos = vec3(root.x, position.y * block * sag, root.y);
+  // each block a little narrower than the one under it
+  bladePos.xz += position.xz * width * (1.0 - aSeg * 0.16);
   bladePos.xz += off * curve * height;
-  bladePos.y = h * height * sag;
   // no blade here: every vertex at one point under the ground, so nothing at all is drawn
   if (height <= 0.001) bladePos = vec3(root.x, -1.0, root.y);
-  // a soft normal, mostly up: the field reads as one surface, lit like a lawn
-  objectNormal = normalize(mix(vec3(fdir.x, 0.0, fdir.y), vec3(0.0, 1.0, 0.0), 0.7) + vec3(off.x, 0.0, off.y) * 0.25);
+  objectNormal = normal;
 
   vec3 tipCol = mix(uBladeTip, uBladeDry, clamp(mask.g + (r.x - 0.5) * 0.35, 0.0, 1.0));
-  bladeColor = mix(uBladeRoot, tipCol, smoothstep(0.0, 1.0, h));
+  // one colour per block, banded root to tip
+  bladeColor = mix(uBladeRoot, tipCol, h);
   bladeColor *= 0.88 + r2.y * 0.24;
   // bent over by a gust, a blade shows its paler side
   bladeColor = mix(bladeColor, bladeColor * 1.28 + vec3(0.02, 0.03, 0.0), gust * h * 0.55);
   int b = int(floor(r.x * 3.999));
   vec3 bloom = b == 0 ? uBloom[0] : b == 1 ? uBloom[1] : b == 2 ? uBloom[2] : uBloom[3];
-  bladeColor = mix(bladeColor, bloom, flower * smoothstep(0.78, 0.95, h));
+  bladeColor = mix(bladeColor, bloom, flower * step(n - 1.5, aSeg));
   vBladeH = h;
   vGust = gust;
   vColor.rgb = bladeColor;
@@ -196,9 +210,9 @@ varying float vGust;
 
 const LIGHT = /* glsl */ `
 {
-  // roots in the shade of the blades around them
-  reflectedLight.indirectDiffuse *= mix(0.55, 1.05, vBladeH);
-  reflectedLight.directDiffuse *= mix(0.7, 1.0, vBladeH);
+  // the lower blocks in the shade of the blades around them
+  reflectedLight.indirectDiffuse *= mix(0.5, 1.05, vBladeH);
+  reflectedLight.directDiffuse *= mix(0.65, 1.0, vBladeH);
   // the sun through the blades when you look toward it
   vec3 toFrag = normalize(vWorldPos - cameraPosition);
   float through = pow(max(dot(toFrag, uSunDir), 0.0), 3.0);
@@ -206,8 +220,8 @@ const LIGHT = /* glsl */ `
 }
 `;
 
-function material(o: MeadowOptions, mask: THREE.Texture, box: THREE.Vector4, grid: THREE.Vector4, inner: number, wide: number): THREE.MeshLambertMaterial {
-  const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+function material(o: MeadowOptions, mask: THREE.Texture, box: THREE.Vector4, grid: THREE.Vector4, inner: number, wide: number, segs: number): THREE.MeshLambertMaterial {
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true });
   patchMaterial(m, { see: true });
   const base = m.onBeforeCompile;
   const bloom = [0, 1, 2, 3].map((i) => new THREE.Color(o.bloom[i % o.bloom.length] ?? '#ffffff'));
@@ -219,6 +233,7 @@ function material(o: MeadowOptions, mask: THREE.Texture, box: THREE.Vector4, gri
       uMeadowGrid: { value: grid },
       uMeadowInner: { value: inner },
       uMeadowWide: { value: wide },
+      uMeadowSegs: { value: segs },
       uBladeRoot: { value: new THREE.Color(o.root) },
       uBladeTip: { value: new THREE.Color(o.tip) },
       uBladeDry: { value: new THREE.Color(o.dryTip) },
@@ -236,7 +251,7 @@ function material(o: MeadowOptions, mask: THREE.Texture, box: THREE.Vector4, gri
   return m;
 }
 
-/** The meadow: a near grid of fine blades and a far one of tufts, both following the camera. */
+/** The meadow: a near grid of blades and a far one of chunkier ones, both following the camera. */
 export function buildMeadow(o: MeadowOptions, level: keyof typeof TIERS): THREE.Group {
   const group = new THREE.Group();
   group.name = 'grass';
@@ -248,15 +263,15 @@ export function buildMeadow(o: MeadowOptions, level: keyof typeof TIERS): THREE.
   const height = o.height ?? 0.6;
   const layers: [number, number, number, number, number][] = [
     // spacing, reach, where it starts, blade width, segments
-    [tier.near[0], tier.near[1], 0, 1, 5],
-    [tier.far[0], tier.far[1], tier.near[1] * 0.85, 2.8, 3],
+    [tier.near[0], tier.near[1], 0, 1, 3],
+    [tier.far[0], tier.far[1], tier.near[1] * 0.85, 2.2, 2],
   ];
   for (const [s, reach, inner, wide, segs] of layers) {
     const G = Math.ceil((reach * 2) / s);
     const geo = bladeGeometry(segs);
     geo.instanceCount = G * G;
     const grid = new THREE.Vector4(s, G, reach, height);
-    const mesh = new THREE.Mesh(geo, material(o, mask, box, grid, inner, wide));
+    const mesh = new THREE.Mesh(geo, material(o, mask, box, grid, inner, wide, segs));
     // placed in the shader around the camera: never culled, never casting
     mesh.frustumCulled = false;
     mesh.receiveShadow = true;
