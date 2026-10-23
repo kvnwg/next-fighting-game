@@ -534,8 +534,8 @@ const SAMPLE_SETS: Record<string, SampleSet> = {
   // the Monk keeps his own (synthesised) sounds
   monk: {},
 };
-/** Every fighter's hit, unless their set names their own: a longsword slice with a ring-out. */
-const DEFAULT_HIT = ['default_hit'];
+/** Every fighter's hit (bar the Monk's), unless their set names their own: the Ronin's brutal bloody slash. */
+const DEFAULT_HIT = ['ronin_hit'];
 
 function recordedSwing(o: Out, p: Profile, s: SwingOpts): boolean {
   // the Ronin's iai: the blade drawn from the sheath into the cut (started well into the clip,
@@ -582,7 +582,7 @@ function recordedHit(o: Out, a: Profile, s: HitOpts): boolean {
 }
 
 /** The other recordings' levels in the mix, each matched (by rendered loudness) to the synthesised sound it replaces. */
-const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12, lancer_spark: 0.07, lancer_bolt: 0.13, paladin_glow: 0.22, paladin_impact: 0.2, reaper_swing: 0.2, default_hit: 0.34, paladin_deflect: 0.52, ronin_unsheathe: 0.4 };
+const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12, lancer_spark: 0.07, lancer_bolt: 0.13, paladin_glow: 0.22, paladin_impact: 0.2, reaper_swing: 0.2, paladin_deflect: 0.52, ronin_unsheathe: 0.4 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 /** the recorded lightning strike as the Lancer's lightning cue (louder than under a hit) */
 const BOLT_CUE_GAIN = 0.3;
