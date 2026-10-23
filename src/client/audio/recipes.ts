@@ -617,10 +617,10 @@ const SAMPLE_GAIN: Record<string, number> = {
   ui_click: 0.1, match_found: 0.16, countdown: 0.18, start_screech: 0.91, start_confirm: 0.91, victory_fanfare: 0.15, victory_piano: 0.15, defeat: 0.15, blade_draw: 0.39, blade_shing: 0.44, heavy_whoosh: 0.44, glass_tink: 0.72, riser_chime: 1.57, juggernaut_slam: 1.32, juggernaut_thud: 1.32, juggernaut_boom: 0.5, juggernaut_rubble: 0.5, ronin_taiko: 0.75, ronin_flute: 0.75, ronin_wind_howl: 0.2, ronin_wind_sweep: 0.2, monk_breath: 0.52, reaper_scrape: 0.18, reaper_groan: 0.18, entrance_stomp: 0.32,
   // the Knight's deflect (the sword hit and the shield ring together), at the level of the shield thud
   // it replaced; his shield bash; the Warden's step (at the level of the gravel step he had); the vanish
-  // (at the roll dodge's level: the synthesised vanish is near silent) and the blink; and the
+  // and the jump (at the roll dodge's level: the synthesised ones are near silent) and the blink; and the
   // swings and the Monk's punches, each pool matched to the swing or hit it replaces (the Wraith's to
   // his old recorded swing)
-  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
+  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, jump: 0.31, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
@@ -956,6 +956,8 @@ export function dodge(o: Out, p: Profile, kind: 'roll' | 'vanish' | 'leap' = 'ro
 }
 
 export function jump(o: Out, p: Profile): void {
+  // everyone's recorded jump, once it has decoded
+  if (playLayers(o, ['jump'])) return;
   noise(o, { color: 'pink', type: 'lowpass', f: 900, f1: 300, dur: 0.12, gain: 0.2 });
   noise(o, { color: 'pink', type: 'bandpass', f: 900, f1: 1600, q: 0.9, dur: 0.15, gain: 0.15, shape: SHAPES.swing(0.4, 1.5) });
   if (p.body === 'plate') rattle(o, { count: 5, spread: 0.1, fLo: 1600, fHi: 4000, decay: 0.05 }, { gain: 0.25, type: 'highpass', f: 1200 });
