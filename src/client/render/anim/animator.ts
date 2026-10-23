@@ -215,6 +215,8 @@ const ROT_CHANNELS = ['spin', 'flip', 'roll', 'hop'] as const;
  * slow heavies.
  */
 const TELL_ARRIVE = 0.55;
+/** How long (ms) the get-up at the end of a knockdown takes: to a knee, then up off it. */
+const GET_UP = 750;
 const TELL_LIGHT = 0.38;
 const TELL_HEAVY = 0.27;
 
@@ -475,7 +477,12 @@ export class Animator {
       if (a.state === 'dead' || a.state === 'knockdown') {
         // a falling drop, and for knockdowns a push back up at the end
         out.lying = Math.max(easeIn(a.elapsed / 380, 2), this.lyingCarry);
-        if (a.state === 'knockdown' && a.dur - a.elapsed < 380) out.lying = Math.min(out.lying, smooth((a.dur - a.elapsed) / 380));
+        // getting up (see statePose): sitting up and over onto a knee, then pushing up from it
+        if (a.state === 'knockdown' && a.dur - a.elapsed < GET_UP) {
+          const q = 1 - (a.dur - a.elapsed) / GET_UP;
+          const up = q < 0.5 ? 1 - 0.75 * smooth(q / 0.5) : 0.25 * (1 - smooth((q - 0.5) / 0.5));
+          out.lying = Math.min(out.lying, up);
+        }
       }
     }
 
@@ -920,6 +927,22 @@ export class Animator {
         p.body.lean = 0.1;
         p.body.crouch = -0.05;
         p.body.headPitch = -0.2;
+        if (a.state === 'knockdown' && a.dur - a.elapsed < GET_UP) {
+          // getting up: over onto one knee with the free hand braced on the floor and the weapon
+          // back in the grip, head still down; then up off the knee into the guard
+          const q = 1 - (a.dur - a.elapsed) / GET_UP;
+          const kneel = this.guardPose(a);
+          kneel.body.crouch = -0.62;
+          kneel.body.lean = 0.62;
+          kneel.body.step = 0.4;
+          kneel.body.back = 0.44;
+          kneel.body.headPitch = 0.4;
+          kneel.body.twist += 0.15;
+          kneel.free.set(0.28, 0.12, 0.32);
+          const guard = this.guardPose(a);
+          const pose = lerpResolved(lerpResolved(p, kneel, smooth(q / 0.5)), guard, smooth((q - 0.55) / 0.45));
+          return { target: pose, tau: 220 };
+        }
         return { target: p, tau: 220 };
       }
       case 'dodge': {
