@@ -225,7 +225,6 @@ export class UI {
           <div class="hint"><span class="h-label">Lock on</span>${icon('target')}<kbd>Tab</kbd></div>
         </div>
         <div class="click-hint hidden">Click the game to capture the mouse</div>
-        <div class="rotate-hint">Turn your device sideways to play</div>
       </div>`);
     this.root.appendChild(this.hud);
     this.lobbyBar = new LobbyBar(this.hud, {

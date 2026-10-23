@@ -469,7 +469,6 @@ h4.ih .pi { width: 20px; height: 20px; }
 .side-menu.in-match > :not(#btn-forfeit):not(.esc-hint) { display: none; }
 
 /* ---------------------------------------------------------------- touch controls (phones, tablets) */
-.rotate-hint { display: none; }
 #ui.touch { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .touch-ui { position: absolute; inset: 0; --u: min(1vh, 0.55vw); }
 .tc-pad { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
@@ -557,9 +556,6 @@ h4.ih .pi { width: 20px; height: 20px; }
 .touch .prompt { pointer-events: auto; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); padding: 9px 18px; font-size: 17px; }
 .touch .toasts { top: 100px; }
 .touch .modal-body { touch-action: pan-y; -webkit-overflow-scrolling: touch; }
-@media (orientation: portrait) {
-  .touch .rotate-hint { display: flex; position: absolute; inset: 0; z-index: 60; align-items: center; justify-content: center; padding: 24px; text-align: center; background: rgba(6, 6, 10, 0.95); font-weight: 700; font-size: 22px; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; pointer-events: auto; }
-}
 
 /* short screens (phones on their side): a more compact HUD */
 @media (max-height: 520px) {
@@ -1015,3 +1011,11 @@ h4.ih .pi { width: 20px; height: 20px; }
 /* no changing fighters mid-match */
 body.chars-locked #btn-chars, body.chars-locked #lb-fighters { display: none !important; }
 .lb-play-key { font-family: var(--ui); font-size: 12px; font-weight: 700; line-height: 1; padding: 3px 5px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 3px; color: rgba(255, 255, 255, 0.75); text-shadow: none; letter-spacing: 0; }
+
+/* ---------------------------------------------------------------- portrait: turn the device (rotate.ts) */
+.rotate-guard { position: fixed; inset: 0; z-index: 2147483000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 24px; background: #07060a; color: #fff; text-align: center; touch-action: none; -webkit-user-select: none; user-select: none; }
+.rotate-guard.hidden { display: none; }
+.rg-text { font-family: var(--display, var(--ui)); font-weight: 700; font-size: 22px; letter-spacing: 0.1em; text-transform: uppercase; max-width: 16em; line-height: 1.4; }
+.rg-phone { width: 54px; height: 92px; border: 4px solid #fff; border-radius: 10px; position: relative; animation: rg-turn 2.4s ease-in-out infinite; }
+.rg-phone span { position: absolute; left: 50%; bottom: 6px; width: 10px; height: 4px; margin-left: -5px; border-radius: 2px; background: #fff; }
+@keyframes rg-turn { 0%, 25% { transform: rotate(0deg); } 55%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
