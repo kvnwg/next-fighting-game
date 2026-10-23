@@ -33,7 +33,7 @@ const SPACES: Record<string, { room: string; floor: R.Floor }> = {
   lobby: { room: 'stone', floor: 'stone' },
   sakura: { room: 'open', floor: 'earth' },
   bamboo: { room: 'grove', floor: 'earth' },
-  summit: { room: 'valley', floor: 'stone' },
+  summit: { room: 'valley', floor: 'snow' },
   forge: { room: 'hall', floor: 'stone' },
   bridge: { room: 'valley', floor: 'wood' },
   ruins: { room: 'stone', floor: 'stone' },
@@ -197,6 +197,37 @@ class AudioEngine {
       gap: 0.02,
       priority: ui ? 2 : 1,
     });
+  }
+
+  /**
+   * A ring-entrance cue. They were the old synthesised effects (chimes, bells, plucks); now each
+   * plays one of the recordings where one fits, the bell-like ones give way to the fighter's own
+   * shimmer or are dropped, and the drums, gongs, wind and rumbles stay as they were.
+   */
+  entrance(char: CharacterId, name: Sfx, volume = 1): void {
+    const swing = char === 'reaper' ? 'reaper_swing' : char === 'duelist' ? 'duelist_swing' : char === 'lancer' ? 'lancer_swing' : 'ronin_swing';
+    const shine = char === 'paladin' ? 'paladin_shimmer' : char === 'monk' ? 'monk_glitter' : null;
+    const INTRO: Partial<Record<Sfx, [string | null, number, number?]>> = {
+      whoosh: [swing, 1.2],
+      shing: ['ronin_unsheathe', 1, 0.05],
+      draw: ['ronin_unsheathe', 1, 0.05],
+      clang: ['block', 1.2],
+      stomp: ['paladin_deflect', 1.1],
+      thump: ['paladin_deflect', 0.9],
+      zap: ['lancer_spark', 1.6],
+      thunder: ['lancer_bolt', 2.2],
+      chime: [shine, 1.6],
+      bell: [shine, 1.6],
+      tink: [shine, 1.2],
+      pluck: [shine, 1.2],
+      fanfare: [shine, 1.8],
+      whisper: [null, 0],
+    };
+    const m = INTRO[name];
+    if (!m) return this.play(name, volume);
+    const [rec, gain, offset] = m;
+    if (!rec) return;
+    this.emit((o) => void (R.playRecorded(o, rec, gain, 1, offset ?? 0) || legacy(o, name)), { level: LEVEL.legacy, vol: volume, wet: 0.25, gap: 0.02, priority: 1 });
   }
 
   // ---------------------------------------------------------------- fighters

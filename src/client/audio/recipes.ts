@@ -491,6 +491,8 @@ export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void
     // and a breath of the holy light off the shield
     const holy = sampleFor(o.ctx, 'paladin_holy');
     if (holy) playSample(o, holy, sampleGain('paladin_holy') * 0.4, jit(1.1, 0.03), 0.02, 0.5);
+    const shimmer = sampleFor(o.ctx, 'paladin_shimmer');
+    if (shimmer) playSample(o, shimmer, sampleGain('paladin_shimmer') * 0.6, jit(1.05, 0.03), 0.02, 0.3);
     return;
   }
   const buf = sampleFor(o.ctx, 'deflect');
@@ -511,6 +513,9 @@ const DEFLECT_GAIN = 1.6;
  */
 interface SampleSet {
   swing?: string[];
+  /** more heavy-swing layers stacked on top: one of `heavyExtra` (picked at random), and `heavyShimmer` */
+  heavyExtra?: string[];
+  heavyShimmer?: string;
   /** the swing takes' level and how far into them to start (where the whoosh has built) */
   swingGain?: number;
   swingOffset?: number;
@@ -528,7 +533,8 @@ const SAMPLE_SETS: Record<string, SampleSet> = {
   // the glaive's whoosh or the katana's, lightning crackling behind it; the cut arcs, a heavy strikes
   lancer: { swing: ['lancer_swing', 'ronin_swing'], swingLayer: 'lancer_zap', hitGain: 0.6, hitLayer: 'lancer_spark', heavyHitLayer: 'lancer_bolt' },
   // the katana's swooshes (weightier) with a holy glow on heavies; every cut lands with a radiant impact
-  paladin: { swing: ['ronin_swing'], swingGain: 1.5, heavySwingLayer: 'paladin_glow', hitGain: 0.75, hitLayer: 'paladin_impact' },
+  // heavies stack the glow, a dark or a fiery whoosh and the holy shimmer; hits ring out pure
+  paladin: { swing: ['ronin_swing'], swingGain: 1.5, heavySwingLayer: 'paladin_glow', heavyExtra: ['paladin_darkwhoosh', 'paladin_firewhoosh'], heavyShimmer: 'paladin_shimmer', hitGain: 0.75, hitLayer: 'paladin_impact', heavyHitLayer: 'paladin_shimmer' },
   // dark whooshes for the sickle
   reaper: { swing: ['reaper_swing'], swingOffset: 0.06, hitGain: 0.78 },
   shade: { hitGain: 0.78 },
@@ -556,6 +562,13 @@ function recordedSwing(o: Out, p: Profile, s: SwingOpts): boolean {
   // swing too, for a fighter with no recorded swing of their own)
   const heavy = s.heavy && set.heavySwingLayer ? sampleFor(o.ctx, set.heavySwingLayer) : null;
   if (heavy) playSample(o, heavy, sampleGain(set.heavySwingLayer!), jit(1, 0.04), 0, 0.14);
+  if (s.heavy && set.heavyExtra) {
+    const name = pick(set.heavyExtra);
+    const extra = sampleFor(o.ctx, name);
+    if (extra) playSample(o, extra, sampleGain(name), jit(1, 0.04), 0, 0.22);
+  }
+  const shimmer = s.heavy && set.heavyShimmer ? sampleFor(o.ctx, set.heavyShimmer) : null;
+  if (shimmer) playSample(o, shimmer, sampleGain(set.heavyShimmer!), jit(1, 0.03), 0, 0.2);
   if (!set.swing) return false;
   const take = pick(set.swing);
   const rec = sampleFor(o.ctx, take);
@@ -587,8 +600,16 @@ function recordedHit(o: Out, a: Profile, s: HitOpts): boolean {
 }
 
 /** The other recordings' levels in the mix, each matched (by rendered loudness) to the synthesised sound it replaces. */
-const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12, lancer_spark: 0.07, lancer_bolt: 0.13, paladin_glow: 0.22, paladin_impact: 0.2, reaper_swing: 0.2, paladin_deflect: 0.52, ronin_unsheathe: 0.4, monk_glitter: 0.18, paladin_holy: 0.35 };
+const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12, lancer_spark: 0.07, lancer_bolt: 0.13, paladin_glow: 0.22, paladin_impact: 0.2, reaper_swing: 0.2, paladin_deflect: 0.52, ronin_unsheathe: 0.4, monk_glitter: 0.18, paladin_holy: 0.35, paladin_darkwhoosh: 0.16, paladin_firewhoosh: 0.16, paladin_shimmer: 0.14, exec_glass: 0.3, step_stone: 0.12, step_snow: 0.17 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
+
+/** Play a recording by name at its mix level (times `gain`); false if it hasn't decoded. */
+export function playRecorded(o: Out, name: string, gain = 1, rate = 1, offset = 0): boolean {
+  const buf = sampleFor(o.ctx, name);
+  if (!buf) return false;
+  playSample(o, buf, sampleGain(name) * gain, rate, 0, offset);
+  return true;
+}
 /** the recorded lightning strike as the Lancer's lightning cue (louder than under a hit) */
 const BOLT_CUE_GAIN = 0.3;
 
@@ -737,6 +758,9 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
   osc(o, { f: 72, f1: 24, dur: 1.6, gain: 0.6 });
   noise(o, { color: 'brown', type: 'lowpass', f: 400, f1: 60, dur: 1.4, gain: 0.55 });
   noise(o, { color: 'pink', type: 'bandpass', f: 1800, f1: 300, q: 0.6, dur: 0.5, gain: 0.4 });
+  // and over every execution, the recorded ringing glass
+  const glass = sampleFor(o.ctx, 'exec_glass');
+  if (glass) playSample(o, glass, sampleGain('exec_glass'), jit(1, 0.02), 0.02);
   switch (a.finisher) {
     case 'iai':
       // one cut too fast to see: the hiss of it, the blade's long silver ring, then the sheath closing
@@ -803,6 +827,8 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       hit(o, a, d, { heavy: true, anim: 'overhead' });
       const holy = sampleFor(o.ctx, 'paladin_holy');
       if (holy) playSample(o, holy, sampleGain('paladin_holy') * 1.3, 0.95, 0, 0.45);
+      const shimmer = sampleFor(o.ctx, 'paladin_shimmer');
+      if (shimmer) playSample(o, shimmer, sampleGain('paladin_shimmer') * 1.3, 0.97, 0, 0.2);
     }
       ring(o, MAT.greatsword, 0.38, { decay: 1.8 });
       ring(o, MAT.bell, 0.32, { delay: 0.05 });
@@ -813,7 +839,7 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
 
 // ------------------------------------------------------------------ bodies moving
 
-export type Floor = 'earth' | 'stone' | 'wood';
+export type Floor = 'earth' | 'stone' | 'wood' | 'snow';
 
 function stompLayer(o: Out, p: Profile, k: number): void {
   thump(o, 85 / Math.sqrt(p.weight), 40, 0.25, 0.7 * k);
@@ -827,6 +853,16 @@ const FEET_GAIN: Record<Profile['feet'], number> = { heavyPlate: 0.8, plate: 1.1
 /** One footfall: the body's weight, the sole, the gear on them, and the floor under them. */
 export function footstep(o: Out, p: Profile, s: { speed: number; floor: Floor }): void {
   const run = clamp(s.speed / 5, 0.4, 1.3);
+  // a recorded step for the floor, if there is one: gravel on stone (and, softer, on earth),
+  // a crunch on snow and ice; a heavier body lands lower and harder
+  const take = s.floor === 'snow' ? 'step_snow' : s.floor === 'stone' || s.floor === 'earth' ? 'step_stone' : null;
+  const step = take ? sampleFor(o.ctx, take) : null;
+  if (step) {
+    const weight = clamp(p.weight, 0.7, 1.6);
+    const soft = s.floor === 'earth' ? 0.9 : 1;
+    playSample(s.floor === 'earth' ? filtered(o, 'lowpass', 2600) : o, step, sampleGain(take!) * run * soft * Math.sqrt(weight), jit(1, 0.06) / Math.pow(weight, 0.25));
+    return;
+  }
   const fl = scaled(s.floor === 'earth' ? filtered(o, 'lowpass', 2200) : o, FEET_GAIN[p.feet]);
   switch (p.feet) {
     case 'heavyPlate':
@@ -1011,6 +1047,8 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
       const holy = sampleFor(o.ctx, 'paladin_holy');
       if (holy) {
         playSample(o, holy, sampleGain('paladin_holy') * Math.min(1.4, k), jit(1, 0.02), 0, 0.3);
+        const shimmer = sampleFor(o.ctx, 'paladin_shimmer');
+        if (shimmer) playSample(o, shimmer, sampleGain('paladin_shimmer') * 1.2, 1, 0, 0.15);
         return true;
       }
     }

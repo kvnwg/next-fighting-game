@@ -525,7 +525,7 @@ class App {
         const key = `${t.r.id}:${i}`;
         if (s >= c.s && s < c.s + 0.12 && !intro.fired.has(key)) {
           intro.fired.add(key);
-          audio.play(c.sound, c.vol ?? 1);
+          audio.entrance(t.r.char, c.sound, c.vol ?? 1);
         }
       });
       const key = `${t.r.id}:card`;
