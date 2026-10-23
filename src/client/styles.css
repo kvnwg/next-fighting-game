@@ -1014,4 +1014,5 @@ h4.ih .pi { width: 20px; height: 20px; }
 
 /* no changing fighters mid-match */
 body.chars-locked #btn-chars, body.chars-locked #lb-fighters { display: none !important; }
-.lb-play-key { position: absolute; right: 30px; top: 50%; transform: translateY(-50%); font-family: var(--ui); font-size: 12px; font-weight: 700; line-height: 1; padding: 3px 5px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 3px; color: rgba(255, 255, 255, 0.75); text-shadow: none; letter-spacing: 0; }
+#ui:not(.touch) .lb-play { padding-right: 72px; }
+.lb-play-key { position: absolute; right: 36px; top: 50%; transform: translateY(-50%); font-family: var(--ui); font-size: 12px; font-weight: 700; line-height: 1; padding: 3px 5px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 3px; color: rgba(255, 255, 255, 0.75); text-shadow: none; letter-spacing: 0; }
