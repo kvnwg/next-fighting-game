@@ -284,7 +284,7 @@ class AudioEngine {
       whisper: [null, 0],
     };
     if (char === 'ronin') {
-      INTRO.wind = [['ronin_wind_howl', 'ronin_wind_sweep'], 1];
+      INTRO.wind = [['wind_howl', 'ronin_wind_sweep'], 1];
       INTRO.taiko = [['ronin_taiko', 'ronin_flute'], 1];
     } else if (char === 'juggernaut') {
       INTRO.rumble = [['juggernaut_boom', 'juggernaut_rubble'], 1];
@@ -379,7 +379,8 @@ class AudioEngine {
         this.emit((out) => R.feint(out, D), { ...at, vol: o.vol * 0.8, level: LEVEL.swing, wet: WET.swing });
         break;
       case 'lava':
-        if (o.mine && e.d) this.emit((out) => legacy(out, 'burn'), { ...at, level: LEVEL.legacy, key: 'burn', gap: 0.15 });
+        // the recorded burn, from near its flare (it swells for a second first)
+        if (o.mine && e.d) this.emit((out) => void (R.playLayers(out, ['lava_burn'], 1, undefined, 0.8) || legacy(out, 'burn')), { ...at, level: LEVEL.legacy, key: 'burn', gap: 0.15 });
         break;
       case 'fall':
         this.emit((out) => R.fall(out), { ...at, level: LEVEL.cue, wet: 0.4 });

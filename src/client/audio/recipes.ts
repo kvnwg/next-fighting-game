@@ -614,13 +614,15 @@ const SAMPLE_GAIN: Record<string, number> = {
   // Ronin's wind sits 6 dB under his unsheathe, the Monk's breath matches his thump, the title
   // screen's whoosh sits 4 dB under its shing and the Wraith's scrape is level with the unsheathe;
   // the entrance stomp keeps the level of the Knight's deflect it replaces
-  ui_click: 0.1, match_found: 0.16, countdown: 0.18, start_screech: 0.91, start_confirm: 0.91, victory_fanfare: 0.15, victory_piano: 0.15, defeat: 0.15, blade_draw: 0.39, blade_shing: 0.44, heavy_whoosh: 0.44, glass_tink: 0.72, riser_chime: 1.57, juggernaut_slam: 1.32, juggernaut_thud: 1.32, juggernaut_boom: 0.5, juggernaut_rubble: 0.5, ronin_taiko: 0.75, ronin_flute: 0.75, ronin_wind_howl: 0.2, ronin_wind_sweep: 0.2, monk_breath: 0.52, reaper_scrape: 0.18, reaper_groan: 0.18, entrance_stomp: 0.32,
+  ui_click: 0.1, match_found: 0.16, countdown: 0.18, start_screech: 0.91, start_confirm: 0.91, victory_fanfare: 0.15, victory_piano: 0.15, defeat: 0.15, blade_draw: 0.39, blade_shing: 0.44, heavy_whoosh: 0.44, glass_tink: 0.72, riser_chime: 1.57, juggernaut_slam: 1.32, juggernaut_thud: 1.32, juggernaut_boom: 0.5, juggernaut_rubble: 0.5, ronin_taiko: 0.75, ronin_flute: 0.75, wind_howl: 0.2, ronin_wind_sweep: 0.2, monk_breath: 0.52, reaper_scrape: 0.18, reaper_groan: 0.18, entrance_stomp: 0.32,
   // the Knight's deflect (the sword hit and the shield ring together), at the level of the shield thud
   // it replaced; his shield bash; the Warden's step (at the level of the gravel step he had); the vanish
-  // and the jump (at the roll dodge's level: the synthesised ones are near silent) and the blink; and the
+  // and the jump (at the roll dodge's level: the synthesised ones are near silent), the blink, the body
+  // falling (matched to the synthesised fall without its weapon drop), the buff, and the lava burn (level
+  // with a blade hit landing: the synthesised burn is near silent); and the
   // swings and the Monk's punches, each pool matched to the swing or hit it replaces (the Wraith's to
   // his old recorded swing)
-  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, jump: 0.31, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
+  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, jump: 0.31, bodyfall: 0.57, buff_shimmer: 0.28, buff_fire: 0.28, lava_burn: 0.43, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
@@ -981,22 +983,26 @@ export function perilous(o: Out, p: Profile): void {
 
 /** A fighter going down: the body landing, the armour clattering, the weapon dropped. */
 export function death(o: Out, d: Profile): void {
-  const w = Math.sqrt(d.weight);
-  thump(o, 80 / w, 40, 0.3, 0.45 * w, 0.12);
-  noise(o, { color: 'pink', type: 'lowpass', f: 500, f1: 150, dur: 0.25, gain: 0.45, delay: 0.12 });
-  thump(o, 70 / w, 36, 0.35, 0.25 * w, 0.34);
-  switch (d.body) {
-    case 'plate':
-      ring(o, MAT.plate, 0.32, { pitch: d.plate / MAT.plate.base, decay: 0.5, delay: 0.12 });
-      rattle(o, { count: 14, spread: 0.5, fLo: 1500, fHi: 4000, decay: 0.06, fade: 1.5 }, { gain: 0.35, delay: 0.12, type: 'highpass', f: 1200 });
-      ring(o, MAT.plate, 0.18, { pitch: (d.plate / MAT.plate.base) * 1.1, decay: 0.35, delay: 0.34 });
-      break;
-    case 'robe':
-    case 'cloth':
-      noise(o, { color: 'pink', type: 'bandpass', f: 800, f1: 400, q: 0.8, dur: 0.3, gain: 0.3, delay: 0.1 });
-      break;
-    default:
-      noise(o, { type: 'bandpass', f: 2600, q: 1, dur: 0.025, gain: 0.2, delay: 0.12 });
+  // the body landing: everyone's recorded fall (its crunch lands where the thumps did), or the
+  // synthesised thumps, armour and cloth until it has decoded
+  if (!playLayers(at(o, 0.1), ['bodyfall'])) {
+    const w = Math.sqrt(d.weight);
+    thump(o, 80 / w, 40, 0.3, 0.45 * w, 0.12);
+    noise(o, { color: 'pink', type: 'lowpass', f: 500, f1: 150, dur: 0.25, gain: 0.45, delay: 0.12 });
+    thump(o, 70 / w, 36, 0.35, 0.25 * w, 0.34);
+    switch (d.body) {
+      case 'plate':
+        ring(o, MAT.plate, 0.32, { pitch: d.plate / MAT.plate.base, decay: 0.5, delay: 0.12 });
+        rattle(o, { count: 14, spread: 0.5, fLo: 1500, fHi: 4000, decay: 0.06, fade: 1.5 }, { gain: 0.35, delay: 0.12, type: 'highpass', f: 1200 });
+        ring(o, MAT.plate, 0.18, { pitch: (d.plate / MAT.plate.base) * 1.1, decay: 0.35, delay: 0.34 });
+        break;
+      case 'robe':
+      case 'cloth':
+        noise(o, { color: 'pink', type: 'bandpass', f: 800, f1: 400, q: 0.8, dur: 0.3, gain: 0.3, delay: 0.1 });
+        break;
+      default:
+        noise(o, { type: 'bandpass', f: 2600, q: 1, dur: 0.025, gain: 0.2, delay: 0.12 });
+    }
   }
   // the weapon hits the floor and bounces
   if (d.edge !== 'fist') {
@@ -1012,12 +1018,16 @@ export function death(o: Out, d: Profile): void {
 
 /** Over the edge: the wind rushing past, falling away. */
 export function fall(o: Out): void {
+  // the user's howling gust (the Ronin's entrance wind) rushing up over it
+  playLayers(o, ['wind_howl'], 0.9);
   noise(o, { color: 'pink', type: 'bandpass', f: 1400, f1: 250, q: 1.2, dur: 1.2, gain: 0.4, shape: (x) => Math.min(1, x * 6) * Math.pow(1 - x, 1.2) });
   osc(o, { f: 900, f1: 180, dur: 1.1, gain: 0.025, shape: (x) => Math.min(1, x * 8) * (1 - x) });
 }
 
 /** A buff: the power coming up through them. */
 export function buff(o: Out): void {
+  // the user's stack: a water-and-shimmer swell with a fire burst igniting
+  if (playLayers(o, ['buff_shimmer', 'buff_fire'])) return;
   for (const det of [0, 2]) osc(filtered(o, 'lowpass', 1800), { type: 'sawtooth', f: 150 + det, f1: 300 + det, dur: 0.5, gain: 0.22 });
   noise(o, { color: 'pink', type: 'bandpass', f: 300, f1: 900, q: 1, dur: 0.6, gain: 0.3, shape: SHAPES.swing(0.4, 1.5) });
   thump(o, 80, 40, 0.3, 0.4);
