@@ -225,6 +225,7 @@ The look is built in code, so you can replace it piece by piece:
   - The arms and legs follow with IK: hands stay on the grip, feet stay planted.
 - `anim/animator.ts` times every move off the attack's windup, active and recovery frames:
   - the weapon chambers, coils, then accelerates through each hit, landing at the same moment the server resolves it (multi-hit moves spread their strikes the way the server spreads hits);
+  - every attack, however quick, is telegraphed: the chamber is pushed well past what's authored, and the whole body winds up on top of it (sinks, rears back, coils away from the strike, draws the weapon back and up) within the first third of the windup and holds there until it snaps through (`anticipate` in `animator.ts`);
   - spins can wind up continuously (`flow`), and baked clips keep their own rhythm (`linear`);
   - it overshoots, settles (or plays a flourish) and flows back to guard;
   - each state blends from the current pose, so combos chain from where the last cut ended.
