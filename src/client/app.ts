@@ -553,7 +553,7 @@ class App {
       if (secs !== this.ringCount && secs > 0 && secs <= 3) {
         this.ringCount = secs;
         this.ui.banner(String(secs), 'Ring duel', 950, 'count', KANJI_NUM[secs]);
-        audio.play('countdown');
+        audio.countdown(secs);
       }
     }
   }
@@ -1305,7 +1305,7 @@ class App {
     this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active || this.rotate.blocked;
     this.entranceCues(now);
     const left = this.select.tick(now);
-    if (left !== null && left > 0 && left <= 3) audio.play('countdown', 0.5);
+    if (left !== null && left > 0 && left <= 3) audio.countdown(left, 0.5);
 
     if (this.lock && (this.lock.s === 'dead' || !this.fighters.has(this.lock.id) || (this.local && dist2D(this.local.cf.pos.x, this.local.cf.pos.z, this.lock.pos.x, this.lock.pos.z) > 30))) {
       if (this.kind !== 'arena' || !this.fighters.has(this.lock.id)) this.lock = null;
@@ -1415,7 +1415,7 @@ class App {
       if (secs !== this.lastCountdown && secs > 0 && secs <= 3) {
         this.lastCountdown = secs;
         this.ui.banner(String(secs), `第${KANJI_NUM[this.match.round] ?? this.match.round}戦 · Round ${this.match.round}`, 950, 'count', KANJI_NUM[secs]);
-        audio.play('countdown');
+        audio.countdown(secs);
       }
     }
 

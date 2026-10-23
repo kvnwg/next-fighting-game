@@ -45,6 +45,29 @@ const CONTACT = new Set<CombatEvent['k']>(['hit', 'armor', 'block', 'guardBreak'
 
 const MAX_VOICES = 48;
 
+/**
+ * Named sounds that play the user's recordings (layers together) rather than the synthesised ones,
+ * and how far into them to start. The synthesised sound plays until the recordings have decoded.
+ */
+const RECORDED: Partial<Record<Sfx, { layers: string[]; offset?: number }>> = {
+  click: { layers: ['ui_click'] },
+  matchFound: { layers: ['match_found'] },
+  // one cycle of the ticking loop per number (see countdown()), from where its zap has built
+  countdown: { layers: ['countdown'], offset: 0.2 },
+  fight: { layers: ['start_screech', 'start_confirm'] },
+  victory: { layers: ['victory_fanfare', 'victory_piano'] },
+  defeat: { layers: ['defeat'] },
+  // the title screen's (the entrances draw with the Ronin's unsheathe, see entrance())
+  draw: { layers: ['blade_draw'] },
+  shing: { layers: ['blade_shing'] },
+  // the title screen's (the entrances whoosh with each fighter's recorded swing)
+  whoosh: { layers: ['heavy_whoosh'] },
+  // the title screen's (silent in the Ronin's entrance)
+  tink: { layers: ['glass_tink'] },
+  // the title screen's (the Monk's entrance chimes with his glitter)
+  chime: { layers: ['riser_chime'] },
+};
+
 export interface Placed {
   /** distance volume from the caller (0..1) */
   vol: number;
@@ -194,7 +217,7 @@ class AudioEngine {
     let gain = e.level * Math.min(1, e.vol);
     if (e.key) {
       const now = ctx.currentTime;
-      const last = this.recent.get(e.key) ?? -1;
+      const last = this.recent.get(e.key) ?? -Infinity;
       const gap = e.gap ?? 0.03;
       if (now - last < gap) return null;
       if (now - last < gap * 2.5) gain *= 0.6;
@@ -213,34 +236,42 @@ class AudioEngine {
     return v;
   }
 
-  /** A named sound (menus, the countdown, entrances, the title screen). */
-  play(name: Sfx, volume = 1, pos?: V3): void {
-    const ui = name === 'click' || name === 'countdown' || name === 'matchFound' || name === 'fight' || name === 'victory' || name === 'defeat';
-    this.emit((o) => legacy(o, name), {
+  /** A named sound (menus, the countdown, entrances, the title screen); `take` picks which of its recordings. */
+  play(name: Sfx, volume = 1, pos?: V3, take?: number): void {
+    const ui = name === 'click' || name === 'type' || name === 'countdown' || name === 'matchFound' || name === 'fight' || name === 'victory' || name === 'defeat';
+    const rec = RECORDED[name];
+    this.emit((o) => void ((rec && R.playLayers(o, rec.layers, 1, take, rec.offset)) || legacy(o, name)), {
       level: (ui ? LEVEL.ui : LEVEL.legacy) * (LEGACY_LEVEL[name] ?? 1),
       vol: volume,
       pos,
       wet: ui ? 0 : 0.25,
-      key: name === 'click' ? 'click' : undefined,
-      gap: 0.02,
+      // clicks and typing don't machine-gun, and a challenge's horn over one still sounding is dropped
+      key: name === 'click' || name === 'type' || name === 'matchFound' ? name : undefined,
+      gap: name === 'matchFound' ? 2 : 0.02,
       priority: ui ? 2 : 1,
     });
   }
 
+  /** The countdown at `n` (3, 2, 1): each number plays its own cycle of the recorded loop, in order. */
+  countdown(n: number, volume = 1): void {
+    this.play('countdown', volume, undefined, Math.max(0, 3 - n));
+  }
+
   /**
    * A ring-entrance cue. They were the old synthesised effects (chimes, bells, plucks); now each
-   * plays one of the recordings where one fits, the bell-like ones give way to the fighter's own
-   * shimmer or are dropped, and the drums, gongs, wind and rumbles stay as they were.
+   * plays one of the recordings where one fits, and the bell-like ones give way to the fighter's own
+   * shimmer or are dropped. The Ronin's wind and taiko, the Warden's rumble and gong, the Wraith's
+   * scrape, the Monk's breath and the stomps have (layered) recordings of their own.
    */
   entrance(char: CharacterId, name: Sfx, volume = 1): void {
     const swing = char === 'reaper' ? 'reaper_swing' : char === 'duelist' ? 'duelist_swing' : char === 'lancer' ? 'lancer_swing' : 'ronin_swing';
     const shine = char === 'paladin' ? 'paladin_shimmer' : char === 'monk' ? 'monk_glitter' : null;
-    const INTRO: Partial<Record<Sfx, [string | null, number, number?]>> = {
+    const INTRO: Partial<Record<Sfx, [string | string[] | null, number, number?]>> = {
       whoosh: [swing, 1.2],
       shing: ['ronin_unsheathe', 1, 0.05],
       draw: ['ronin_unsheathe', 1, 0.05],
       clang: ['block', 1.2],
-      stomp: ['paladin_deflect', 1.1],
+      stomp: ['entrance_stomp', 1],
       thump: ['paladin_deflect', 0.9],
       zap: ['lancer_spark', 1.6],
       thunder: ['lancer_bolt', 2.2],
@@ -251,11 +282,20 @@ class AudioEngine {
       fanfare: [shine, 1.8],
       whisper: [null, 0],
     };
+    if (char === 'ronin') {
+      INTRO.wind = [['ronin_wind_howl', 'ronin_wind_sweep'], 1];
+      INTRO.taiko = [['ronin_taiko', 'ronin_flute'], 1];
+    } else if (char === 'juggernaut') {
+      INTRO.rumble = [['juggernaut_boom', 'juggernaut_rubble'], 1];
+      INTRO.gong = [['juggernaut_slam', 'juggernaut_thud'], 1];
+    } else if (char === 'reaper') INTRO.scrape = [['reaper_scrape', 'reaper_groan'], 1];
+    else if (char === 'monk') INTRO.breath = ['monk_breath', 1];
     const m = INTRO[name];
     if (!m) return this.play(name, volume);
     const [rec, gain, offset] = m;
     if (!rec) return;
-    this.emit((o) => void (R.playRecorded(o, rec, gain, 1, offset ?? 0) || legacy(o, name)), { level: LEVEL.legacy, vol: volume, wet: 0.25, gap: 0.02, priority: 1 });
+    const layers = typeof rec === 'string' ? [rec] : rec;
+    this.emit((o) => void (R.playLayers(o, layers, gain, undefined, offset ?? 0) || legacy(o, name)), { level: LEVEL.legacy, vol: volume, wet: 0.25, gap: 0.02, priority: 1 });
   }
 
   // ---------------------------------------------------------------- fighters

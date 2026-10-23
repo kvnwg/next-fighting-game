@@ -98,7 +98,7 @@ export class TitleScreen {
     this.input.addEventListener('input', () => {
       this.syncField();
       this.spark();
-      audio.play('click', 0.12);
+      audio.play('type', 0.12);
     });
     this.input.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
@@ -216,7 +216,7 @@ export class TitleScreen {
       this.typing = window.setInterval(() => {
         i++;
         el.textContent = q.slice(0, i);
-        if (i % 2 === 0 && q[i - 1] !== ' ') audio.play('click', 0.07);
+        if (i % 2 === 0 && q[i - 1] !== ' ') audio.play('type', 0.07);
         if (i >= q.length) clearInterval(this.typing);
       }, 28);
     };

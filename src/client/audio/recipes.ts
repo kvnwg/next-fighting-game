@@ -484,10 +484,10 @@ export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void
   // one clang for everyone: a take of the recorded clash, or the synthesised one (clang.ts) until
   // the recordings have decoded. Back-to-back deflects climb a little in pitch and level.
   void a;
-  // the Knight deflects on his shield: a heavy thud, not steel ringing
-  const shield = d.id === 'paladin' ? sampleFor(o.ctx, 'paladin_deflect') : null;
+  // the Knight's deflect is his own: a single-handed sword hit, not the shared clang
+  const shield = d.id === 'paladin' ? sampleFor(o.ctx, 'paladin_parry') : null;
   if (shield) {
-    playSample(o, shield, sampleGain('paladin_deflect') * (s.heavy ? 1.15 : 1), jit(1, 0.04));
+    playSample(o, shield, sampleGain('paladin_parry') * (s.heavy ? 1.15 : 1), jit(1, 0.04));
     // and a breath of the holy light off the shield
     const holy = sampleFor(o.ctx, 'paladin_holy');
     if (holy) playSample(o, holy, sampleGain('paladin_holy') * 0.4, jit(1.1, 0.03), 0.02, 0.5);
@@ -600,14 +600,27 @@ function recordedHit(o: Out, a: Profile, s: HitOpts): boolean {
 }
 
 /** The other recordings' levels in the mix, each matched (by rendered loudness) to the synthesised sound it replaces. */
-const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12, lancer_spark: 0.07, lancer_bolt: 0.13, paladin_glow: 0.22, paladin_impact: 0.2, reaper_swing: 0.2, paladin_deflect: 0.52, ronin_unsheathe: 0.4, monk_glitter: 0.18, paladin_holy: 0.35, paladin_darkwhoosh: 0.16, paladin_firewhoosh: 0.16, paladin_shimmer: 0.14, exec_glass: 0.3, step_stone: 0.12, step_snow: 0.17 };
+const SAMPLE_GAIN: Record<string, number> = {
+  block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12, lancer_spark: 0.07, lancer_bolt: 0.13, paladin_glow: 0.22, paladin_impact: 0.2, reaper_swing: 0.2, paladin_deflect: 0.52, ronin_unsheathe: 0.4, monk_glitter: 0.18, paladin_holy: 0.35, paladin_darkwhoosh: 0.16, paladin_firewhoosh: 0.16, paladin_shimmer: 0.14, exec_glass: 0.3, step_stone: 0.12, step_snow: 0.17,
+  // the menus, the match's cues, the title screen and the entrance cues (layers share a gain, matched
+  // as a whole). The synthesised wind, breath, whoosh and scrape are all but silent, so instead the
+  // Ronin's wind sits 6 dB under his unsheathe, the Monk's breath matches his thump, the title
+  // screen's whoosh sits 4 dB under its shing and the Wraith's scrape is level with the unsheathe;
+  // the entrance stomp keeps the level of the Knight's deflect it replaces
+  ui_click: 0.1, match_found: 0.16, countdown: 0.18, start_screech: 0.91, start_confirm: 0.91, victory_fanfare: 0.15, victory_piano: 0.15, defeat: 0.15, blade_draw: 0.39, blade_shing: 0.44, heavy_whoosh: 0.44, glass_tink: 0.72, riser_chime: 1.57, juggernaut_slam: 1.32, juggernaut_thud: 1.32, juggernaut_boom: 0.5, juggernaut_rubble: 0.5, ronin_taiko: 0.75, ronin_flute: 0.75, ronin_wind_howl: 0.2, ronin_wind_sweep: 0.2, monk_breath: 0.52, reaper_scrape: 0.18, reaper_groan: 0.18, entrance_stomp: 0.32,
+  // the Knight's deflect, at the level of the shield thud it replaces
+  paladin_parry: 0.24,
+};
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
-/** Play a recording by name at its mix level (times `gain`); false if it hasn't decoded. */
-export function playRecorded(o: Out, name: string, gain = 1, rate = 1, offset = 0): boolean {
-  const buf = sampleFor(o.ctx, name);
-  if (!buf) return false;
-  playSample(o, buf, sampleGain(name) * gain, rate, 0, offset);
+/**
+ * Play recordings layered, each at its mix level (times `gain`), from take `take` (or one at random)
+ * and `offset` seconds in; false, playing nothing, unless every layer has decoded.
+ */
+export function playLayers(o: Out, names: readonly string[], gain = 1, take?: number, offset = 0): boolean {
+  const bufs = names.map((n) => sampleFor(o.ctx, n, take));
+  if (!bufs.every((b): b is AudioBuffer => !!b)) return false;
+  bufs.forEach((b, i) => playSample(o, b, sampleGain(names[i]) * gain, 1, 0, offset));
   return true;
 }
 /** the recorded lightning strike as the Lancer's lightning cue (louder than under a hit) */
