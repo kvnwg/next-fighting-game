@@ -814,8 +814,9 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       click(o, 0.3, 6000, 0.005, 1.0);
       break;
     case 'crush':
-      hit(o, a, d, { heavy: true, anim: 'slam' });
-      shockwave(at(o, 0.02), a, 2);
+      // the hammer crushing them: the blunt crunch, not the blade's slash every other hit uses (the
+      // crash into the floor is the choreography's own shockwave cue, landing on this same blow)
+      BASE.hit(o, a, d, { heavy: true, anim: 'slam' });
       ring(o, MAT.hammer, 0.45, { decay: 1.6 });
       break;
     case 'pierce':

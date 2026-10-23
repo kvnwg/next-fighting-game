@@ -7,7 +7,7 @@ import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RingView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
 import { audio } from './audio';
-import { CameraRig, executionShots } from './camera';
+import { CAMERA_BULK, CameraRig, executionShots } from './camera';
 import { CARD_AT, ENTRANCES, entranceStarts, introSequence } from './entrances';
 import { ENTRANCE_MS } from './render/anim/animator';
 import { buildBlockers, constrainCamera } from './cameraClip';
@@ -1348,6 +1348,7 @@ class App {
       this.cam.shakeScale = settings.reduceShake ? 0.35 : this.touch ? 0.8 : 1;
       this.cam.subjectScale = this.local.cf.model.scale;
       this.cam.targetScale = this.lock?.model.scale ?? 1;
+      this.cam.subjectBulk = CAMERA_BULK[this.local.cf.roster.char] ?? 1;
       this.cam.update(dt, p, this.lock ? this.lock.pos : null, { dodging: this.local.sim.state === 'dodge' });
       this.mapView?.update(dt, p);
     } else if (this.titleScene) {
