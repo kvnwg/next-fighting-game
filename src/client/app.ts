@@ -311,7 +311,7 @@ class App {
     });
     n.on('selectCancel', (m) => {
       this.select.hide();
-      audio.music(null, 1);
+      audio.music(this.kind === 'lobby' ? 'lobby' : null, 1);
       if (this.local && this.kind === 'lobby') this.local.frozen = false;
       this.ui.toast(m.reason, 'warn');
     });
@@ -393,7 +393,7 @@ class App {
     this.ui.setDeath(null);
     if (m.kind === 'lobby') {
       this.match = null;
-      audio.music(null, 1.5);
+      audio.music('lobby');
       this.ui.setMatch(null, 0);
       this.net.send({ t: 'leaderboard' });
     } else {
