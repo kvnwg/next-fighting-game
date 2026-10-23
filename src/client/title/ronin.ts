@@ -9,7 +9,6 @@ import * as THREE from 'three';
 import { buildRonin, palette as RONIN } from '../../../characters/ronin/model.js';
 import { bindGlobals } from '../render/gfx/globals';
 import { litMaterial } from '../render/gfx/materials';
-import { VoxelVolume, meshVoxels } from '../render/gfx/voxel';
 import { VOXEL } from '../render/voxel/mesh';
 import { voxelModel } from '../render/voxel/fighters';
 
@@ -130,8 +129,10 @@ function looseHair(src: THREE.BufferGeometry): THREE.BufferGeometry {
 }
 
 /**
- * A long scarf from the back of his collar, streaming downwind. Built as voxels along a curve in
- * the torso's frame; the cloth shader sends waves rolling down it.
+ * A long scarf from the back of his collar, streaming downwind: one solid strip along a curve in
+ * the torso's frame (not loose voxels, which the cloth waves would pull apart into holes), in
+ * blocky bands of colour, with a darker trim along its edges and a frayed end. The cloth shader
+ * sends waves rolling down it.
  */
 function scarfRibbon(windLocal: THREE.Vector3): THREE.BufferGeometry {
   const anchor = new THREE.Vector3(2, 59.5 - 41, -5.5); // torso pivot is (0, 41, 0)
@@ -141,7 +142,7 @@ function scarfRibbon(windLocal: THREE.Vector3): THREE.BufferGeometry {
   const steps = 92;
   const pts: THREE.Vector3[] = [];
   const p = anchor.clone();
-  for (let k = 0; k < steps; k++) {
+  for (let k = 0; k <= steps; k++) {
     pts.push(p.clone());
     const t = k / steps;
     const dir = back.clone().lerp(down, ease(clamp01(t * 3.2))).normalize();
@@ -149,61 +150,75 @@ function scarfRibbon(windLocal: THREE.Vector3): THREE.BufferGeometry {
     dir.y += Math.sin(t * 7) * 0.12;
     p.addScaledVector(dir.normalize(), 1);
   }
-  const lo = new THREE.Vector3(Infinity, Infinity, Infinity);
-  const hi = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
-  for (const q of pts) {
-    lo.min(q);
-    hi.max(q);
-  }
-  lo.subScalar(4).floor();
-  hi.addScalar(4).ceil();
-  const n = hi.clone().sub(lo);
-  const vol = new VoxelVolume(n.x, n.y, n.z, [VOXEL, VOXEL, VOXEL], [lo.x * VOXEL, lo.y * VOXEL, lo.z * VOXEL]);
-  // crimson for the title: the one warm note on him, against the sunset
-  const scarf = new THREE.Color('#8a1c26');
-  const trim = new THREE.Color('#5e121a');
-  const fray = new THREE.Color(RONIN.coatFold);
-  const along: number[] = [];
-  for (let k = 0; k < pts.length; k++) {
-    const c = pts[k];
-    const t = k / pts.length;
+  // a frame at each point: across the scarf, and through it
+  const frames = pts.map((c, k) => {
     const dir = (pts[k + 1] ?? c).clone().sub(pts[k - 1] ?? c).normalize();
     // the scarf's width leans toward upright, so it shows its face from the side and its waves from behind
     const flat = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
     const up = new THREE.Vector3(0, 1, 0).addScaledVector(dir, -dir.y).normalize();
     const side = flat.lerp(up, 0.65).normalize();
-    // wide at the neck, narrowing, frayed at the end
-    const half = 3.4 - t * 1.4;
-    for (let w = -half; w <= half; w += 0.5) {
-      if (t > 0.93 && Math.abs(w) < half - 0.6 && (k + Math.round(w * 2)) % 3 === 0) continue;
-      const q = c.clone().addScaledVector(side, w);
-      const xi = Math.floor(q.x - lo.x);
-      const yi = Math.floor(q.y - lo.y);
-      const zi = Math.floor(q.z - lo.z);
-      const edge = Math.abs(w) > half - 0.6;
-      vol.set(xi, yi, zi, t > 0.9 ? fray : edge && k % 4 < 2 ? trim : scarf);
-      along.push(xi, yi, zi, k);
+    const through = new THREE.Vector3().crossVectors(dir, side).normalize();
+    return { c, side, through };
+  });
+  // crimson for the title: the one warm note on him, against the sunset
+  const scarf = new THREE.Color('#8a1c26');
+  const trim = new THREE.Color('#5e121a');
+  const fray = new THREE.Color(RONIN.coatFold);
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const col: number[] = [];
+  const ao: number[] = [];
+  const vox: number[] = [];
+  const n = new THREE.Vector3();
+  const c = new THREE.Color();
+  const T = 0.35; // half its thickness, in voxels
+  // one flat quad: corners as [segment, across (-1..1 of the half width), through (-1, 1)]
+  const quad = (q: [number, number, number][], color: THREE.Color, shade: number) => {
+    const at = q.map(([k, w, d]) => {
+      const f = frames[k];
+      const half = 3.4 - (k / steps) * 1.4;
+      return f.c.clone().addScaledVector(f.side, w * half).addScaledVector(f.through, d * T).multiplyScalar(VOXEL);
+    });
+    n.crossVectors(at[1].clone().sub(at[0]), at[2].clone().sub(at[0])).normalize();
+    for (const i of [0, 1, 2, 0, 2, 3]) {
+      pos.push(at[i].x, at[i].y, at[i].z);
+      nor.push(n.x, n.y, n.z);
+      col.push(color.r * shade, color.g * shade, color.b * shade);
+      ao.push(1);
+      const s = q[i][0] * VOXEL;
+      vox.push(Math.pow(clamp01(s / 1.4), 1.2) * 1.15, s);
     }
-  }
-  const geo = meshVoxels(vol, { jitter: 0.08, seed: 9, sway: () => 0.001 });
-  // aVox: how free each vertex is, and how far along the scarf it sits
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  const vox = geo.attributes.aVox as THREE.BufferAttribute;
-  const tmp = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    tmp.set(pos.getX(i), pos.getY(i), pos.getZ(i)).divideScalar(VOXEL);
-    let best = 0;
-    let bd = Infinity;
-    for (let k = 0; k < pts.length; k += 2) {
-      const d = pts[k].distanceToSquared(tmp);
-      if (d < bd) {
-        bd = d;
-        best = k;
-      }
+  };
+  // across: a trim band, the face, a trim band
+  const bands = [-1, -0.8, 0.8, 1];
+  for (let k = 0; k < steps; k++) {
+    const t = k / steps;
+    // blocky colour, a band per voxel's length, jittered like the rest of him
+    const jit = 0.92 + (((k * 7919) % 97) / 97) * 0.16;
+    for (let b = 0; b < 3; b++) {
+      const edge = b !== 1;
+      c.copy(t > 0.9 ? fray : edge && k % 4 < 2 ? trim : scarf);
+      const w0 = bands[b];
+      const w1 = bands[b + 1];
+      // the frayed end: the threads thin out toward the tip
+      if (t > 0.93 && edge && k % 3 === 0) continue;
+      quad([[k, w0, 1], [k, w1, 1], [k + 1, w1, 1], [k + 1, w0, 1]], c, jit);
+      quad([[k, w1, -1], [k, w0, -1], [k + 1, w0, -1], [k + 1, w1, -1]], c, jit * 0.8);
     }
-    const s = best * VOXEL;
-    vox.setXY(i, Math.pow(clamp01(s / 1.4), 1.2) * 1.15, s);
+    // its two edges
+    c.copy(t > 0.9 ? fray : trim);
+    quad([[k, 1, 1], [k, 1, -1], [k + 1, 1, -1], [k + 1, 1, 1]], c, jit * 0.85);
+    quad([[k, -1, -1], [k, -1, 1], [k + 1, -1, 1], [k + 1, -1, -1]], c, jit * 0.85);
   }
+  // the end, closed off
+  c.copy(fray);
+  quad([[steps, -1, 1], [steps, 1, 1], [steps, 1, -1], [steps, -1, -1]], c, 0.8);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setAttribute('aAO', new THREE.Float32BufferAttribute(ao, 1));
+  geo.setAttribute('aVox', new THREE.Float32BufferAttribute(vox, 2));
   geo.computeBoundingSphere();
   return geo;
 }
@@ -260,7 +275,12 @@ export class TitleRonin {
     }
     // the scarf streams downwind; he faces +Z, so the wind is already in his frame
     const ribbon = new THREE.Mesh(scarfRibbon(new THREE.Vector3(windDir.x, 0, windDir.y).normalize()), clothMaterial(true));
-    ribbon.castShadow = true;
+    // the waves carry it well outside the bounds it was built in: never cull it, and leave its
+    // shadow out (the shadow pass doesn't move with the cloth, so it would lie still under it)
+    ribbon.frustumCulled = false;
+    // a thin strip: both faces of each quad are drawn, whichever way it twists
+    (ribbon.material as THREE.Material).side = THREE.DoubleSide;
+    ribbon.castShadow = false;
     this.bones.get('torso')!.add(ribbon);
 
     for (const [side, s] of [['L', 1], ['R', -1]] as const) {
