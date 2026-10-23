@@ -158,7 +158,9 @@ const FOG = /* glsl */ `
   {
     // faces turned to the sun catch it, the cloud glows where it crosses the sun (the silver
     // lining), and far off it melts into the haze
-    vec3 voxN = normalize(cross(dFdx(vWorldPos), dFdy(vWorldPos)));
+    // (a face seen edge-on has no area: normalising that would be NaN, and bloom spreads NaN over the screen)
+    vec3 voxC = cross(dFdx(vWorldPos), dFdy(vWorldPos));
+    vec3 voxN = voxC / max(length(voxC), 1e-8);
     vec3 voxView = normalize(vWorldPos - cameraPosition);
     float toward = max(dot(voxView, uSunDir), 0.0);
     float lit = max(dot(voxN, uSunDir), 0.0);

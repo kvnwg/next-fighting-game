@@ -4,6 +4,7 @@ import { MapDef, PropKind } from '../../../shared/maps';
 import { Quality } from '../gfx/quality';
 import { CloudOptions } from '../gfx/sky';
 import { GrassOptions } from '../gfx/grass';
+import type { MeadowOptions } from '../gfx/meadow';
 import { ParticleOptions } from '../gfx/particles';
 import { TreePlacement } from '../gfx/trees';
 import { PropStyle, SceneryKind } from '../gfx/voxprops';
@@ -59,6 +60,8 @@ export interface BuildContext {
   /** voxel props (instanced) */
   props(list: PropPlacement[], into?: THREE.Object3D): void;
   grass(o: GrassOptions): void;
+  /** a field of real blades grown on the GPU around the camera (see gfx/meadow) */
+  meadow(o: MeadowOptions): void;
   /** ambient particles; falling kinds follow the camera unless `anchored` (e.g. petals under one tree) */
   particles(o: Omit<ParticleOptions, 'ambient'> & { anchored?: boolean }): void;
   water(o: Omit<WaterOptions, 'reflections' | 'skyHorizon' | 'skyZenith' | 'ambient'>): void;

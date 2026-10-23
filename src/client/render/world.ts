@@ -9,6 +9,7 @@ import { LeaderboardEntry } from '../../shared/protocol';
 import { rankOf } from '../../shared/ranks';
 import { G } from './gfx/globals';
 import { buildGrass } from './gfx/grass';
+import { buildMeadow } from './gfx/meadow';
 import { litMaterial, swayDepthMaterial } from './gfx/materials';
 import { Particles } from './gfx/particles';
 import { CloudLayer, Sky } from './gfx/sky';
@@ -216,6 +217,11 @@ export class MapView {
       grass: (o) => {
         const g = buildGrass(o, q.grass);
         g.name = 'grass';
+        g.traverse((m) => m.layers.set(DETAIL_LAYER));
+        this.group.add(g);
+      },
+      meadow: (o) => {
+        const g = buildMeadow(o, q.level);
         g.traverse((m) => m.layers.set(DETAIL_LAYER));
         this.group.add(g);
       },
