@@ -20,7 +20,8 @@ export interface Track {
 export type Bed = 'select' | 'combat';
 
 export const TRACKS: Record<Bed, Track[]> = {
-  select: [],
+  // a 24-second cut of it: the select screen only lasts ten
+  select: [{ file: 'dragon-castle.mp3', title: 'Dragon Castle', artist: 'Makai Symphony', licence: 'CC BY-NC 3.0', link: 'https://creativecommons.org/licenses/by-nc/3.0/', commercial: false }],
   combat: [
     { file: 'thunder-unison.mp3', title: 'Thunder Unison', artist: 'Keys Of Moon', licence: 'CC BY 3.0', link: 'https://creativecommons.org/licenses/by/3.0/', commercial: true },
     { file: 'good-day-to-die.mp3', title: 'Good Day To Die', artist: 'Miguel Johnson', licence: 'CC BY 3.0', link: 'https://creativecommons.org/licenses/by/3.0/', commercial: true },
