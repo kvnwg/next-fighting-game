@@ -619,11 +619,14 @@ const SAMPLE_GAIN: Record<string, number> = {
   // it replaced; his shield bash; the Warden's step (at the level of the gravel step he had); the vanish
   // and the jump (at the roll dodge's level: the synthesised ones are near silent), the blink, the body
   // falling (matched to the synthesised fall without its weapon drop), the buff, and the lava burn (level
-  // with a blade hit landing: the synthesised burn is near silent), the Warden's hammer shockwave (matched
-  // to the synthesised slam at his usual size); and the
+  // with a blade hit landing: the synthesised burn is near silent), the shockwaves (see shockwave()), the
+  // stomp (at a mikiri's strength), the flash line, the chain throw, the chi, the roar (6 dB under the
+  // heavy shockwave: the synthesised growl is low and quiet), the fog, whirl and soulfire (set against
+  // the shockwaves and swings: the synthesised ones are near silent), the bolt's layers (level with
+  // the bolt); and the
   // swings and the Monk's punches, each pool matched to the swing or hit it replaces (the Wraith's to
   // his old recorded swing)
-  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, jump: 0.31, bodyfall: 0.57, buff_shimmer: 0.28, buff_fire: 0.28, lava_burn: 0.43, juggernaut_crash: 0.9, juggernaut_punch: 0.9, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
+  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, jump: 0.31, bodyfall: 0.57, buff_shimmer: 0.28, buff_fire: 0.28, lava_burn: 0.43, juggernaut_crash: 0.9, juggernaut_punch: 0.9, shock_heavy_water: 0.55, shock_heavy_slam: 0.55, shock_light_tom: 0.93, shock_light_bag: 0.93, stomp_foot: 0.44, stomp_kick: 0.44, flashline: 0.25, chain_net: 0.93, chain_metal: 0.93, chi_crystal: 0.66, chi_drone: 0.66, roar_tiger: 0.34, roar_dragon: 0.34, roar_leopard: 0.34, fog_poof: 0.41, fog_boom: 0.41, whirl_flutter: 0.25, soulfire: 0.72, bolt_summon: 0.31, bolt_crackle: 0.31, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
@@ -778,9 +781,15 @@ export function groundSlam(o: Out, scale: number, iron: boolean): void {
   if (iron) ring(o, MAT.hammer, 0.2, { decay: 1, pitch: 0.95 });
 }
 
-/** A hammer slamming the ground: the Warden's recorded crash and punch, or the synthesised slam. */
-function hammerSlam(o: Out, p: Profile, scale: number): void {
-  if (p.id === 'juggernaut' && playLayers(o, ['juggernaut_crash', 'juggernaut_punch'], Math.min(1.2, scale) / 1.2)) return;
+/**
+ * A blow's shockwave through the ground: the Warden's hammer crash and punch, everyone else's
+ * recorded heavy or light slam (by size), or the synthesised slam until they have decoded. Each is
+ * matched to the synthesised slam at the size it stands for (his at 1.5, heavy at 1.5, light at 0.9).
+ */
+function shockwave(o: Out, p: Profile, scale: number): void {
+  const big = scale >= 1.2;
+  const layers = p.id === 'juggernaut' ? ['juggernaut_crash', 'juggernaut_punch'] : big ? ['shock_heavy_water', 'shock_heavy_slam'] : ['shock_light_tom', 'shock_light_bag'];
+  if (playLayers(o, layers, Math.min(1.2, scale) / (p.id === 'juggernaut' || big ? 1.2 : 0.9))) return;
   groundSlam(o, scale, p.edge === 'blunt');
 }
 
@@ -806,7 +815,7 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       break;
     case 'crush':
       hit(o, a, d, { heavy: true, anim: 'slam' });
-      hammerSlam(at(o, 0.02), a, 2);
+      shockwave(at(o, 0.02), a, 2);
       ring(o, MAT.hammer, 0.45, { decay: 1.6 });
       break;
     case 'pierce':
@@ -875,6 +884,8 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
 export type Floor = 'earth' | 'stone' | 'wood' | 'snow';
 
 function stompLayer(o: Out, p: Profile, k: number): void {
+  // everyone's recorded stamp: a creature's footstep over a deep kick
+  if (playLayers(o, ['stomp_foot', 'stomp_kick'], k)) return;
   thump(o, 85 / Math.sqrt(p.weight), 40, 0.25, 0.7 * k);
   noise(o, { color: 'pink', type: 'lowpass', f: 600, dur: 0.15, gain: 0.4 * k });
   if (p.body === 'plate') rattle(o, { count: 8, spread: 0.12, fLo: 1500, fHi: 4000, decay: 0.05 }, { gain: 0.3 * k, type: 'highpass', f: 1200 });
@@ -1049,7 +1060,7 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
   const k = clamp(scale, 0.3, 2.5);
   switch (kind) {
     case 'shockwave':
-      hammerSlam(o, p, k);
+      shockwave(o, p, k);
       return true;
     case 'stomp':
       stompLayer(o, p, Math.min(1.2, k * 0.8));
@@ -1060,10 +1071,11 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
       debris(o, 5, 0.6, 500, 1800, { gain: 0.3 });
       return true;
     case 'bolt': {
-      // a recorded lightning strike, if there is one
+      // a recorded lightning strike, if there is one, with the user's electric step and crackle over it
       const bolt = sampleFor(o.ctx, 'lancer_bolt');
       if (bolt) {
         playSample(o, bolt, BOLT_CUE_GAIN * Math.min(1.5, scale), jit(1, 0.03));
+        playLayers(o, ['bolt_summon', 'bolt_crackle'], Math.min(1.5, scale));
         return true;
       }
     }
@@ -1076,6 +1088,8 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
       osc(o, { f: 50, f1: 30, dur: 1.2, gain: 0.4, delay: 0.03 });
       return true;
     case 'chain': {
+      // the user's chain net over a wet metal chain
+      if (playLayers(o, ['chain_net', 'chain_metal'])) return true;
       // the sickle thrown out on its chain: a whirr, the links running out, the snap as it goes taut
       const am = o.ctx.createGain();
       am.gain.value = 0.5;
@@ -1110,27 +1124,42 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
       osc(o, { f: 1320, dur: 0.8, gain: 0.02, shape: SHAPES.swing(0.3, 1.5) });
       return true;
     case 'chi':
+      // the user's crystal impact over a tapering electric drone
+      if (playLayers(o, ['chi_crystal', 'chi_drone'], Math.min(1.2, k) / 0.9)) return true;
       noise(o, { color: 'pink', type: 'lowpass', f: 700, f1: 150, dur: 0.35, gain: 0.55 * Math.min(1.2, k) });
       osc(o, { f: 120, f1: 55, dur: 0.3, gain: 0.45 });
       whoosh(o, 500, 0.22, 1, 0.25, 2.2, 0.3);
       return true;
     case 'flashline':
+      // the user's sword scrape
+      if (playLayers(o, ['flashline'])) return true;
       noise(o, { type: 'highpass', f: 5000, f1: 9000, dur: 0.25, gain: 0.1, shape: SHAPES.swing(0.4, 2) });
       ring(o, p.metal, 0.05, { decay: 1, hard: 0.5 });
       return true;
     case 'roar':
+      // the user's tiger, dragon and leopard together
+      if (playLayers(o, ['roar_tiger', 'roar_dragon', 'roar_leopard'])) return true;
       osc(filtered(o, 'lowpass', 300), { type: 'sawtooth', f: 70, f1: 58, dur: 0.9, gain: 0.07, shape: SHAPES.swing(0.25, 1.5) });
       noise(o, { color: 'brown', type: 'lowpass', f: 300, dur: 0.9, gain: 0.22, shape: SHAPES.swing(0.25, 1.5) });
       return true;
     case 'smoke':
     case 'fog':
+      // the fog is the user's airy poof over a trailer's boom (smoke keeps the synthesised puff)
+      if (kind === 'fog' && playLayers(o, ['fog_poof', 'fog_boom'])) return true;
       noise(o, { color: 'pink', type: 'lowpass', f: 1200, f1: 300, dur: 0.3, gain: 0.25 });
       return true;
     case 'whirl':
     case 'spiral':
+      // the user's howling gust and a flutter whoosh, in equal shares
+      if (playLayers(o, ['whirl_flutter'])) {
+        playLayers(o, ['wind_howl'], 1.26);
+        return true;
+      }
       whoosh(o, 800, 0.45, 1.4, 0.2, 2, 0.5);
       return true;
     case 'soulfire':
+      // the user's fire burst, extinguished
+      if (playLayers(o, ['soulfire'])) return true;
       noise(o, { type: 'bandpass', f: 2000, f1: 600, q: 3, dur: 0.6, gain: 0.2 });
       osc(o, { f: 220, f1: 110, dur: 0.6, gain: 0.04 });
       return true;
