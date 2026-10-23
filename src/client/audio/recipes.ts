@@ -9,7 +9,7 @@ import type { Edge, Profile } from './profiles';
 import { deflectClang } from './clang';
 import { playSample, sampleFor } from './samples';
 import { VOICES } from './voices';
-import { SHAPES, Out, at, chance, clamp, crackle, crunch, debris, filtered, jit, modal, noise, osc, rand, rattle, scaled, spatter, squelch, tear, thump, via } from './synth';
+import { SHAPES, Out, at, chance, clamp, pick, crackle, crunch, debris, filtered, jit, modal, noise, osc, rand, rattle, scaled, spatter, squelch, tear, thump, via } from './synth';
 
 // ------------------------------------------------------------------ layers
 
@@ -87,18 +87,8 @@ export interface SwingOpts {
  * if the blow lands, so a miss sounds like a miss: the whole whoosh carrying on through nothing.
  */
 export function swing(o0: Out, p: Profile, s: SwingOpts = {}): void {
-  // a recorded swing for this fighter, if there is one: heavies slower and lower
-  // (the Lancer swings the glaive's own whoosh or the katana's, with the spear's lightning
-  // crackling behind it)
-  const take = p.id === 'lancer' ? (chance(0.5) ? 'lancer_swing' : 'ronin_swing') : `${p.id}_swing`;
-  const rec = sampleFor(o0.ctx, take);
-  if (rec) {
-    const thrust = s.anim === 'thrust' || s.anim === 'charge';
-    playSample(o0, rec, sampleGain(take) * (s.heavy ? 1.15 : 1), jit(1, 0.04) * (s.heavy ? 0.86 : thrust ? 1.08 : 1));
-    const zap = p.lightning ? sampleFor(o0.ctx, 'lancer_zap') : null;
-    if (zap) playSample(o0, zap, sampleGain('lancer_zap') * (s.heavy ? 1.3 : 1), jit(1, 0.06), 0.02);
-    return;
-  }
+  // a recorded swing for this fighter, if there is one (see SAMPLE_SETS): heavies slower and lower
+  if (recordedSwing(o0, p, s)) return;
   const voice = VOICES[p.id]?.swing;
   if (voice) voice(o0, p, s);
   else BASE.swing(o0, p, s);
@@ -202,14 +192,8 @@ function tell(o: Out, a: Profile, h: number): void {
 
 /** A clean hit: what the attacker's weapon does to what the defender is wearing. */
 export function hit(o: Out, a: Profile, d: Profile, s: HitOpts = {}): void {
-  // a recorded hit for this weapon, if there is one: heavies lower and harder. Started a little
-  // into the clip, where it has swelled, so it lands with the blow
-  const rec = sampleFor(o.ctx, `${a.id}_hit`);
-  if (rec) {
-    const h = (s.heavy ? 1.2 : 1) * (s.armor ? 0.75 : 1) * (s.backstab ? 1.1 : 1);
-    playSample(o, rec, sampleGain(`${a.id}_hit`) * h, jit(1, 0.04) * (s.heavy ? 0.88 : 1), 0, 0.04);
-    return;
-  }
+  // a recorded hit for this weapon, if there is one (see SAMPLE_SETS)
+  if (recordedHit(o, a, s)) return;
   const voice = VOICES[a.id]?.hit;
   if (voice) voice(o, a, d, s);
   else BASE.hit(o, a, d, s);
@@ -500,7 +484,12 @@ export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void
   // one clang for everyone: a take of the recorded clash, or the synthesised one (clang.ts) until
   // the recordings have decoded. Back-to-back deflects climb a little in pitch and level.
   void a;
-  void d;
+  // the Knight deflects on his shield: a heavy thud, not steel ringing
+  const shield = d.id === 'paladin' ? sampleFor(o.ctx, 'paladin_deflect') : null;
+  if (shield) {
+    playSample(o, shield, sampleGain('paladin_deflect') * (s.heavy ? 1.15 : 1), jit(1, 0.04));
+    return;
+  }
   const buf = sampleFor(o.ctx, 'deflect');
   if (!buf) {
     deflectClang(o, s);
@@ -512,9 +501,91 @@ export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void
 
 /** The recorded deflect's level in the mix, matched to the synthesised one's loudness. */
 const DEFLECT_GAIN = 1.6;
+/**
+ * Which recordings each fighter's swings and hits use: a pool of takes (one picked at random), and
+ * layers on top (`swingLayer` on every swing, `heavySwingLayer` on heavies, `hitLayer` on every hit,
+ * `heavyHitLayer` on heavies). Fighters not listed keep their synthesised sounds.
+ */
+interface SampleSet {
+  swing?: string[];
+  /** the swing takes' level and how far into them to start (where the whoosh has built) */
+  swingGain?: number;
+  swingOffset?: number;
+  swingLayer?: string;
+  heavySwingLayer?: string;
+  hit?: string[];
+  /** the flesh take's level under its layers */
+  hitGain?: number;
+  hitLayer?: string;
+  heavyHitLayer?: string;
+}
+const SAMPLE_SETS: Record<string, SampleSet> = {
+  ronin: { swing: ['ronin_swing'], hit: ['ronin_hit'] },
+  duelist: { swing: ['duelist_swing'], hitGain: 0.6 },
+  // the glaive's whoosh or the katana's, lightning crackling behind it; the cut arcs, a heavy strikes
+  lancer: { swing: ['lancer_swing', 'ronin_swing'], swingLayer: 'lancer_zap', hitGain: 0.6, hitLayer: 'lancer_spark', heavyHitLayer: 'lancer_bolt' },
+  // the katana's swooshes (weightier) with a holy glow on heavies; every cut lands with a radiant impact
+  paladin: { swing: ['ronin_swing'], swingGain: 1.5, heavySwingLayer: 'paladin_glow', hitGain: 0.75, hitLayer: 'paladin_impact' },
+  // dark whooshes for the sickle
+  reaper: { swing: ['reaper_swing'], swingOffset: 0.06, hitGain: 0.78 },
+  shade: { hitGain: 0.78 },
+  // a hammer lands harder than a sword
+  juggernaut: { hitGain: 1.4 },
+  // the Monk keeps his own (synthesised) sounds
+  monk: {},
+};
+/** Every fighter's hit, unless their set names their own: a longsword slice with a ring-out. */
+const DEFAULT_HIT = ['default_hit'];
+
+function recordedSwing(o: Out, p: Profile, s: SwingOpts): boolean {
+  // the Ronin's iai: the blade drawn from the sheath into the cut (started well into the clip,
+  // since the draw is over in ~130 ms)
+  if (p.id === 'ronin' && s.anim === 'draw') {
+    const draw = sampleFor(o.ctx, 'ronin_unsheathe');
+    if (draw) {
+      playSample(o, draw, sampleGain('ronin_unsheathe'), jit(1, 0.02), 0, 0.16);
+      return true;
+    }
+  }
+  const set = SAMPLE_SETS[p.id];
+  if (!set?.swing) return false;
+  const take = pick(set.swing);
+  const rec = sampleFor(o.ctx, take);
+  if (!rec) return false;
+  const thrust = s.anim === 'thrust' || s.anim === 'charge';
+  playSample(o, rec, sampleGain(take) * (set.swingGain ?? 1) * (s.heavy ? 1.15 : 1), jit(1, 0.04) * (s.heavy ? 0.86 : thrust ? 1.08 : 1), 0, set.swingOffset ?? 0);
+  const layer = set.swingLayer && sampleFor(o.ctx, set.swingLayer);
+  if (layer) playSample(o, layer, sampleGain(set.swingLayer!) * (s.heavy ? 1.3 : 1), jit(1, 0.06), 0.02);
+  // the heavy layer swells a beat ahead, so start it part way in
+  const heavy = s.heavy && set.heavySwingLayer ? sampleFor(o.ctx, set.heavySwingLayer) : null;
+  if (heavy) playSample(o, heavy, sampleGain(set.heavySwingLayer!), jit(1, 0.04), 0, 0.14);
+  return true;
+}
+
+function recordedHit(o: Out, a: Profile, s: HitOpts): boolean {
+  // the Monk (who has a set, but no hit in it) keeps his; everyone else cuts with their own
+  // takes or the default slice. A shield bash is no cut: it keeps its synthesised thud
+  const set = SAMPLE_SETS[a.id] ?? {};
+  const pool = set.hit ?? (a.id === 'monk' ? null : DEFAULT_HIT);
+  if (!pool || s.anim === 'bash') return false;
+  const take = pick(pool);
+  const rec = sampleFor(o.ctx, take);
+  if (!rec) return false;
+  const h = (s.heavy ? 1.2 : 1) * (s.armor ? 0.75 : 1) * (s.backstab ? 1.1 : 1);
+  // started a little into the clip, where it has swelled, so it lands with the blow
+  playSample(o, rec, sampleGain(take) * h * (set.hitGain ?? 1), jit(1, 0.04) * (s.heavy ? 0.88 : 1), 0, 0.04);
+  const layer = set.hitLayer && sampleFor(o.ctx, set.hitLayer);
+  if (layer) playSample(o, layer, sampleGain(set.hitLayer!) * h, jit(1, 0.05));
+  const heavy = s.heavy && set.heavyHitLayer ? sampleFor(o.ctx, set.heavyHitLayer) : null;
+  if (heavy) playSample(o, heavy, sampleGain(set.heavyHitLayer!), jit(1, 0.04));
+  return true;
+}
+
 /** The other recordings' levels in the mix, each matched (by rendered loudness) to the synthesised sound it replaces. */
-const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12 };
+const SAMPLE_GAIN: Record<string, number> = { block: 0.79, ronin_swing: 0.28, ronin_hit: 0.34, duelist_swing: 0.62, lancer_swing: 0.3, lancer_zap: 0.12, lancer_spark: 0.07, lancer_bolt: 0.13, paladin_glow: 0.22, paladin_impact: 0.2, reaper_swing: 0.2, default_hit: 0.34, paladin_deflect: 0.52, ronin_unsheathe: 0.4 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
+/** the recorded lightning strike as the Lancer's lightning cue (louder than under a hit) */
+const BOLT_CUE_GAIN = 0.3;
 
 function deflectBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
   const st = striker(a, s.anim, !!s.heavy);
@@ -684,8 +755,11 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       noise(o, { type: 'highpass', f: 5000, dur: 0.12, gain: 0.18, delay: 0.35, shape: SHAPES.swing(0.5, 2) });
       ring(o, MAT.rapier, 0.18, { pitch: 1.04, delay: 0.38 });
       break;
-    case 'thunder':
+    case 'thunder': {
       // impaled, and the lightning goes through the spear into them
+      const bolt = sampleFor(o.ctx, 'lancer_bolt');
+      if (bolt) playSample(o, bolt, sampleGain('lancer_bolt') * 1.5, 0.92);
+    }
       hit(o, a, d, { heavy: true, anim: 'thrust' });
       crackle(o, 0.9, 40, { gain: 0.55, type: 'highpass', f: 1800 });
       noise(o, { type: 'highpass', f: 900, f1: 400, dur: 0.15, gain: 0.9, a: 0.001 });
@@ -890,7 +964,15 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
       crunch(o, 0.5, { gain: 0.4, type: 'lowpass', f: 600 });
       debris(o, 5, 0.6, 500, 1800, { gain: 0.3 });
       return true;
-    case 'bolt':
+    case 'bolt': {
+      // a recorded lightning strike, if there is one
+      const bolt = sampleFor(o.ctx, 'lancer_bolt');
+      if (bolt) {
+        playSample(o, bolt, BOLT_CUE_GAIN * Math.min(1.5, scale), jit(1, 0.03));
+        return true;
+      }
+    }
+    // falls through to the synthesised one
       // lightning: the crack, the arc spitting, the thunder rolling away
       noise(o, { type: 'highpass', f: 1500, f1: 600, dur: 0.08, gain: 0.9, a: 0.001 });
       crackle(o, 0.45 * k, 45, { gain: 0.55, type: 'highpass', f: 1500 });
