@@ -45,19 +45,12 @@ describe('posture', () => {
     expect(f.posture).toBeLessThan(30);
   });
 
-  it('comes back shaken from a posture break, and only refills a while after getting up', () => {
+  it('comes back whole when a posture break ends', () => {
     const f = new Fighter('a', 'ronin');
     f.addPosture(f.maxPosture, 1000);
     f.force('broken', 1000, COMBAT.brokenTime);
-    const up = 1000 + COMBAT.brokenTime + 10;
-    f.update(up);
+    f.update(1000 + COMBAT.brokenTime + 10);
     expect(f.state).not.toBe('broken');
-    const shaken = f.maxPosture * COMBAT.brokenRecoverPosture;
-    expect(f.posture).toBe(shaken);
-    // nothing comes back for the usual wait, counted from getting up
-    run(f, up, up + COMBAT.postureRegenDelay - 100);
-    expect(f.posture).toBe(shaken);
-    run(f, up + COMBAT.postureRegenDelay - 100, up + COMBAT.postureRegenDelay + 3000);
     expect(f.posture).toBe(0);
   });
 });

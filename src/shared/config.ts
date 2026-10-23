@@ -93,11 +93,8 @@ export const COMBAT = {
   executeDamage: 0.45,
   /** how far apart the executioner and the victim stand, per unit of body scale */
   executeDistance: 1.55,
-  /**
-   * Posture left (fraction of the bar) when a posture break ends without an execution: the guard
-   * comes back shaken, not whole, and only starts refilling postureRegenDelay after they recover.
-   */
-  brokenRecoverPosture: 0.6,
+  /** Posture left after a posture break ends without a deathblow (0: the guard comes back whole). */
+  brokenRecoverPosture: 0,
 
   /** Attack recovery can be cancelled into guard once this fraction of it has elapsed. */
   recoveryGuardCancel: 0.4,
