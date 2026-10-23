@@ -7,6 +7,7 @@ import type { AttackAnim } from '../../shared/characters';
 import { MAT, Material } from './materials';
 import type { Edge, Profile } from './profiles';
 import { deflectClang } from './clang';
+import { playSample, sampleFor } from './samples';
 import { VOICES } from './voices';
 import { SHAPES, Out, at, chance, clamp, crackle, crunch, debris, filtered, jit, modal, noise, osc, rand, rattle, scaled, spatter, squelch, tear, thump, via } from './synth';
 
@@ -470,11 +471,21 @@ function blockBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
 
 /** The perfect deflect: the sound the game is named for. Bright, ringing, and long. */
 export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
-  // one clang for everyone (see clang.ts)
+  // one clang for everyone: a take of the recorded clash, or the synthesised one (clang.ts) until
+  // the recordings have decoded. Back-to-back deflects climb a little in pitch and level.
   void a;
   void d;
-  deflectClang(o, s);
+  const buf = sampleFor(o.ctx, 'deflect');
+  if (!buf) {
+    deflectClang(o, s);
+    return;
+  }
+  const streak = Math.min(4, Math.max(1, s.streak ?? 1)) - 1;
+  playSample(o, buf, DEFLECT_GAIN * (1 + 0.08 * streak) * (s.heavy ? 1.1 : 1), jit(1, 0.035) * (1 + 0.025 * streak));
 }
+
+/** The recorded deflect's level in the mix, matched to the synthesised one's loudness. */
+const DEFLECT_GAIN = 1.6;
 
 function deflectBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
   const st = striker(a, s.anim, !!s.heavy);

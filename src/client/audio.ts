@@ -7,6 +7,7 @@
 import { CHARACTERS, CharacterId, getAttack } from '../shared/characters';
 import type { CombatEvent } from '../shared/protocol';
 import { LEGACY_LEVEL, Sfx, legacy } from './audio/legacy';
+import { loadSamples } from './audio/samples';
 import { LEVEL, WET } from './audio/levels';
 import { Mixer, Voice } from './audio/mixer';
 import { Profile, profile } from './audio/profiles';
@@ -100,6 +101,7 @@ class AudioEngine {
       if (!Ctx) return;
       this.ctx = new Ctx();
       this.mix = new Mixer(this.ctx);
+      void loadSamples(this.ctx);
       this.mix.setRoom(this.roomId);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
