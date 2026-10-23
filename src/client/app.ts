@@ -688,6 +688,15 @@ class App {
       else this.net.send(this.queue ? { t: 'unqueue' } : { t: 'queue', mode: 'ranked' });
       return;
     }
+    if (pressed && b === 'play') {
+      if (this.ui.chatOpen || this.ui.modalOpen || this.kind !== 'lobby') return;
+      // the menu needs the cursor: a locked mouse would leave nothing to click it with
+      if (this.ui.togglePlayPanel()) {
+        this.input.releaseAll();
+        this.input.exitLock();
+      }
+      return;
+    }
     if (pressed && (b === 'accept' || b === 'decline')) {
       this.ui.answerChallenge(b === 'accept');
       return;

@@ -25,6 +25,7 @@ export type Bind =
   | 'decline'
   | 'ranked'
   | 'practice'
+  | 'play'
   | 'escape';
 
 export const KEYS: Record<Bind, string[]> = {
@@ -49,6 +50,8 @@ export const KEYS: Record<Bind, string[]> = {
   decline: ['KeyN'],
   ranked: ['KeyK'],
   practice: ['KeyP'],
+  // the Play menu, with the cursor freed to click it
+  play: ['KeyM'],
   escape: ['Escape'],
 };
 

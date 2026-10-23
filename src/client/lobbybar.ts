@@ -52,7 +52,7 @@ export class LobbyBar {
       <div class="lobby-bar">
         <div class="lb-row">
           <span class="lb-portrait"><img alt="" draggable="false"></span>
-          <button class="lb-play" id="lb-play"><span class="lb-play-ico">${icon('swords')}</span><span class="lb-play-text">Play</span></button>
+          <button class="lb-play" id="lb-play"><span class="lb-play-ico">${icon('swords')}</span><span class="lb-play-text">Play</span><span class="key lb-play-key">M</span></button>
         </div>
         <div class="lb-icons">
           ${tile('fighters', ICONS.fighters, 'Fighters', 'C')}

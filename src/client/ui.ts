@@ -396,6 +396,12 @@ export class UI {
     this.lobbyBar.setChar(id);
   }
 
+  /** Open or close the play panel (M); true if it's now open. */
+  togglePlayPanel(): boolean {
+    this.lobbyBar.setPanel(!this.lobbyBar.isOpen);
+    return this.lobbyBar.isOpen;
+  }
+
   /** Close the play panel if it's open (Escape); true if it was. */
   closePlayPanel(): boolean {
     if (!this.lobbyBar.isOpen) return false;
@@ -888,6 +894,7 @@ export class UI {
               <tr><td>R</td><td>Character ability</td></tr>
               <tr><td>Tab / Q / MMB</td><td>Lock on</td></tr>
               <tr><td>G</td><td>Challenge the player you're looking at</td></tr>
+              <tr><td>M</td><td>Play menu (frees the cursor to click it)</td></tr>
               <tr><td>K · P</td><td>Queue ranked · Practice vs bot</td></tr>
               <tr><td>C · L · H</td><td>Characters · Ladder · Help</td></tr>
               <tr><td>Esc</td><td>Free the cursor (to click menus)</td></tr>
