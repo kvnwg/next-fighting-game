@@ -32,11 +32,15 @@ export interface MeadowOptions {
 }
 
 /** Spacing (m) and reach (m) of the near and far grids, per quality tier. */
+/**
+ * Every blade's vertices run the whole shader (mask lookup, wind, pushes), so the count is the
+ * cost: about 450k vertices a frame on high, 190k on medium, 50k on low (no far grid there).
+ */
 const TIERS = {
-  low: { near: [0.34, 10], far: [1.0, 28] },
-  medium: { near: [0.26, 14], far: [0.75, 40] },
-  high: { near: [0.2, 18], far: [0.6, 50] },
-  ultra: { near: [0.17, 20], far: [0.5, 56] },
+  low: { near: [0.45, 8], far: null },
+  medium: { near: [0.36, 11], far: [1.1, 28] },
+  high: { near: [0.3, 14], far: [0.9, 36] },
+  ultra: { near: [0.26, 16], far: [0.8, 42] },
 } as const;
 
 /**
@@ -149,7 +153,7 @@ vec3 bladeColor;
   float alive = (r2.x < dens * keep ? 1.0 : 0.0) * edge;
   float flower = step(1.0 - mask.b * 0.07, r2.y) * alive;
   float height = (0.6 + r2.y * 0.7) * mix(0.55, 1.0, dens) * uMeadowGrid.w * alive * mix(0.4, 1.0, edge) * (1.0 + flower * 0.2);
-  float width = (0.07 + r.x * 0.03) * (1.0 + (1.0 - keep) * 0.8) * uMeadowWide;
+  float width = (0.09 + r.x * 0.04) * (1.0 + (1.0 - keep) * 0.8) * uMeadowWide;
   vec2 fdir = normalize(r - 0.5 + 1e-3);
 
   // wind: long gust fronts rolling along it, a quicker ripple, and the tips' flutter
@@ -262,10 +266,10 @@ export function buildMeadow(o: MeadowOptions, level: keyof typeof TIERS): THREE.
   const box = new THREE.Vector4(o.bounds.x0, o.bounds.z0, 1 / w, 1 / d);
   const height = o.height ?? 0.6;
   const layers: [number, number, number, number, number][] = [
-    // spacing, reach, where it starts, blade width, segments
-    [tier.near[0], tier.near[1], 0, 1, 3],
-    [tier.far[0], tier.far[1], tier.near[1] * 0.85, 2.2, 2],
+    // spacing, reach, where it starts, blade width, blocks per blade
+    [tier.near[0], tier.near[1], 0, 1, 2],
   ];
+  if (tier.far) layers.push([tier.far[0], tier.far[1], tier.near[1] * 0.85, 2, 1]);
   for (const [s, reach, inner, wide, segs] of layers) {
     const G = Math.ceil((reach * 2) / s);
     const geo = bladeGeometry(segs);

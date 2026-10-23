@@ -171,10 +171,10 @@ export const lobbyRecipe: MapRecipe = {
     }
     ctx.props(fence);
     // groves in the rolling grass: clumps, with clear meadow between them
-    const groves = scatter(Math.round(70 * q.scenery), { x0: -112, z0: -112, x1: 112, z1: 112 }, (x, z) => Math.max(Math.abs(x), Math.abs(z)) > 76 && fbm2(x * 0.04, z * 0.04, 2, 23) > 0.52, 4, 101, ctx.taken);
+    const groves = scatter(Math.round(40 * q.scenery), { x0: -112, z0: -112, x1: 112, z1: 112 }, (x, z) => Math.max(Math.abs(x), Math.abs(z)) > 76 && fbm2(x * 0.04, z * 0.04, 2, 23) > 0.52, 4, 101, ctx.taken);
     // the forest thickening up the foothills
     const forest = scatter(
-      Math.round(320 * q.scenery),
+      Math.round(170 * q.scenery),
       { x0: -235, z0: -235, x1: 235, z1: 235 },
       (x, z) => {
         const r = Math.hypot(x, z);
