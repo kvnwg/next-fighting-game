@@ -1,14 +1,13 @@
 /**
- * Ambient auras: particles a fighter gives off all the time, part of who they are. The Ronin
- * steams like a body still hot from the last fight on a cold morning: soft white and grey puffs
- * rising off the shoulders and head, streaming back as he moves, and boiling off the blade as it
- * cuts.
+ * Ambient auras: particles a fighter gives off all the time, part of who they are. The Ronin's
+ * blade steams like steel still hot from the forge on a cold morning: soft white and grey wisps
+ * rising off it all along its length, streaming back as he moves, and boiling off as it cuts.
  */
 import type { CharacterId } from '../shared/characters';
 
 export interface Aura {
   colors: string[];
-  /** puffs per second standing, extra per second when moving at full walk, and off the blade mid-swing */
+  /** puffs per second off the blade standing, extra moving at full walk, and extra mid-swing */
   rate: number;
   moveRate: number;
   swingRate: number;
@@ -17,9 +16,6 @@ export interface Aura {
   size: number;
   grow: number;
   life: number;
-  /** where on the body it comes off: height range (x body scale) and spread across the shoulders */
-  from: [number, number];
-  spread: number;
 }
 
 export const AURAS: Partial<Record<CharacterId, Aura>> = {
@@ -29,10 +25,8 @@ export const AURAS: Partial<Record<CharacterId, Aura>> = {
     moveRate: 14,
     swingRate: 55,
     rise: 0.55,
-    size: 0.07,
+    size: 0.05,
     grow: 3.2,
-    life: 1.7,
-    from: [1.25, 1.95],
-    spread: 0.24,
+    life: 1.4,
   },
 };

@@ -802,7 +802,7 @@ class App {
   /** Per-fighter aura emitters: how many puffs are owed, and where the fighter was last frame. */
   private auraState = new Map<string, { acc: number; prev: THREE.Vector3 }>();
 
-  /** The fighter's ambient aura (see auras.ts): puffs off the body, more on the move, off the blade in a swing. */
+  /** The fighter's ambient aura (see auras.ts): steam off the blade, more on the move and much more in a swing. */
   private auraFx(f: ClientFighter, dt: number): void {
     const aura = AURAS[f.roster.char];
     if (!aura || dt <= 0 || !f.model.root.visible) return;
@@ -818,32 +818,26 @@ class App {
     const fx = this.effects;
     const color = () => aura.colors[Math.floor(Math.random() * aura.colors.length)];
     const opts = { life: aura.life, size: aura.size * k, gravity: -aura.rise * 0.35, drag: 1.1, grow: aura.grow };
-    // off the body: rising, streaming back against the way he's moving
-    st.acc += (aura.rate + aura.moveRate * Math.min(1, speed / 3)) * dt;
-    const fw = forward(f.yaw);
+    // off the blade, anywhere along it: rising and streaming back against the way he moves,
+    // and boiling off much harder as it cuts
+    const base = this.tmp2;
+    const tip = this.tmp3;
+    f.model.weaponTips(base, tip);
+    st.acc += (aura.rate + aura.moveRate * Math.min(1, speed / 3) + (f.model.swingMain ? aura.swingRate : 0)) * dt;
     while (st.acc >= 1) {
       st.acc -= 1;
-      const side = (Math.random() * 2 - 1) * aura.spread * k;
-      const h = (aura.from[0] + Math.random() * (aura.from[1] - aura.from[0])) * k;
-      const back = (Math.random() * 0.12 - 0.1) * k;
+      // the far half of the blade gives off most
+      const t = 0.25 + 0.75 * Math.sqrt(Math.random());
       fx.emit(
-        f.pos.x + fw.z * side + fw.x * back,
-        f.pos.y + h,
-        f.pos.z - fw.x * side + fw.z * back,
-        -vx * 0.35 + (Math.random() - 0.5) * 0.15,
-        aura.rise * (0.6 + Math.random() * 0.6),
-        -vz * 0.35 + (Math.random() - 0.5) * 0.15,
+        base.x + (tip.x - base.x) * t + (Math.random() - 0.5) * 0.04 * k,
+        base.y + (tip.y - base.y) * t + (Math.random() - 0.5) * 0.04 * k,
+        base.z + (tip.z - base.z) * t + (Math.random() - 0.5) * 0.04 * k,
+        -vx * 0.3 + (Math.random() - 0.5) * 0.15,
+        aura.rise * (0.5 + Math.random() * 0.6),
+        -vz * 0.3 + (Math.random() - 0.5) * 0.15,
         color(),
-        opts,
+        f.model.swingMain ? { ...opts, life: aura.life * 0.6 } : opts,
       );
-    }
-    // boiling off the blade as it cuts
-    if (f.model.swingMain) {
-      const n = Math.round(aura.swingRate * dt + Math.random());
-      const tip = f.weaponTip(this.tmp3);
-      for (let i = 0; i < n; i++) {
-        fx.emit(tip.x, tip.y, tip.z, (Math.random() - 0.5) * 0.3, aura.rise * (0.3 + Math.random() * 0.5), (Math.random() - 0.5) * 0.3, color(), { ...opts, life: aura.life * 0.6, size: aura.size * k * 0.8 });
-      }
     }
   }
 
