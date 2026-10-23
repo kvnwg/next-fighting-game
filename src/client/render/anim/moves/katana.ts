@@ -9,11 +9,13 @@
  * Most paths are authored relative to the hips (`body: true`), so a blade that points ahead
  * points at the opponent however far the torso has wound or pitched.
  *
- * The moves with a clear moment in the reference (the sword clip, player in yellow) are keyed joint
- * by joint from traces of it (`keyed`): where the fists sit in front of the chest at each phase,
- * and where the blade points. Swallow Cut is the flat cut at 1.50-1.75 s, Rising Petal the hanging
- * point-down whip at 3.42-3.75 s, Heaven Splitter the jodan cut at 1.92-2.33 s, Gatotsu the thrust
- * at 2.67-3.00 s, Ground Wheel the wide low sweep at 4.00-4.33 s.
+ * The moves with a clear moment in a reference are keyed joint by joint from traces of it (`keyed`):
+ * where the fists sit in front of the chest at each phase, and where the blade points. The light
+ * string and the first heavy follow the Dueling Grounds katana duel (the user in yellow): Swallow
+ * Cut the flat cut at 0.73-1.10 s, Rising Petal the high-left to low-right cut at 1.27-1.65 s, Twin
+ * Swallow the drop-and-rise that ends point-up at 1.72-2.25 s, Heaven Splitter the wound-up kesa at
+ * 4.90-5.95 s. From the older sword clip: Gatotsu the thrust at 2.67-3.00 s, Ground Wheel the wide
+ * low sweep at 4.00-4.33 s. Every chamber is drawn up or out to the side, so it reads from in front.
  */
 import { B, K, P, Style, X, arc, fx, hitAt, line, mv, N, seq, track } from '../author';
 import type { KeyIn, Motion, V3 } from '../author';
@@ -123,80 +125,117 @@ function keyed(body: KeyIn[], keys: WKey[], lead = 0.1, blend = 0.05): Motion {
   return seq(parts, blend);
 }
 
-// Swallow Cut (ref 1.50-1.75 s): the point drops low on the right, ahead of the right foot; the fists
-// sweep flat across the hips from right to left, the left hand closing on the pommel as the blade
-// points at them, and carry on round to the left chest, the point rising up past the left shoulder
+// Swallow Cut (duel ref 0.73-1.10 s): the point snaps up from the low guard to upright in front of
+// the right chest, the hand rides up beside the right temple with the blade cocked up and back over
+// the right shoulder (the tell), then wheels out flat to the right and one arm sweeps it level across
+// the front at chest height, right to left, carrying on round to the left hip with the point trailed
+// back past it
 const swallowHit = 0.45;
 const swallowBody = [
-  K(-0.1, B({ ...body, twist: -0.5, hipTwist: -0.25, lean: 0.12, crouch: -0.12, step: 0.3, back: 0.3 })),
-  K(0.28, B({ ...body, twist: -0.1, hipTwist: 0.15, lean: 0.2, crouch: -0.18, step: 0.44, back: 0.32 })),
-  K(swallowHit, B({ ...body, twist: 0.3, hipTwist: 0.3, lean: 0.28, crouch: -0.22, step: 0.52, back: 0.34 })),
-  K(0.85, B({ ...body, twist: 0.75, hipTwist: 0.35, lean: 0.24, crouch: -0.22, step: 0.54, back: 0.34 })),
-  K(1.05, B({ ...body, twist: 0.8, hipTwist: 0.35, lean: 0.32, crouch: -0.3, step: 0.54, back: 0.34, headPitch: 0.08 })),
+  // standing up a little as the point comes up, the chest still square
+  K(-0.4, B({ ...body, twist: -0.15, hipTwist: -0.05, lean: 0.04, crouch: -0.1, step: 0.3, back: 0.28 })),
+  // wound right behind the cocked blade, the weight back
+  K(-0.1, B({ ...body, twist: -0.55, hipTwist: -0.25, lean: 0.06, crouch: -0.12, step: 0.3, back: 0.32, side: 0.05 })),
+  K(0.2, B({ ...body, twist: -0.3, hipTwist: 0.0, lean: 0.16, crouch: -0.16, step: 0.42, back: 0.32 })),
+  K(swallowHit, B({ ...body, twist: 0.2, hipTwist: 0.25, lean: 0.26, crouch: -0.2, step: 0.52, back: 0.34 })),
+  K(0.75, B({ ...body, twist: 0.6, hipTwist: 0.35, lean: 0.26, crouch: -0.22, step: 0.54, back: 0.34 })),
+  K(1.05, B({ ...body, twist: 0.75, hipTwist: 0.38, lean: 0.24, crouch: -0.24, step: 0.54, back: 0.34, headPitch: 0.06 })),
 ];
 const swallow = keyed(swallowBody, [
-  { s: -0.1, grip: [-0.3, 0.06, 0.2], dir: [-0.65, -0.33, 0.68] },
-  { s: 0.28, grip: [-0.22, 0.1, 0.38], dir: [-0.55, -0.2, 0.8] },
-  { s: swallowHit, grip: [-0.1, 0.18, 0.4], dir: [0.02, -0.04, 1], g2: G2 },
-  { s: 0.62, grip: [0.02, 0.24, 0.36], dir: [0.72, 0.1, 0.68], g2: G2 },
-  { s: 0.85, grip: [0.12, 0.34, 0.3], dir: [0.75, 0.62, -0.2], g2: G2 },
-  { s: 1.05, grip: [0.12, 0.32, 0.28], dir: [0.72, 0.6, -0.35], g2: G2 },
+  { s: -0.4, grip: [-0.17, 0.3, 0.36], dir: [-0.12, 0.98, 0.16] },
+  { s: -0.1, grip: [-0.4, 0.58, 0.16], dir: [-0.45, 0.8, -0.4], torso: true },
+  { s: 0.05, grip: [-0.44, 0.5, 0.26], dir: [-0.85, 0.42, 0.3] },
+  { s: 0.22, grip: [-0.36, 0.38, 0.4], dir: [-0.82, 0.02, 0.58] },
+  { s: swallowHit, grip: [-0.1, 0.32, 0.5], dir: [0.04, -0.06, 1] },
+  { s: 0.68, grip: [0.1, 0.24, 0.42], dir: [0.82, -0.12, 0.56] },
+  { s: 1.05, grip: [0.16, 0.12, 0.3], dir: [0.76, -0.02, -0.65] },
 ]);
 
-// Rising Petal (ref 3.42-3.75 s): out of the wrap the blade hangs point-down by the right of the chest,
-// then one hand whips it up through them and out flat to the right, the arm at full length at
-// shoulder height and the left arm flung out the other way
+// Rising Petal (duel ref 1.27-1.65 s): out of the left hip the one hand rides up past the left of the
+// face, the blade standing up behind the left shoulder (the tell); it comes over the top and cuts
+// down from high on the left to low on the right, backhand, the body turning after it, and ends low
+// on the right with the point down at their knees, where the guard is
 const petalHit = 0.45;
 const petalBody = [
-  K(-0.1, B({ ...body, twist: 0.25, hipTwist: 0.15, lean: 0.2, crouch: -0.16, step: 0.36, back: 0.3 })),
-  K(0.3, B({ ...body, twist: 0.05, hipTwist: -0.1, lean: 0.28, crouch: -0.2, step: 0.48, back: 0.32 })),
-  K(petalHit, B({ ...body, twist: -0.15, hipTwist: -0.22, lean: 0.32, crouch: -0.2, step: 0.55, back: 0.32 })),
-  K(0.7, B({ ...body, twist: -0.5, hipTwist: -0.28, lean: 0.22, crouch: -0.16, step: 0.54, back: 0.32, side: -0.06 })),
-  K(1.0, B({ ...body, twist: -0.65, hipTwist: -0.3, lean: 0.15, crouch: -0.12, step: 0.52, back: 0.3, side: -0.12, headPitch: -0.05 })),
+  K(-0.4, B({ ...body, twist: 0.45, hipTwist: 0.2, lean: 0.14, crouch: -0.16, step: 0.4, back: 0.3 })),
+  // coiled left behind the raised blade, the right shoulder forward
+  K(-0.1, B({ ...body, twist: 0.6, hipTwist: 0.25, lean: 0.06, crouch: -0.12, step: 0.36, back: 0.3, side: -0.05 })),
+  K(0.2, B({ ...body, twist: 0.3, hipTwist: 0.05, lean: 0.18, crouch: -0.16, step: 0.46, back: 0.32 })),
+  K(petalHit, B({ ...body, twist: -0.1, hipTwist: -0.15, lean: 0.32, crouch: -0.22, step: 0.54, back: 0.34 })),
+  K(0.75, B({ ...body, twist: -0.45, hipTwist: -0.28, lean: 0.3, crouch: -0.24, step: 0.56, back: 0.34 })),
+  K(1.0, B({ ...body, twist: -0.55, hipTwist: -0.3, lean: 0.24, crouch: -0.22, step: 0.54, back: 0.32, headPitch: 0.05 })),
 ];
 const petal = keyed(petalBody, [
-  { s: -0.1, grip: [-0.16, 0.32, 0.36], dir: [-0.12, -0.62, 0.78] },
-  { s: 0.3, grip: [-0.14, 0.34, 0.42], dir: [-0.06, -0.4, 0.92] },
-  { s: petalHit, grip: [-0.12, 0.34, 0.44], dir: [-0.12, 0.02, 1] },
-  { s: 0.7, grip: [-0.4, 0.44, 0.42], dir: [-0.75, 0.08, 0.66] },
-  { s: 1.0, grip: [-0.66, 0.5, 0.22], dir: [-0.98, 0.1, 0.12] },
+  { s: -0.4, grip: [0.08, 0.24, 0.34], dir: [0.75, 0.3, -0.58], torso: true },
+  // authored short of where it shows: the tell pushes the chamber on out from the guard
+  { s: -0.1, grip: [0.06, 0.38, 0.31], dir: [0.7, 0.6, -0.4], torso: true },
+  { s: 0.18, grip: [0.0, 0.56, 0.46], dir: [0.35, 0.85, 0.4], torso: true },
+  { s: petalHit, grip: [-0.12, 0.4, 0.5], dir: [-0.16, 0.08, 1] },
+  { s: 0.72, grip: [-0.26, 0.2, 0.44], dir: [-0.52, -0.42, 0.74] },
+  { s: 1.0, grip: [-0.28, 0.1, 0.38], dir: [-0.35, -0.22, 0.91] },
 ]);
 
-// Twin Swallow: both hands meet in hasso by the right shoulder; kesa down to the low left, then
-// the blade turns over and snaps back flat from left to right
-const twin = seq([
-  [-0.1, 0.62, swing(0.24, [[-0.8, 0.55, -0.25], [-0.6, 0.65, 0.45], [-0.15, 0.3, 1], [0.45, -0.35, 0.82], [0.7, -0.5, 0.45]], G2, [0, [-0.2, 0.62, 0.1], -0.45, 0.1], [2, [-0.06, 0.4, 0.44], 0.4, 0.5])],
-  [0.62, 1.12, two([0.0, 0.34, 0.24], 0.24, [[0.7, -0.5, 0.45], [0.85, -0.08, 0.5], [0.45, 0.02, 0.9], [-0.05, 0.05, 1], [-0.65, 0.02, 0.75], [-0.9, -0.05, 0.25]], [-0.04, 0.34, 0.26])],
-], 0.06);
-const twinHits = [hitAt(twin, 2, 0), hitAt(twin, 3, 1)];
+// Twin Swallow (duel ref 1.72-2.25 s): tsubame-gaeshi. The point snaps upright again, then the hand
+// drops in front of the chest and lays the blade out flat to the left (the tell); it falls down the
+// left and cuts in low (the first hit), turns over at the bottom and rips straight back up the centre
+// line (the second), and the arm ends raised above the right shoulder, the point up at their face
+const twinBody = [
+  K(-0.4, B({ ...body, twist: -0.12, hipTwist: -0.05, lean: 0.04, crouch: -0.1, step: 0.3, back: 0.28 })),
+  // turned left over the blade laid out to that side
+  K(-0.1, B({ ...body, twist: 0.3, hipTwist: 0.15, lean: 0.1, crouch: -0.14, step: 0.34, back: 0.3 })),
+  K(0.3, B({ ...body, twist: 0.3, hipTwist: 0.1, lean: 0.34, crouch: -0.26, step: 0.5, back: 0.32 })),
+  // the bottom of the V: down in the knees
+  K(0.46, B({ ...body, twist: 0.12, hipTwist: 0.0, lean: 0.36, crouch: -0.3, step: 0.54, back: 0.34 })),
+  K(0.6, B({ ...body, twist: -0.05, hipTwist: -0.12, lean: 0.22, crouch: -0.2, step: 0.56, back: 0.34 })),
+  // stretched up tall behind the raised point
+  K(1.05, B({ ...body, twist: -0.4, hipTwist: -0.25, lean: -0.04, crouch: -0.08, step: 0.5, back: 0.36, headPitch: -0.1 })),
+];
+const twinHits = [0.3, 0.6];
+const twin = keyed(twinBody, [
+  { s: -0.4, grip: [-0.17, 0.3, 0.38], dir: [-0.08, 0.92, 0.38] },
+  // laid over to the left out in front, clear of the brim
+  { s: -0.25, grip: [-0.12, 0.32, 0.42], dir: [0.6, 0.6, 0.55] },
+  { s: -0.1, grip: [-0.06, 0.3, 0.42], dir: [0.92, 0.15, 0.25] },
+  { s: 0.12, grip: [0.0, 0.3, 0.44], dir: [0.78, -0.3, 0.55] },
+  { s: twinHits[0], grip: [-0.04, 0.3, 0.5], dir: [0.3, -0.12, 0.95] },
+  { s: 0.46, grip: [-0.06, 0.2, 0.52], dir: [0.05, -0.58, 0.81] },
+  { s: twinHits[1], grip: [-0.1, 0.34, 0.52], dir: [-0.05, 0.22, 0.97] },
+  { s: 0.8, grip: [-0.24, 0.6, 0.42], dir: [-0.1, 0.62, 0.78] },
+  { s: 1.05, grip: [-0.3, 0.7, 0.3], dir: [-0.1, 0.55, 0.83] },
+]);
 
-// Heaven Splitter (ref 1.92-2.33 s): jodan, both fists above the brim of the hat with the blade laid
-// back over its crown and the chest leaning back over the straight rear leg; the blade comes over
-// through upright and down the centre line as the whole body folds over the front knee
+// Heaven Splitter (duel ref 4.90-5.95 s): both hands come up and the whole body winds right, the left
+// shoulder at them, the fists high over the hat and the blade hung down behind the back (the tell,
+// held); the hips unwind, the blade wheels up behind and over the top, and the kesa cleave comes down
+// from high on the right through them to low on the left as the body drops into a deep lunge
 /**
- * Jodan, in torso space: the fists at the front edge of the brim, just above it (higher is out of
- * reach), and the blade laid back over the crown, about 145 degrees from the guard blade, as far
- * back as the arms take it (the tell's extra turn has faded out by there). The fists are authored
- * short of the brim; the tell pushes the chamber's position on up from the chin.
+ * Jodan, in torso space (Falling Star still uses it): the fists at the front edge of the brim and the
+ * blade laid back over the crown.
  */
 const JODAN_GRIP: V3 = [-0.085, 0.5, 0.33];
 const JODAN_DIR: V3 = [-0.07, 0.85, -0.52];
 const heavenHit = 0.45;
 const heavenBody = [
-  // stretched long and leaning back over the rear foot, the weight right back on it
-  K(-0.2, B({ ...body, twist: -0.05, lean: -0.25, crouch: 0.03, step: 0.2, back: 0.44, side: 0.04, headPitch: -0.22 })),
-  K(0.15, B({ ...body, twist: 0.0, lean: 0.05, crouch: -0.08, step: 0.42, back: 0.4 }), { hop: 0.08 }),
-  K(heavenHit, B({ ...body, twist: 0.03, lean: 0.85, crouch: -0.4, step: 0.66, back: 0.42 }), { hop: 0 }),
-  // the stop: the knees give and the weight sinks over the front foot
-  K(1.05, B({ ...body, twist: 0.03, lean: 1.05, crouch: -0.54, step: 0.68, back: 0.44, headPitch: 0.15 })),
+  K(-0.5, B({ ...body, twist: -0.3, hipTwist: -0.15, lean: 0.02, crouch: -0.08, step: 0.26, back: 0.3 })),
+  // wound right (the tell carries it on to nearly side-on), tall, the weight back on the rear foot
+  K(-0.16, B({ ...body, twist: -0.68, hipTwist: -0.32, lean: -0.05, crouch: -0.07, step: 0.24, back: 0.38, side: 0.06, headPitch: -0.08 })),
+  K(0.15, B({ ...body, twist: -0.45, hipTwist: -0.12, lean: 0.1, crouch: -0.12, step: 0.42, back: 0.42 }), { hop: 0.06 }),
+  K(heavenHit, B({ ...body, twist: 0.15, hipTwist: 0.2, lean: 0.45, crouch: -0.32, step: 0.68, back: 0.46 }), { hop: 0 }),
+  // the stop: the knees give and the weight sinks over the front foot, deep in the lunge
+  K(1.05, B({ ...body, twist: 0.4, hipTwist: 0.28, lean: 0.55, crouch: -0.5, step: 0.72, back: 0.48, headPitch: 0.1 })),
 ];
 const heaven = keyed(heavenBody, [
-  { s: -0.16, grip: JODAN_GRIP, dir: JODAN_DIR, g2: G2, torso: true },
-  { s: 0.1, grip: [-0.02, 0.74, 0.33], dir: [0.0, 0.98, 0.2], g2: G2, torso: true },
-  { s: 0.3, grip: [0.0, 0.62, 0.48], dir: [0.0, 0.7, 0.72], g2: G2 },
-  { s: heavenHit, grip: [-0.02, 0.44, 0.48], dir: [0.0, 0.1, 1], g2: G2 },
-  { s: 0.75, grip: [-0.02, 0.38, 0.46], dir: [0.0, -0.06, 1], g2: G2 },
-  { s: 1.05, grip: [-0.02, 0.36, 0.44], dir: [0.0, -0.04, 1], g2: G2 },
+  { s: -0.5, grip: [-0.24, 0.42, 0.32], dir: [-0.15, 0.96, 0.22], torso: true },
+  { s: -0.32, grip: [-0.3, 0.5, 0.22], dir: [-0.45, 0.6, -0.65], torso: true },
+  // the sword hand high over the right shoulder, clear of the brim, the blade hung down the back;
+  // authored short of where it shows (the tell pushes it on out from the guard)
+  { s: -0.16, grip: [-0.34, 0.63, 0.13], dir: [0.0, -0.42, -0.91], torso: true },
+  // it wheels up behind the right shoulder and comes over the top on that side
+  { s: 0.05, grip: [-0.3, 0.6, 0.2], dir: [-0.3, 0.3, -0.9], torso: true },
+  { s: 0.22, grip: [-0.18, 0.6, 0.42], dir: [-0.4, 0.8, 0.45], g2: G2, torso: true },
+  { s: heavenHit, grip: [-0.06, 0.42, 0.5], dir: [-0.12, 0.18, 1], g2: G2 },
+  { s: 0.72, grip: [0.06, 0.28, 0.46], dir: [0.5, -0.15, 0.85], g2: G2 },
+  { s: 1.05, grip: [0.12, 0.26, 0.4], dir: [0.8, -0.02, 0.4], g2: G2 },
 ]);
 
 // Iai Flash: out of the scabbard mouth, flat across the body
@@ -407,60 +446,75 @@ export const katana: Style = {
   // iai: blade in the scabbard (see KATANA_SHEATH), right hand on the hilt, left hand on the saya
   stance: P(stanceBody, X(IAI_GRIP, KATANA_SHEATH, [0, 1, 0], 'y'), null, [0.08, 0.09, 0.16]),
   moves: {
-    // Swallow Cut: weight settles on the back foot as the point drops low on the right; the hips open
-    // first, the shoulders follow and the fists sweep flat across the waist, the left hand closing on
-    // the pommel at the hit, then the wrap carries the blade up past the left shoulder
+    // Swallow Cut: the point snaps upright, the hand rides up by the right temple with the blade cocked
+    // over the right shoulder and the body wound right; the hips open first and the one arm wheels
+    // the blade out flat to the right and level across the front, on round to the left hip
     l0: mv({
       keys: swallowBody,
       main: swallow,
       free: track([
-        [-0.1, [0.14, 0.12, 0.2]],
-        [0.28, [0.12, 0.16, 0.3]],
+        [-0.4, [0.2, 0.22, 0.3]],
+        [-0.1, [0.3, 0.3, 0.26]],
+        [swallowHit, [0.42, 0.32, 0.02]],
+        [1.05, [0.46, 0.3, -0.12]],
       ]),
       impacts: [swallowHit],
+      start: -0.4,
       chamber: -0.1,
       fx: [fx(swallowHit, 'sparkle', 'tip', 0.6), fx(swallowHit + 0.06, 'dust', 'feet', 0.6)],
     }),
-    // Rising Petal: the chest turns left over the hanging blade; the hips unwind first and the one arm
-    // whips the point up through them and out flat to the right, at full length at shoulder height,
-    // the left arm flung out the other way and the body leaning away from the throw
+    // Rising Petal: out of the left hip the hand rides up past the left of the face, the blade upright
+    // behind the left shoulder; it comes over the top and down from high left to low right, backhand,
+    // the hips turning right after it, the left arm thrown back the other way
     l1: mv({
       keys: petalBody,
       main: petal,
       free: track([
-        [-0.1, [0.24, 0.28, 0.24]],
-        [petalHit, [0.42, 0.36, 0.05]],
-        [1.0, [0.6, 0.62, -0.05]],
+        [-0.4, [0.36, 0.24, 0.1]],
+        [-0.1, [0.4, 0.2, 0.02]],
+        [petalHit, [0.44, 0.3, -0.04]],
+        [1.0, [0.46, 0.34, -0.14]],
       ]),
       impacts: [petalHit],
+      start: -0.4,
       chamber: -0.1,
       fx: [fx(petalHit, 'sparkle', 'tip', 0.6)],
     }),
-    // Twin Swallow: tsubame-gaeshi. Both hands close in hasso by the right shoulder, weight back; the
-    // kesa lands on a long step, the blade turns over in a blink and snaps back flat across.
+    // Twin Swallow: tsubame-gaeshi. The point snaps upright, then the blade is laid out flat to the
+    // left; it falls down the left side into the first cut, turns over at the bottom of the V and
+    // rips back up the centre line, the arm ending high above the right shoulder, held
     l2: mv({
-      keys: [
-        K(-0.1, B({ ...body, twist: -0.65, hipTwist: -0.25, lean: -0.08, crouch: -0.06, step: 0.3, back: 0.32, headPitch: -0.05 })),
-        K(twinHits[0] - 0.12, B({ ...body, twist: -0.25, hipTwist: 0.15, lean: 0.26, crouch: -0.18, step: 0.5, back: 0.34 })),
-        K(twinHits[0], B({ ...body, twist: 0.25, hipTwist: 0.2, lean: 0.5, crouch: -0.3, step: 0.6, back: 0.36 })),
-        K((twinHits[0] + twinHits[1]) / 2, B({ ...body, twist: 0.5, hipTwist: 0.1, lean: 0.5, crouch: -0.32, step: 0.62, back: 0.36 })),
-        K(twinHits[1], B({ ...body, twist: -0.15, hipTwist: -0.15, lean: 0.48, crouch: -0.3, step: 0.64, back: 0.36 })),
-        K(1.1, B({ ...body, twist: -0.7, hipTwist: -0.2, lean: 0.4, crouch: -0.3, step: 0.64, back: 0.36, headPitch: 0.08 })),
-      ],
+      keys: twinBody,
       main: twin,
+      free: track([
+        [-0.4, [0.22, 0.22, 0.3]],
+        [-0.1, [0.38, 0.06, 0.0]],
+        [twinHits[1], [0.42, 0.2, 0.0]],
+        [1.05, [0.42, 0.3, -0.1]],
+      ]),
       impacts: twinHits,
+      start: -0.4,
       chamber: -0.1,
-      end: 1.1,
+      end: 1.05,
+      rest: 1.05,
+      settle: 0.6,
       fx: [fx(twinHits[0], 'sparkle', 'tip', 0.6), fx(twinHits[1], 'sparkle', 'tip', 0.8), fx(twinHits[1], 'dust', 'feet', 0.7)],
     }),
-    // Heaven Splitter: tall in jodan with the chest leaning back over the straight rear leg; one long
-    // stamping step and the hips drive the whole body down over the cut, folding almost flat over
-    // the front knee as the blade carries on down the centre line
+    // Heaven Splitter: both fists go up over the hat as the whole body winds right, the left shoulder
+    // at them and the blade hung down the back (held); the hips unwind, the blade wheels up and over,
+    // and the kesa cleave comes down from high right to low left into a deep lunge
     h: mv({
       keys: heavenBody,
       main: heaven,
+      // the left hand goes up with the right (authored short: the tell carries it on), then closes on
+      // the hilt as the blade comes over the top
+      free: track([
+        [-0.5, [0.18, 0.3, 0.32]],
+        [-0.16, [-0.06, 0.5, 0.25]],
+        [0.05, [-0.1, 0.56, 0.32]],
+      ]),
       impacts: [heavenHit],
-      start: 0,
+      start: -0.5,
       chamber: -0.16,
       fx: [fx(heavenHit, 'stomp', 'feet', 1), fx(heavenHit, 'flashline', 'tip', 1.1)],
       trail: { life: 0.2, glow: 0.5 },

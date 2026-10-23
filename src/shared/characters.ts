@@ -229,11 +229,11 @@ const ronin: BaseDef = {
   ratings: { power: 3, speed: 3, reach: 3, defense: 4, difficulty: 2 },
   lights: [
     { name: 'Swallow Cut', anim: 'slashR', windup: FIRST_LIGHT_WINDUP, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 3, arc: 36, lunge: 0.6 },
-    { name: 'Rising Petal', anim: 'slashL', windup: 270, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 3, arc: 36, lunge: 0.5 },
+    { name: 'Rising Petal', anim: 'slashL', windup: 200, active: 90, recovery: 320, damage: 9, posture: 10, blockPosture: 14, range: 3, arc: 36, lunge: 0.5 },
     // tsubame-gaeshi: two cuts, there and back, a blink apart
-    { name: 'Twin Swallow', anim: 'slashR', windup: 340, active: 150, recovery: 470, damage: 7, posture: 9, blockPosture: 11, range: 3.1, arc: 33, lunge: 0.8, hits: 2 },
+    { name: 'Twin Swallow', anim: 'slashR', windup: 250, active: 150, recovery: 470, damage: 7, posture: 9, blockPosture: 11, range: 3.1, arc: 33, lunge: 0.8, hits: 2 },
   ],
-  heavy: { name: 'Heaven Splitter', anim: 'overhead', windup: 620, active: 120, recovery: 520, damage: 18, posture: 26, blockPosture: 34, range: 3.2, arc: 30, lunge: 1.2, feintable: true },
+  heavy: { name: 'Heaven Splitter', anim: 'overhead', windup: 560, active: 120, recovery: 450, damage: 18, posture: 26, blockPosture: 34, range: 3.2, arc: 30, lunge: 1.2, feintable: true },
   special: { name: 'Gatotsu', anim: 'thrust', windup: 720, active: 160, recovery: 650, damage: 22, posture: 30, blockPosture: 30, range: 4.3, arc: 15, lunge: 3.0, perilous: 'thrust', cooldown: 7000 },
   ability: {
     kind: 'stance',
