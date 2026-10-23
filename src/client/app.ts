@@ -1,10 +1,10 @@
 /** The client application: wires networking, input, simulation, rendering and UI together. */
 import * as THREE from 'three';
 import { AttackKey, CHARACTERS, CharacterId, executeSpacing, getAttack, isHeavyKey } from '../shared/characters';
-import { COMBAT, MATCH } from '../shared/config';
+import { COMBAT, MATCH, PLAYER_RADIUS } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
-import { CombatEvent, PROTOCOL_VERSION, ProfileView, RosterEntry, ServerMsg } from '../shared/protocol';
+import { CombatEvent, PROTOCOL_VERSION, ProfileView, RingView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
 import { audio } from './audio';
 import { CameraRig, executionShots } from './camera';
@@ -23,13 +23,14 @@ import { G } from './render/gfx/globals';
 import { portraitURL } from './render/portrait';
 import { SelectScreen } from './select';
 import { MapView } from './render/world';
+import { RingWalls } from './render/rings';
 import { TITLE_MAP } from './render/maps/title';
 import { TitleScene } from './title/scene';
 import { TitleScreen } from './title/screen';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
 import { TouchControls, isTouchDevice } from './touch';
-import { CardData, Preview, UI } from './ui';
+import { CardData, Preview, UI, esc } from './ui';
 
 type MatchMsg = Extract<ServerMsg, { t: 'match' }>;
 
@@ -85,6 +86,12 @@ class App {
   /** the title screen: the Ronin on the cliff (3D) and the menus over it, until the game starts */
   private titleScene: TitleScene | null = null;
   private titleScreen: TitleScreen | null = null;
+  /** which lobby we're in and how full it is */
+  private lobbyInfo: { n: number; count: number; cap: number } | null = null;
+  /** the lobby's dueling rings, and the walls of light around the sealed ones */
+  private rings: RingView[] = [];
+  private ringWalls: RingWalls | null = null;
+  private ringCount = -1;
   /** someone wants a copy of the next rendered frame (the title's cut into the game) */
   private snapWant: ((frame: HTMLCanvasElement) => void) | null = null;
 
@@ -248,6 +255,7 @@ class App {
     n.onClose = (reason) => {
       platform.gameplayStop();
       this.myId = '';
+      this.lobbyInfo = null;
       this.ui.showTitle();
       this.input.exitLock();
       this.clearFighters();
@@ -335,8 +343,10 @@ class App {
       this.ui.showLeaderboard(m.entries, m.you, m.total, this.profile);
       this.mapView?.setLeaderboard(m.entries);
     });
+    n.on('lobby', (m) => (this.lobbyInfo = m));
+    n.on('rings', (m) => this.onRings(m.r));
     n.on('challenge', (m) => {
-      this.ui.showChallenge(m.from, m.name, m.char);
+      this.ui.showChallenge(m.from, m.name, m.char, m.ring !== undefined);
       audio.play('matchFound');
     });
     n.on('notice', (m) => this.ui.toast(m.text, m.kind));
@@ -358,6 +368,14 @@ class App {
     this.effects.setWeather(null);
     this.effects.clearBlood();
     if (this.local) this.local.map = map;
+    this.ringWalls?.dispose();
+    this.ringWalls = null;
+    for (let i = 0; i < this.rings.length; i++) this.ui.ringLabel(i, null);
+    this.rings = [];
+    if (map.rings) {
+      this.ringWalls = new RingWalls(map.rings);
+      this.scene.add(this.ringWalls.group);
+    }
   }
 
   private clearFighters(): void {
@@ -387,6 +405,7 @@ class App {
         if (a === 'jump') audio.jump(me.roster.char, { vol: 0.6, pos: me.pos });
       };
       this.local.onTeleport(m.x, m.z, m.yaw, m.epoch, undefined);
+      if (map.rings) this.local.fence = (p) => this.fenceRings(p);
       this.cam.snapBehind(m.yaw);
     }
     this.ui.setLobbyMode(m.kind === 'lobby');
@@ -435,6 +454,97 @@ class App {
       f.applySnap(s, serverTime, positional);
       if (first) f.teleportTo(s.x, s.y, s.z, s.r);
       if (s.i === this.myId) this.local?.onServerState(s);
+    }
+  }
+
+  // ------------------------------------------------------------------ dueling rings
+
+  /** The ring view for the duel we're in (sealed or just settled), if any. */
+  private myRing(): RingView | null {
+    return this.rings.find((r) => r.state !== 'open' && (r.a === this.myId || r.b === this.myId)) ?? null;
+  }
+
+  /** Index of the ring (x, z) stands in, or -1. */
+  private ringAt(x: number, z: number): number {
+    return this.map.rings?.findIndex((r) => Math.hypot(x - r.x, z - r.z) < r.r) ?? -1;
+  }
+
+  /** Our own walls: kept inside a ring we're dueling in, kept out of anyone else's. */
+  private fenceRings(p: { x: number; z: number }): void {
+    const defs = this.map.rings;
+    if (!defs) return;
+    for (const v of this.rings) {
+      if (v.state !== 'countdown' && v.state !== 'fight') continue;
+      const r = defs[v.i];
+      const inside = v.a === this.myId || v.b === this.myId;
+      const dx = p.x - r.x;
+      const dz = p.z - r.z;
+      const d = Math.hypot(dx, dz) || 1e-3;
+      const lim = inside ? r.r - PLAYER_RADIUS : r.r + PLAYER_RADIUS;
+      if (inside ? d <= lim : d >= lim) continue;
+      p.x = r.x + (dx / d) * lim;
+      p.z = r.z + (dz / d) * lim;
+    }
+  }
+
+  private onRings(list: RingView[]): void {
+    const prev = this.rings;
+    this.rings = list;
+    for (const r of list) {
+      this.ringWalls?.set(r.i, r.state === 'countdown' || r.state === 'fight', r.state === 'over');
+      const was = prev.find((p) => p.i === r.i);
+      if (was?.state === r.state || (r.a !== this.myId && r.b !== this.myId)) continue;
+      const mineA = r.a === this.myId;
+      const oppName = (mineA ? r.bn : r.an) ?? '';
+      if (r.state === 'countdown') {
+        // the ring seals: you're squared up with them, locked on
+        this.lock = this.fighters.get((mineA ? r.b : r.a) ?? '') ?? this.lock;
+        this.ringCount = -1;
+        this.ui.hideChallenge();
+        this.ui.banner('Ring duel', `vs ${oppName}`, 1300, 'count', '決闘');
+        audio.play('gong');
+        audio.music('combat');
+      } else if (r.state === 'fight') {
+        this.ui.banner('Fight', '', 900, 'fight', '始め');
+        audio.play('fight');
+      } else if (r.state === 'over') {
+        const draw = r.w === '';
+        const won = r.w === this.myId;
+        this.ui.banner(draw ? 'Draw' : won ? 'Victory' : 'Defeat', `vs ${oppName}`, 2600, draw ? 'draw' : won ? 'win' : 'lose', draw ? '引分' : won ? '勝利' : '敗北');
+        audio.play(won || draw ? 'victory' : 'defeat');
+        audio.music('lobby');
+        this.lock = null;
+      }
+    }
+  }
+
+  /** Ring labels, the countdown of our own duel, and what standing in a free ring offers. */
+  private ringHud(now: number): void {
+    const defs = this.map.rings;
+    const me = this.local?.cf;
+    if (!defs || !me) return;
+    for (const v of this.rings) {
+      const r = defs[v.i];
+      const near = dist2D(me.pos.x, me.pos.z, r.x, r.z) < 60;
+      const at = v.state !== 'open' && near ? this.project(r.x, 3.6, r.z) : null;
+      if (!at) {
+        this.ui.ringLabel(v.i, null);
+        continue;
+      }
+      const left = Math.max(0, Math.ceil(((v.until ?? now) - now) / 1000));
+      const names = `${esc(v.an ?? '')}<span class="rl-vs">対</span>${esc(v.bn ?? '')}`;
+      const sub =
+        v.state === 'countdown' ? `Begins in ${left}` : v.state === 'fight' ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : v.w ? `${esc(v.w === v.a ? v.an ?? '' : v.bn ?? '')} wins` : 'A draw';
+      this.ui.ringLabel(v.i, at, `<span class="rl-jp">決闘</span><div>${names}</div><div class="rl-sub">${sub}</div>`);
+    }
+    const mine = this.myRing();
+    if (mine?.state === 'countdown') {
+      const secs = Math.ceil(((mine.until ?? now) - now) / 1000);
+      if (secs !== this.ringCount && secs > 0 && secs <= 3) {
+        this.ringCount = secs;
+        this.ui.banner(String(secs), 'Ring duel', 950, 'count', KANJI_NUM[secs]);
+        audio.play('countdown');
+      }
     }
   }
 
@@ -634,8 +744,10 @@ class App {
     const me = this.local.cf;
     let best: ClientFighter | null = null;
     let bestD = 7;
+    // nobody in a ring duel can take another challenge
+    const busy = new Set(this.rings.flatMap((r) => (r.state === 'countdown' || r.state === 'fight' ? [r.a, r.b] : [])));
     for (const f of this.fighters.values()) {
-      if (f === me || f.roster.bot || f.s === 'dead') continue;
+      if (f === me || f.roster.bot || f.s === 'dead' || busy.has(f.id)) continue;
       const d = dist2D(me.pos.x, me.pos.z, f.pos.x, f.pos.z);
       const ang = Math.abs(angleDiff(this.cam.yaw, yawTo(me.pos.x, me.pos.z, f.pos.x, f.pos.z)));
       if (d < bestD && ang < 0.7) {
@@ -1225,6 +1337,7 @@ class App {
       this.mapView?.update(dt, new THREE.Vector3());
     }
     this.titleScreen?.update(dt);
+    this.ringWalls?.update(dt);
     this.effects.update(dt, this.renderer.camera);
     this.updateHud(dt, now);
     this.renderer.render();
@@ -1259,7 +1372,7 @@ class App {
     if (!local) return;
     const me = local.cf;
     const sim = local.sim;
-    this.ui.setNetInfo(this.online, this.offline ? null : Math.round(this.net.rtt), settings.showFps ? this.fps.value : null);
+    this.ui.setNetInfo(this.online, this.offline ? null : Math.round(this.net.rtt), settings.showFps ? this.fps.value : null, this.kind === 'lobby' ? this.lobbyInfo : null);
     this.ui.setHints(sim.char, now, { dodge: sim.dodgeReady, special: sim.specialReadyAt, ability: sim.abilityReadyAt });
     if (this.touch) {
       const charges = sim.dodgeReady;
@@ -1360,10 +1473,19 @@ class App {
     }
 
     // challenge prompt / death
-    const ct = this.challengeTarget();
+    this.ringHud(now);
+    const dueling = this.myRing();
+    const ct = dueling ? null : this.challengeTarget();
     const who = ct ? `<b>${ct.roster.name.replace(/</g, '&lt;')}</b>` : '';
-    this.ui.setPrompt(ct && sim.isAlive() ? (this.touch ? `Tap to challenge ${who} to a duel` : `<b>[G]</b> Challenge ${who} to a duel`) : null);
-    if (this.kind === 'lobby' && sim.state === 'dead') this.ui.setDeath('Respawning in the shrine plaza…');
+    const ring = this.kind === 'lobby' && !dueling ? this.ringAt(me.pos.x, me.pos.z) : -1;
+    const free = ring >= 0 && (this.rings[ring]?.state ?? 'open') === 'open';
+    const here = free && ct && this.ringAt(ct.pos.x, ct.pos.z) === ring;
+    const act = this.touch ? 'Tap to challenge' : '<b>[G]</b> Challenge';
+    let prompt: string | null = null;
+    if (sim.isAlive() && ct) prompt = here ? `${act} ${who} to a duel <b>here in the ring</b>` : `${act} ${who} to a duel`;
+    else if (sim.isAlive() && free) prompt = 'Duel ring · challenge someone standing in it with you to fight them here, uninterrupted';
+    this.ui.setPrompt(prompt);
+    if (this.kind === 'lobby' && sim.state === 'dead') this.ui.setDeath(dueling ? 'Beaten in the ring… you get up where you fell' : 'Respawning in the shrine plaza…');
     else this.ui.setDeath(null);
     void forward;
   }

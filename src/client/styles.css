@@ -305,6 +305,12 @@ select { font-family: var(--ui); font-weight: 600; font-size: 14px; letter-spaci
 .plate { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; width: 160px; margin-left: -80px; margin-top: -26px; }
 .plate-name { font-weight: 600; font-size: 14px; letter-spacing: 0.06em; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0, 0, 0, 0.8); white-space: nowrap; }
 .plate-sub { color: rgba(255, 255, 255, 0.65); font-size: 12px; font-weight: 500; }
+/* over a dueling ring: who's in it, the clock, the result */
+.ring-label { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 240px; margin-left: -120px; margin-top: -40px; text-align: center; font-size: 14px; letter-spacing: 0.04em; color: #fff; text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7); pointer-events: none; }
+.ring-label .rl-jp { font-family: var(--jp); font-size: 12px; padding: 1px 6px; color: #fff; background: var(--red); text-shadow: none; }
+.ring-label .rl-vs { color: var(--red-hi); margin: 0 6px; }
+.ring-label .rl-sub { font-size: 12px; color: var(--gold); }
+.ring-label.won .rl-sub { color: var(--gold-hi); }
 .plate-hp { width: 70px; height: 5px; background: rgba(8, 8, 12, 0.85); margin-top: 3px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25); transform: skewX(-20deg); }
 .plate-hp div { height: 100%; background: #f2b02a; }
 .plate-po { width: 70px; height: 3px; margin-top: 3px; background: rgba(8, 8, 12, 0.7); transform: skewX(-20deg); }
@@ -893,6 +899,8 @@ h4.ih .pi { width: 20px; height: 20px; }
 
 .lobby-bar { position: absolute; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
 .lobby-bar > * { pointer-events: auto; }
+/* prompts sit above the lobby bar, not under it */
+.hud.lobby .prompt { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 .lb-row { display: flex; align-items: center; gap: 10px; }
 .lb-portrait { position: relative; display: block; width: 52px; height: 52px; background: color-mix(in srgb, var(--accent, #2a2a34) 80%, #101018); box-shadow: 0 0 0 3px #16121a, 0 0 0 5px rgba(255, 255, 255, 0.85), 5px 5px 0 3px rgba(0, 0, 0, 0.4); }
 .lb-portrait img { display: block; width: 100%; height: 100%; }

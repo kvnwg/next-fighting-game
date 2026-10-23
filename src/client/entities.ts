@@ -206,10 +206,18 @@ export class ClientFighter {
     this.buf = [];
   }
 
+  /** how far behind the server remote fighters are drawn (ms) */
+  private delay = INTERP_DELAY_MS;
+
   /** Remote fighters: interpolate between buffered snapshots. */
   interpolate(serverNow: number): void {
     if (this.isLocal || this.buf.length === 0) return;
-    const t = serverNow - INTERP_DELAY_MS;
+    // far-off fighters in a lobby arrive less often (INTEREST): stay a gap behind so they still glide
+    const n = this.buf.length;
+    const gap = n >= 2 ? this.buf[n - 1].t - this.buf[n - 2].t : 0;
+    const want = Math.max(INTERP_DELAY_MS, Math.min(600, gap + 50));
+    this.delay += (want - this.delay) * 0.05;
+    const t = serverNow - this.delay;
     let i = this.buf.length - 1;
     while (i > 0 && this.buf[i - 1].t > t) i--;
     const b = this.buf[i];

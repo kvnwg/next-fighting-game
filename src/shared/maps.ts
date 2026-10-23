@@ -111,6 +111,8 @@ export interface MapDef {
   theme: MapTheme;
   safeZone?: { x: number; z: number; r: number };
   dummies?: DummySpawn[];
+  /** dueling rings (lobby): sealed while two players fight in one */
+  rings?: { x: number; z: number; r: number }[];
 }
 
 const PI = Math.PI;
@@ -131,11 +133,14 @@ function ring(kind: PropKind, count: number, r: number, offset = 0, extra: Parti
 const LOBBY_HALF = 70;
 const SAFE_R = 15;
 const YARD = { x: 30, z: 0, hw: 7, hd: 7 };
-const DUEL_RINGS = [
+/** The lobby's dueling rings: challenge someone while you're both inside one to fight there. */
+export const DUEL_RINGS = [
   { x: -32, z: 18, r: 7 },
   { x: -26, z: -30, r: 7 },
   { x: 18, z: 36, r: 7 },
   { x: 22, z: -36, r: 6 },
+  { x: 46, z: 20, r: 6 },
+  { x: -46, z: -12, r: 6 },
 ];
 
 function inYard(x: number, z: number, pad: number): boolean {
@@ -250,6 +255,7 @@ function buildLobby(): MapDef {
     decals,
     hazards: [],
     safeZone: { x: 0, z: 0, r: SAFE_R },
+    rings: DUEL_RINGS,
     dummies: [
       { x: YARD.x - 1, z: YARD.z - 3, yaw: -PI / 2, kind: 'passive' },
       { x: YARD.x - 1, z: YARD.z + 3, yaw: -PI / 2, kind: 'sparring' },

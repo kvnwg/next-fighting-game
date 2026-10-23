@@ -1,4 +1,4 @@
-/** Top-level server state: connections, the lobby, running arenas, matchmaking and challenges. */
+/** Top-level server state: connections, the lobbies, running arenas, matchmaking and challenges. */
 import { CHARACTER_IDS, CharacterId, isCharacterId } from '../shared/characters';
 import { MATCH, SERVER_TICK_HZ } from '../shared/config';
 import { ARENA_MAPS, MapDef } from '../shared/maps';
@@ -50,11 +50,14 @@ export interface GameOptions {
 
 export class Game {
   readonly players = new Map<string, Player>();
-  readonly lobby: Lobby;
+  /** The lobbies, LOBBY_CAP players each; the first one always stays open. */
+  readonly lobbies: Lobby[] = [];
+  /** the lobby each player was last in, to go back to after a match */
+  private home = new WeakMap<Player, Lobby>();
   readonly arenas = new Set<Arena>();
   private queue: Player[] = [];
-  /** pending challenges keyed by the challenged player's id */
-  private challenges = new Map<string, { from: string; expires: number }>();
+  /** pending challenges keyed by the challenged player's id (ring: fought in that lobby ring) */
+  private challenges = new Map<string, { from: string; expires: number; ring: number }>();
   /** Matches waiting on the map and fighter select, by player. */
   private selecting = new Map<Player, PendingMatch>();
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -71,7 +74,52 @@ export class Game {
     readonly options: GameOptions = {},
   ) {
     this.now = clock ?? (() => performance.now() - this.t0 + 1000);
-    this.lobby = new Lobby(this, options.roamers ?? 0);
+    this.lobbies.push(new Lobby(this, options.roamers ?? 0, 1));
+  }
+
+  /** The first lobby (the only one until it fills up). */
+  get lobby(): Lobby {
+    return this.lobbies[0];
+  }
+
+  /**
+   * Where a player goes: back to `prefer` if there's room, else the busiest lobby with room (so
+   * lobbies stay lively rather than spreading everyone thin), else a new one.
+   */
+  private lobbyFor(prefer?: Lobby): Lobby {
+    if (prefer && !prefer.full && this.lobbies.includes(prefer)) return prefer;
+    let best: Lobby | null = null;
+    for (const l of this.lobbies) if (!l.full && (!best || l.players.size > best.players.size)) best = l;
+    if (best) return best;
+    // the lowest free number, so lobbies that emptied out get reused
+    let n = 1;
+    while (this.lobbies.some((l) => l.n === n)) n++;
+    const l = new Lobby(this, 0, n);
+    this.lobbies.push(l);
+    return l;
+  }
+
+  /** Close lobbies that emptied out (players away in a match still count: they come back). */
+  private closeEmptyLobbies(): void {
+    if (this.lobbies.length < 2) return;
+    const homes = new Set<Lobby>();
+    for (const p of this.players.values()) {
+      const h = this.home.get(p);
+      if (h) homes.add(h);
+    }
+    for (let i = this.lobbies.length - 1; i > 0; i--) {
+      const l = this.lobbies[i];
+      if (l.players.size > 0 || homes.has(l)) continue;
+      l.destroy();
+      this.lobbies.splice(i, 1);
+    }
+  }
+
+  /** Put a player in a lobby (their own one if it has room). */
+  enterLobby(p: Player): void {
+    const l = this.lobbyFor(this.home.get(p));
+    this.home.set(p, l);
+    l.addPlayer(p, l.spawnPoint());
   }
 
   start(): void {
@@ -88,7 +136,7 @@ export class Game {
   tick(): void {
     const now = this.now();
     // one broken instance must never take the whole server down
-    for (const inst of [this.lobby, ...this.arenas]) {
+    for (const inst of [...this.lobbies, ...this.arenas]) {
       try {
         inst.tick(now);
       } catch (err) {
@@ -113,10 +161,12 @@ export class Game {
       }
       if (now >= pm.endsAt) this.finishSelect(pm);
     }
+
     if (now - this.lastMatchmake > 1000) {
       this.lastMatchmake = now;
       this.matchmake(now);
       for (const [target, c] of this.challenges) if (now > c.expires) this.challenges.delete(target);
+      this.closeEmptyLobbies();
     }
   }
 
@@ -191,7 +241,7 @@ export class Game {
     const p = new Player(ws, profile, char);
     this.players.set(p.id, p);
     p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.players.size, serverTime: this.now() });
-    this.lobby.addPlayer(p, this.lobby.spawnPoint());
+    this.enterLobby(p);
     this.broadcastAll({ t: 'online', n: this.players.size });
     this.broadcastAll({ t: 'chat', name: '', text: `${p.name} entered the grounds.`, sys: true });
     return p;
@@ -234,7 +284,7 @@ export class Game {
         break;
       case 'char':
         if (!isCharacterId(msg.id)) return;
-        if (p.instance === this.lobby) this.lobby.changeCharacter(p, msg.id);
+        if (p.instance instanceof Lobby) p.instance.changeCharacter(p, msg.id);
         else p.send({ t: 'notice', text: 'Finish your match before switching characters.', kind: 'warn' });
         break;
       case 'queue':
@@ -275,8 +325,12 @@ export class Game {
   // ------------------------------------------------------------------ queue & matchmaking
 
   private enqueue(p: Player, mode: 'ranked' | 'practice', diff: BotDifficulty = 'normal'): void {
-    if (p.instance !== this.lobby) {
+    if (!(p.instance instanceof Lobby)) {
       p.send({ t: 'notice', text: 'You are already in a match.', kind: 'warn' });
+      return;
+    }
+    if (p.instance.inDuel(p)) {
+      p.send({ t: 'notice', text: 'Finish your ring duel first.', kind: 'warn' });
       return;
     }
     if (this.selecting.has(p)) return;
@@ -371,7 +425,7 @@ export class Game {
     arena.destroy();
     for (const p of humans) {
       if (p.closed) continue;
-      this.lobby.addPlayer(p, this.lobby.spawnPoint());
+      this.enterLobby(p);
       p.send({ t: 'profile', profile: profileView(p.profile) });
     }
   }
@@ -440,16 +494,19 @@ export class Game {
     if (typeof targetId !== 'string') return;
     const target = this.players.get(targetId);
     if (!target || target === p) return;
-    if (p.instance !== this.lobby || target.instance !== this.lobby || this.selecting.has(p) || this.selecting.has(target)) {
+    const lobby = p.instance;
+    if (!(lobby instanceof Lobby) || target.instance !== lobby || lobby.inDuel(p) || lobby.inDuel(target) || this.selecting.has(p) || this.selecting.has(target)) {
       p.send({ t: 'notice', text: `${target.name} is busy right now.`, kind: 'warn' });
       return;
     }
     const existing = this.challenges.get(target.id);
     if (existing && existing.from === p.id && this.now() < existing.expires) return;
     const expires = this.now() + MATCH.challengeTimeout;
-    this.challenges.set(target.id, { from: p.id, expires });
-    target.send({ t: 'challenge', from: p.id, name: p.name, char: p.charId, expires });
-    p.send({ t: 'notice', text: `Challenge sent to ${target.name}.`, kind: 'info' });
+    // both standing in the same open ring: the duel is fought right there
+    const ring = lobby.sharedRing(p, target);
+    this.challenges.set(target.id, { from: p.id, expires, ring });
+    target.send({ t: 'challenge', from: p.id, name: p.name, char: p.charId, expires, ...(ring >= 0 ? { ring } : {}) });
+    p.send({ t: 'notice', text: ring >= 0 ? `Challenge sent to ${target.name}: a duel here in the ring.` : `Challenge sent to ${target.name}.`, kind: 'info' });
   }
 
   private challengeReply(p: Player, from: unknown, accept: boolean): void {
@@ -462,8 +519,19 @@ export class Game {
       challenger.send({ t: 'notice', text: `${p.name} declined your challenge.`, kind: 'info' });
       return;
     }
-    if (challenger.instance !== this.lobby || p.instance !== this.lobby || this.selecting.has(challenger) || this.selecting.has(p)) {
+    const lobby = p.instance;
+    if (!(lobby instanceof Lobby) || challenger.instance !== lobby || lobby.inDuel(p) || lobby.inDuel(challenger) || this.selecting.has(challenger) || this.selecting.has(p)) {
       p.send({ t: 'notice', text: 'That challenge is no longer available.', kind: 'warn' });
+      return;
+    }
+    if (c.ring >= 0) {
+      this.unqueue(p);
+      this.unqueue(challenger);
+      if (!lobby.startDuel(c.ring, challenger, p)) {
+        const text = 'The ring duel is off: you both need to be standing in a free ring.';
+        p.send({ t: 'notice', text, kind: 'warn' });
+        challenger.send({ t: 'notice', text, kind: 'warn' });
+      }
       return;
     }
     this.beginSelect('casual', challenger, p);

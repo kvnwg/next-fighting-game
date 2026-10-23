@@ -1,6 +1,6 @@
 /** Server-side wrappers: a connected human (Player) and a simulated fighter (ServerFighter). */
 import { CharacterId } from '../shared/characters';
-import { HIT_CONFIRM_SLACK_MS, MAX_LAG_COMP_MS } from '../shared/config';
+import { HIT_CONFIRM_SLACK_MS, INTEREST, MAX_LAG_COMP_MS } from '../shared/config';
 import { PLACEMENT_MATCHES } from '../shared/ranks';
 import { Fighter, DefenseEvent } from '../shared/fighter';
 import { BotDifficulty, QueueMode, RosterEntry, ServerMsg } from '../shared/protocol';
@@ -44,6 +44,8 @@ export class ServerFighter extends Fighter {
   interrupt: { serial: number; t: number } | null = null;
   /** A knockback slide in progress (server-moved fighters; players replay their own). */
   knock: { dx: number; dz: number; t0: number; dur: number; done: number } | null = null;
+  /** which far-snapshot turn this fighter goes out on (see Instance.sendByInterest) */
+  readonly slot = Math.floor(Math.random() * INTEREST.farEvery);
 
   respawnAt = 0;
   spawnProtectedUntil = 0;

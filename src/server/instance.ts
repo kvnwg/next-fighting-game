@@ -3,7 +3,7 @@
  * state machines -> hit detection -> lag-compensated hit resolution -> broadcast.
  */
 import { AttackDef, AttackKey, executeSpacing } from '../shared/characters';
-import { COMBAT, MAX_LAG_COMP_MS, PLAYER_RADIUS, SNAPSHOT_HZ, FALL_DEATH_Y, SPRINT_MULT } from '../shared/config';
+import { COMBAT, INTEREST, MAX_LAG_COMP_MS, PLAYER_RADIUS, SNAPSHOT_HZ, FALL_DEATH_Y, SPRINT_MULT } from '../shared/config';
 import { HitResult, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pruneDefenseLog, pushDefense } from '../shared/combat';
 import { FORCED_STATES, INPUT_ACTIONS, InputAction, InputOptions } from '../shared/fighter';
 import { MapDef, hazardAt, inSafeZone, onFloor } from '../shared/maps';
@@ -47,6 +47,12 @@ export abstract class Instance {
   protected fx: CombatEvent[] = [];
   protected lastTick: number;
   private lastSnap = 0;
+  private snapCount = 0;
+  /**
+   * Beyond this distance a player hears less about a fighter: fewer snapshots, and no state changes
+   * or combat effects (see INTEREST). Infinity: everyone hears everything (arenas).
+   */
+  protected interest = Infinity;
 
   constructor(
     readonly game: Game,
@@ -618,22 +624,57 @@ export abstract class Instance {
 
   private flush(now: number): void {
     // immediate state-change broadcast
-    const changed: FighterSnap[] = [];
+    const changed: ServerFighter[] = [];
     for (const f of this.fighters.values()) {
       const sig = `${f.state}|${f.stateStart}|${f.attackSerial}|${f.blockHeld}|${Math.round(f.hp)}|${f.buffUntil > now}`;
       if (sig !== f.lastSig) {
         f.lastSig = sig;
-        changed.push(fighterSnap(f, this.flags(f, now)));
+        changed.push(f);
       }
     }
-    if (changed.length) this.broadcast({ t: 'st', s: now, f: changed });
-    if (this.fx.length) {
-      this.broadcast({ t: 'fx', e: this.fx });
-      this.fx = [];
+    const snap = now - this.lastSnap >= 1000 / SNAPSHOT_HZ;
+    if (snap) this.lastSnap = now;
+    if (this.interest === Infinity) {
+      if (changed.length) this.broadcast({ t: 'st', s: now, f: changed.map((f) => fighterSnap(f, this.flags(f, now))) });
+      if (this.fx.length) this.broadcast({ t: 'fx', e: this.fx });
+      if (snap) this.broadcast({ t: 'snap', s: now, f: this.snapshots(now) });
+    } else {
+      this.sendByInterest(now, changed, snap);
     }
-    if (now - this.lastSnap >= 1000 / SNAPSHOT_HZ) {
-      this.lastSnap = now;
-      this.broadcast({ t: 'snap', s: now, f: this.snapshots(now) });
+    this.fx = [];
+  }
+
+  /**
+   * Each player gets what's near them: fighters within INTEREST.near on every snapshot and the rest
+   * on every INTEREST.farEvery-th (staggered, so the far ones don't all land together), and state
+   * changes and combat effects only from within INTEREST.fx. Each fighter is encoded once.
+   */
+  private sendByInterest(now: number, changed: ServerFighter[], snap: boolean): void {
+    const near2 = this.interest * this.interest;
+    const fx2 = INTEREST.fx * INTEREST.fx;
+    const close = (a: { x: number; z: number }, b: { x: number; z: number }, r2: number) => (a.x - b.x) ** 2 + (a.z - b.z) ** 2 <= r2;
+    const json = new Map<ServerFighter, string>();
+    const enc = (f: ServerFighter) => {
+      let j = json.get(f);
+      if (j === undefined) {
+        j = JSON.stringify(fighterSnap(f, this.flags(f, now)));
+        json.set(f, j);
+      }
+      return j;
+    };
+    const t = JSON.stringify(now);
+    const k = snap ? this.snapCount++ : 0;
+    for (const p of this.players) {
+      const me = p.fighter;
+      const sees = (f: ServerFighter, r2: number) => !me || f === me || close(me, f, r2);
+      const st = changed.filter((f) => sees(f, fx2));
+      if (st.length) p.sendRaw(`{"t":"st","s":${t},"f":[${st.map(enc).join(',')}]}`);
+      const fx = this.fx.filter((e) => !me || e.a === me.id || e.d === me.id || close(me, e, fx2));
+      if (fx.length) p.sendRaw(JSON.stringify({ t: 'fx', e: fx }));
+      if (!snap) continue;
+      const list: string[] = [];
+      for (const f of this.fighters.values()) if (sees(f, near2) || (k + f.slot) % INTEREST.farEvery === 0) list.push(enc(f));
+      p.sendRaw(`{"t":"snap","s":${t},"f":[${list.join(',')}]}`);
     }
   }
 

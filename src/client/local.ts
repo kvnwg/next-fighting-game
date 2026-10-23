@@ -61,6 +61,8 @@ export class LocalController {
   /** world-space direction of the current movement input */
   private moveDir = { x: 0, z: 0 };
   onAction: ((a: InputAction, ok: boolean) => void) | null = null;
+  /** walls that come and go (a sealed duel ring): moves the body back where it may be */
+  fence: ((p: { x: number; z: number }) => void) | null = null;
 
   constructor(
     readonly cf: ClientFighter,
@@ -213,6 +215,7 @@ export class LocalController {
     const obstacles = ctx.others.filter((o) => o.s !== 'dead').map((o) => ({ x: o.pos.x, z: o.pos.z }));
     sim.airControl(now, dt);
     const res = stepBody(sim, vx, vz, dt, this.map, sim.state === 'dodge' ? [] : obstacles);
+    this.fence?.(sim);
     if (res.fell && !this.fellSent) {
       this.fellSent = true;
       this.net.send({ t: 'fell' });

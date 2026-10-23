@@ -116,6 +116,7 @@ export class UI {
   private chatLog: HTMLElement;
   private chatInput: HTMLInputElement;
   private plates = new Map<string, HTMLElement>();
+  private ringLabels = new Map<number, HTMLElement>();
   private plateLayer: HTMLElement;
   private floatLayer: HTMLElement;
   private floaters: Floater[] = [];
@@ -347,8 +348,10 @@ export class UI {
   }
 
   /** Small, dim connection line: players online, round-trip time, fps. */
-  setNetInfo(online: number, rtt: number | null, fps: number | null): void {
+  setNetInfo(online: number, rtt: number | null, fps: number | null, lobby: { n: number; count: number; cap: number } | null = null): void {
     const parts = [this.offline ? 'Single player' : `${online} online`];
+    // which lobby you're in, once there's more than one
+    if (lobby && !this.offline && online > lobby.count) parts.unshift(`Grounds ${lobby.n} · ${lobby.count}/${lobby.cap}`);
     if (rtt !== null) parts.push(`${rtt}ms`);
     this.setText(this.els.online, parts.join(' · '));
     this.setText(this.els.fps, fps !== null ? ` · ${fps} fps` : '');
@@ -612,6 +615,26 @@ export class UI {
     this.setBar(po.firstElementChild as HTMLElement, postureFrac);
   }
 
+  /** A label over a dueling ring (who's fighting, the clock, the result); null hides it. */
+  ringLabel(i: number, at: { x: number; y: number } | null, html = ''): void {
+    let el = this.ringLabels.get(i);
+    if (!at) {
+      if (el) el.style.display = 'none';
+      return;
+    }
+    if (!el) {
+      el = h(`<div class="ring-label"></div>`);
+      this.plateLayer.appendChild(el);
+      this.ringLabels.set(i, el);
+    }
+    el.style.display = '';
+    el.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`;
+    if (el.dataset.html !== html) {
+      el.innerHTML = html;
+      el.dataset.html = html;
+    }
+  }
+
   removePlate(id: string): void {
     this.plates.get(id)?.remove();
     this.plates.delete(id);
@@ -679,11 +702,12 @@ export class UI {
 
   // ------------------------------------------------------------------ challenge
 
-  showChallenge(from: string, name: string, char: CharacterId): void {
+  /** `ring`: they want to fight here, in the duel ring you're both standing in */
+  showChallenge(from: string, name: string, char: CharacterId, ring = false): void {
     this.challengeFrom = from;
     const el = this.els.challenge;
     el.innerHTML = `<div class="ch-seal" aria-hidden="true">挑</div><div class="ch-head">${icon('swords')}挑戦状 · A challenge</div>
-      <div><b>${esc(name)}</b> (${CHARACTERS[char].name}) challenges you to a duel!</div>
+      <div><b>${esc(name)}</b> (${CHARACTERS[char].name}) challenges you to a duel${ring ? ' <b>here in the ring</b>' : ''}!</div>
       <div class="row"><button class="btn small" data-a="1">${jpLabel('受', 'Accept', 'check')}<span class="key"> [Y]</span></button><button class="btn small danger" data-a="0">${jpLabel('断', 'Decline', 'close')}<span class="key"> [N]</span></button></div>`;
     el.classList.remove('hidden');
     el.querySelectorAll('button').forEach((b) =>

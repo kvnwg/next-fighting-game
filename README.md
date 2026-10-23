@@ -113,6 +113,8 @@ Everything in the world is voxels, lit the way a Minecraft shader pack lights th
 
 The server is authoritative for combat. Each client predicts its own actions with the same state machine (`src/shared/fighter.ts`), so attacks start instantly. Defensive inputs (guard, dodge, jump) are **lag-compensated**: the client sends the server time it was seeing when the key was pressed, and the server waits up to `ping/2 + 35ms` before finalising a hit, so your deflect counts if you pressed it in time on your own screen (capped at 220ms). Remote players are interpolated 100ms behind, but their attack animations are timed off the server clock, so the windup you react to lines up with the hit.
 
+In a lobby, each player is sent what's near them (`INTEREST` in `src/shared/config.ts`): fighters within 40m on every snapshot (20 a second), everyone farther away on every fourth, and combat effects and state changes only from within 60m. Clients draw far-off fighters a little further behind so they still glide. A full lobby of 24 spread over the grounds costs each player about 30 KB/s; packed into one spot it's about 60 KB/s, what it was before (everyone is near everyone).
+
 ## Characters
 
 | | Weapon | Role | Passive | Perilous (E) | Ability (R) |
@@ -131,9 +133,17 @@ You can switch characters in the lobby safe zone (press **C**).
 ## Lobby, ranked and maps
 
 - **Lobby (Proving Grounds).** You spawn in the shrine plaza, which is a **safe zone** where nobody can be damaged. Outside it, anyone can fight anyone, and you respawn in the plaza after dying. The **training yard** to the east has a passive dummy and a **sparring dummy** that swings at you, so you can practise deflects and perilous counters. The wooden board in the plaza shows the top of the ladder.
+- **Lobbies of 24.** Each lobby holds up to 24 players (`LOBBY_CAP`); when they're all full another one opens. Newcomers join the busiest lobby with room, you go back to your own lobby after a match if there's space, and empty lobbies close. The HUD shows which one you're in ("Grounds 2 · 18/24") once there's more than one. Ranked matchmaking and chat span every lobby.
+- **Dueling rings.** Six sand rings ringed with lanterns stand around the grounds. Challenge someone (G) while you both stand in the same free ring and the duel is fought right there:
+  - the ring seals behind a wall of light, you're both made whole and set apart facing each other, and a 3s countdown starts;
+  - only the two of you can land blows, nobody else can step in, and neither of you can step out;
+  - a KO ends it, or after 90s the healthier fighter wins. Walking away (leaving, disconnecting) loses it, and the result goes out to the lobby;
+  - the loser gets back up where they fell, and the ring opens again.
+
+  Spectators see who's fighting and the clock over the ring. A challenge made anywhere else still goes to a private arena.
 - **Ranked.** Press **K** or click **Ranked** to queue. Matchmaking pairs the closest ratings, and the allowed gap widens the longer you wait. Matches are best of 3 rounds with a 120s round timer (on time-out, the higher health % wins the round) on a random arena. Ratings are Elo: K=64 for your first 5 placement matches, 32 afterwards, 24 at Grandmaster. Leaving a ranked match counts as a loss.
 - **Tiers:** Bronze, Silver (850), Gold (1000), Platinum (1150), Diamond (1300), Master (1450), Grandmaster (1600). Each tier below Grandmaster has three divisions (III, II, I). Everyone starts at 900 MMR.
-- **Practice** puts you in the same match flow against an Easy, Normal or Hard bot, unranked. **Challenges** (G) start a casual duel with another player.
+- **Practice** puts you in the same match flow against an Easy, Normal or Hard bot, unranked. **Challenges** (G) start a casual duel with another player: in a private arena, or right there if you're both in a dueling ring.
 - **Map and fighter select.** Every duel opens with a 10s vote: each side picks an arena (or Random) and a fighter, with portrait badges showing both picks. When the two map votes differ, a coin flip decides between them.
 - **Ring entrances.** Before round one the camera films each fighter's entrance in turn: the opponent's, then yours, then a swing behind your shoulder. Each entrance is 3.6s in three shots, with its own choreography, sounds, effects (lightning, fog, embers…) and a name card revealed in the fighter's style, with their line.
 
@@ -242,7 +252,7 @@ All combat timings live in `COMBAT` and `MATCH` in `src/shared/config.ts` (defle
 
 - No real accounts: identity is a browser token. Hook up auth before running a public ranked ladder.
 - Movement is client-reported. The server caps speed by state (no walking away while staggered or broken), limits height to real jumps, and measures latency itself. That stops the obvious cheats, but it isn't a fully server-simulated movement model.
-- One server process holds everyone. Scaling out would need sharded lobbies and a shared store such as SQLite or Postgres.
+- One server process holds every lobby and match. Scaling past one machine would need lobbies spread over several processes and a shared store such as SQLite or Postgres.
 - No gamepad support yet (keyboard + mouse, or touch).
 
 ## Voxel characters

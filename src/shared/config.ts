@@ -14,6 +14,18 @@ export const MAX_LAG_COMP_MS = 220;
 /** Extra slack added on top of a player's measured one-way latency before a hit is finalised. */
 export const HIT_CONFIRM_SLACK_MS = 35;
 
+// ---- Lobbies -------------------------------------------------------------------
+/** Players per lobby; when every lobby is full another one opens. */
+export const LOBBY_CAP = 24;
+/**
+ * What each player is sent about the others in a lobby: fighters within `near` metres at the full
+ * snapshot rate, everyone farther away on every `farEvery`th snapshot. Combat effects and state
+ * changes reach players within `fx` metres.
+ */
+export const INTEREST = { near: 40, farEvery: 4, fx: 60 };
+/** Duels in the lobby's rings: the countdown once it seals, the time limit, the pause after. */
+export const RING_DUEL = { countdown: 3000, time: 90_000, after: 3500 };
+
 // ---- Movement ------------------------------------------------------------------
 export const PLAYER_RADIUS = 0.45;
 export const GRAVITY = 30;

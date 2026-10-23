@@ -4,7 +4,7 @@ import { Outcome } from './combat';
 import { Fighter, FighterState, InputAction } from './fighter';
 import { round2 } from './math';
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export type QueueMode = 'ranked' | 'practice';
 export type MatchMode = 'ranked' | 'practice' | 'casual';
@@ -121,6 +121,23 @@ export interface SelectView {
   votes: { map: [string | null, string | null]; char: [CharacterId | null, CharacterId | null] };
 }
 
+/** A dueling ring in the lobby, and the duel in it if there is one. */
+export interface RingView {
+  /** index into the map's rings */
+  i: number;
+  /** open: anyone can walk in. countdown/fight: sealed around the two duelists. over: the result, before it opens */
+  state: 'open' | 'countdown' | 'fight' | 'over';
+  a?: string;
+  b?: string;
+  /** the duelists' names */
+  an?: string;
+  bn?: string;
+  /** when this state ends (server ms) */
+  until?: number;
+  /** who won ('' for a draw), once it's over */
+  w?: string;
+}
+
 export type ServerMsg =
   | { t: 'welcome'; id: string; token: string; profile: ProfileView; online: number; serverTime: number }
   | { t: 'pong'; c: number; s: number }
@@ -169,11 +186,15 @@ export type ServerMsg =
     }
   | { t: 'profile'; profile: ProfileView }
   | { t: 'leaderboard'; entries: LeaderboardEntry[]; you: number | null; total: number }
-  | { t: 'challenge'; from: string; name: string; char: CharacterId; expires: number }
+  /** ring: the duel would be fought in this lobby ring, where you both stand */
+  | { t: 'challenge'; from: string; name: string; char: CharacterId; expires: number; ring?: number }
   | { t: 'notice'; text: string; kind?: 'info' | 'warn' | 'good' }
   | { t: 'chat'; name: string; text: string; sys?: boolean }
   | { t: 'feed'; killer: string; victim: string; how: string }
   | { t: 'online'; n: number }
+  /** which lobby you're in (numbered from 1) and how full it is */
+  | { t: 'lobby'; n: number; count: number; cap: number }
+  | { t: 'rings'; r: RingView[] }
   | ({ t: 'select' } & SelectView)
   /** the select closed without a match (the other side left) */
   | { t: 'selectCancel'; reason: string };
