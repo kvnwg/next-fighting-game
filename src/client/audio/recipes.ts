@@ -616,10 +616,11 @@ const SAMPLE_GAIN: Record<string, number> = {
   // the entrance stomp keeps the level of the Knight's deflect it replaces
   ui_click: 0.1, match_found: 0.16, countdown: 0.18, start_screech: 0.91, start_confirm: 0.91, victory_fanfare: 0.15, victory_piano: 0.15, defeat: 0.15, blade_draw: 0.39, blade_shing: 0.44, heavy_whoosh: 0.44, glass_tink: 0.72, riser_chime: 1.57, juggernaut_slam: 1.32, juggernaut_thud: 1.32, juggernaut_boom: 0.5, juggernaut_rubble: 0.5, ronin_taiko: 0.75, ronin_flute: 0.75, ronin_wind_howl: 0.2, ronin_wind_sweep: 0.2, monk_breath: 0.52, reaper_scrape: 0.18, reaper_groan: 0.18, entrance_stomp: 0.32,
   // the Knight's deflect (the sword hit and the shield ring together), at the level of the shield thud
-  // it replaced; his shield bash; the Warden's step (at the level of the gravel step he had); and the
+  // it replaced; his shield bash; the Warden's step (at the level of the gravel step he had); the vanish
+  // (at the roll dodge's level: the synthesised vanish is near silent) and the blink; and the
   // swings and the Monk's punches, each pool matched to the swing or hit it replaces (the Wraith's to
   // his old recorded swing)
-  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
+  paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
@@ -937,6 +938,8 @@ export function footstep(o: Out, p: Profile, s: { speed: number; floor: Floor })
 /** A dodge: the roll or sidestep, the gear moving, the landing. */
 export function dodge(o: Out, p: Profile, kind: 'roll' | 'vanish' | 'leap' = 'roll'): void {
   if (kind === 'vanish') {
+    // the user's recorded vanish, once it has decoded
+    if (playLayers(o, ['vanish'])) return;
     noise(o, { type: 'bandpass', f: 3000, f1: 5200, q: 6, dur: 0.3, gain: 0.3, shape: SHAPES.swell(2) });
     noise(o, { color: 'pink', type: 'bandpass', f: 2400, f1: 500, q: 1.5, dur: 0.25, gain: 0.35, delay: 0.05 });
     return;

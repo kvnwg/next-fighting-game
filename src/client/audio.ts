@@ -372,7 +372,8 @@ class AudioEngine {
         this.emit((out) => R.counter(out, A, D, { anim }), { ...at, level: LEVEL.deflect, wet: WET.deflect, priority: 2 });
         break;
       case 'evade':
-        if (tags.includes('blink')) this.emit((out) => legacy(out, 'blink'), { ...at, level: LEVEL.dodge, wet: 0.3 });
+        // the blink: the recorded dash, over one of its two magic whooshes
+        if (tags.includes('blink')) this.emit((out) => void (R.playLayers(out, ['blink_dash', 'blink_magic']) || legacy(out, 'blink')), { ...at, level: LEVEL.dodge, wet: 0.3 });
         break;
       case 'feint':
         this.emit((out) => R.feint(out, D), { ...at, vol: o.vol * 0.8, level: LEVEL.swing, wet: WET.swing });
