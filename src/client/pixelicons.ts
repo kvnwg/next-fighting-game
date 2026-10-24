@@ -115,6 +115,28 @@ export function pixelSVG(rows: readonly string[], opts: { drop?: boolean; cls?: 
   return svg;
 }
 
+/**
+ * A katana cut from corner to corner of an `n`-pixel square, top left to bottom right (`flip` cuts
+ * from the top right): a brush stroke sharp at both ends with its belly a little past the middle,
+ * red lacquer, white-hot along its core. The execution mark is two of them crossed.
+ */
+export function slashRows(n: number, flip = false): string[] {
+  const rows: string[] = [];
+  for (let y = 0; y < n; y++) {
+    let row = '';
+    for (let x0 = 0; x0 < n; x0++) {
+      const x = flip ? n - 1 - x0 : x0;
+      const s = (x + y) / (2 * (n - 1));
+      const d = Math.abs(x - y) / Math.SQRT2;
+      const u = s < 0.58 ? s / 0.58 : 1 + (s - 0.58) / 0.42;
+      const hw = 3.1 * Math.max(0, u <= 1 ? Math.sin((Math.PI * u) / 2) : Math.cos((Math.PI * (u - 1)) / 2)) ** 0.7;
+      row += d > hw ? '.' : d <= hw - 1.5 ? 'h' : 'r';
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
 /** The same icon as a CSS url() for backgrounds. */
 export function pixelURL(rows: readonly string[], drop = true): string {
   const svg = pixelSVG(rows, { drop }).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');

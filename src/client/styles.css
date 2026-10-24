@@ -1000,10 +1000,36 @@ h4.ih .pi { width: 20px; height: 20px; }
 .keys.cancels tr:first-child td { color: var(--gold); font-size: 12px; }
 
 /* the red X over a fighter whose guard is broken (after the reference): finish them */
-.broken-mark { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; z-index: 2; pointer-events: none; animation: bm-pulse 0.5s ease-in-out infinite alternate; }
-.broken-mark i { position: absolute; left: 50%; top: 50%; width: 58px; height: 9px; margin: -4.5px 0 0 -29px; background: #ff2a3a; box-shadow: 0 0 12px #ff2a3a, 0 0 26px rgba(255, 42, 58, 0.7), inset 0 0 0 2px rgba(255, 255, 255, 0.55); transform: rotate(45deg); }
-.broken-mark i + i { transform: rotate(-45deg); }
-@keyframes bm-pulse { from { opacity: 0.75; scale: 0.92; } to { opacity: 1; scale: 1.08; } }
+/*
+ * The execution mark (ui.setBrokenMark), centred on a posture-broken opponent's chest: two pixel
+ * katana cuts crossed, lock-on brackets and a 斬 tag. It cuts in when it appears (the strokes one
+ * after the other, each flashing white as it lands, then the brackets and the tag), then throbs in
+ * hard two-frame steps while a diamond pulses out from it.
+ */
+.broken-mark { position: absolute; left: -40px; top: -40px; width: 80px; height: 80px; z-index: 2; pointer-events: none; }
+.bm-x { position: absolute; inset: 6px; animation: bm-throb 0.44s steps(1, end) 0.42s infinite; }
+.broken-mark .bm-cut { position: absolute; inset: 0; width: 100%; height: 100%; vertical-align: 0; }
+.bm-cut.a { animation: bm-cut-a 0.12s steps(4, end) both, bm-flash 0.1s steps(1, end) 0.1s both; }
+.bm-cut.b { animation: bm-cut-b 0.12s steps(4, end) 0.11s both, bm-flash 0.1s steps(1, end) 0.21s both; }
+@keyframes bm-cut-a { from { clip-path: polygon(0 0, 0 0, 0 0); } to { clip-path: polygon(0 0, 200% 0, 0 200%); } }
+@keyframes bm-cut-b { from { clip-path: polygon(100% 0, 100% 0, 100% 0); } to { clip-path: polygon(100% 0, 100% 200%, -100% 0); } }
+@keyframes bm-flash { from { filter: brightness(0) invert(1); } to { filter: none; } }
+@keyframes bm-throb { 0% { scale: 1; } 50% { scale: 1.08; } }
+/* lock-on brackets: four corners snapping in from wide, then breathing with the throb */
+.bm-lock { position: absolute; inset: 0; animation: bm-lock-in 0.18s steps(3, end) 0.2s both, bm-throb 0.44s steps(1, end) 0.42s infinite; }
+.bm-lock i { position: absolute; width: 14px; height: 14px; border: 0 solid #fff; filter: drop-shadow(2px 2px 0 #16121a); }
+.bm-lock i:nth-child(1) { left: 0; top: 0; border-width: 4px 0 0 4px; }
+.bm-lock i:nth-child(2) { right: 0; top: 0; border-width: 4px 4px 0 0; }
+.bm-lock i:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 4px 4px; }
+.bm-lock i:nth-child(4) { right: 0; bottom: 0; border-width: 0 4px 4px 0; }
+@keyframes bm-lock-in { from { opacity: 0; transform: scale(1.9); } 34% { opacity: 1; } to { opacity: 1; transform: scale(1); } }
+/* a hard-edged diamond pulsing out from it, twice a second */
+.bm-wave { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border: 3px solid var(--red-hi); transform: rotate(45deg) scale(0.6); opacity: 0; animation: bm-wave 0.88s steps(7, end) 0.3s infinite; }
+.bm-wave.late { animation-delay: 0.74s; }
+@keyframes bm-wave { from { transform: rotate(45deg) scale(0.6); opacity: 1; } 70% { opacity: 0.6; } to { transform: rotate(45deg) scale(2.1); opacity: 0; } }
+/* 斬: slay, white on a crimson tag under the cut */
+.bm-tag { position: absolute; left: 50%; top: 100%; margin-top: 2px; padding: 2px 5px 3px; font-size: 15px; line-height: 1; color: #fff; background: var(--red); box-shadow: inset 0 -3px 0 #9a1620, 2px 2px 0 #16121a; transform: translateX(-50%); animation: bm-tag-in 0.16s steps(2, end) 0.28s both; }
+@keyframes bm-tag-in { from { opacity: 0; transform: translate(-50%, -14px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* lost health shows as a bright white chunk that then drains */
 .fc-hp .fc-trail { background: #ffffff; box-shadow: inset 0 -5px 0 #ffb0b8; }

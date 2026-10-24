@@ -5,7 +5,7 @@ import { BotDifficulty, LeaderboardEntry, MatchMode, ProfileView, RosterEntry, S
 import { PLACEMENT_MATCHES, RankInfo, TIERS, rankOf } from '../shared/ranks';
 import { CANCELS, CANCEL_NAMES, CancelInto, CancelWindow, MoveClass } from '../shared/cancels';
 import { LobbyBar } from './lobbybar';
-import { ICON, IconName, icon, pixelSVG, recolor } from './pixelicons';
+import { ICON, IconName, icon, pixelSVG, recolor, slashRows } from './pixelicons';
 import { TRACKS } from './audio/music';
 import { settings } from './settings';
 
@@ -473,13 +473,22 @@ export class UI {
     this.postureBar(this.els.postureMain, frac, broken);
   }
 
-  /** The same bar above the opponent's head (null hides it). */
+  /**
+   * The execution mark on a posture-broken opponent (null hides it): two katana cuts slash across
+   * it one after the other, lock-on brackets snap in round them and 斬 (slay) drops in under it,
+   * then it throbs, a hard-edged diamond pulsing out from it, until they recover or are cut down.
+   * Showing it again (it is display: none when hidden) plays the cuts again.
+   */
   setBrokenMark(at: { x: number; y: number } | null): void {
     let el = this.hud.querySelector<HTMLElement>('.broken-mark');
     if (!el) {
       el = document.createElement('div');
       el.className = 'broken-mark hidden';
-      el.innerHTML = '<i></i><i></i>';
+      el.innerHTML =
+        '<span class="bm-wave"></span><span class="bm-wave late"></span>' +
+        '<span class="bm-lock"><i></i><i></i><i></i><i></i></span>' +
+        `<span class="bm-x">${pixelSVG(slashRows(21), { cls: 'bm-cut a' })}${pixelSVG(slashRows(21, true), { cls: 'bm-cut b' })}</span>` +
+        '<b class="bm-tag jp">斬</b>';
       this.hud.querySelector('.plates')!.after(el);
     }
     el.classList.toggle('hidden', !at);
