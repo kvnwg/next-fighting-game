@@ -308,6 +308,14 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
       rig.playShots(executionShots(ex[0].root.position, ex[1].root.position, k));
       rig.update(at / 1000, ex[0].root.position, ex[1].root.position);
     }
+    // `&impact=1` or `2`: the finishing blow's impact frame (ink on white, on red), on the victim's chest
+    const impact = Number(params.get('impact') ?? 0);
+    if (impact > 0) {
+      r.camera.updateMatrixWorld();
+      const p = ex[1].root.position.clone().add(new THREE.Vector3(0, 1.1 * k, 0)).project(r.camera);
+      r.impactAt.set(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5);
+      r.impact = impact;
+    }
     const label = document.createElement('div');
     label.style.cssText = 'position:fixed;left:8px;top:8px;color:#fff;font:14px monospace;text-shadow:0 1px 0 #000';
     label.textContent = `execute ${ca} -> ${cd}  ${at} ms`;

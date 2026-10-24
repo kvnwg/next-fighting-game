@@ -37,6 +37,10 @@ type MatchMsg = Extract<ServerMsg, { t: 'match' }>;
 
 /** kanji numerals for countdowns and round titles */
 const KANJI_NUM = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+/** each step of an execution's impact frame (ink on white, then on red), in ms */
+const IMPACT_MS = 70;
+/** how long before the finishing blow its swing starts, so the recorded whoosh peaks on the hit (ms) */
+const EXEC_WHOOSH_LEAD = 160;
 
 export function startApp(root: HTMLElement, offline = false): void {
   new App(root, offline);
@@ -66,12 +70,14 @@ class App {
   /** seconds left of the red-and-black beat after a posture break */
   private drama = 0;
   /** the execution cinematic running (only for one you're in) */
-  private exec: { a: ClientFighter; d: ClientFighter; t: number; start: number; hitDone: boolean } | null = null;
+  private exec: { a: ClientFighter; d: ClientFighter; t: number; start: number; hitDone: boolean; whooshed: boolean } | null = null;
   /** the map's own fighter rim strength, restored after an execution */
   private rimBase = 0.6;
   /** back-to-back deflects build up the spectacle */
   private deflectStreak = 0;
   private lastDeflectAt = -Infinity;
+  /** when the last impact frame began (performance.now) */
+  private impactStart = -Infinity;
   /** the ring entrances playing in the match intro: whose, when, and which cues have fired */
   private intro: { start: number; turns: { f: ClientFighter; r: RosterEntry; mine: boolean; at: number }[]; fired: Set<string> } | null = null;
   private queue: { since: number; count: number } | null = null;
@@ -907,6 +913,12 @@ class App {
           if (d) this.cam.punchIn(d.pos, 0.45);
           this.renderer.flash = 0.3;
           this.renderer.flashColor.set('#ffffff');
+          // the impact frame (not with reduced shake: it's a hard flash)
+          if (!settings.reduceShake) {
+            const p = pos.clone().project(this.renderer.camera);
+            this.renderer.impactAt.set(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5);
+            this.impactStart = performance.now();
+          }
         }
         break;
       }
@@ -1243,7 +1255,7 @@ class App {
    * away as they go down.
    */
   private startExecution(a: ClientFighter, d: ClientFighter): void {
-    this.exec = { a, d, t: 0, start: this.net.serverNow(), hitDone: false };
+    this.exec = { a, d, t: 0, start: this.net.serverNow(), hitDone: false, whooshed: false };
     audio.musicDuck(true);
     this.ui.setCinematic(true);
     // laid out the way the server stands them (the victim straight ahead at the execution distance),
@@ -1266,6 +1278,11 @@ class App {
       // on the server's clock, like the paired animation, so the camera can't drift off it
       ex.t = now - ex.start;
       this.cam.syncShots(ex.t / 1000);
+      // the finishing strike's heavy swing, started to swell into the blow
+      if (!ex.whooshed && ex.t >= COMBAT.executeHitAt - EXEC_WHOOSH_LEAD) {
+        ex.whooshed = true;
+        audio.executionStrike(ex.a.id, ex.a.roster.char, { vol: this.volumeAt(ex.a.pos.x, ex.a.pos.z), pos: ex.a.pos });
+      }
       const T = COMBAT.executeTime;
       dark = Math.min(1, ex.t / 350) * (1 - Math.max(0, Math.min(1, (ex.t - (T - 450)) / 450)));
       if (ex.t >= T || !this.fighters.has(ex.a.id) || !this.fighters.has(ex.d.id)) {
@@ -1291,6 +1308,9 @@ class App {
     this.last = t;
     const now = this.net.serverNow();
     this.renderer.flash = Math.max(0, this.renderer.flash - dt * 3);
+    // the impact frame: ink on white, then on red, IMPACT_MS each
+    const sinceImpact = performance.now() - this.impactStart;
+    this.renderer.impact = sinceImpact < IMPACT_MS ? 1 : sinceImpact < 2 * IMPACT_MS ? 2 : 0;
     this.stepExecution(dt, now);
     if (this.drama > 0) {
       // the screen sinks to a deep red, holds and comes back

@@ -196,6 +196,12 @@ export interface MoveDef {
   /** afterimages are left behind while s is in this range */
   ghosts: [number, number] | null;
   trail: TrailStyle | null;
+  /**
+   * Executions: where the finishing blow's strike leaves its loaded pose. From here into the last
+   * impact plays as a heavy's strike does (quick, accelerating into the hit), however long it was
+   * authored; the choreography before it makes room. Null: the move keeps its own key spacing.
+   */
+  sStrike: number | null;
 }
 
 /** How an executed fighter takes the finishing blow: driven into the floor, flung away, run through, spun round. */
@@ -222,7 +228,8 @@ export interface Style {
    * The execution of a posture-broken opponent: played over COMBAT.executeTime, its LAST impact
    * landing on the finishing blow at COMBAT.executeHitAt (earlier impacts are flourish strikes).
    * s runs linearly in time: from sStart at 0 to the last impact at executeHitAt, then on to sRest
-   * at the end, so the move's own key spacing sets its rhythm (slow wind, fast strike, held finish).
+   * at the end, so the move's own key spacing sets its rhythm (slow wind, fast strike, held finish),
+   * except that the finishing strike (from sStrike, if set) always lands quick and heavy.
    * The victim stands one executeDistance (x body scale) straight ahead, kneeling broken.
    */
   execute?: MoveDef;
@@ -366,6 +373,7 @@ export interface MoveOpts {
   fx?: FxCue[];
   ghosts?: [number, number];
   trail?: TrailStyle;
+  strike?: number;
 }
 
 /**
@@ -401,6 +409,7 @@ export function mv(o: MoveOpts): MoveDef {
     fx: o.fx ?? [],
     ghosts: o.ghosts ?? null,
     trail: o.trail ?? null,
+    sStrike: o.strike ?? null,
   };
 }
 

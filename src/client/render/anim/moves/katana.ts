@@ -747,6 +747,8 @@ export const katana: Style = {
       [3.0, SAYA],
     ]),
     impacts: [EXEC_HIT],
+    // the draw leaves the sheath and cuts
+    strike: 1.95,
     start: 0,
     chamber: 1.95,
     end: 2.5,

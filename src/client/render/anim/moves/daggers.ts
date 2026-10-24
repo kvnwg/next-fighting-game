@@ -692,6 +692,8 @@ export const daggers: Style = {
     main: right(EXEC_R, 0.04, { body: true }),
     off: left(EXEC_L, 0.04, { body: true }),
     impacts: [EXEC_CUT1, EXEC_CUT2, EXEC_HIT],
+  // the knife driven home
+  strike: 2.0,
     start: 0,
     chamber: 0.3,
     end: 2.6,

@@ -372,7 +372,8 @@ const execBlade = glide(
     [1.86, [-0.35, 0.68, -0.17], [0.04, 0.01, 1]],
     // the release: slow out of the coil, then the arm whips straight (before the feet go)
     [1.92, [-0.3, 0.64, 0.02], [0.04, 0.0, 1]],
-    [1.98, [-0.09, 0.52, 0.8], [0.03, -0.05, 1]],
+    // still driving in as the point lands (it used to arrive early and wait)
+    [2.06, [-0.09, 0.52, 0.8], [0.03, -0.05, 1]],
     [EXEC_HIT, X_IN, X_IN_D],
     // driven on through them as the body sinks into the lunge
     [2.4, [-0.05, 0.47, 1.08], X_IN_D],
@@ -811,6 +812,8 @@ export const rapier: Style = {
       [2.8, [0.3, 0.02, 0.06]],
     ]),
     impacts: [1.0, 1.12, 1.24, EXEC_HIT],
+    // the lunge, from the coil
+    strike: 1.92,
     start: 0,
     chamber: 0.9,
     end: 2.62,

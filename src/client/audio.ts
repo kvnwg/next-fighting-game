@@ -450,6 +450,17 @@ class AudioEngine {
     this.swings.delete(fighterId);
   }
 
+  /**
+   * An execution's finishing strike: a heavy swing started so it swells into the blow (the strike
+   * itself is over in a blink), the tip-speed whooshes held off meanwhile so it doesn't double. The
+   * Ronin's iai is the blade drawn.
+   */
+  executionStrike(fighterId: string, char: CharacterId, o: Placed): void {
+    const w = this.walkers.get(fighterId);
+    if (w && this.ctx) w.lastWhoosh = this.ctx.currentTime + 0.1;
+    this.emit((out) => R.swing(out, profile(char), { heavy: true, anim: char === 'ronin' ? 'draw' : undefined }), { level: LEVEL.swing, vol: o.vol, pos: o.pos, wet: WET.swing, hero: true, priority: 2 });
+  }
+
   dodge(char: CharacterId, kind: 'roll' | 'vanish' | 'leap', o: Placed): void {
     const p = profile(char);
     this.emit((out) => R.dodge(out, p, kind), { level: LEVEL.dodge, vol: o.vol, pos: o.pos, wet: WET.swing });

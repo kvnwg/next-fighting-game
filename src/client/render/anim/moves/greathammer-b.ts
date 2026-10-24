@@ -428,6 +428,8 @@ export const WARDEN_EXECUTE: MoveDef = heave(mv({
     ]),
   },
   impacts: [-0.75, 0.45],
+  // the crush, from the hammer hung behind him
+  strike: 0.28,
   start: -1.7,
   chamber: -0.95,
   rest: 1.0,

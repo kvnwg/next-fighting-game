@@ -682,6 +682,8 @@ export const spear: Style = {
       [2.56, [0.1, 0.4, 0.4]],
     ]),
     impacts: [0.95, EXEC_HIT],
+    // the spear driven in: a thrust, not a push
+    strike: 1.85,
     start: 0,
     chamber: 0.5,
     end: 2.62,

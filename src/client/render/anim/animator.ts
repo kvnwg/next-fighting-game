@@ -341,6 +341,46 @@ interface MoveFrame {
   kick: KickTarget | null;
 }
 
+/** An execution's finishing strike: from its loaded pose into the hit, as long as a heavy's. */
+const EXEC_STRIKE_MS = 130;
+
+/**
+ * Where an execution's choreography is (its s) at `e` ms, before the finishing blow: the strike
+ * (from sStrike) lands in EXEC_STRIKE_MS, accelerating into the hit like any attack's, and the
+ * choreography before it fills the rest of the time, so its loaded pose hangs a beat longer.
+ */
+function execS(def: MoveDef, e: number): number {
+  const hitAt = COMBAT.executeHitAt;
+  const last = def.impacts[def.impacts.length - 1];
+  const w = execStrikeMs(def);
+  if (w === 0) return def.sStart + (last - def.sStart) * (e / hitAt);
+  const strike = def.sStrike!;
+  const t0 = hitAt - w;
+  if (e < t0) return def.sStart + (strike - def.sStart) * (e / t0);
+  const q = (e - t0) / w;
+  return strike + (last - strike) * q * q;
+}
+
+/** When (ms) an execution reaches s: the inverse of execS (for the victim's flinches). */
+function execT(def: MoveDef, s: number): number {
+  const hitAt = COMBAT.executeHitAt;
+  const last = def.impacts[def.impacts.length - 1];
+  const w = execStrikeMs(def);
+  if (w === 0) return ((s - def.sStart) / Math.max(1e-6, last - def.sStart)) * hitAt;
+  const strike = def.sStrike!;
+  const t0 = hitAt - w;
+  if (s <= strike) return ((s - def.sStart) / Math.max(1e-6, strike - def.sStart)) * t0;
+  return t0 + w * Math.sqrt((s - strike) / Math.max(1e-6, last - strike));
+}
+
+/** How long the finishing strike takes (0: the move keeps its authored spacing). Never slower than authored. */
+function execStrikeMs(def: MoveDef): number {
+  const last = def.impacts[def.impacts.length - 1];
+  if (def.sStrike === null || def.sStrike <= def.sStart || def.sStrike >= last) return 0;
+  const authored = ((last - def.sStrike) / (last - def.sStart)) * COMBAT.executeHitAt;
+  return Math.min(EXEC_STRIKE_MS, authored);
+}
+
 export class Animator {
   readonly style: Style;
   private current: ResolvedPose;
@@ -771,7 +811,7 @@ export class Animator {
     const hitAt = COMBAT.executeHitAt;
     const dur = Math.max(hitAt + 1, a.dur || COMBAT.executeTime);
     const last = def.impacts[def.impacts.length - 1];
-    const s = e < hitAt ? def.sStart + (last - def.sStart) * (e / hitAt) : last + (def.sRest - last) * clamp01((e - hitAt) / (dur - hitAt - 300));
+    const s = e < hitAt ? execS(def, e) : last + (def.sRest - last) * clamp01((e - hitAt) / (dur - hitAt - 300));
     this.cues(def, s, out);
     out.trail = def.trail;
     out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
@@ -801,9 +841,8 @@ export class Animator {
     const rot: Rot = { ...ZERO_ROT };
     // flinches at the flourish strikes before the last
     if (def && def.impacts.length > 1) {
-      const last = def.impacts[def.impacts.length - 1];
       for (const at of def.impacts.slice(0, -1)) {
-        const t = ((at - def.sStart) / Math.max(1e-6, last - def.sStart)) * hitAt;
+        const t = execT(def, at);
         const k = e > t ? kick((e - t) / 90) * Math.exp(-(e - t) / 260) : 0;
         p.body.lean -= 0.25 * k;
         p.body.headPitch -= 0.4 * k;

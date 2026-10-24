@@ -552,6 +552,8 @@ export const swordShield: Style = {
         0.015,
       ),
       impacts: [T_CHIN, T_CUT],
+      // the greatsword brought down from the top
+      strike: 1.86,
       start: 0,
       chamber: cutAFrom - 0.05,
       end: 2.42,
