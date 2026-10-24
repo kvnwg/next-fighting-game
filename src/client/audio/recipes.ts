@@ -5,7 +5,7 @@
  */
 import type { AttackAnim } from '../../shared/characters';
 import { MAT, Material } from './materials';
-import type { Edge, Profile } from './profiles';
+import type { Edge, Guard, Profile } from './profiles';
 import { deflectClang } from './clang';
 import { playSample, sampleFor } from './samples';
 import { VOICES } from './voices';
@@ -628,8 +628,9 @@ const SAMPLE_GAIN: Record<string, number> = {
   // his old recorded swing)
   paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, jump: 0.31, bodyfall: 0.57, buff_shimmer: 0.28, buff_fire: 0.28, lava_burn: 0.43, juggernaut_crash: 0.9, juggernaut_punch: 0.9, shock_heavy_water: 0.55, shock_heavy_slam: 0.55, shock_light_tom: 0.93, shock_light_bag: 0.93, stomp_foot: 0.44, stomp_kick: 0.44, flashline: 0.25, chain_net: 0.93, chain_metal: 0.93, chi_crystal: 0.66, chi_drone: 0.66, roar_tiger: 0.34, roar_dragon: 0.34, roar_leopard: 0.34, fog_poof: 0.41, fog_boom: 0.41, whirl_flutter: 0.25, soulfire: 0.72, bolt_summon: 0.31, bolt_crackle: 0.31, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
   // the title screen's wind, 6 dB under its shing (as the Ronin's wind sits under his unsheathe); the
-  // executions: the Warden's finishing blow (the whoosh-punch, the bass hit and the impact, the impact
-  // level with the bass), the Ronin's (the slice, the clatter and the flute), the Wraith's (his five),
+  // perilous warning (the drum and riser, matched together to the synthesised cue); the executions:
+  // the Warden's finishing blow (the whoosh-punch, the bass hit and the impact, the impact level with
+  // the bass), the Ronin's (the slice, the clatter and the flute), the Wraith's (his five),
   // the Duelist's (his three) and the Monk's (his four), each matched as a whole, as led in, to the
   // synthesised blow it replaces; the Lancer's
   // whoosh-bang, 2 dB under the rest of his blow; the Warden's flourish strike (the crunch over the sub
@@ -641,6 +642,7 @@ const SAMPLE_GAIN: Record<string, number> = {
   ronin_finish_slice: 1.8, ronin_finish_clatter: 1.8, ronin_finish_flute: 1.8, juggernaut_triumph: 1.07, lancer_finish_bang: 1.02,
   reaper_finish_siren: 1.64, reaper_finish_depths: 1.64, reaper_finish_strings: 1.64, reaper_finish_perish: 1.64, reaper_finish_gore: 1.64,
   duelist_finish_dust: 1.23, duelist_finish_ball: 1.23, duelist_finish_wand: 1.23, monk_finish_punch: 0.94, monk_finish_punch2: 0.94, monk_finish_bones: 0.94, monk_finish_crowbar: 0.94, title_wind: 0.28,
+  perilous_drum: 0.84, perilous_riser: 0.84,
 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
@@ -674,8 +676,38 @@ function deflectBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
   if (streak >= 3) ring(o, MAT.rapier, 0.08, { pitch: 1.5, decay: 1.2 });
 }
 
-/** The guard caves in under the blow. */
+/**
+ * What each guard adds as it is knocked away (the user's recordings), and its level against the
+ * sword clatter's: the Knight's shield clanging, a blade's or the glaive's clatter, the hammer's crisp
+ * punch, the chain's metal, the Monk's bracer taking a punch.
+ */
+const GUARD_GIVES: Record<Guard, [string, number]> = {
+  shield: ['paladin_bash', 2.95],
+  blade: ['ronin_finish_clatter', 1],
+  knives: ['ronin_finish_clatter', 1],
+  haft: ['ronin_finish_clatter', 1],
+  hammer: ['juggernaut_punch', 2.02],
+  chain: ['chain_metal', 5.13],
+  bracer: ['monk_finish_punch2', 2],
+};
+
+/**
+ * The guard caves in under the blow: the user's recorded block clash over a floor tom's thud, and the
+ * guard knocked away (GUARD_GIVES), matched together to the synthesised break they replace; then the
+ * falling growl players know.
+ */
 export function guardBreak(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
+  if (playLayers(o, ['block', 'shock_light_tom'])) {
+    const [layer, k] = GUARD_GIVES[d.guard];
+    playLayers(o, [layer], k);
+    tell(o, a, 1);
+  } else guardBreakBase(o, a, d, s);
+  // the posture giving way: the falling growl players know
+  osc(filtered(o, 'lowpass', 900), { type: 'sawtooth', f: 200, f1: 60, dur: 0.5, gain: 0.2, delay: 0.02 });
+}
+
+/** The synthesised break, until the recordings decode. */
+function guardBreakBase(o: Out, a: Profile, d: Profile, s: GuardOpts): void {
   const st = striker(a, s.anim, true);
   onGuard(o, d, st, 'break', 1, s.anim, 1, s.rim);
   tell(o, a, 1);
@@ -709,29 +741,33 @@ export function guardBreak(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): v
   }
   thump(o, 75, 30, 0.6, 0.9);
   noise(o, { color: 'pink', type: 'lowpass', f: 3000, f1: 200, dur: 0.35, gain: 0.45 });
-  // the posture giving way: the falling growl players know
-  osc(filtered(o, 'lowpass', 900), { type: 'sawtooth', f: 200, f1: 60, dur: 0.5, gain: 0.2, delay: 0.02 });
 }
 
-/** Posture broken: the guard shatters like glass over a deep boom. */
+/**
+ * Posture broken: the guard shatters like glass over a deep boom. The shards are the user's ringing
+ * glass (matched to the synthesised shards it replaces, which play until it decodes).
+ */
 export function postureBreak(o: Out, d: Profile | null): void {
+  void d;
   noise(o, { type: 'highpass', f: 5000, f1: 2500, q: 0.7, dur: 0.06, gain: 0.9, a: 0.001 });
   noise(o, { type: 'bandpass', f: 3500, f1: 1800, q: 2.5, dur: 0.6, gain: 0.4, delay: 0.03, a: 0.01 });
-  for (let i = 0; i < 6; i++) ring(o, MAT.shard, 0.06, { pitch: rand(1, 2.1), decay: rand(0.8, 1.6), delay: rand(0, 0.12), beat: false });
+  if (!playLayers(o, ['exec_glass'], 0.87)) for (let i = 0; i < 6; i++) ring(o, MAT.shard, 0.06, { pitch: rand(1, 2.1), decay: rand(0.8, 1.6), delay: rand(0, 0.12), beat: false });
   thump(o, 90, 30, 0.9, 0.9);
   osc(filtered(o, 'lowpass', 500), { type: 'sawtooth', f: 60, f1: 28, dur: 0.7, gain: 0.25, delay: 0.02 });
-  if (d?.body === 'plate') ring(o, MAT.plate, 0.18, { pitch: d.plate / MAT.plate.base, decay: 1.2 });
 }
 
-/** Mikiri: the thrust read and stamped into the ground. */
+/**
+ * Mikiri: the thrust read and stamped into the ground. All the user's recordings: the stamp (a
+ * creature's footstep over a deep kick), the blade scraping under the foot and a floor tom's thud,
+ * matched together to the synthesised mikiri they replace.
+ */
 export function mikiri(o: Out, a: Profile, d: Profile): void {
+  void a;
+  if (playLayers(o, ['stomp_foot', 'stomp_kick', 'flashline', 'shock_light_tom'], 1.95)) return;
   stompLayer(o, d, 1);
-  const st = striker(a, 'thrust', false);
-  if (st.edge !== 'fist') ring(o, st.mat, 0.32, { pitch: st.pitch, decay: 0.5, hard: 0.8, delay: 0.01 });
   click(o, 0.45, 2500, 0.015);
   debris(o, 6, 0.35, 600, 2200, { gain: 0.35 });
   osc(o, { type: 'triangle', f: 90, f1: 40, dur: 0.3, gain: 0.35 });
-  ring(o, MAT.katana, 0.22, { pitch: 0.76, decay: 0.8 });
 }
 
 /** A counter: the attacker's blow turned, and the defender's answer landing on them. */
@@ -892,16 +928,16 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       osc(o, { f: 55, f1: 30, dur: 1.8, gain: 0.5, delay: 0.05 });
       // (and the user's whoosh into a bang, led in: see execLead)
       break;
-    case 'flurry':
-      // three cuts too quick to count, then the knife driven home
-      for (let i = 0; i < 3; i++) {
-        const c = at(o, i * rand(0.06, 0.08));
-        noise(c, { type: 'bandpass', f: rand(4800, 6200), f1: 1600, q: 1.3, dur: 0.06, gain: 0.4 });
-        ring(c, MAT.knife, 0.14, { pitch: rand(0.95, 1.1), decay: 0.4 });
-      }
+    case 'flurry': {
+      // three cuts too quick to count (the user's knife swings), then the knife driven home (the
+      // gory slice over the recorded hit), matched to the knife rings they replace
+      const cuts = sampleFor(o.ctx, 'reaper_finish_gore') ? [0, 1, 0] : [];
+      cuts.forEach((take, i) => playLayers(at(o, i * rand(0.06, 0.08)), ['shade_swing'], 0.71, take));
+      if (!cuts.length) for (let i = 0; i < 3; i++) noise(at(o, i * rand(0.06, 0.08)), { type: 'bandpass', f: rand(4800, 6200), f1: 1600, q: 1.3, dur: 0.06, gain: 0.4 });
       hit(at(o, 0.24), a, d, { heavy: true, anim: 'thrust' });
-      ring(o, MAT.knife, 0.3, { decay: 0.9, delay: 0.24 });
+      playLayers(at(o, 0.24), ['reaper_finish_gore'], 0.71);
       break;
+    }
     case 'reap':
       // the sickle drawn through on its chain, the chain running out, something torn loose (until
       // the recordings decode)
@@ -926,8 +962,9 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       const shimmer = sampleFor(o.ctx, 'paladin_shimmer');
       if (shimmer) playSample(o, shimmer, sampleGain('paladin_shimmer') * 1.3, 0.97, 0, 0.2);
     }
-      ring(o, MAT.greatsword, 0.38, { decay: 1.8 });
-      ring(o, MAT.bell, 0.32, { delay: 0.05 });
+      // the blade's weight and the toll: the user's radiant impact and barrel slam, matched to the
+      // greatsword's ring and the bell they replace
+      playLayers(o, ['paladin_impact', 'juggernaut_slam'], 1.26);
       noise(o, { type: 'highpass', f: 6000, dur: 1.5, gain: 0.08, a: 0.05, delay: 0.05 });
       break;
   }
@@ -1006,7 +1043,12 @@ export function footstep(o: Out, p: Profile, s: { speed: number; floor: Floor })
       thump(fl, 120, 70, 0.05, 0.18 * run);
       break;
   }
-  if (s.floor === 'wood') ring(o, MAT.haft, 0.12 * run, { pitch: rand(0.55, 0.7) });
+  // the hollow plank underfoot: the user's floor tom, quiet and pitched a little at random
+  if (s.floor === 'wood') {
+    const tom = sampleFor(o.ctx, 'shock_light_tom');
+    if (tom) playSample(o, tom, sampleGain('shock_light_tom') * 0.08 * run, rand(0.9, 1.2));
+    else ring(o, MAT.haft, 0.12 * run, { pitch: rand(0.55, 0.7) });
+  }
 }
 
 /** A dodge: the roll or sidestep, the gear moving, the landing. */
@@ -1044,13 +1086,24 @@ export function feint(o: Out, p: Profile): void {
   osc(o, { type: 'triangle', f: 500, f1: 900, dur: 0.12, gain: 0.2 });
 }
 
-/** Perilous: the danger cue, with the attacker's weapon glinting in it. */
-export function perilous(o: Out, p: Profile): void {
+/** the user's sliced riser is at its height this long into it */
+const RISER_PEAK = 0.568;
+
+/**
+ * Perilous: the danger cue, everyone's. The user's mission drum cadence sounding the alarm, and a
+ * sliced riser climbing to its height as the attack strikes (`windup`: the seconds until it does);
+ * a synthesised drone and beep until they decode.
+ */
+export function perilous(o: Out, p: Profile, windup = 0.75): void {
+  void p;
+  if (playLayers(o, ['perilous_drum'])) {
+    const t = windup - RISER_PEAK;
+    playLayers(t > 0 ? at(o, t) : o, ['perilous_riser'], 1, undefined, Math.max(0, -t));
+    return;
+  }
   osc(filtered(o, 'lowpass', 1400), { type: 'sawtooth', f: 110, f1: 105, dur: 0.5, gain: 0.25 });
   osc(o, { type: 'square', f: 880, f1: 870, dur: 0.35, gain: 0.05, delay: 0.02 });
-  ring(o, MAT.bell, 0.16, { pitch: 660 / 290, decay: 0.25 });
   thump(o, 90, 50, 0.3, 0.4);
-  ring(o, p.metal, 0.05, { decay: 0.8, hard: 0.5, delay: 0.03 });
 }
 
 /** A fighter going down: the body landing, the armour clattering, the weapon dropped. */
@@ -1076,8 +1129,13 @@ export function death(o: Out, d: Profile): void {
         noise(o, { type: 'bandpass', f: 2600, q: 1, dur: 0.025, gain: 0.2, delay: 0.12 });
     }
   }
-  // the weapon hits the floor and bounces
-  if (d.edge !== 'fist') {
+  // the weapon hits the floor and bounces: the user's sword clatter (the Wraith's chain rattling out
+  // with it, the Knight's shield clanging down), matched to the synthesised rings that play until
+  // they decode
+  if (d.edge !== 'fist' && playLayers(at(o, 0.45 - 0.273), ['ronin_finish_clatter'], 0.2)) {
+    if (d.chain) playLayers(at(o, 0.45), ['chain_metal'], 1);
+    if (d.guard === 'shield') playLayers(at(o, 0.52 - 0.04), ['paladin_bash'], 0.58);
+  } else if (d.edge !== 'fist') {
     let g = 0.22;
     for (const t of [0.45, 0.6, 0.69]) {
       ring(o, d.metal, g, { pitch: d.pitch, decay: 0.35, hard: 0.6, delay: t + rand(-0.02, 0.02) });

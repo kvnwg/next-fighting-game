@@ -68,6 +68,8 @@ const RECORDED: Partial<Record<Sfx, { layers: string[]; offset?: number }>> = {
   chime: { layers: ['riser_chime'] },
   // the title screen's (the Ronin's entrance blows with his own howl and sweep)
   wind: { layers: ['title_wind'] },
+  // the lobby's ring duel: the Warden's entrance gong (a barrel slam over a big kick)
+  gong: { layers: ['juggernaut_slam', 'juggernaut_thud'] },
 };
 
 export interface Placed {
@@ -486,8 +488,9 @@ class AudioEngine {
     this.emit((out) => R.jump(out, profile(char)), { level: LEVEL.dodge, vol: o.vol, pos: o.pos, wet: WET.step });
   }
 
-  perilous(char: CharacterId, o: Placed): void {
-    this.emit((out) => R.perilous(out, profile(char)), { level: LEVEL.legacy, vol: o.vol, pos: o.pos, wet: 0.3, priority: 2 });
+  /** A perilous attack starting, `windup` seconds before it strikes. */
+  perilous(char: CharacterId, o: Placed, windup?: number): void {
+    this.emit((out) => R.perilous(out, profile(char), windup), { level: LEVEL.legacy, vol: o.vol, pos: o.pos, wet: 0.3, priority: 2 });
   }
 
   buff(o: Placed): void {

@@ -1239,7 +1239,7 @@ class App {
       const vol = this.volumeAt(f.pos.x, f.pos.z);
       if (v.state === 'attack' && v.attack?.perilous && f.lastPerilousSerial !== v.serial) {
         f.lastPerilousSerial = v.serial;
-        audio.perilous(f.roster.char, { vol, pos: f.pos });
+        audio.perilous(f.roster.char, { vol, pos: f.pos }, Math.max(0, v.attack.windup - v.elapsed) / 1000);
         this.effects.flash(this.tmp.set(f.pos.x, f.pos.y + 2.4 * f.model.scale, f.pos.z), '#ff2a2a', 1.4, 0.3);
       }
       if (v.state === 'dodge' && v.elapsed < 200) audio.dodge(f.roster.char, v.dodgeKind ?? 'roll', { vol: vol * 0.8, pos: f.pos });
