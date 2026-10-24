@@ -254,6 +254,33 @@ describe('hit resolution', () => {
   });
 });
 
+describe("the Duelist's Prise de Fer", () => {
+  it('parries an attack into it and ripostes with a hit that lands on the instant', () => {
+    const { A, D } = duel('ronin', 'duelist');
+    D.input('ability', 900);
+    expect(D.state).toBe('stance');
+    A.input('light', 1000);
+    const tHit = 1000 + A.atkWindup;
+    const out = decideOutcome(A, D, A.attack!, tHit, defenseAt([], tHit));
+    expect(out).toBe('counter');
+    const hp = A.hp;
+    const r = applyHit(A, D, A.attack!, A.attackKey!, out, tHit, { distance: 2 });
+    // the riposte is no swing the attacker could guard: its damage is dealt with the parry
+    expect(r.damage).toBe(Math.round(CHARACTERS.duelist.ability.kind === 'counter' ? CHARACTERS.duelist.ability.attack.damage * COMBAT.hitDamageMult : 0));
+    expect(A.hp).toBe(hp - r.damage);
+    expect(A.state === 'stagger' || A.state === 'broken').toBe(true);
+    expect(D.attackKey).toBe('ct');
+  });
+
+  it('cannot take a grab', () => {
+    const { A, D } = duel('monk', 'duelist');
+    D.input('ability', 900);
+    A.input('special', 1000);
+    const tHit = 1000 + A.atkWindup;
+    expect(decideOutcome(A, D, A.attack!, tHit, defenseAt([], tHit))).not.toBe('counter');
+  });
+});
+
 describe('ranks', () => {
   it('shows placements until enough matches are played', () => {
     expect(rankOf(900, 2).placed).toBe(false);

@@ -298,12 +298,15 @@ const duelist: BaseDef = {
   ],
   heavy: { name: 'Moulinet', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.7, arc: 16, lunge: 1.5, feintable: true },
   special: { name: 'Coup de Grace', anim: 'thrust', windup: 620, active: 140, recovery: 600, damage: 20, posture: 30, blockPosture: 30, range: 4.7, arc: 15, lunge: 3.5, perilous: 'thrust', cooldown: 6500 },
+  // the parry that answers: struck in it, he takes the blade aside and runs them through before
+  // they can guard (the riposte lands on the instant, like the Monk's counter)
   ability: {
-    kind: 'attack',
-    name: 'Fleche',
-    description: 'Explode forward in a 6m running thrust.',
-    cooldown: 7000,
-    attack: { name: 'Fleche', anim: 'thrust', windup: 280, active: 200, recovery: 500, damage: 12, posture: 18, blockPosture: 24, range: 2.9, arc: 22, lunge: 6.5 },
+    kind: 'counter',
+    name: 'Prise de Fer',
+    description: 'Salute and hold a parry for 0.8s. If struck by a normal or thrust attack, take the blade aside and riposte: Coup Droit, a thrust that cannot be blocked.',
+    cooldown: 8000,
+    duration: 800,
+    attack: { name: 'Coup Droit', anim: 'thrust', windup: 80, active: 80, recovery: 420, damage: 14, posture: 32, blockPosture: 32, range: 3.4, arc: 30, noHitbox: true },
   },
   passive: {
     name: 'Riposte',

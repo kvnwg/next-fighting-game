@@ -937,12 +937,15 @@ class App {
           this.effects.burst(pos, { count: 26, color: ['#9b6bff', '#3a2a5a', '#d0b8ff'], speed: 3, life: 0.6, size: 0.12, gravity: -1, up: 1 });
         } else if (mine) say('EVADED', head(d).x, head(d).y, head(d).z, 'muted');
         break;
-      case 'counter':
-        this.effects.burst(pos, { count: 24, color: ['#ffd24a', '#ffffff'], speed: 6, life: 0.45 });
+      case 'counter': {
+        // the Duelist's Prise de Fer takes the blade aside in white sparks and ripostes
+        const riposte = d?.roster.char === 'duelist';
+        this.effects.burst(pos, { count: riposte ? 32 : 24, color: riposte ? ['#ffffff', '#ffd6e0', '#ff8aa0'] : ['#ffd24a', '#ffffff'], speed: riposte ? 8 : 6, life: 0.45 });
         a?.model.react('hit');
-        say('COUNTER!', head(d).x, head(d).y, head(d).z, 'good big', '返し');
+        say(riposte ? 'RIPOSTE!' : 'COUNTER!', head(d).x, head(d).y, head(d).z, 'good big', riposte ? '突き返し' : '返し');
         if (e.dmg) say(`-${e.dmg}`, head(a).x, head(a).y - 0.5, head(a).z, meA ? 'dmg me' : 'dmg');
         break;
+      }
       case 'feint':
         if (d) say('FEINT', head(d).x, head(d).y, head(d).z, 'warn small');
         break;
