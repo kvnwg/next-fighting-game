@@ -57,6 +57,8 @@ export interface UIHandlers {
   onModalChange(open: boolean): void;
   /** the on-screen prompt was tapped (touch: challenge the player in front of you) */
   onPrompt(): void;
+  /** copy a link that brings a friend into this lobby */
+  onInvite(): void;
   createPreview(container: HTMLElement): Preview;
   /** data URL of a character's portrait (rendered in-engine) */
   portrait(id: CharacterId): string;
@@ -238,6 +240,7 @@ export class UI {
         this.openModal('help');
         this.modal.querySelector('.settings')?.scrollIntoView({ block: 'center' });
       },
+      onInvite: () => this.handlers.onInvite(),
       portrait: (id) => this.handlers.portrait(id),
     }, offline);
     this.lobbyBar.setChar(settings.char);
@@ -680,6 +683,13 @@ export class UI {
   }
 
   // ------------------------------------------------------------------ chat
+
+  /** Chat off (CrazyGames' setting): no way to type, and nobody's messages, just the game's own. */
+  setChatEnabled(on: boolean): void {
+    document.body.classList.toggle('no-chat', !on);
+    if (!on && this.chatOpen) this.closeChat();
+    if (!on) for (const line of this.chatLog.querySelectorAll('.chat-line:not(.sys)')) line.remove();
+  }
 
   chat(name: string, text: string, sys = false): void {
     const el = h(`<div class="chat-line ${sys ? 'sys' : ''}">${sys ? '' : `<b>${esc(name)}:</b> `}${esc(text)}</div>`);

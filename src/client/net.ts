@@ -8,7 +8,7 @@ export interface SocketLike {
   readyState: number;
   onopen: (() => void) | null;
   onmessage: ((e: { data: string }) => void) | null;
-  onclose: ((e: { reason: string }) => void) | null;
+  onclose: ((e: { reason: string; code?: number }) => void) | null;
   onerror: (() => void) | null;
   send(data: string): void;
   close(): void;
@@ -24,7 +24,8 @@ export class Net {
   private samples: { rtt: number; offset: number }[] = [];
   rtt = 0;
   connected = false;
-  onClose: ((reason: string) => void) | null = null;
+  /** the connection dropped: the server's reason, and its close code (1012: restarting) */
+  onClose: ((reason: string, code: number) => void) | null = null;
   /** messages waiting while the connection is held (see hold) */
   private held: ServerMsg[] | null = null;
   /** sees each message as it's queued while held */
@@ -49,7 +50,7 @@ export class Net {
         this.connected = false;
         if (this.pingTimer) clearInterval(this.pingTimer);
         this.held = null;
-        if (was) this.onClose?.(e.reason || 'Connection lost');
+        if (was) this.onClose?.(e.reason || 'Connection lost', e.code ?? 1006);
       };
       ws.onmessage = (e) => {
         let m: ServerMsg;

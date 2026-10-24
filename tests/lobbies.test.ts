@@ -20,12 +20,12 @@ function harness() {
       game.tick();
     }
   };
-  const join = (name: string) => {
+  const join = (name: string, hello: object = {}) => {
     const inbox: ServerMsg[] = [];
     const on: Record<string, (d?: unknown) => void> = {};
     const ws = { readyState: 1, send: (d: string) => inbox.push(JSON.parse(d)), close: () => on.close?.(), on: (ev: string, cb: (d?: unknown) => void) => (on[ev] = cb) };
     game.handleConnection(ws as never);
-    on.message!(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name, char: 'ronin' }));
+    on.message!(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name, char: 'ronin', ...hello }));
     const id = (inbox.find((m) => m.t === 'welcome') as Msg<'welcome'>).id;
     const p = game.players.get(id)!;
     return {
@@ -86,6 +86,56 @@ describe('lobbies', () => {
     place(b.p, -45, -45);
     const near = count();
     expect(near.other).toBe(near.total);
+  });
+
+  it("joins a friend's lobby from an invite, or another one when it's full or gone", () => {
+    const { game, join } = harness();
+    const clients = Array.from({ length: LOBBY_CAP + 1 }, (_, i) => join(`P${i}`));
+    const [first, second] = game.lobbies;
+    const host = clients[LOBBY_CAP];
+    expect(host.last('lobby')!.id).toBe(second.id);
+    expect(first.id).not.toBe(second.id);
+
+    const friend = join('Friend', { lobby: second.id });
+    expect(friend.p.instance).toBe(second);
+    clients[0].leave();
+    // the busiest lobby with room would be the first, but the invite wins
+    const another = join('Another', { lobby: second.id });
+    expect(another.p.instance).toBe(second);
+
+    const lost = join('Lost', { lobby: 'gone1234' });
+    expect(lost.p.instance).toBe(first);
+    expect(lost.last('notice')!.text).toMatch(/closed/);
+  });
+
+  it("moves to a friend's lobby from in the game, and after a match if in one", () => {
+    const { game, step, join } = harness();
+    const clients = Array.from({ length: LOBBY_CAP + 1 }, (_, i) => join(`P${i}`));
+    const [first, second] = game.lobbies;
+    const mover = clients[1];
+    mover.send({ t: 'joinLobby', id: second.id });
+    expect(mover.p.instance).toBe(second);
+    expect(mover.last('enter')!.kind).toBe('lobby');
+    expect(mover.last('lobby')).toMatchObject({ id: second.id, count: 2 });
+    expect(first.players.size).toBe(LOBBY_CAP - 1);
+
+    // in a match: they go to their friend's lobby when it ends
+    const fighter = clients[2];
+    fighter.send({ t: 'queue', mode: 'practice', diff: 'easy' });
+    step(600);
+    expect(fighter.p.instance).not.toBe(first);
+    fighter.send({ t: 'joinLobby', id: second.id });
+    [...game.arenas][0].forfeit(fighter.p);
+    step(8000);
+    expect(fighter.p.instance).toBe(second);
+
+    // a full lobby turns them away
+    for (let i = 0; i < LOBBY_CAP; i++) join(`Fill${i}`, { lobby: second.id });
+    expect(second.full).toBe(true);
+    const turnedAway = clients[3];
+    turnedAway.send({ t: 'joinLobby', id: second.id });
+    expect(turnedAway.p.instance).toBe(first);
+    expect(turnedAway.last('notice')!.text).toMatch(/full/);
   });
 
   it('comes back to its own lobby after a match', () => {

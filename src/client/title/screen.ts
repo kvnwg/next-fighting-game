@@ -28,6 +28,12 @@ const h = (html: string): HTMLElement => {
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/** A button offering another way on. */
+export interface TitleAction {
+  label: string;
+  run(): void;
+}
+
 export interface TitleScreenOptions {
   touch: boolean;
   offline: boolean;
@@ -76,6 +82,7 @@ export class TitleScreen {
           </label>
           <div class="ts-row"><span class="ts-count">0/16</span><button class="ts-go" type="submit"><span class="bk">参る</span>${o.offline ? 'Begin' : 'Enter the grounds'}</button></div>
           <div class="ts-status" aria-live="polite"></div>
+          <button class="ts-alt" type="button" hidden></button>
         </form>
         <div class="ts-forge" aria-live="polite"><div class="ts-forge-text">Forging your legend</div><div class="ts-forge-bar">${'<i></i>'.repeat(12)}</div></div>
         <div class="ts-welcome">
@@ -160,7 +167,7 @@ export class TitleScreen {
   }
 
   /** Straight back to the name, after a disconnect. */
-  resume(error: string): void {
+  resume(error: string, alt?: TitleAction): void {
     this.clearTimers();
     this.el.classList.remove('hidden');
     const sc = this.o.scene();
@@ -171,6 +178,7 @@ export class TitleScreen {
     this.bootDur = 1.2;
     this.toName(true);
     this.setStatus(error, true);
+    this.setAlt(alt);
   }
 
   private toPress(): void {
@@ -267,10 +275,25 @@ export class TitleScreen {
     }
   }
 
-  setName(name: string): void {
-    if (this.input.value) return;
+  /** Fill in a name: only into an empty field, unless `force` (the player's CrazyGames name). */
+  setName(name: string, force = false): void {
+    if (this.input.value && !force) return;
     this.input.value = name.slice(0, 16);
     this.syncField();
+  }
+
+  /** A second way on under the status (play single player while the server's down), or none. */
+  setAlt(action?: TitleAction): void {
+    const btn = this.el.querySelector<HTMLButtonElement>('.ts-alt')!;
+    btn.hidden = !action;
+    btn.textContent = action?.label ?? '';
+    btn.onclick = action
+      ? (e) => {
+          e.preventDefault();
+          audio.play('click');
+          action.run();
+        }
+      : null;
   }
 
   setStatus(text: string, error = false): void {
@@ -293,6 +316,7 @@ export class TitleScreen {
   /** The name was accepted: show the account being made while App connects. */
   forging(): void {
     this.set('forge');
+    this.setAlt();
     this.input.blur();
     audio.play('draw', 0.5);
     this.pixelPulse(6, 0.4);
@@ -302,7 +326,7 @@ export class TitleScreen {
   }
 
   /** Connecting failed: back to the name with the reason. */
-  failed(text: string): void {
+  failed(text: string, alt?: TitleAction): void {
     this.clearTimers();
     this.epoch++;
     const sc = this.o.scene();
@@ -315,6 +339,7 @@ export class TitleScreen {
     this.el.classList.remove('stamped');
     this.toName(true);
     this.setStatus(text, true);
+    this.setAlt(alt);
   }
 
   // ------------------------------------------------------------------ welcome, and into the game

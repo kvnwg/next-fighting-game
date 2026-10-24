@@ -26,8 +26,14 @@ const MIME: Record<string, string> = {
 
 /** text the build serves that's worth compressing (the scripts are most of a first load) */
 const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.svg']);
-/** how often every socket is pinged; one that hasn't answered the last ping by the next is dropped */
+/** how often every socket is pinged */
 const HEARTBEAT_MS = 10_000;
+/**
+ * Pings a socket can leave unanswered before it's dropped. A browser busy on a long task (building
+ * a map, compiling shaders on a slow machine) stops reading its socket, pings included, so one
+ * missed ping isn't a dead player.
+ */
+const MAX_MISSED_PINGS = 4;
 
 export interface ServerOptions {
   port: number;
@@ -227,7 +233,8 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
   /** open connections, and connections made this minute, by address */
   const open = new Map<string, number>();
   const recent = new Map<string, number>();
-  const live = new WeakSet<WebSocket>();
+  /** pings each socket has left unanswered in a row */
+  const missed = new WeakMap<WebSocket, number>();
 
   server.on('upgrade', (req, socket, head) => {
     if (!req.url?.startsWith('/ws')) {
@@ -250,13 +257,14 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
         : attempts > connectsPerMinute ? 'Too many connection attempts. Wait a minute and try again.'
         : null;
       if (refusal) {
-        ws.close(1013, refusal);
+        // 1012 tells the client to wait for the restart and walk back in
+        ws.close(game.closing ? 1012 : 1013, refusal);
         return;
       }
       open.set(ip, (open.get(ip) ?? 0) + 1);
-      live.add(ws);
-      ws.on('pong', () => live.add(ws));
-      ws.on('message', () => live.add(ws));
+      missed.set(ws, 0);
+      ws.on('pong', () => missed.set(ws, 0));
+      ws.on('message', () => missed.set(ws, 0));
       ws.on('close', () => {
         const n = (open.get(ip) ?? 1) - 1;
         if (n > 0) open.set(ip, n);
@@ -270,11 +278,13 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
   // would stand in the lobby (or hold a match hostage) until TCP gave up, minutes later
   const heartbeat = setInterval(() => {
     for (const ws of wss.clients) {
-      if (!live.has(ws)) {
+      const n = missed.get(ws) ?? 0;
+      if (n >= MAX_MISSED_PINGS) {
+        console.log(`[ws] dropped a connection that stopped answering (${n} pings)`);
         ws.terminate();
         continue;
       }
-      live.delete(ws);
+      missed.set(ws, n + 1);
       ws.ping();
     }
   }, opts.heartbeatMs ?? HEARTBEAT_MS);
@@ -295,7 +305,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
           clearInterval(minute);
           // a restart (a deploy) isn't anyone walking out: matches end without a result
           game.shutdown();
-          for (const c of wss.clients) c.close(1012, 'The server is restarting. Reconnect in a moment.');
+          for (const c of wss.clients) c.close(1012, 'The server is restarting.');
           // give the goodbyes a moment to go out, then cut whoever's left
           await new Promise((r) => setTimeout(r, 250));
           for (const c of wss.clients) c.terminate();

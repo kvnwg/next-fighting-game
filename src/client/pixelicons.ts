@@ -655,6 +655,20 @@ export const ICON = {
     'hddhddddhddh',
     'hhhhhhhhhhhh',
   ],
+  /** a letter sealed with a red hanko: invite a friend */
+  invite: [
+    'pppppppppppppppp',
+    'p5pppppppppppp5p',
+    'pp5pppppppppp5pp',
+    'ppp5pppppppp5ppp',
+    'pppp5pprrpp5pppp',
+    'ppppp5rrrr5ppppp',
+    'ppppprrRrrrppppp',
+    'ppppprrrrrrppppp',
+    'pppppprrrrpppppp',
+    'pppppppppppppppp',
+    'pppppppppppppppp',
+  ],
   /** skip chevrons: cancels */
   chain: [
     'g.....g.....',

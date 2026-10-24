@@ -8,22 +8,34 @@
  *                                screen and match results are breaks
  *   happytime                    a rare celebration (a ranked promotion)
  *   requestMidgameAd             only at natural breaks (after a match), never mid-fight
+ *   updateRoom / leftRoom        which lobby the player is in and whether friends can join it, so
+ *                                CrazyGames can offer Join and Invite (the lobby is the room)
+ *
+ * And what it hears back: the platform's settings (mute, chat off), the invite a player arrived
+ * with, a friend's room to join from in the game, and whether to drop straight into multiplayer.
  */
 
 export interface PlatformSettings {
   muteAudio: boolean;
+  /** the player (or their parent) has turned chat off on CrazyGames */
+  disableChat: boolean;
 }
+
+/** What a friend needs to join: the lobby's id. */
+export type InviteParams = Record<string, string>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sdk = any;
 
 class Platform {
   env: 'none' | 'local' | 'crazygames' | 'disabled' = 'none';
-  settings: PlatformSettings = { muteAudio: false };
+  settings: PlatformSettings = { muteAudio: false, disableChat: false };
   private sdk: Sdk = null;
   private playing = false;
   private loading = false;
   private listeners: ((s: PlatformSettings) => void)[] = [];
+  /** the room last reported, so a lobby's every coming and going isn't sent on */
+  private room = '';
 
   async init(timeoutMs = 4000): Promise<void> {
     const sdk = (window as unknown as { CrazyGames?: { SDK?: Sdk } }).CrazyGames?.SDK;
@@ -34,9 +46,9 @@ class Platform {
       if (this.env === 'disabled') return;
       this.sdk = sdk;
       const s = sdk.game?.settings;
-      if (s) this.settings = { muteAudio: !!s.muteAudio };
+      if (s) this.settings = { muteAudio: !!s.muteAudio, disableChat: !!s.disableChat };
       sdk.game?.addSettingsChangeListener?.((next: PlatformSettings) => {
-        this.settings = { muteAudio: !!next.muteAudio };
+        this.settings = { muteAudio: !!next.muteAudio, disableChat: !!next.disableChat };
         for (const l of this.listeners) l(this.settings);
       });
     } catch (err) {
@@ -123,6 +135,42 @@ class Platform {
         done();
       }
     });
+  }
+
+  // ------------------------------------------------------------------ multiplayer
+
+  /** Started from CrazyGames' multiplayer UI: go straight into a joinable game, no menus. */
+  get instantMultiplayer(): boolean {
+    return !!this.call((s) => s.game.isInstantMultiplayer);
+  }
+
+  /** The invite the game was opened from (a friend's room), if any. */
+  inviteParams(): InviteParams | null {
+    return this.call((s) => s.game.inviteParams as InviteParams | null) ?? null;
+  }
+
+  /** A friend's room picked in CrazyGames' UI while already playing. */
+  onJoinRoom(listener: (params: InviteParams) => void): void {
+    this.call((s) => s.game.addJoinRoomListener(listener));
+  }
+
+  /** The player is in this room, and friends can (or can't) join it. */
+  updateRoom(roomId: string, isJoinable: boolean, inviteParams: InviteParams): void {
+    const key = `${roomId}|${isJoinable}`;
+    if (key === this.room) return;
+    this.room = key;
+    this.call((s) => s.game.updateRoom({ roomId, isJoinable, inviteParams }));
+  }
+
+  leftRoom(): void {
+    if (!this.room) return;
+    this.room = '';
+    this.call((s) => s.game.leftRoom());
+  }
+
+  /** A link to this game on CrazyGames that opens with these invite params. */
+  inviteLink(params: InviteParams): string | null {
+    return this.call((s) => s.game.inviteLink(params) as string) ?? null;
   }
 
   /** The CrazyGames account name, when the player is signed in. */

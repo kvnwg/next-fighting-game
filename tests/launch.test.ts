@@ -179,6 +179,18 @@ describe('connections', () => {
     await until(() => !s.game.players.has(ghost.id), 3000, 'the ghost to be dropped');
   });
 
+  it('keeps a slow player who misses a ping or two (a long map load)', async () => {
+    const s = await serve({ heartbeatMs: 100 });
+    const slow = await new Client(s.port, { autoPong: false }).hello('Slow');
+    let pings = 0;
+    slow.ws.on('ping', () => {
+      if (++pings % 2 === 0) slow.ws.pong();
+    });
+    await new Promise((r) => setTimeout(r, 1200));
+    expect(pings).toBeGreaterThan(6);
+    expect(s.game.players.has(slow.id)).toBe(true);
+  });
+
   it('drops a connection that never says hello', () => {
     vi.useFakeTimers();
     try {

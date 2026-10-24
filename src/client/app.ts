@@ -27,7 +27,8 @@ import { MapView } from './render/world';
 import { RingWalls } from './render/rings';
 import { TITLE_MAP } from './render/maps/title';
 import { TitleScene } from './title/scene';
-import { TitleScreen } from './title/screen';
+import { TitleAction, TitleScreen } from './title/screen';
+import { hasServer, reloadAs, serverURL } from './endpoint';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
 import { RotateGuard } from './rotate';
@@ -44,6 +45,10 @@ const IMPACT_MS = 70;
 const EXEC_WHOOSH_LEAD = 160;
 /** and the finishing blow's recorded lead-ins (audio's EXEC_LEAD) */
 const EXEC_SOUND_LEAD = EXEC_LEAD * 1000;
+
+const RESTARTING = 'The server is restarting for an update. Back in a moment…';
+/** the server can't be reached: the game still plays on its own */
+const SINGLE_PLAYER: TitleAction = { label: 'Play single player instead', run: () => reloadAs(true) };
 
 export function startApp(root: HTMLElement, offline = false): void {
   new App(root, offline);
@@ -98,11 +103,18 @@ class App {
   private titleScene: TitleScene | null = null;
   private titleScreen: TitleScreen | null = null;
   /** which lobby we're in and how full it is */
-  private lobbyInfo: { n: number; count: number; cap: number } | null = null;
+  private lobbyInfo: { n: number; id: string; count: number; cap: number } | null = null;
   /** the lobby's dueling rings, and the walls of light around the sealed ones */
   private rings: RingView[] = [];
   private ringWalls: RingWalls | null = null;
   private ringCount = -1;
+  /** a lobby to join on connecting: a friend's, from an invite */
+  private pendingLobby: string | null = null;
+  /** a connection attempt is under way (one at a time) */
+  private connecting = false;
+  /** when the server went down for a restart, while we wait to walk back in (performance.now) */
+  private rejoinSince = 0;
+  private rejoinTimer = 0;
   /** someone wants a copy of the next rendered frame (the title's cut into the game) */
   private snapWant: ((frame: HTMLCanvasElement) => void) | null = null;
 
@@ -151,6 +163,7 @@ class App {
         } else if (this.myId) platform.gameplayStart();
       },
       onPrompt: () => this.sendChallenge(),
+      onInvite: () => void this.invite(),
       createPreview: (el) => createPreview(el),
       portrait: (id) => portraitURL(this.renderer.renderer, id),
     }, offline, touch);
@@ -187,9 +200,24 @@ class App {
     requestAnimationFrame(() => platform.loadingStop());
     audio.setMuted('platform', platform.settings.muteAudio);
     audio.setListener(this.renderer.camera);
-    platform.onSettingsChange((p) => audio.setMuted('platform', p.muteAudio));
-    // a signed-in CrazyGames player gets their name filled in
-    if (!settings.name) void platform.username().then((name) => name && this.titleScreen?.setName(name));
+    platform.onSettingsChange((p) => {
+      audio.setMuted('platform', p.muteAudio);
+      this.ui.setChatEnabled(!p.disableChat);
+    });
+    this.ui.setChatEnabled(!platform.settings.disableChat);
+    // a signed-in CrazyGames player plays under their CrazyGames name, so their friends know them
+    const platformName = platform.username().then((name) => {
+      if (name) this.titleScreen?.setName(name, true);
+      return name;
+    });
+    if (!offline) {
+      // arriving from an invite (CrazyGames', or a shared link) or CrazyGames' multiplayer button:
+      // no name prompt, straight in and joinable. Off CrazyGames a newcomer still picks a name.
+      this.pendingLobby = platform.inviteParams()?.lobby ?? new URLSearchParams(location.search).get('lobby');
+      platform.onJoinRoom((p) => this.joinFriend(p.lobby));
+      const straightIn = platform.active ? !!this.pendingLobby || platform.instantMultiplayer : !!this.pendingLobby && !!settings.name;
+      if (straightIn) void platformName.then((name) => this.quickEnter(name));
+    }
     // dev builds: reach the app from the console / screenshot scripts
     if (import.meta.env.DEV) (window as unknown as { __app: App }).__app = this;
   }
@@ -200,7 +228,8 @@ class App {
   private openTitle(): void {
     this.loadMap(TITLE_MAP);
     this.titleScene = new TitleScene(this.scene, this.renderer, this.mapView!);
-    this.titleScreen ??= new TitleScreen(this.renderer.container, {
+    if (this.titleScreen) return;
+    this.titleScreen = new TitleScreen(this.renderer.container, {
       touch: this.input.touchMode,
       offline: this.offline,
       name: settings.name,
@@ -208,6 +237,8 @@ class App {
       scene: () => this.titleScene,
       onSubmit: (name) => void this.connect(name),
     });
+    // here because the server was down: the way back
+    if (this.offline && hasServer) this.titleScreen.setAlt({ label: 'Try online again', run: () => reloadAs(false) });
   }
 
   private closeTitle(): void {
@@ -239,7 +270,7 @@ class App {
     audio.unlock();
     audio.play('click');
     const screen = this.titleScreen;
-    if (!screen) return;
+    if (!screen || this.connecting || this.net.connected) return;
     if (name.length < 2) {
       screen.setStatus('Pick a name (2-16 letters).', true);
       return;
@@ -249,29 +280,101 @@ class App {
     screen.setStatus('');
     screen.forging();
     const isNew = !settings.token;
+    this.connecting = true;
     try {
       if (this.offline) {
         const { connectOffline } = await import('./offline');
         await this.net.connect(connectOffline);
       } else {
-        await this.net.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+        await this.net.connect(serverURL());
       }
     } catch (e) {
-      screen.failed(`${(e as Error).message}${this.offline ? '' : ' Is the server running? (npm run dev)'}`);
+      const why = (e as Error).message;
+      if (this.offline) screen.failed(why);
+      else if (this.rejoinSince) {
+        // still restarting: keep waiting
+        screen.failed(RESTARTING);
+        this.rejoinWhenBack();
+      } else screen.failed(`${why} ${import.meta.env.DEV ? 'Is the server running? (npm run dev)' : 'It may be down for a moment: try again soon.'}`, SINGLE_PLAYER);
       return;
+    } finally {
+      this.connecting = false;
     }
     // hold the game back until the welcome has played out
     this.net.hold();
     this.net.onHeld = (m) => {
       if (m.t === 'welcome') void this.onWelcomeHeld(m.profile, isNew);
     };
-    this.net.send({ t: 'hello', v: PROTOCOL_VERSION, token: settings.token || undefined, name, char: settings.char });
+    this.net.send({ t: 'hello', v: PROTOCOL_VERSION, token: settings.token || undefined, name, char: settings.char, lobby: this.pendingLobby ?? undefined });
+  }
+
+  /** Straight in (an invite, or CrazyGames' multiplayer button): no name prompt. */
+  private quickEnter(platformName: string | null): void {
+    void this.connect(platformName || settings.name || `Wanderer${Math.floor(1000 + Math.random() * 9000)}`);
+  }
+
+  /** A friend's lobby, picked in CrazyGames' UI. */
+  private joinFriend(id: string | undefined): void {
+    if (!id) return;
+    if (this.myId) {
+      this.net.send({ t: 'joinLobby', id });
+      return;
+    }
+    this.pendingLobby = id;
+    if (!this.connecting) this.quickEnter(null);
+  }
+
+  /** After a restart: wait for the server to come back up, then walk straight back in. */
+  private rejoinWhenBack(): void {
+    if (this.rejoinTimer || this.offline) return;
+    this.rejoinTimer = window.setTimeout(() => {
+      this.rejoinTimer = 0;
+      if (this.myId || this.connecting || !this.titleScreen) return;
+      if (performance.now() - this.rejoinSince > 120_000) {
+        this.rejoinSince = 0;
+        this.titleScreen.failed('The server is taking longer than usual to come back. Press Enter to try again.', SINGLE_PLAYER);
+        return;
+      }
+      // knock first, so the screen doesn't flicker through "forging" while it's still down
+      const probe = new WebSocket(serverURL());
+      let up = false;
+      probe.onopen = () => {
+        up = true;
+        probe.close();
+        void this.connect(settings.name);
+      };
+      probe.onclose = () => {
+        if (!up) this.rejoinWhenBack();
+      };
+    }, 3000);
+  }
+
+  /** Copy a link that brings a friend into this lobby. */
+  private async invite(): Promise<void> {
+    const info = this.lobbyInfo;
+    if (!info) return;
+    let link = platform.inviteLink({ lobby: info.id });
+    if (!link) {
+      const u = new URL(location.pathname, location.origin);
+      u.searchParams.set('lobby', info.id);
+      link = u.toString();
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      this.ui.toast(`Invite link copied. Friends who open it join you in Grounds ${info.n}.`, 'good');
+    } catch {
+      this.ui.toast(`Send friends this link to join you: ${link}`, 'info');
+    }
   }
 
   private bindNet(): void {
     const n = this.net;
-    n.onClose = (reason) => {
+    n.onClose = (reason, code) => {
       platform.gameplayStop();
+      platform.leftRoom();
+      // 1012: the server is restarting (a deploy): wait for it and walk back in
+      const restarting = code === 1012;
+      if (restarting) this.rejoinSince ||= performance.now();
       this.myId = '';
       this.lobbyInfo = null;
       this.ui.showTitle();
@@ -285,21 +388,24 @@ class App {
       this.cam.stopShots();
       this.endEntrances();
       this.select.hide();
-      const text = `Disconnected: ${reason}. Press Enter to reconnect.`;
+      const text = restarting ? RESTARTING : `Disconnected: ${reason.replace(/\.$/, '')}. Press Enter to reconnect.`;
       if (this.titleScreen?.active) {
         // dropped while the welcome was playing
         this.titleScreen.failed(text);
-        return;
+      } else {
+        this.titleScreen?.el.remove();
+        this.titleScreen = null;
+        this.titleScene?.dispose();
+        this.titleScene = null;
+        this.openTitle();
+        this.titleScreen!.resume(text);
       }
-      this.titleScreen?.el.remove();
-      this.titleScreen = null;
-      this.titleScene?.dispose();
-      this.titleScene = null;
-      this.openTitle();
-      this.titleScreen!.resume(text);
+      if (restarting) this.rejoinWhenBack();
     };
     n.on('welcome', (m) => {
       this.myId = m.id;
+      this.rejoinSince = 0;
+      this.pendingLobby = null;
       settings.token = m.token;
       saveSettings();
       this.profile = m.profile;
@@ -361,14 +467,22 @@ class App {
       this.ui.showLeaderboard(m.entries, m.you, m.total, this.profile);
       this.mapView?.setLeaderboard(m.entries);
     });
-    n.on('lobby', (m) => (this.lobbyInfo = m));
+    n.on('lobby', (m) => {
+      this.lobbyInfo = m;
+      // the lobby is the room CrazyGames' Join and Invite point friends at
+      if (!this.offline) platform.updateRoom(m.id, m.count < m.cap, { lobby: m.id });
+    });
     n.on('rings', (m) => this.onRings(m.r));
     n.on('challenge', (m) => {
       this.ui.showChallenge(m.from, m.name, m.char, m.ring !== undefined);
       audio.play('matchFound');
     });
     n.on('notice', (m) => this.ui.toast(m.text, m.kind));
-    n.on('chat', (m) => this.ui.chat(m.name, m.text, m.sys));
+    n.on('chat', (m) => {
+      // chat turned off on CrazyGames: the game's own announcements still show
+      if (!m.sys && platform.settings.disableChat) return;
+      this.ui.chat(m.name, m.text, m.sys);
+    });
     n.on('feed', (m) => this.ui.killFeed(m.killer, m.victim, m.how));
     n.on('online', (m) => (this.online = m.n));
   }
@@ -688,7 +802,7 @@ class App {
     }
     if (!inGame) return;
     if (b === 'chat') {
-      if (pressed && !this.ui.chatOpen && !this.ui.modalOpen) {
+      if (pressed && !this.ui.chatOpen && !this.ui.modalOpen && !platform.settings.disableChat) {
         this.input.releaseAll();
         this.ui.openChat();
         this.input.suspended = true;

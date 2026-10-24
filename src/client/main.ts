@@ -7,7 +7,8 @@ for (const f of [`22px 'DotGothic16'`, `600 18px 'Pixelify Sans'`, `700 64px 'Si
 
 const root = document.getElementById('app')!;
 const params = new URLSearchParams(location.search);
-// single-player build (artifact) or ?offline: run the game server inside the page
+// single-player build (artifact), or ?offline (also where a player lands who picks single player
+// while the server is down): run the game server inside the page
 const offline = import.meta.env.VITE_OFFLINE === '1' || params.has('offline');
 
 if (params.has('viewer')) {

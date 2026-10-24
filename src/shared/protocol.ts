@@ -83,7 +83,8 @@ export interface LeaderboardEntry {
 }
 
 export type ClientMsg =
-  | { t: 'hello'; v: number; token?: string; name: string; char: CharacterId }
+  /** lobby: the id of a lobby to join (a friend's, from an invite), if it has room */
+  | { t: 'hello'; v: number; token?: string; name: string; char: CharacterId; lobby?: string }
   | { t: 'move'; x: number; y: number; z: number; r: number; g: 0 | 1; e: number }
   /** q: client sequence number, echoed in a 'reject' if the input never takes effect */
   | { t: 'act'; a: InputAction; vt: number; dx?: number; dz?: number; r?: number; q?: number }
@@ -100,7 +101,9 @@ export type ClientMsg =
   | { t: 'leaderboard' }
   | { t: 'fell' }
   /** a pick on the map and fighter select before a match ('random' leaves the arena to chance) */
-  | { t: 'vote'; map?: string; char?: CharacterId };
+  | { t: 'vote'; map?: string; char?: CharacterId }
+  /** over to a friend's lobby (by its id), from in the game */
+  | { t: 'joinLobby'; id: string };
 
 /** One side of the map and fighter select. */
 export interface SelectSide {
@@ -192,8 +195,8 @@ export type ServerMsg =
   | { t: 'chat'; name: string; text: string; sys?: boolean }
   | { t: 'feed'; killer: string; victim: string; how: string }
   | { t: 'online'; n: number }
-  /** which lobby you're in (numbered from 1) and how full it is */
-  | { t: 'lobby'; n: number; count: number; cap: number }
+  /** which lobby you're in (numbered from 1, and its id for invites) and how full it is */
+  | { t: 'lobby'; n: number; id: string; count: number; cap: number }
   | { t: 'rings'; r: RingView[] }
   | ({ t: 'select' } & SelectView)
   /** the select closed without a match (the other side left) */

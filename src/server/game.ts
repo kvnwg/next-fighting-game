@@ -122,9 +122,9 @@ export class Game {
     }
   }
 
-  /** Put a player in a lobby (their own one if it has room). */
-  enterLobby(p: Player): void {
-    const l = this.lobbyFor(this.home.get(p));
+  /** Put a player in a lobby: `want` (a friend's) or their own one, if it has room. */
+  enterLobby(p: Player, want?: Lobby): void {
+    const l = this.lobbyFor(want ?? this.home.get(p));
     this.home.set(p, l);
     l.addPlayer(p, l.spawnPoint());
   }
@@ -265,7 +265,10 @@ export class Game {
     this.players.set(p.id, p);
     p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.players.size, serverTime: this.now() });
     if (renamed) p.send({ t: 'notice', text: `That name isn't allowed here, so you're ${name} for now.`, kind: 'warn' });
-    this.enterLobby(p);
+    const want = typeof msg.lobby === 'string' ? this.lobbies.find((l) => l.id === msg.lobby) : undefined;
+    if (msg.lobby && !want) p.send({ t: 'notice', text: 'The lobby you were invited to has closed, so you’re in another one.', kind: 'info' });
+    else if (want?.full) p.send({ t: 'notice', text: `Grounds ${want.n} is full, so you’re in another one for now.`, kind: 'info' });
+    this.enterLobby(p, want);
     this.broadcastAll({ t: 'online', n: this.players.size });
     this.broadcastAll({ t: 'chat', name: '', text: `${p.name} entered the grounds.`, sys: true });
     return p;
@@ -341,6 +344,9 @@ export class Game {
       case 'leaderboard':
         p.send({ t: 'leaderboard', entries: this.store.leaderboard(25).map((e) => ({ ...e, name: this.shownName(e.name) })), you: this.store.position(p.profile), total: this.store.placedCount() });
         break;
+      case 'joinLobby':
+        this.joinLobby(p, msg.id);
+        break;
       case 'fell': {
         const f = p.fighter;
         if (f && p.instance && f.y < -3) p.instance.killByEnvironment(f, 'fall', now);
@@ -349,6 +355,36 @@ export class Game {
       default:
         break;
     }
+  }
+
+  /** Over to a friend's lobby (a CrazyGames invite, or a shared link), if there's room. */
+  private joinLobby(p: Player, id: unknown): void {
+    const target = typeof id === 'string' ? this.lobbies.find((l) => l.id === id) : undefined;
+    if (!target) {
+      p.send({ t: 'notice', text: 'That lobby has closed.', kind: 'warn' });
+      return;
+    }
+    if (target === p.instance || (!(p.instance instanceof Lobby) && this.home.get(p) === target)) return;
+    if (target.full) {
+      p.send({ t: 'notice', text: `Grounds ${target.n} is full right now.`, kind: 'warn' });
+      return;
+    }
+    if (!(p.instance instanceof Lobby)) {
+      // in a match (or picking one): they go there when it's over
+      this.home.set(p, target);
+      p.send({ t: 'notice', text: `You'll join Grounds ${target.n} after this match.`, kind: 'info' });
+      return;
+    }
+    if (p.instance.inDuel(p) || this.selecting.has(p)) {
+      p.send({ t: 'notice', text: 'Finish your duel first.', kind: 'warn' });
+      return;
+    }
+    // ranked search spans every lobby, so it carries on
+    this.challenges.delete(p.id);
+    p.instance.removePlayer(p);
+    this.home.set(p, target);
+    target.addPlayer(p, target.spawnPoint());
+    p.send({ t: 'notice', text: `You joined Grounds ${target.n}.`, kind: 'good' });
   }
 
   // ------------------------------------------------------------------ queue & matchmaking

@@ -18,6 +18,8 @@ export interface LobbyBarHandlers {
   onLadder(): void;
   onHelp(): void;
   onSettings(): void;
+  /** copy an invite link to this lobby (online only) */
+  onInvite(): void;
   portrait(id: CharacterId): string;
 }
 
@@ -27,6 +29,7 @@ const ICONS = {
   ladder: icon('ladder'),
   help: icon('help'),
   settings: icon('settings'),
+  invite: icon('invite'),
 };
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -46,7 +49,7 @@ export class LobbyBar {
     offline: boolean,
   ) {
     const tile = (id: string, svg: string, label: string, key: string) =>
-      `<button class="lb-icon" id="lb-${id}" title="${esc(label)} [${key}]">${svg}<span>${esc(label)}</span></button>`;
+      `<button class="lb-icon" id="lb-${id}" title="${esc(label)}${key ? ` [${key}]` : ''}">${svg}<span>${esc(label)}</span></button>`;
     const wrap = document.createElement('div');
     wrap.innerHTML = `
       <div class="lobby-bar">
@@ -59,6 +62,7 @@ export class LobbyBar {
           ${tile('ladder', ICONS.ladder, 'Ladder', 'L')}
           ${tile('help', ICONS.help, 'Help', 'H')}
           ${tile('settings', ICONS.settings, 'Settings', 'H')}
+          ${offline ? '' : tile('invite', ICONS.invite, 'Invite', '')}
         </div>
       </div>
       <div class="mode-panel hidden">
@@ -95,6 +99,7 @@ export class LobbyBar {
     on('#lb-ladder', () => this.h.onLadder());
     on('#lb-help', () => this.h.onHelp());
     on('#lb-settings', () => this.h.onSettings());
+    if (!offline) on('#lb-invite', () => this.h.onInvite());
     for (const chip of this.panel.querySelectorAll<HTMLElement>('[data-diff]')) {
       chip.addEventListener('click', (e) => {
         // picking a difficulty doesn't start the match: the card does

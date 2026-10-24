@@ -36,6 +36,8 @@ export class Lobby extends Instance {
   private duels: (RingDuel | null)[] = RINGS.map(() => null);
   /** ring duel losers, waiting to get back up where they fell */
   private downedInRing = new Set<ServerFighter>();
+  /** unique to this lobby for as long as it's open (numbers get reused): what invites carry */
+  readonly id = Math.random().toString(36).slice(2, 10);
 
   /** `n`: this lobby's number, from 1 */
   constructor(
@@ -183,7 +185,7 @@ export class Lobby extends Instance {
   }
 
   private sendInfo(): void {
-    this.broadcast({ t: 'lobby', n: this.n, count: this.players.size, cap: LOBBY_CAP });
+    this.broadcast({ t: 'lobby', n: this.n, id: this.id, count: this.players.size, cap: LOBBY_CAP });
   }
 
   // ------------------------------------------------------------------ dueling rings
