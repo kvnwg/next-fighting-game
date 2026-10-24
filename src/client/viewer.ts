@@ -210,6 +210,10 @@ function showStrip(r: GameRenderer, params: URLSearchParams, n: number): void {
     m.root.rotation.y = top ? 0 : yaw + Math.atan2(-m.root.position.x, dist);
     scene.add(m.root);
     for (let j = 0; j < 30; j++) m.update(IDLE, 0.05);
+    // `move`: the walk really carries it forward (cloth reacts to the motion), and it is put back
+    // where the strip shows it at the end
+    const home = m.root.position.clone();
+    const ahead = new THREE.Vector3(Math.sin(m.root.rotation.y), 0, Math.cos(m.root.rotation.y));
     // play the timeline up to this moment in small steps (the animator is stateful); `step=16.7`
     // steps at the game's frame time, for effects that depend on it (smears)
     const stepMs = Number(params.get('step') ?? 10);
@@ -233,8 +237,10 @@ function showStrip(r: GameRenderer, params: URLSearchParams, n: number): void {
         input = { ...IDLE, elapsed: e };
       } else input = { ...IDLE, state: cur.key as FighterState, elapsed: e, dur: cur.dur, serial };
       if (walk) Object.assign(input, { speed: walk, moveForward: 1, moveSide: 0 });
+      if (walk && params.has('move')) m.root.position.addScaledVector(ahead, (walk * stepMs) / 1000);
       m.update(input, stepMs / 1000);
     }
+    m.root.position.copy(home);
   }
   label.textContent = `${id} ${chain.join(',')}  ` + times.map((x) => Math.round(x)).join(' / ') + ' ms';
   const loop = () => {
