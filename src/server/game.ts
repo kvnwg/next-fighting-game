@@ -10,6 +10,8 @@ import { Lobby } from './lobby';
 import { Store, profileView } from './store';
 
 const MAX_MSGS_PER_SEC = 160;
+/** a connection has this long to say hello before it's dropped (ms) */
+const HELLO_TIMEOUT = 10_000;
 const DIFFICULTIES: BotDifficulty[] = ['easy', 'normal', 'hard'];
 
 export function sanitizeName(raw: unknown): string {
@@ -65,6 +67,8 @@ export class Game {
   private lastQueueBroadcast = 0;
   private lastServerPing = 0;
   private readonly t0 = performance.now();
+  /** set when the server is going down: players leaving then haven't walked out on anything */
+  closing = false;
   /** Server clock in ms (monotonic). Clients sync to this. Injectable for simulations. */
   readonly now: () => number;
 
@@ -133,6 +137,15 @@ export class Game {
     this.store.flush();
   }
 
+  /**
+   * The server is going down (a restart, a deploy). Nobody walked out, so the matches still on end
+   * without a result: no forfeits, and nobody's rating moves.
+   */
+  shutdown(): void {
+    this.closing = true;
+    this.stop();
+  }
+
   tick(): void {
     const now = this.now();
     // one broken instance must never take the whole server down
@@ -179,6 +192,9 @@ export class Game {
 
   handleConnection(ws: SocketLike): void {
     let player: Player | null = null;
+    const helloBy = setTimeout(() => {
+      if (!player) ws.close(4003, 'no hello');
+    }, HELLO_TIMEOUT);
     ws.on('message', (data) => {
       let msg: ClientMsg;
       try {
@@ -189,6 +205,7 @@ export class Game {
       if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return;
       if (!player) {
         if (msg.t === 'hello') player = this.join(ws, msg);
+        if (player) clearTimeout(helloBy);
         return;
       }
       if (!this.rateLimit(player)) {
@@ -202,6 +219,7 @@ export class Game {
       }
     });
     ws.on('close', () => {
+      clearTimeout(helloBy);
       if (player) this.leave(player);
     });
     ws.on('error', () => ws.close());
@@ -236,7 +254,7 @@ export class Game {
       profile = this.store.create(name);
     }
     profile.lastSeen = Date.now();
-    this.store.markDirty();
+    this.store.markDirty(profile);
     const char: CharacterId = isCharacterId(msg.char) ? msg.char : 'ronin';
     const p = new Player(ws, profile, char);
     this.players.set(p.id, p);
@@ -254,7 +272,7 @@ export class Game {
     this.unqueue(p);
     this.challenges.delete(p.id);
     const inst = p.instance;
-    if (inst instanceof Arena) inst.forfeit(p);
+    if (inst instanceof Arena && !this.closing) inst.forfeit(p);
     inst?.removePlayer(p);
     this.players.delete(p.id);
     this.broadcastAll({ t: 'online', n: this.players.size });
@@ -463,8 +481,8 @@ export class Game {
           prof.losses++;
           prof.streak = prof.streak <= 0 ? prof.streak - 1 : -1;
         }
+        this.store.markDirty(prof);
       }
-      this.store.markDirty();
     }
     for (const i of [0, 1] as const) {
       const p = humans[i];

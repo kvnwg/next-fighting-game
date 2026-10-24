@@ -24,7 +24,10 @@ export function profileView(p: Profile): ProfileView {
 
 export interface StorePersistence {
   load(): Profile[];
+  /** Write these profiles: every one, or with `incremental` only those that changed since the last save. */
   save(profiles: Profile[]): void;
+  /** the backend keeps profiles it isn't handed again (a database), so saves can skip the unchanged */
+  incremental?: boolean;
 }
 
 function randomId(): string {
@@ -44,6 +47,12 @@ export class Store {
   private byId = new Map<string, Profile>();
   private byToken = new Map<string, Profile>();
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** profiles changed since the last save */
+  private dirty = new Set<Profile>();
+  /** placed profiles, best first, until a profile changes */
+  private ladder: Profile[] | null = null;
+  /** loading failed: never save over what's there, or it would be lost */
+  private readOnly = false;
 
   /** `persist` null = in-memory only (tests). */
   constructor(private readonly persist: StorePersistence | null) {
@@ -51,7 +60,8 @@ export class Store {
       try {
         for (const p of persist.load()) this.index(p);
       } catch (err) {
-        console.error('[store] could not load profiles:', err);
+        this.readOnly = true;
+        console.error('[store] could not load profiles; nothing will be saved until this is fixed:', err);
       }
     }
   }
@@ -91,7 +101,7 @@ export class Store {
       lastSeen: now,
     };
     this.index(p);
-    this.markDirty();
+    this.markDirty(p);
     return p;
   }
 
@@ -112,13 +122,16 @@ export class Store {
   }
 
   private placed(): Profile[] {
-    return [...this.byId.values()]
-      .filter((p) => p.placements >= PLACEMENT_MATCHES)
-      .sort((a, b) => b.mmr - a.mmr || b.wins - a.wins);
+    this.ladder ??= [...this.byId.values()].filter((p) => p.placements >= PLACEMENT_MATCHES).sort((a, b) => b.mmr - a.mmr || b.wins - a.wins);
+    return this.ladder;
   }
 
-  markDirty(): void {
-    if (!this.persist || this.saveTimer) return;
+  /** `p` changed (a rating, a name, a kill): save it soon. */
+  markDirty(p: Profile): void {
+    this.ladder = null;
+    if (!this.persist) return;
+    this.dirty.add(p);
+    if (this.saveTimer) return;
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
       this.flush();
@@ -126,14 +139,18 @@ export class Store {
   }
 
   flush(): void {
-    if (!this.persist) return;
     if (this.saveTimer) {
       clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
+    if (!this.persist || this.readOnly || !this.dirty.size) return;
+    const changed = [...this.dirty];
+    this.dirty.clear();
     try {
-      this.persist.save([...this.byId.values()]);
+      this.persist.save(this.persist.incremental ? changed : [...this.byId.values()]);
     } catch (err) {
+      // keep them for the next try
+      for (const p of changed) this.dirty.add(p);
       console.error('[store] save failed:', err);
     }
   }

@@ -115,7 +115,7 @@ export class Lobby extends Instance {
     this.broadcast({ t: 'feed', killer: killerName, victim: victim.name, how });
     if (killer?.owner && killer !== victim) {
       killer.owner.profile.kills++;
-      this.game.store.markDirty();
+      this.game.store.markDirty(killer.owner.profile);
     }
   }
 
