@@ -1113,10 +1113,30 @@ export class Animator {
       const to = C.body[c];
       if (to !== undefined) b[c] += (to - b[c]) * w;
     }
-    // the hands go from the guard to the carry
-    pose.main.pos.lerp(C.main.pos, w);
-    pose.main.quat.slerp(C.main.quat, w);
-    pose.main.hold2 += (C.main.hold2 - pose.main.hold2) * w;
+    // the hands go from the guard to the carry, by way of its waypoint if it has one: the blend is
+    // split where the waypoint falls along the whole turn, so the weapon turns at an even pace
+    const m = pose.main;
+    if (C.via) {
+      const a1 = m.quat.angleTo(C.via.quat);
+      const h = a1 / Math.max(1e-6, a1 + C.via.quat.angleTo(C.main.quat));
+      if (w < h) {
+        const t = w / h;
+        m.pos.lerp(C.via.pos, t);
+        m.quat.slerp(C.via.quat, t);
+        m.grip2 += (C.via.grip2 - m.grip2) * t;
+        m.hold2 += (C.via.hold2 - m.hold2) * t;
+      } else {
+        const t = (w - h) / Math.max(1e-6, 1 - h);
+        m.pos.lerpVectors(C.via.pos, C.main.pos, t);
+        m.quat.slerpQuaternions(C.via.quat, C.main.quat, t);
+        m.grip2 = C.via.grip2;
+        m.hold2 = C.via.hold2 + (C.main.hold2 - C.via.hold2) * t;
+      }
+    } else {
+      m.pos.lerp(C.main.pos, w);
+      m.quat.slerp(C.main.quat, w);
+      m.hold2 += (C.main.hold2 - m.hold2) * w;
+    }
     if (pose.off && C.off) {
       pose.off.pos.lerp(C.off.pos, w);
       pose.off.quat.slerp(C.off.quat, w);
