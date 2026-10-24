@@ -7,6 +7,7 @@ import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RingView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
 import { audio } from './audio';
+import { EXEC_LEAD } from './audio/recipes';
 import { CAMERA_BULK, CameraRig, executionShots } from './camera';
 import { CARD_AT, ENTRANCES, entranceStarts, introSequence } from './entrances';
 import { ENTRANCE_MS } from './render/anim/animator';
@@ -41,6 +42,8 @@ const KANJI_NUM = ['〇', '一', '二', '三', '四', '五', '六', '七', '八'
 const IMPACT_MS = 70;
 /** how long before the finishing blow its swing starts, so the recorded whoosh peaks on the hit (ms) */
 const EXEC_WHOOSH_LEAD = 160;
+/** and the finishing blow's recorded lead-ins (audio's EXEC_LEAD) */
+const EXEC_SOUND_LEAD = EXEC_LEAD * 1000;
 
 export function startApp(root: HTMLElement, offline = false): void {
   new App(root, offline);
@@ -70,7 +73,7 @@ class App {
   /** seconds left of the red-and-black beat after a posture break */
   private drama = 0;
   /** the execution cinematic running (only for one you're in) */
-  private exec: { a: ClientFighter; d: ClientFighter; t: number; start: number; hitDone: boolean; whooshed: boolean } | null = null;
+  private exec: { a: ClientFighter; d: ClientFighter; t: number; start: number; hitDone: boolean; whooshed: boolean; led: boolean } | null = null;
   /** the map's own fighter rim strength, restored after an execution */
   private rimBase = 0.6;
   /** back-to-back deflects build up the spectacle */
@@ -1287,7 +1290,7 @@ class App {
    * away as they go down.
    */
   private startExecution(a: ClientFighter, d: ClientFighter): void {
-    this.exec = { a, d, t: 0, start: this.net.serverNow(), hitDone: false, whooshed: false };
+    this.exec = { a, d, t: 0, start: this.net.serverNow(), hitDone: false, whooshed: false, led: false };
     audio.musicDuck(true);
     this.ui.setCinematic(true);
     // laid out the way the server stands them (the victim straight ahead at the execution distance),
@@ -1310,6 +1313,11 @@ class App {
       // on the server's clock, like the paired animation, so the camera can't drift off it
       ex.t = now - ex.start;
       this.cam.syncShots(ex.t / 1000);
+      // the finishing blow's recordings that swell into it
+      if (!ex.led && ex.t >= COMBAT.executeHitAt - EXEC_SOUND_LEAD) {
+        ex.led = true;
+        audio.executionLead(ex.a.roster.char, { vol: this.volumeAt(ex.a.pos.x, ex.a.pos.z), pos: ex.a.pos });
+      }
       // the finishing strike's heavy swing, started to swell into the blow
       if (!ex.whooshed && ex.t >= COMBAT.executeHitAt - EXEC_WHOOSH_LEAD) {
         ex.whooshed = true;

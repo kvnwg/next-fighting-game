@@ -137,6 +137,8 @@ export const ENTRANCES: Record<CharacterId, Entrance> = {
     sfx: [
       { s: 0, sound: 'whisper' },
       { s: 0.28, sound: 'stomp', vol: 0.5 },
+      // a metal grind as he rises, swelling out as the knives come out
+      { s: 0.3, sound: 'scrape' },
       { s: 0.72, sound: 'shing' },
       { s: 0.77, sound: 'shing' },
     ],

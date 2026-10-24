@@ -627,6 +627,20 @@ const SAMPLE_GAIN: Record<string, number> = {
   // swings and the Monk's punches, each pool matched to the swing or hit it replaces (the Wraith's to
   // his old recorded swing)
   paladin_parry: 0.2, paladin_shield: 0.2, paladin_bash: 0.75, juggernaut_step: 0.072, vanish: 0.15, jump: 0.31, bodyfall: 0.57, buff_shimmer: 0.28, buff_fire: 0.28, lava_burn: 0.43, juggernaut_crash: 0.9, juggernaut_punch: 0.9, shock_heavy_water: 0.55, shock_heavy_slam: 0.55, shock_light_tom: 0.93, shock_light_bag: 0.93, stomp_foot: 0.44, stomp_kick: 0.44, flashline: 0.25, chain_net: 0.93, chain_metal: 0.93, chi_crystal: 0.66, chi_drone: 0.66, roar_tiger: 0.34, roar_dragon: 0.34, roar_leopard: 0.34, fog_poof: 0.41, fog_boom: 0.41, whirl_flutter: 0.25, soulfire: 0.72, bolt_summon: 0.31, bolt_crackle: 0.31, blink_dash: 0.22, blink_magic: 0.22, juggernaut_swing: 0.54, reaper_scythe: 0.27, shade_swing: 0.6, monk_swing: 0.52, monk_punch: 0.37,
+  // the title screen's wind, 6 dB under its shing (as the Ronin's wind sits under his unsheathe); the
+  // executions: the Warden's finishing blow (the whoosh-punch, the bass hit and the impact, the impact
+  // level with the bass), the Ronin's (the slice, the clatter and the flute), the Wraith's (his five),
+  // the Duelist's (his three) and the Monk's (his four), each matched as a whole, as led in, to the
+  // synthesised blow it replaces; the Lancer's
+  // whoosh-bang, 2 dB under the rest of his blow; the Warden's flourish strike (the crunch over the sub
+  // drop, matched to his synthesised one); over every wind-up the braaam, and over the Assassin's his
+  // scream, 6 and 8 dB under the Warden's finishing blow (the synthesised wind-up is a quiet bed under
+  // them); the Assassin's entrance grind, level with the Wraith's scrape; and the Warden's arrival
+  // stinger, level with the bass hit it rides under (the pair is set level with his gong in entrance())
+  juggernaut_finish_punch: 1.05, juggernaut_finish_bass: 1.05, juggernaut_finish_appear: 1.05, juggernaut_blow_crunch: 0.5, juggernaut_blow_drop: 0.5, exec_braaam: 1.93, shade_exec_scream: 1.23, shade_scrape: 0.21,
+  ronin_finish_slice: 1.8, ronin_finish_clatter: 1.8, ronin_finish_flute: 1.8, juggernaut_triumph: 1.07, lancer_finish_bang: 1.02,
+  reaper_finish_siren: 1.64, reaper_finish_depths: 1.64, reaper_finish_strings: 1.64, reaper_finish_perish: 1.64, reaper_finish_gore: 1.64,
+  duelist_finish_dust: 1.23, duelist_finish_ball: 1.23, duelist_finish_wand: 1.23, monk_finish_punch: 0.94, monk_finish_punch2: 0.94, monk_finish_bones: 0.94, monk_finish_crowbar: 0.94, title_wind: 0.28,
 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
@@ -736,12 +750,18 @@ function heartbeat(o: Out, g: number): void {
   thump(lo, 56, 36, 0.22, g * 0.7, 0.19);
 }
 
+/** the Assassin's scream (the user's recording) is at its height this long into it */
+const SCREAM_PEAK = 1.76;
+
 /**
- * Under the execution's wind-up: a low drone and rumble swelling, a quickening heartbeat, and a
- * rising rush into the blow. The engine cuts it as the finishing blow lands.
+ * Under the execution's wind-up: the user's braaam struck on the deathblow, a low drone and rumble
+ * swelling, a quickening heartbeat, and a rising rush into the blow; over the Assassin's, whispers
+ * rising into a scream at its height just before the blow. The engine cuts it as the finishing blow
+ * lands.
  */
 export function execWindup(o: Out, a: Profile, close: boolean): void {
   const T = EXEC_HIT + 0.25;
+  playLayers(o, ['exec_braaam']);
   const bed = (x: number) => Math.min(1, x * 4) * (x < 0.9 ? 1 : (1 - x) / 0.1);
   osc(o, { f: 41, dur: T, gain: 0.1, shape: bed });
   osc(o, { f: 41.9, dur: T, gain: 0.08, shape: bed });
@@ -750,25 +770,41 @@ export function execWindup(o: Out, a: Profile, close: boolean): void {
   // the rush into the blow
   noise(o, { color: 'pink', type: 'bandpass', f: 300, f1: 2600, q: 1.2, dur: 0.75, gain: 0.35, shape: SHAPES.swell(3), delay: EXEC_HIT - 0.75 });
   osc(filtered(o, 'lowpass', 900), { type: 'sawtooth', f: 110, f1: 220, dur: 0.75, gain: 0.06, shape: SHAPES.swell(2), delay: EXEC_HIT - 0.75 });
-  // the executioner readies the weapon
-  switch (a.finisher) {
-    case 'iai':
-      noise(o, { type: 'highpass', f: 4000, f1: 7000, dur: 0.4, gain: 0.08, delay: 0.25, shape: SHAPES.swing(0.6, 2) });
-      ring(o, MAT.katana, 0.05, { decay: 1.4, hard: 0.4, delay: 0.45 });
-      break;
-    case 'thunder':
-      crackle(o, 1.6, 12, { gain: 0.08, type: 'highpass', f: 2000, delay: 0.3 });
-      break;
-    case 'reap':
-      rattle(o, { count: 30, spread: 1.6, fLo: 2200, fHi: 6000, decay: 0.04, fade: 0.3, whirl: 3 }, { gain: 0.2, type: 'highpass', f: 1800, delay: 0.2 });
-      break;
-    case 'crush':
-      ring(o, MAT.hammer, 0.08, { decay: 1.2, hard: 0.3, delay: 0.4 });
-      break;
-    default:
-      ring(o, a.metal, 0.05, { decay: 1.2, hard: 0.4, delay: 0.4 });
-  }
+  if (a.finisher === 'flurry') playLayers(at(o, EXEC_HIT - 0.2 - SCREAM_PEAK), ['shade_exec_scream']);
 }
+
+/** how long before the finishing blow its lead-in recordings start (the engine calls execLead then) */
+export const EXEC_LEAD = 1.7;
+
+/**
+ * The user's finishing-blow recordings that swell into the blow, each with how long it runs before
+ * it strikes (as encoded): the Warden's whoosh into a punch; the Ronin's slash sliding through and a
+ * sword hit's clatter; the Wraith's siren braam, his two deep impacts, the string stab and the gory
+ * slice; the Lancer's stealthy whoosh into a bang; the Duelist's fairy dust rising, a dark ball of
+ * energy charging into the blow and a wand's light spell.
+ */
+const LEAD: Partial<Record<Profile['finisher'], [string, number][]>> = {
+  crush: [['juggernaut_finish_punch', 0.116]],
+  iai: [['ronin_finish_slice', 0.108], ['ronin_finish_clatter', 0.273]],
+  reap: [['reaper_finish_siren', 0.55], ['reaper_finish_depths', 0.249], ['reaper_finish_strings', 0.209], ['reaper_finish_perish', 0.259], ['reaper_finish_gore', 0.081]],
+  thunder: [['lancer_finish_bang', 0.541]],
+  pierce: [['duelist_finish_dust', 0.54], ['duelist_finish_ball', 1.613], ['duelist_finish_wand', 0.057]],
+};
+export const hasLead = (a: Profile): boolean => !!LEAD[a.finisher];
+
+/** The finishing strike's lead-in, EXEC_LEAD before the blow: each recording timed to strike on it. */
+export function execLead(o: Out, a: Profile): void {
+  for (const [name, lead] of LEAD[a.finisher] ?? []) playLayers(at(o, EXEC_LEAD - lead), [name]);
+}
+
+/** the finishers that are all the user's recordings: what plays on the blow itself (the rest led in) */
+const ON_BLOW: Partial<Record<Profile['finisher'], string[]>> = {
+  crush: ['juggernaut_finish_bass', 'juggernaut_finish_appear'],
+  iai: ['ronin_finish_flute'],
+  reap: [],
+  pierce: [],
+  palm: ['monk_finish_punch', 'monk_finish_punch2', 'monk_finish_bones', 'monk_finish_crowbar'],
+};
 
 /** The ground taking a huge blow: a deep boom, a crack, a rumble and the grit coming down. */
 export function groundSlam(o: Out, scale: number, iron: boolean): void {
@@ -783,11 +819,12 @@ export function groundSlam(o: Out, scale: number, iron: boolean): void {
 
 /**
  * One of an execution's flourish strikes landing: the executioner's own hit (the Warden's hammer
- * lands with the blunt crunch, as his finishing blow does).
+ * lands with the user's crowbar crunch over a sub drop, or the blunt crunch until they decode).
  */
 export function execBlow(o: Out, a: Profile, d: Profile): void {
-  if (a.finisher === 'crush') BASE.hit(o, a, d, { heavy: true, anim: 'slam' });
-  else hit(o, a, d, { heavy: true });
+  if (a.finisher === 'crush') {
+    if (!playLayers(o, ['juggernaut_blow_crunch', 'juggernaut_blow_drop'])) BASE.hit(o, a, d, { heavy: true, anim: 'slam' });
+  } else hit(o, a, d, { heavy: true });
 }
 
 /**
@@ -804,37 +841,44 @@ function shockwave(o: Out, p: Profile, scale: number): void {
 
 /** The execution's finishing blow: a cinematic hit, different for every weapon. */
 export function execFinish(o: Out, a: Profile, d: Profile): void {
-  // the cinematic under every one: a crack, a deep drop and the air rushing out
-  click(o, 0.9, 1500, 0.02);
-  osc(o, { f: 72, f1: 24, dur: 1.6, gain: 0.6 });
-  noise(o, { color: 'brown', type: 'lowpass', f: 400, f1: 60, dur: 1.4, gain: 0.55 });
-  noise(o, { color: 'pink', type: 'bandpass', f: 1800, f1: 300, q: 0.6, dur: 0.5, gain: 0.4 });
+  // the Warden's, the Ronin's, the Wraith's, the Duelist's and the Monk's are the user's recordings:
+  // led in (see execLead), and on the blow the Warden's deep cinematic bass hit and impact, the
+  // Ronin's flute, the Monk's two punches and two bone-crushing blows
+  const own = ON_BLOW[a.finisher];
+  const recorded = !!own && (LEAD[a.finisher] ?? []).every(([n]) => !!sampleFor(o.ctx, n)) && playLayers(o, own);
+  if (!recorded) {
+    // the cinematic under every other one: a crack, a deep drop and the air rushing out
+    click(o, 0.9, 1500, 0.02);
+    osc(o, { f: 72, f1: 24, dur: 1.6, gain: 0.6 });
+    noise(o, { color: 'brown', type: 'lowpass', f: 400, f1: 60, dur: 1.4, gain: 0.55 });
+    noise(o, { color: 'pink', type: 'bandpass', f: 1800, f1: 300, q: 0.6, dur: 0.5, gain: 0.4 });
+  }
   // and over every execution, the recorded ringing glass
   const glass = sampleFor(o.ctx, 'exec_glass');
   if (glass) playSample(o, glass, sampleGain('exec_glass'), jit(1, 0.02), 0.02);
   switch (a.finisher) {
     case 'iai':
-      // one cut too fast to see: the hiss of it, the blade's long silver ring, then the sheath closing
+      // one cut too fast to see (until the recordings decode): the hiss of it, then the sheath closing
+      if (recorded) break;
       noise(o, { type: 'highpass', f: 3500, f1: 9000, dur: 0.14, gain: 0.5, shape: SHAPES.swing(0.4, 2) });
       hit(o, a, d, { heavy: true, anim: 'draw' });
-      ring(o, MAT.katana, 0.4, { decay: 1.6 });
       noise(o, { type: 'bandpass', f: 5000, q: 3, dur: 0.2, gain: 0.07, delay: 0.8, shape: (x) => x });
-      ring(o, MAT.knife, 0.3, { pitch: 0.9, decay: 0.25, delay: 1.0 });
       click(o, 0.3, 6000, 0.005, 1.0);
       break;
     case 'crush':
-      // the hammer crushing them: the blunt crunch, not the blade's slash every other hit uses (the
-      // crash into the floor is the choreography's own shockwave cue, landing on this same blow)
+      // the hammer crushing them (until the recordings decode): the blunt crunch, not the blade's
+      // slash every other hit uses (the crash into the floor is the choreography's own shockwave cue,
+      // landing on this same blow)
+      if (recorded) break;
       BASE.hit(o, a, d, { heavy: true, anim: 'slam' });
       ring(o, MAT.hammer, 0.45, { decay: 1.6 });
       break;
     case 'pierce':
-      // run through, then the blade drawn back out with a ting
+      // run through, then the blade drawn back out (until the recordings decode)
+      if (recorded) break;
       noise(o, { type: 'bandpass', f: 2600, f1: 4200, q: 8, dur: 0.12, gain: 0.3 });
       hit(o, a, d, { heavy: true, anim: 'thrust' });
-      ring(o, MAT.rapier, 0.38, { decay: 2 });
       noise(o, { type: 'highpass', f: 5000, dur: 0.12, gain: 0.18, delay: 0.35, shape: SHAPES.swing(0.5, 2) });
-      ring(o, MAT.rapier, 0.18, { pitch: 1.04, delay: 0.38 });
       break;
     case 'thunder': {
       // impaled, and the lightning goes through the spear into them
@@ -846,7 +890,7 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       noise(o, { type: 'highpass', f: 900, f1: 400, dur: 0.15, gain: 0.9, a: 0.001 });
       noise(o, { color: 'brown', type: 'lowpass', f: 1600, f1: 60, dur: 2.4, gain: 0.8, delay: 0.04 });
       osc(o, { f: 55, f1: 30, dur: 1.8, gain: 0.5, delay: 0.05 });
-      ring(o, MAT.glaive, 0.25, { decay: 1.2 });
+      // (and the user's whoosh into a bang, led in: see execLead)
       break;
     case 'flurry':
       // three cuts too quick to count, then the knife driven home
@@ -859,20 +903,20 @@ export function execFinish(o: Out, a: Profile, d: Profile): void {
       ring(o, MAT.knife, 0.3, { decay: 0.9, delay: 0.24 });
       break;
     case 'reap':
-      // the sickle drawn through on its chain, the chain running out, something torn loose
+      // the sickle drawn through on its chain, the chain running out, something torn loose (until
+      // the recordings decode)
+      if (recorded) break;
       hit(o, a, d, { heavy: true, anim: 'slashR' });
-      ring(o, MAT.sickle, 0.38, { decay: 1.5 });
       rattle(o, { count: 40, spread: 0.9, fLo: 2000, fHi: 6000, decay: 0.05, fade: 1.2 }, { gain: 0.45, type: 'highpass', f: 1500 });
       for (const det of [0, 3.5]) osc(filtered(o, 'lowpass', 600), { type: 'sawtooth', f: 220 + det, f1: 105, dur: 1.6, gain: 0.05, delay: 0.05 });
       noise(o, { type: 'bandpass', f: 3000, f1: 800, q: 6, dur: 1.2, gain: 0.12, delay: 0.05, a: 0.05 });
       break;
     case 'palm':
-      // the air itself struck: a pressure wave, the slap, and the body ringing like a gong
+      // the air itself struck: a pressure wave and the slap (until the recordings decode)
+      if (recorded) break;
       noise(o, { color: 'pink', type: 'lowpass', f: 500, f1: 80, dur: 0.5, gain: 1.0 });
       osc(o, { f: 55, f1: 32, dur: 0.8, gain: 0.8 });
       hit(o, a, d, { heavy: true, anim: 'punchR' });
-      ring(o, MAT.gong, 0.32, { decay: 1, delay: 0.01 });
-      ring(o, MAT.bronze, 0.18, { decay: 1 });
       break;
     case 'rites': {
       // the greatsword brought down, and a bell tolls for them (and the holy spell rings out)

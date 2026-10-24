@@ -66,6 +66,8 @@ const RECORDED: Partial<Record<Sfx, { layers: string[]; offset?: number }>> = {
   tink: { layers: ['glass_tink'] },
   // the title screen's (the Monk's entrance chimes with his glitter)
   chime: { layers: ['riser_chime'] },
+  // the title screen's (the Ronin's entrance blows with his own howl and sweep)
+  wind: { layers: ['title_wind'] },
 };
 
 export interface Placed {
@@ -261,7 +263,8 @@ class AudioEngine {
    * A ring-entrance cue. They were the old synthesised effects (chimes, bells, plucks); now each
    * plays one of the recordings where one fits, and the bell-like ones give way to the fighter's own
    * shimmer or are dropped. The Ronin's wind and taiko, the Warden's rumble and gong, the Wraith's
-   * scrape, the Monk's breath and the stomps have (layered) recordings of their own.
+   * scrape, the Assassin's grind, the Monk's breath and the stomps have (layered) recordings of their
+   * own.
    */
   entrance(char: CharacterId, name: Sfx, volume = 1): void {
     // the Wraith's entrance keeps his old dark whoosh
@@ -287,9 +290,11 @@ class AudioEngine {
       INTRO.wind = [['wind_howl', 'ronin_wind_sweep'], 1];
       INTRO.taiko = [['ronin_taiko', 'ronin_flute'], 1];
     } else if (char === 'juggernaut') {
-      INTRO.rumble = [['juggernaut_boom', 'juggernaut_rubble'], 1];
+      // arriving: his finishing blow's bass hit under a dark triumphant stinger, level with his gong
+      INTRO.rumble = [['juggernaut_finish_bass', 'juggernaut_triumph'], 1.2];
       INTRO.gong = [['juggernaut_slam', 'juggernaut_thud'], 1];
     } else if (char === 'reaper') INTRO.scrape = [['reaper_scrape', 'reaper_groan'], 1];
+    else if (char === 'shade') INTRO.scrape = ['shade_scrape', 1];
     else if (char === 'monk') INTRO.breath = ['monk_breath', 1];
     const m = INTRO[name];
     if (!m) return this.play(name, volume);
@@ -459,6 +464,12 @@ class AudioEngine {
     const w = this.walkers.get(fighterId);
     if (w && this.ctx) w.lastWhoosh = this.ctx.currentTime + 0.1;
     this.emit((out) => R.swing(out, profile(char), { heavy: true, anim: char === 'ronin' ? 'draw' : undefined }), { level: LEVEL.swing, vol: o.vol, pos: o.pos, wet: WET.swing, hero: true, priority: 2 });
+  }
+
+  /** The finishing blow's recordings that swell into it, started EXEC_LEAD (1.7 s) before it lands. */
+  executionLead(char: CharacterId, o: Placed): void {
+    const p = profile(char);
+    if (R.hasLead(p)) this.emit((out) => R.execLead(out, p), { level: LEVEL.finish, vol: o.vol, pos: o.pos, wet: WET.finish, hero: true, priority: 3 });
   }
 
   /** One of an execution's flourish strikes landing on the victim. */
