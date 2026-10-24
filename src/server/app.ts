@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import zlib from 'node:zlib';
 import { WebSocket, WebSocketServer } from 'ws';
 import { LOBBY_CAP } from '../shared/config';
+import { Censor, createCensor } from './censor';
 import { Game } from './game';
 import { Store, StorePersistence } from './store';
 
@@ -51,6 +52,13 @@ export interface ServerOptions {
   connectsPerMinute?: number;
   /** How often sockets are pinged (ms; tests shorten it). */
   heartbeatMs?: number;
+  /** Moderation for names and chat; the bundled word list unless given (null turns it off). */
+  censor?: Censor | null;
+}
+
+/** the word list CrazyGames gives multiplayer games, starring out names and chat */
+export function defaultCensor(): Censor {
+  return createCensor(fs.readFileSync(new URL('./blocklist.txt', import.meta.url), 'utf8'));
 }
 
 export interface RunningServer {
@@ -199,7 +207,8 @@ function staticHandler(dir: string | undefined): http.RequestListener {
 
 export function startServer(opts: ServerOptions): Promise<RunningServer> {
   const store = new Store(opts.persistence);
-  const game = new Game(store, undefined, { selectTime: opts.selectTime, introTime: opts.introTime });
+  const censor = opts.censor === undefined ? defaultCensor() : opts.censor ?? undefined;
+  const game = new Game(store, undefined, { selectTime: opts.selectTime, introTime: opts.introTime, censor });
   const serveStatic = staticHandler(opts.staticDir);
   const started = Date.now();
   const server = http.createServer((req, res) => {
