@@ -782,6 +782,15 @@ export function groundSlam(o: Out, scale: number, iron: boolean): void {
 }
 
 /**
+ * One of an execution's flourish strikes landing: the executioner's own hit (the Warden's hammer
+ * lands with the blunt crunch, as his finishing blow does).
+ */
+export function execBlow(o: Out, a: Profile, d: Profile): void {
+  if (a.finisher === 'crush') BASE.hit(o, a, d, { heavy: true, anim: 'slam' });
+  else hit(o, a, d, { heavy: true });
+}
+
+/**
  * A blow's shockwave through the ground: the Warden's hammer crash and punch, everyone else's
  * recorded heavy or light slam (by size), or the synthesised slam until they have decoded. Each is
  * matched to the synthesised slam at the size it stands for (his at 1.5, heavy at 1.5, light at 0.9).

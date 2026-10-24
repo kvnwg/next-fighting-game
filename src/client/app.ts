@@ -1085,6 +1085,35 @@ class App {
     }
   }
 
+  /**
+   * One of an execution's flourish strikes lands: the victim takes it like any heavy hit, knocked
+   * the way the blow travelled, with a flash, a moment's freeze, blood and the hit's sound.
+   */
+  private executionBlow(a: ClientFighter): void {
+    let d: ClientFighter | null = null;
+    let best = 6;
+    for (const f of this.fighters.values()) {
+      if (f === a || f.s !== 'executed') continue;
+      const dd = dist2D(a.pos.x, a.pos.z, f.pos.x, f.pos.z);
+      if (dd < best) {
+        best = dd;
+        d = f;
+      }
+    }
+    if (!d) return;
+    const swing = a.swingDir;
+    const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.1 * d.model.scale, d.pos.z);
+    d.model.react('hit', { side: Math.max(-1, Math.min(1, swing.x * Math.cos(d.yaw) - swing.z * Math.sin(d.yaw))), heavy: true });
+    d.model.flash('#ffffff', 0.7);
+    // the executioner's freeze is shorter: flourishes can come 120 ms apart, and the lag must be
+    // made up before the finishing blow
+    d.hitstop(110, 0.08);
+    a.hitstop(70);
+    this.effects.blood(chest, swing, 0.9);
+    audio.executionBlow(a.roster.char, d.roster.char, { vol: this.volumeAt(chest.x, chest.z), pos: chest });
+    if (a === this.local?.cf || d === this.local?.cf) this.cam.shake(0.22, 0.22);
+  }
+
   private moveFx(f: ClientFighter): void {
     if (!f.fxQueue.length) return;
     const me = this.local?.cf;
@@ -1166,6 +1195,9 @@ class App {
         }
         case 'shake':
           this.shakeNear(f, 0.1 * sc, 0.15);
+          break;
+        case 'blow':
+          this.executionBlow(f);
           break;
         case 'bolt':
           pos.y = Math.max(0, f.pos.y);

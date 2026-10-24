@@ -461,6 +461,11 @@ class AudioEngine {
     this.emit((out) => R.swing(out, profile(char), { heavy: true, anim: char === 'ronin' ? 'draw' : undefined }), { level: LEVEL.swing, vol: o.vol, pos: o.pos, wet: WET.swing, hero: true, priority: 2 });
   }
 
+  /** One of an execution's flourish strikes landing on the victim. */
+  executionBlow(a: CharacterId, d: CharacterId, o: Placed): void {
+    this.emit((out) => R.execBlow(out, profile(a), profile(d)), { level: LEVEL.hit, vol: o.vol, pos: o.pos, wet: WET.hit, hero: true, priority: 2 });
+  }
+
   dodge(char: CharacterId, kind: 'roll' | 'vanish' | 'leap', o: Placed): void {
     const p = profile(char);
     this.emit((out) => R.dodge(out, p, kind), { level: LEVEL.dodge, vol: o.vol, pos: o.pos, wet: WET.swing });

@@ -292,6 +292,8 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
     const T = COMBAT.executeTime;
     for (let t = 0; t <= at; t += 10) {
       ex[0].update({ ...IDLE, state: 'execute', elapsed: t, dur: T, serial: 1 }, 0.01);
+      // the victim takes each flourish strike as the game has them (see App.executionBlow)
+      if (ex[0].frame?.fx.some((c) => c.kind === 'blow')) ex[1].react('hit', { side: 0.7, heavy: true });
       ex[1].update({ ...IDLE, state: 'executed', elapsed: t, dur: T, serial: 1, execBy: ca }, 0.01);
     }
     G.uDark.value = 0.86 * Math.min(1, at / 350) * (1 - Math.max(0, Math.min(1, (at - (T - 450)) / 450)));

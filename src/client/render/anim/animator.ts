@@ -812,7 +812,10 @@ export class Animator {
     const dur = Math.max(hitAt + 1, a.dur || COMBAT.executeTime);
     const last = def.impacts[def.impacts.length - 1];
     const s = e < hitAt ? execS(def, e) : last + (def.sRest - last) * clamp01((e - hitAt) / (dur - hitAt - 300));
+    const from = this.fxMaxS === -Infinity ? Math.min(def.sStart, def.sChamber) - 1e-3 : this.fxMaxS;
     this.cues(def, s, out);
+    // each flourish strike lands on the victim (the finishing blow is the server's 'execute')
+    for (const at of def.impacts.slice(0, -1)) if (at > from && at <= s) out.fx.push({ s: at, kind: 'blow', at: 'tip', scale: 1 });
     out.trail = def.trail;
     out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
     const swinging = s >= def.sChamber && s <= def.sEnd;
@@ -839,15 +842,19 @@ export class Animator {
     const react: ExecuteReact = by?.executeReact ?? 'crumple';
     const p = this.statePose({ ...a, state: 'broken' }).target;
     const rot: Rot = { ...ZERO_ROT };
-    // flinches at the flourish strikes before the last
+    // reeling from each flourish strike before the last: thrown back and twisted away (left and right
+    // in turn), the head snapped round, slow to come back (the app adds the hit's own knock on top)
     if (def && def.impacts.length > 1) {
-      for (const at of def.impacts.slice(0, -1)) {
+      def.impacts.slice(0, -1).forEach((at, i) => {
         const t = execT(def, at);
-        const k = e > t ? kick((e - t) / 90) * Math.exp(-(e - t) / 260) : 0;
-        p.body.lean -= 0.25 * k;
-        p.body.headPitch -= 0.4 * k;
-        p.body.twist += 0.18 * k;
-      }
+        const k = e > t ? kick((e - t) / 70) * Math.exp(-(e - t) / 380) : 0;
+        const way = i % 2 === 0 ? 1 : -1;
+        p.body.lean -= 0.45 * k;
+        p.body.headPitch -= 0.75 * k;
+        p.body.twist += 0.4 * way * k;
+        p.body.side += 0.2 * way * k;
+        p.body.back += 0.08 * k;
+      });
     }
     if (e >= hitAt) {
       const t = e - hitAt;

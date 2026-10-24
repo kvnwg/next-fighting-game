@@ -128,7 +128,8 @@ export type FxKind =
   | 'bolt' // a lightning bolt from the sky onto the anchor (gold unless coloured)
   | 'fog' // low mist rolling out across the ground
   | 'embers' // sparks and embers rising around the fighter
-  | 'shake'; // camera shake only
+  | 'shake' // camera shake only
+  | 'blow'; // an execution's flourish strike landing on the victim (emitted by the animator, not authored)
 
 export type FxAnchor = 'tip' | 'main' | 'off' | 'offTip' | 'kick' | 'feet' | 'root' | 'front';
 
