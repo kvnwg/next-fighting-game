@@ -265,12 +265,11 @@ class AudioEngine {
    * A ring-entrance cue. They were the old synthesised effects (chimes, bells, plucks); now each
    * plays one of the recordings where one fits, and the bell-like ones give way to the fighter's own
    * shimmer or are dropped. The Ronin's wind and taiko, the Warden's rumble and gong, the Wraith's
-   * scrape, the Assassin's grind, the Monk's breath and the stomps have (layered) recordings of their
-   * own.
+   * breathing, scrape and whoosh, the Assassin's grind, the Monk's breath and the stomps have
+   * (layered) recordings of their own.
    */
   entrance(char: CharacterId, name: Sfx, volume = 1): void {
-    // the Wraith's entrance keeps his old dark whoosh
-    const swing = char === 'reaper' ? 'reaper_swing' : char === 'duelist' ? 'duelist_swing' : char === 'lancer' ? 'lancer_swing' : char === 'juggernaut' ? 'juggernaut_swing' : 'ronin_swing';
+    const swing = char === 'duelist' ? 'duelist_swing' : char === 'lancer' ? 'lancer_swing' : char === 'juggernaut' ? 'juggernaut_swing' : 'ronin_swing';
     const shine = char === 'paladin' ? 'paladin_shimmer' : char === 'monk' ? 'monk_glitter' : null;
     const INTRO: Partial<Record<Sfx, [string | string[] | null, number, number?]>> = {
       whoosh: [swing, 1.2],
@@ -295,7 +294,13 @@ class AudioEngine {
       // arriving: his finishing blow's bass hit under a dark triumphant stinger, level with his gong
       INTRO.rumble = [['juggernaut_finish_bass', 'juggernaut_triumph'], 1.2];
       INTRO.gong = [['juggernaut_slam', 'juggernaut_thud'], 1];
-    } else if (char === 'reaper') INTRO.scrape = [['reaper_scrape', 'reaper_groan'], 1];
+    } else if (char === 'reaper') {
+      INTRO.scrape = [['reaper_scrape', 'reaper_groan'], 1];
+      // a demon breathing as he comes out of the fog, and a void whoosh round his spin (started
+      // part way in, so it peaks with it)
+      INTRO.whisper = ['reaper_breath', 1];
+      INTRO.whoosh = ['reaper_void', 1.2, 0.3];
+    }
     else if (char === 'shade') INTRO.scrape = ['shade_scrape', 1];
     else if (char === 'monk') INTRO.breath = ['monk_breath', 1];
     const m = INTRO[name];

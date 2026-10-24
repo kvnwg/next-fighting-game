@@ -536,8 +536,9 @@ const SAMPLE_SETS: Record<string, SampleSet> = {
   // the katana's swooshes (weightier) with a holy glow on heavies; every cut lands with a radiant impact
   // heavies stack the glow, a dark or a fiery whoosh and the holy shimmer; hits ring out pure
   paladin: { swing: ['ronin_swing'], swingGain: 1.5, heavySwingLayer: 'paladin_glow', heavyExtra: ['paladin_darkwhoosh', 'paladin_firewhoosh'], heavyShimmer: 'paladin_shimmer', hitGain: 0.75, hitLayer: 'paladin_impact', heavyHitLayer: 'paladin_shimmer' },
-  // the scythe: cloth and metal swooshes, an axe's swing, a heavy sword's slow one
-  reaper: { swing: ['reaper_scythe'], hitGain: 0.78 },
+  // the scythe: cloth and metal swooshes, an axe's swing, a heavy sword's slow one; a fiery demon's
+  // whoosh through his heavies
+  reaper: { swing: ['reaper_scythe'], heavySwingLayer: 'reaper_firewhoosh', hitGain: 0.78 },
   // knife shings, slicing the air
   shade: { swing: ['shade_swing'], hitGain: 0.78 },
   // deep, heavy hammer whooshes; and a hammer lands harder than a sword
@@ -643,6 +644,10 @@ const SAMPLE_GAIN: Record<string, number> = {
   reaper_finish_siren: 1.64, reaper_finish_depths: 1.64, reaper_finish_strings: 1.64, reaper_finish_perish: 1.64, reaper_finish_gore: 1.64,
   duelist_finish_dust: 1.23, duelist_finish_ball: 1.23, duelist_finish_wand: 1.23, monk_finish_punch: 0.94, monk_finish_punch2: 0.94, monk_finish_bones: 0.94, monk_finish_crowbar: 0.94, title_wind: 0.28,
   perilous_drum: 0.84, perilous_riser: 0.84,
+  // the Wraith's: his entrance's breathing (level with the Monk's breath) and void whoosh (level with
+  // the old dark whoosh it replaces), the fiery whoosh 3 dB under his scythe swings, the conjuring
+  // through his Reaping Arc level with the perilous warning, the shriek level with his body falling
+  reaper_breath: 0.28, reaper_void: 0.14, reaper_firewhoosh: 0.13, reaper_conjure: 0.53, reaper_shriek: 0.24,
 };
 const sampleGain = (name: string): number => SAMPLE_GAIN[name] ?? 0.5;
 
@@ -1086,19 +1091,24 @@ export function feint(o: Out, p: Profile): void {
   osc(o, { type: 'triangle', f: 500, f1: 900, dur: 0.12, gain: 0.2 });
 }
 
-/** the user's sliced riser is at its height this long into it */
+/** the user's sliced riser is at its height this long into it, and the Wraith's conjuring roars out this long into it */
 const RISER_PEAK = 0.568;
+const CONJURE_ROAR = 0.603;
 
 /**
  * Perilous: the danger cue, everyone's. The user's mission drum cadence sounding the alarm, and a
  * sliced riser climbing to its height as the attack strikes (`windup`: the seconds until it does);
- * a synthesised drone and beep until they decode.
+ * a synthesised drone and beep until they decode. The Wraith conjures fire through his, roaring out
+ * as it strikes.
  */
 export function perilous(o: Out, p: Profile, windup = 0.75): void {
-  void p;
   if (playLayers(o, ['perilous_drum'])) {
     const t = windup - RISER_PEAK;
     playLayers(t > 0 ? at(o, t) : o, ['perilous_riser'], 1, undefined, Math.max(0, -t));
+    if (p.id === 'reaper') {
+      const c = windup - CONJURE_ROAR;
+      playLayers(c > 0 ? at(o, c) : o, ['reaper_conjure'], 1, undefined, Math.max(0, -c));
+    }
     return;
   }
   osc(filtered(o, 'lowpass', 1400), { type: 'sawtooth', f: 110, f1: 105, dur: 0.5, gain: 0.25 });
@@ -1108,6 +1118,8 @@ export function perilous(o: Out, p: Profile, windup = 0.75): void {
 
 /** A fighter going down: the body landing, the armour clattering, the weapon dropped. */
 export function death(o: Out, d: Profile): void {
+  // the Wraith's pained shriek (the user's)
+  if (d.id === 'reaper') playLayers(o, ['reaper_shriek']);
   // the body landing: everyone's recorded fall (its crunch lands where the thumps did), or the
   // synthesised thumps, armour and cloth until it has decoded
   if (!playLayers(at(o, 0.1), ['bodyfall'])) {

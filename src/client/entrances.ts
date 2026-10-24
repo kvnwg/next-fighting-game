@@ -160,7 +160,6 @@ export const ENTRANCES: Record<CharacterId, Entrance> = {
       { s: 0.1, sound: 'chime', vol: 0.5 },
       { s: 0.4, sound: 'scrape' },
       { s: 0.74, sound: 'whoosh' },
-      { s: 0.9, sound: 'whisper' },
     ],
   },
   monk: {
