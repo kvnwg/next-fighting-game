@@ -2,7 +2,8 @@
 // hair in a topknot with a red pin, long trailing sleeves and red ribbons.
 // Wields an inverted scythe (buildWraithScythe): thin steel staff, gnarled
 // metal at the foot and a long red crescent blade sweeping along the ground.
-// Floats with the hem ~8 voxels off the ground (1 voxel ≈ 2.25 cm).
+// The robe falls from the sash to the ground with a short train behind, and the game swings and
+// drags it as cloth (src/client/render/skirt.ts) over legs it hides (1 voxel ≈ 2.25 cm).
 
 import { VoxelBuilder, hash3, noise3 } from '../../tools/voxel/builder.js';
 
@@ -45,13 +46,16 @@ export function buildWraith() {
 
   // ---- skeleton -----------------------------------------------------------
   b.bone('pelvis', null, [0, 52, 0]);
+  // the robe below the sash, one skirt to the ground (the game flows it as cloth, by these names),
+  // and the mist it trails off into
+  b.bone('skirt', 'pelvis', [0, 50, 0]);
+  b.bone('skirtMist', 'skirt', [0, 50, 0], { opacity: 0.45 });
   // a short outer layer at the back of the robe, hung from the sash: it sways (cloth)
   b.bone('robeLower', 'pelvis', [0, 50, 0]);
-  // legs inside the robe: hips under the sash, knees under the robe's hem, ankles hidden in mist
+  // legs inside the robe, never seen: the rig still walks them, and the robe drapes over the knees
   for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
     b.bone(`thigh${side}`, 'pelvis', [5 * s, 50, 0]);
     b.bone(`shin${side}`, `thigh${side}`, [5 * s, 27, 0]);
-    b.bone(`mist${side}`, `shin${side}`, [5 * s, 10, 0], { opacity: 0.45 });
   }
   b.bone('ribbons', 'pelvis', [0, 55, 5.5]);
   b.bone('torso', 'pelvis', [0, 56, 0]);
@@ -63,77 +67,63 @@ export function buildWraith() {
     b.bone(`hand${side}`, `forearm${side}`, [33.5 * s, SHOULDER_Y, 0]);
   }
 
-  // ---- robe: flared, folded, open over an inner panel, split over the legs --
+  // ---- robe: flared, folded, open over an inner panel, down to the ground ---
   const skirtX = (y) => 6.8 + (56 - y) * 0.17;
   const skirtZ = (y) => 4.8 + (56 - y) * 0.12;
+  // the back reaches out further toward the ground, a short train that drags behind
+  const TRAIN = 7;
+  const trainZ = (y, z) => (z < 0 ? 1 + (TRAIN / skirtZ(0)) * clamp01((24 - y) / 24) ** 1.6 : 1);
   const skirt = (p, v) => {
     const a = Math.atan2(p[2], p[0]);
     const wave = 1 + 0.055 * Math.sin(a * 13 + p[1] * 0.08);
-    if (sel(p[0] / (skirtX(p[1]) * wave), p[2] / (skirtZ(p[1]) * wave)) > 1) return undefined;
-    if (p[1] < 9 + hash3(v[0], 2, v[2]) * 3.5) return undefined; // ragged hem
+    const X = skirtX(p[1]) * wave;
+    const Z = skirtZ(p[1]) * wave * trainZ(p[1], p[2]);
+    if (sel(p[0] / X, p[2] / Z) > 1) return undefined;
+    if (p[1] < 0.5 + hash3(v[0], 2, v[2]) * 2.5 - (p[2] < 0 ? 1.5 : 0)) return undefined; // ragged hem
     const panel = 2.2 + (56 - p[1]) * 0.05;
     if (p[2] > 0 && Math.abs(p[0]) < panel) {
-      if (sel(p[0] / (skirtX(p[1]) * wave - 1), p[2] / (skirtZ(p[1]) * wave - 1)) > 1) return null; // recessed
+      if (sel(p[0] / (X - 1), p[2] / (Z - 1)) > 1) return null; // recessed
       return Math.abs(p[0]) > panel - 0.9 ? 'robeShade' : 'robeLight';
     }
     return folds(p);
   };
-  // which bone a voxel of the robe rides. The sash band and yoke ride the pelvis; below them the
-  // robe is split up the middle and each half rides its own thigh down to just below the knee, so
-  // a step, a lunge or a bent knee carries the robe with the leg instead of the knee cutting
-  // through it. Under it the legs are wrapped in wide trousers, a tube on each shin from the knee
-  // down to the ragged, misty hem (a hakama under the robe)
+  // which bone a voxel of the robe rides: the sash band and yoke ride the pelvis, and the rest is
+  // one skirt, never split over the legs
   const YOKE = 45;
-  const HEM = 23;
-  const skirtBone = (p) => (p[1] >= YOKE ? 'pelvis' : p[0] >= 0 ? 'thighL' : 'thighR');
-  b.fill([-18, HEM - 1, -14], [18, 56, 12], (p, v) => (p[1] < HEM + hash3(v[0], 9, v[2]) * 3.5 ? undefined : skirt(p, v)), { bone: skirtBone });
+  const skirtBone = (p) => (p[1] >= YOKE ? 'pelvis' : 'skirt');
+  const BOX = [[-18, 0, -21], [18, 56, 13]];
+  b.fill(BOX[0], BOX[1], skirt, { bone: skirtBone });
   // the robe's hem, a darker turned edge
-  b.fill([-18, HEM - 1, -14], [18, HEM + 5, 12], (p, v) => (b.has(v[0], v[1], v[2]) && !b.has(v[0], v[1] - 1, v[2]) ? 'robeShade' : undefined), { bone: skirtBone });
-  // the back of the robe below the sash: a short outer layer over the split that sways (robeLower)
-  b.fill([-17, 33, -14], [17, YOKE, 2], (p, v) => {
-    const X = skirtX(p[1]) * 1.13, Z = skirtZ(p[1]) * 1.13;
+  b.fill(BOX[0], [18, 6, 13], (p, v) => (b.has(v[0], v[1], v[2]) && !b.has(v[0], v[1] - 1, v[2]) ? 'robeShade' : undefined), { bone: skirtBone });
+  // the back of the robe below the sash: a short outer layer over the skirt that sways (robeLower)
+  b.fill([-17, 33, -16], [17, YOKE, 2], (p, v) => {
+    const X = skirtX(p[1]) * 1.13, Z = skirtZ(p[1]) * 1.13 * trainZ(p[1], p[2]);
     if (p[2] > -Z * 0.15 || sel(p[0] / X, p[2] / Z) > 1 || sel(p[0] / X, p[2] / Z) < 0.72) return undefined;
     if (p[1] < 34 + hash3(v[0], 8, v[2]) * 3) return undefined;
     if (b.has(v[0], v[1], v[2])) return undefined;
     return p[1] < 36 ? 'robeShade' : folds(p);
   }, { bone: 'robeLower' });
-  // the trouser legs: wide tubes round each shin, widening a little to the hem
-  const SHIN_X = 5.6;
-  for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
-    const cx = SHIN_X * s;
-    b.use(`shin${side}`).fill([cx - 10, 8, -10], [cx + 10, HEM + 6, 10], (p, v) => {
-      const d = 27 - p[1];
-      const rx = 6.4 + d * 0.09, rz = 5.8 + d * 0.1;
-      const q = [p[0] - cx, p[1], p[2]];
-      const a = Math.atan2(q[2], q[0]);
-      const wave = 1 + 0.06 * Math.sin(a * 7 + p[1] * 0.3);
-      if (sel(q[0] / (rx * wave), q[2] / (rz * wave)) > 1) return undefined;
-      if (p[1] < 9 + hash3(v[0], 2, v[2]) * 3.5) return undefined; // ragged hem
-      return folds(q, 5);
-    }, { mode: 'under' });
-  }
 
-  // mist: translucent tendrils curling off each trouser leg's hem toward the ground
-  for (const [s, side] of [[1, 'L'], [-1, 'R']]) {
-    b.use(`mist${side}`);
-    const cx = SHIN_X * s;
-    for (let i = 0; i < 14; i++) {
-      const a0 = (i / 14) * Math.PI * 2 + hash3(i, 5, s) * 0.3;
-      const curl = (hash3(i, 6, s) - 0.5) * 1.2;
-      const len = 0.6 + hash3(i, 7, s) * 0.6;
-      const pts = [];
-      for (let k = 0; k <= 4; k++) {
-        const t = k / 4;
-        const a = a0 + curl * t;
-        const rr = 1.0 + t * 0.35 * len;
-        pts.push([cx + Math.cos(a) * 7.8 * rr, 11 - t * 10 * len, Math.sin(a) * 7.4 * rr]);
-      }
-      b.polyline(pts, (k) => 1.3 - k * 0.22, (p) => (hash3(...p.map(Math.floor)) > 0.7 ? 'robeLight' : 'mist'));
+  // mist: translucent wisps curling up off the hem and pooling round it on the ground
+  b.use('skirtMist');
+  for (let i = 0; i < 26; i++) {
+    const a0 = (i / 26) * Math.PI * 2 + hash3(i, 5, 1) * 0.2;
+    const curl = (hash3(i, 6, 1) - 0.5) * 1.4;
+    const len = 0.6 + hash3(i, 7, 1) * 0.7;
+    const pts = [];
+    for (let k = 0; k <= 4; k++) {
+      const t = k / 4;
+      const a = a0 + curl * t;
+      const y = 1 + t * 9 * len;
+      const rr = 1.04 + t * 0.12 * len;
+      pts.push([Math.cos(a) * skirtX(y) * rr, y, Math.sin(a) * skirtZ(y) * trainZ(y, Math.sin(a)) * rr]);
     }
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2 + 0.4;
-      b.ellipsoid([cx + Math.cos(a) * 7, 1.6, Math.sin(a) * 6], [3, 1.6, 2.6], 'mist', { mode: 'under' });
-    }
+    b.polyline(pts, (k) => 1.4 - k * 0.25, (p) => (hash3(...p.map(Math.floor)) > 0.7 ? 'robeLight' : 'mist'), { mode: 'under' });
+  }
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + 0.3;
+    const x = Math.cos(a) * skirtX(1) * 1.02, z = Math.sin(a) * skirtZ(1) * trainZ(1, Math.sin(a)) * 1.02;
+    b.ellipsoid([x, 1.4, z], [3.6, 1.6, 3.2], 'mist', { mode: 'under' });
   }
 
   // sash with an ornate clasp, and long red streamers

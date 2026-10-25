@@ -14,6 +14,7 @@ import { CHAR_LAYER, FX_LAYER } from './renderer';
 import { patchMaterial } from './gfx/materials';
 import { WeaponParts, buildWeapon } from './weapons';
 import type { VoxelBone } from '../../../characters/voxel-model';
+import { Skirt } from './skirt';
 import { BONE_SLOTS, PropSpec, RigDims, RigSlot, SLOT_BONE, VOXEL_FIGHTERS, propFrame, propRotation, restDirection, rigDims, voxelModel } from './voxel/fighters';
 import { VOXEL } from './voxel/mesh';
 
@@ -43,6 +44,7 @@ const _rh = new THREE.Vector3();
 const _lh = new THREE.Vector3();
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
+const _floor = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _yaw = new THREE.Quaternion();
 const _ident = new THREE.Quaternion();
@@ -112,6 +114,9 @@ interface ClothSpec {
   around?: boolean;
 }
 
+/** The bones of a robe that flows as cloth all the way down (the Wraith's: see skirt.ts). */
+const SKIRT_BONES = new Set(['skirt', 'skirtMist']);
+
 const CLOTH: Record<string, ClothSpec> = {
   // heavy: about 20 degrees back at a run, flaring out in spins and leaps
   cape: { k: 55, zeta: 0.6, gravity: 1, drag: 0.25, inertia: 0.6, lift: 1.0, side: 0.5, flutter: 0.05 },
@@ -179,6 +184,8 @@ export class CharacterModel {
   /** whether each weapon is mid-swing this frame (drives the trails) */
   swingMain = false;
   swingOff = false;
+  /** the main weapon is out of the hand (a thrown spear, drawn by the app): hidden, and no trail */
+  thrown = false;
   /** trail anchors in weapon space */
   readonly trailMain: { base: THREE.Vector3; tip: THREE.Vector3 };
   readonly trailOff: { base: THREE.Vector3; tip: THREE.Vector3 } | null;
@@ -210,6 +217,7 @@ export class CharacterModel {
   private chainOut = 0;
   private chain: { pts: THREE.Vector3[]; prev: THREE.Vector3[]; seg: number; links: THREE.InstancedMesh; started: boolean } | null = null;
   private clothTime = 0;
+  private skirt: Skirt | null = null;
   private flashColor = new THREE.Color('#ffffff');
   private ghosts: Ghost[] = [];
   private ghostT = 0;
@@ -296,6 +304,7 @@ export class CharacterModel {
       return cur ? BONE_SLOTS[cur.name] : 'hips';
     };
     const restQ = new Map<RigSlot, THREE.Quaternion>();
+    const skirt: THREE.Mesh[] = [];
     const DOWN = new THREE.Vector3(0, -1, 0);
     for (const slot of Object.keys(slots) as RigSlot[]) {
       const dir = slot.endsWith('.end') && slot.startsWith('leg') ? null : restDirection(body.model, SLOT_BONE[slot]);
@@ -308,7 +317,9 @@ export class CharacterModel {
       const anchor = bones.get(SLOT_BONE[slot]);
       if (!anchor) continue;
       const q = restQ.get(slot)!;
-      const mesh = new THREE.Mesh(geo, voxMat(bone));
+      // a flowing robe is reshaped every frame, so it gets a geometry of its own
+      const mesh = new THREE.Mesh(SKIRT_BONES.has(bone.name) ? geo.clone() : geo, voxMat(bone));
+      if (SKIRT_BONES.has(bone.name)) skirt.push(mesh);
       mesh.quaternion.copy(q);
       mesh.position.set(bone.pivot[0] - anchor.pivot[0], bone.pivot[1] - anchor.pivot[1], bone.pivot[2] - anchor.pivot[2]).multiplyScalar(VOXEL).applyQuaternion(q);
       // the hand group sits where the fist closes, a little past the wrist pivot
@@ -328,6 +339,7 @@ export class CharacterModel {
         this.cloth.push({ pivot, spec: cloth, front: centre.z > 0.02, a: 0, b: 0, va: 0, vb: 0, prev: new THREE.Vector3(), vel: new THREE.Vector3(), acc: new THREE.Vector3(), started: false, phase: Math.random() * 10 });
       } else slots[slot].add(mesh);
     }
+    if (skirt.length) this.skirt = new Skirt(skirt, [this.legL, this.legR]);
 
     // weapons are carried by the torso and the hands reach for them: the voxel props, with the
     // placeholder set kept only for what it wears on the body (the katana's scabbard)
@@ -667,8 +679,9 @@ export class CharacterModel {
     this.frame = f;
     const p = f.pose;
     const b = p.body;
-    this.swingMain = f.swingMain;
+    this.swingMain = f.swingMain && !this.thrown;
     this.swingOff = f.swingOff;
+    this.weapon.main.visible = !this.thrown;
     // lightning crackles along the spear through heavy swings and the special
     const charged = (a.state === 'attack' && (isHeavyKey(a.key) || a.key === 'sp')) || a.state === 'execute';
     this.charged.forEach((m, i) => (m.visible = charged && Math.sin(performance.now() / 21 + i * 2.1) > -0.35));
@@ -799,6 +812,8 @@ export class CharacterModel {
     this.updateGhosts(f.ghost || this.dodging, dt);
     this.updateSmears(dt);
     this.stepCloth(dt);
+    // the robe flows over the legs and drags on the ground (not in the air)
+    this.skirt?.step(dt, a.airborne ? -Infinity : this.root.getWorldPosition(_floor).y);
     this.stepChain(dt);
     this.drawSkeleton();
 
@@ -930,8 +945,9 @@ export class CharacterModel {
       toneMapped: false,
     });
     const group = new THREE.Group();
-    this.root.traverse((o) => {
-      if (!(o instanceof THREE.Mesh) || !o.visible) return;
+    // (not a weapon that's out of the hand)
+    this.root.traverseVisible((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
       const m = new THREE.Mesh(o.geometry, mat);
       m.matrixAutoUpdate = false;
       m.matrix.copy(o.matrixWorld);

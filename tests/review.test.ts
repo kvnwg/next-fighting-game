@@ -109,6 +109,50 @@ function setup(a: CharacterId, b: CharacterId) {
   return { game, arena, pa, pb, fa: arena.slots[0] as ServerFighter, fb: arena.slots[1] as ServerFighter, inboxA, step, now: () => t };
 }
 
+describe('new specials on the server', () => {
+  const hitsBy = (inbox: ServerMsg[], id: string) =>
+    inbox.filter((m) => m.t === 'fx').flatMap((m) => (m as Extract<ServerMsg, { t: 'fx' }>).e).filter((e) => e.a === id && e.k !== 'feint');
+
+  it('Light the Way hits on the way out and again on the way back, unless they get off its line', () => {
+    for (const leave of [false, true]) {
+      const { arena, fa, fb, inboxA, now, step } = setup('lancer', 'ronin');
+      fa.owner = null;
+      fa.x = 0;
+      fa.z = 0;
+      fa.yaw = 0;
+      fb.x = 0.3;
+      fb.z = 9;
+      fb.yaw = Math.PI;
+      fa.specialReadyAt = 0;
+      arena.applyInput(fa, 'special', now());
+      step(300);
+      if (leave) fb.x = 3.5;
+      step(fa.atkWindup + fa.attack!.active + 300);
+      const out = hitsBy(inboxA, fa.id).filter((e) => e.k === 'hit');
+      expect(out.length).toBe(leave ? 0 : 2);
+    }
+  });
+
+  it('Vault Strike carries the Lancer over the foe and takes them in the back, past their guard', () => {
+    const { arena, pb, fa, fb, inboxA, now, step } = setup('lancer', 'ronin');
+    fa.owner = null;
+    fa.x = 0;
+    fa.z = 0;
+    fa.yaw = 0;
+    fb.x = 0;
+    fb.z = 2.6;
+    fb.yaw = Math.PI;
+    // guarding toward where he started
+    arena.handleAction(pb, { t: 'act', a: 'blockDown', vt: now(), r: Math.PI });
+    step(300);
+    arena.applyInput(fa, 'ability', now());
+    step(fa.atkWindup + fa.attack!.active + 200);
+    expect(fa.z).toBeGreaterThan(fb.z + 0.5);
+    expect(fb.blockHeld).toBe(true);
+    expect(hitsBy(inboxA, fa.id)[0]?.k).toBe('hit');
+  });
+});
+
 describe('server authority', () => {
   it('ignores impossible heights (hovering out of reach)', () => {
     const { arena, pa, fa } = setup('ronin', 'ronin');
@@ -163,5 +207,29 @@ describe('server authority', () => {
     const outcomes = inboxA.filter((m) => m.t === 'fx').flatMap((m) => (m as Extract<ServerMsg, { t: 'fx' }>).e).filter((e) => e.a === fa.id).map((e) => e.k);
     expect(outcomes[0]).toBe('deflect');
     expect(outcomes.length).toBe(1);
+  });
+});
+
+describe('forfeiting', () => {
+  it('is refused while you are finishing your opponent, and still counts otherwise', () => {
+    const { arena, pa, pb, fa, fb, now } = setup('ronin', 'ronin');
+    // A is executing B: the round is A's, so A giving up now changes nothing
+    fa.force('execute', now(), 3000);
+    fb.force('executed', now(), 3000);
+    arena.forfeit(pa, true);
+    expect(arena.finished).toBe(false);
+    // B giving up mid-execution does end it, in A's favour
+    arena.forfeit(pb, true);
+    expect(arena.finished).toBe(true);
+    expect(arena.winner).toBe(0);
+  });
+
+  it('leaving still forfeits, even mid-execution', () => {
+    const { arena, pa, fa, fb, now } = setup('ronin', 'ronin');
+    fa.force('execute', now(), 3000);
+    fb.force('executed', now(), 3000);
+    arena.forfeit(pa);
+    expect(arena.finished).toBe(true);
+    expect(arena.winner).toBe(1);
   });
 });

@@ -83,7 +83,12 @@ export class Fighter {
   attack: AttackDef | null = null;
   attackKey: AttackKey | null = null;
   atkWindup = 0;
+  /** every windup stretched by this much (the tutorial's sensei swings slowly enough to read) */
+  windupScale = 1;
   comboIndex = -1;
+  /** the light chain left off at this hit to guard; a light from guard before `chainUntil` throws the next one */
+  chainFrom = -1;
+  chainUntil = -Infinity;
   /** Increments for every attack started; lets the server track which targets an attack already hit. */
   attackSerial = 0;
   /** the attackSerial of the last attack that made contact (hit, armour, block, guard break) */
@@ -118,6 +123,11 @@ export class Fighter {
   buffUntil = 0;
   riposteUntil = 0;
   invulnUntil = 0;
+  /**
+   * Where the current attack is aimed, for a zone attack (AttackShape 'zone'): set by the server as
+   * the attack starts, to the nearest foe in front within its range (see Instance.aimPoint).
+   */
+  aim: { x: number; z: number } | null = null;
 
   // kinematics (authoritative on the owning client for players, on the server for bots)
   x = 0;
@@ -171,6 +181,7 @@ export class Fighter {
     this.dodgeReady.fill(0);
     this.buffered = null;
     this.blockHeld = false;
+    this.chainUntil = -Infinity;
     this.attack = null;
     this.attackKey = null;
     this.state = 'idle';
@@ -282,6 +293,8 @@ export class Fighter {
         return 9;
       case 'attack': {
         const p = this.attackPhase(now);
+        // a thrown weapon holds its line until it's back in the hand
+        if (p === 'active' && this.attack?.thrown) return 0;
         return p === 'windup' ? 7 : p === 'active' ? 1.5 : 3;
       }
       default:
@@ -311,11 +324,17 @@ export class Fighter {
   /** Forward lunge speed (m/s) from the current attack, if any; negative for attacks that give ground. */
   lungeSpeed(now: number): number {
     if (this.state !== 'attack' || !this.attack?.lunge) return 0;
-    const start = this.atkWindup * 0.55;
-    const end = this.atkWindup + this.attack.active;
+    // a vault carries them through the air from early in the windup and lands as it ends
+    const start = this.atkWindup * (this.attack.vault ? 0.15 : 0.55);
+    const end = this.atkWindup + (this.attack.vault ? 0 : this.attack.active);
     const e = now - this.stateStart;
     if (e < start || e > end) return 0;
     return this.attack.lunge / ((end - start) / 1000);
+  }
+
+  /** In the air on a vault's lunge, passing over anyone in the way (no bodies to collide with). */
+  vaulting(now: number): boolean {
+    return this.state === 'attack' && !!this.attack?.vault && now - this.stateStart < this.atkWindup;
   }
 
   /** Dodge velocity (world space, m/s). Ease-out profile that integrates to dodgeDist. */
@@ -341,6 +360,12 @@ export class Fighter {
   }
 
   setState(s: FighterState, now: number, dur = 0, logTime = now): void {
+    // a light ending in guard (or idle, then guard) keeps its place in the chain a moment;
+    // anything else done or suffered loses it
+    if (this.state === 'attack' && this.isLightKey(this.attackKey) && (s === 'block' || s === 'idle')) {
+      this.chainFrom = this.comboIndex;
+      this.chainUntil = now + COMBAT.chainThroughGuard;
+    } else if (s !== 'block' && s !== 'idle') this.chainUntil = -Infinity;
     this.state = s;
     this.stateStart = now;
     this.stateDur = dur;
@@ -365,16 +390,19 @@ export class Fighter {
   startAttack(key: AttackKey, now: number): void {
     const atk = getAttack(this.char, key);
     if (!atk) return;
-    let scale = 1;
+    let scale = this.windupScale;
     const rip = this.mods.riposteWindupMult;
     if (rip && this.riposteUntil > now) {
-      scale = rip;
+      scale *= rip;
       this.riposteUntil = 0;
     }
     this.setState('attack', now);
     this.attack = atk;
     this.attackKey = key;
     this.atkWindup = Math.round(atk.windup * scale);
+    this.aim = null;
+    // a vault is untouchable in the air
+    if (atk.vault) this.invulnUntil = Math.max(this.invulnUntil, now + this.atkWindup * 0.9);
     this.comboIndex = this.isLightKey(key) ? Number(key.slice(1)) : -1;
     this.attackSerial++;
     this.emit({ type: 'attack', t: now, key });
@@ -441,7 +469,9 @@ export class Fighter {
       return true;
     }
     if (this.neutral) {
-      this.startAttack('l0', now);
+      // out of guard straight after a light, the chain carries on where it left off
+      const next = this.state === 'block' && now <= this.chainUntil ? this.chainFrom + 1 : 0;
+      this.startAttack(lightKey(next < this.char.lights.length ? next : 0), now);
       return true;
     }
     if (this.canCancel('light', now)) {

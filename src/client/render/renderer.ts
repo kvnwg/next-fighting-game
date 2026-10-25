@@ -168,6 +168,9 @@ uniform vec3 gain;
 uniform float vignette;
 uniform float flash;
 uniform vec3 flashColor;
+uniform float impact;
+uniform vec2 impactAt;
+uniform sampler2D tMask;
 uniform float time;
 uniform float aspect;
 uniform vec2 resolution;
@@ -222,7 +225,16 @@ void main() {
   c = clamp((c - 0.5) * contrast + 0.5, 0.0, 1.0);
   vec2 v = (vUv - 0.5) * vec2(aspect, 1.0);
   c *= 1.0 - smoothstep(0.35, 1.25, length(v)) * vignette;
-  c = mix(c, flashColor, flash);
+  if (impact > 0.0) {
+    // the impact frame: the blow drawn in ink. The fighters go solid black on a blank page, with
+    // speed lines bursting out from the hit (1); then black on blood red (2)
+    float ink = step(0.5, texture2D(tMask, uv).r);
+    vec2 d = (vUv - impactAt) * vec2(aspect, 1.0);
+    float wedge = fract(sin((floor(atan(d.y, d.x) * 34.0) + impact * 17.0) * 12.9898) * 43758.5453);
+    float lines = step(0.76, wedge) * smoothstep(0.1, 0.5, length(d));
+    vec3 page = impact < 1.5 ? vec3(0.96, 0.94, 0.9) : vec3(0.74, 0.03, 0.07);
+    c = mix(page, vec3(0.02), max(ink, lines));
+  } else c = mix(c, flashColor, flash);
   float n = fract(sin(dot(gl_FragCoord.xy + fract(time) * 71.0, vec2(12.9898, 78.233))) * 43758.5453);
   c += (n - 0.5) / 160.0;
   if (fade > 0.0) c = mix(c, fadeColor, step(bayer4(cell), fade));
@@ -249,6 +261,9 @@ export class GameRenderer {
   height = 1;
   flash = 0;
   flashColor = new THREE.Color('#ffffff');
+  /** the impact frame (0 off; 1 ink on white, 2 ink on red) and where on screen the blow landed (0..1) */
+  impact = 0;
+  impactAt = new THREE.Vector2(0.5, 0.5);
   /** pixelate the frame into blocks this many screen pixels across (1 = off) */
   pixelate = 1;
   /** 0..1: dissolve the frame to fadeColor through an ordered dither (1 = solid) */
@@ -261,6 +276,9 @@ export class GameRenderer {
   private rayA: THREE.WebGLRenderTarget;
   private rayB: THREE.WebGLRenderTarget;
   private black: THREE.DataTexture;
+  /** the fighters alone, drawn flat white: the impact frame's ink (rendered only while it shows) */
+  private impactMask: THREE.WebGLRenderTarget;
+  private maskMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
   private quad: THREE.Mesh;
   private quadScene = new THREE.Scene();
   private quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -308,6 +326,7 @@ export class GameRenderer {
     this.rayB = rt();
     this.black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
     this.black.needsUpdate = true;
+    this.impactMask = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true, generateMipmaps: false });
 
     const mat = (frag: string, uniforms: Record<string, THREE.IUniform>, defines: Record<string, string | number> = {}) =>
       new THREE.ShaderMaterial({ uniforms, defines, vertexShader: QUAD_VERT, fragmentShader: frag, depthTest: false, depthWrite: false, toneMapped: false });
@@ -331,6 +350,9 @@ export class GameRenderer {
       vignette: { value: 0.35 },
       flash: { value: 0 },
       flashColor: { value: this.flashColor },
+      impact: { value: 0 },
+      impactAt: { value: this.impactAt },
+      tMask: { value: this.black },
       time: { value: 0 },
       aspect: { value: 1 },
       resolution: { value: new THREE.Vector2(1, 1) },
@@ -427,6 +449,7 @@ export class GameRenderer {
     const lh = Math.max(1, Math.round(h * pr));
     this.hdr.setSize(lw, lh);
     this.ldr.setSize(lw, lh);
+    this.impactMask.setSize(lw, lh);
     let bw = lw;
     let bh = lh;
     for (let i = 0; i < this.down.length; i++) {
@@ -500,6 +523,8 @@ export class GameRenderer {
 
     // bloom: threshold into half res, down the chain, back up adding each level
     const cu = this.composite.uniforms;
+    if (this.impact > 0) this.renderImpactMask();
+    cu.tMask.value = this.impact > 0 ? this.impactMask.texture : this.black;
     if (this.down.length > 0 && g.bloom > 0) {
       const pu = this.prefilter.uniforms;
       pu.tInput.value = this.hdr.texture;
@@ -571,6 +596,7 @@ export class GameRenderer {
     (cu.gain.value as THREE.Color).copy(g.gain);
     cu.vignette.value = g.vignette;
     cu.flash.value = this.flash;
+    cu.impact.value = this.impact;
     // pixel blocks are given in CSS pixels, so they look the same at any resolution
     cu.pixel.value = this.pixelate > 1 ? Math.max(1, Math.round(this.pixelate * this.renderer.getPixelRatio())) : 1;
     cu.fade.value = this.fade;
@@ -582,6 +608,26 @@ export class GameRenderer {
       this.pass(this.composite, this.ldr);
       this.pass(this.fxaa, null);
     }
+  }
+
+  /** The impact frame's ink: the fighters alone (CHAR_LAYER), flat white on black, from this frame's camera. */
+  private renderImpactMask(): void {
+    const r = this.renderer;
+    const layers = this.camera.layers.mask;
+    const background = this.scene.background;
+    const shadows = r.shadowMap.autoUpdate;
+    this.camera.layers.set(CHAR_LAYER);
+    this.scene.overrideMaterial = this.maskMat;
+    this.scene.background = null;
+    r.shadowMap.autoUpdate = false;
+    r.setRenderTarget(this.impactMask);
+    r.setClearColor(0x000000, 1);
+    r.clear();
+    r.render(this.scene, this.camera);
+    this.camera.layers.mask = layers;
+    this.scene.overrideMaterial = null;
+    this.scene.background = background;
+    r.shadowMap.autoUpdate = shadows;
   }
 
   /** Project a world point to CSS pixels. Returns false when behind the camera. */

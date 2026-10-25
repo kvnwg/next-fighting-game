@@ -20,6 +20,7 @@ import type { WeaponKind } from '../../../shared/characters';
 import { X } from './author';
 import type { V3, WeaponXf } from './author';
 import { smooth } from './math';
+import { G2 } from './moves/greathammer-base';
 
 /** How a fighter walks: the defaults, and each fighter's character. */
 export interface GaitStyle {
@@ -80,6 +81,11 @@ export interface Carry {
   /** the trunk and head while walking (absolute; channels left out keep the guard's) */
   body: { lean?: number; twist?: number; hipTwist?: number; side?: number; headPitch?: number; crouch?: number };
   main: WeaponXf;
+  /**
+   * a waypoint the main weapon passes through between the guard and the carry, both ways, when
+   * the straight turn from one to the other would sweep it through the body
+   */
+  via?: WeaponXf;
   /** the off-hand item (dagger, fist, shield) */
   off?: WeaponXf;
   /** the free left hand */
@@ -143,10 +149,15 @@ export const CARRY: Partial<Record<WeaponKind, Carry>> = {
   // left arm hangs out from his bulk and swings big against the legs; head down, glowering. His
   // breastplate fills torso space out to about x ±0.32 and z 0.22 at the shoulders (in these
   // reference units), so the fist is held out in front of the right shoulder, past the plate's
-  // corner, with the elbow down at his side: any closer in and the forearm sinks into his chest
+  // corner, with the elbow down at his side: any closer in and the forearm sinks into his chest.
+  // From the guard (the head on the floor ahead of his left foot) the shortest turn to the carry
+  // swings the head through his chest and out of his left side, so he hoists it instead: up in
+  // front of him, the haft standing up from his fists before the right side of his chest, and
+  // over the shoulder from there
   greathammer: {
     body: { lean: 0.16, twist: 0, hipTwist: 0, side: 0, headPitch: 0.06 },
     main: X([-0.36, 0.4, 0.31], [-0.04, 0.5, -0.87], [0, 0.87, 0.5], 'x'),
+    via: X([-0.28, 0.42, 0.42], [-0.1, 0.8, 0.58], [0, -0.59, 0.81], 'x', G2),
     free: [0.44, 0.06, 0.05],
     swingR: 0.03,
     swingL: 0.36,

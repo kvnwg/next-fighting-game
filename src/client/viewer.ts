@@ -210,6 +210,10 @@ function showStrip(r: GameRenderer, params: URLSearchParams, n: number): void {
     m.root.rotation.y = top ? 0 : yaw + Math.atan2(-m.root.position.x, dist);
     scene.add(m.root);
     for (let j = 0; j < 30; j++) m.update(IDLE, 0.05);
+    // `move`: the walk really carries it forward (cloth reacts to the motion), and it is put back
+    // where the strip shows it at the end
+    const home = m.root.position.clone();
+    const ahead = new THREE.Vector3(Math.sin(m.root.rotation.y), 0, Math.cos(m.root.rotation.y));
     // play the timeline up to this moment in small steps (the animator is stateful); `step=16.7`
     // steps at the game's frame time, for effects that depend on it (smears)
     const stepMs = Number(params.get('step') ?? 10);
@@ -233,8 +237,10 @@ function showStrip(r: GameRenderer, params: URLSearchParams, n: number): void {
         input = { ...IDLE, elapsed: e };
       } else input = { ...IDLE, state: cur.key as FighterState, elapsed: e, dur: cur.dur, serial };
       if (walk) Object.assign(input, { speed: walk, moveForward: 1, moveSide: 0 });
+      if (walk && params.has('move')) m.root.position.addScaledVector(ahead, (walk * stepMs) / 1000);
       m.update(input, stepMs / 1000);
     }
+    m.root.position.copy(home);
   }
   label.textContent = `${id} ${chain.join(',')}  ` + times.map((x) => Math.round(x)).join(' / ') + ' ms';
   const loop = () => {
@@ -292,6 +298,8 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
     const T = COMBAT.executeTime;
     for (let t = 0; t <= at; t += 10) {
       ex[0].update({ ...IDLE, state: 'execute', elapsed: t, dur: T, serial: 1 }, 0.01);
+      // the victim takes each flourish strike as the game has them (see App.executionBlow)
+      if (ex[0].frame?.fx.some((c) => c.kind === 'blow')) ex[1].react('hit', { side: 0.7, heavy: true });
       ex[1].update({ ...IDLE, state: 'executed', elapsed: t, dur: T, serial: 1, execBy: ca }, 0.01);
     }
     G.uDark.value = 0.86 * Math.min(1, at / 350) * (1 - Math.max(0, Math.min(1, (at - (T - 450)) / 450)));
@@ -307,6 +315,14 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
       const rig = new CameraRig(r.camera);
       rig.playShots(executionShots(ex[0].root.position, ex[1].root.position, k));
       rig.update(at / 1000, ex[0].root.position, ex[1].root.position);
+    }
+    // `&impact=1` or `2`: the finishing blow's impact frame (ink on white, on red), on the victim's chest
+    const impact = Number(params.get('impact') ?? 0);
+    if (impact > 0) {
+      r.camera.updateMatrixWorld();
+      const p = ex[1].root.position.clone().add(new THREE.Vector3(0, 1.1 * k, 0)).project(r.camera);
+      r.impactAt.set(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5);
+      r.impact = impact;
     }
     const label = document.createElement('div');
     label.style.cssText = 'position:fixed;left:8px;top:8px;color:#fff;font:14px monospace;text-shadow:0 1px 0 #000';

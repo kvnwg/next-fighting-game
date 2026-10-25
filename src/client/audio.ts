@@ -7,7 +7,7 @@
 import { CHARACTERS, CharacterId, getAttack } from '../shared/characters';
 import type { CombatEvent } from '../shared/protocol';
 import { LEGACY_LEVEL, Sfx, legacy } from './audio/legacy';
-import { loadSamples } from './audio/samples';
+import { loadSamples, primeSample } from './audio/samples';
 import { LEVEL, WET } from './audio/levels';
 import { Mixer, Voice } from './audio/mixer';
 import { Bed, Music } from './audio/music';
@@ -44,6 +44,35 @@ const SPACES: Record<string, { room: string; floor: R.Floor }> = {
 const CONTACT = new Set<CombatEvent['k']>(['hit', 'armor', 'block', 'guardBreak', 'deflect', 'mikiri', 'counter', 'deathblow']);
 
 const MAX_VOICES = 48;
+
+/**
+ * Named sounds that play the user's recordings (layers together) rather than the synthesised ones,
+ * and how far into them to start. The synthesised sound plays until the recordings have decoded.
+ */
+const RECORDED: Partial<Record<Sfx, { layers: string[]; offset?: number }>> = {
+  click: { layers: ['ui_click'] },
+  matchFound: { layers: ['match_found'] },
+  // one cycle of the ticking loop per number (see countdown()), from where its zap has built
+  countdown: { layers: ['countdown'], offset: 0.2 },
+  fight: { layers: ['start_screech', 'start_confirm'] },
+  victory: { layers: ['victory_fanfare', 'victory_piano'] },
+  defeat: { layers: ['defeat'] },
+  // the title screen's (the entrances draw with the Ronin's unsheathe, see entrance())
+  draw: { layers: ['blade_draw'] },
+  shing: { layers: ['blade_shing'] },
+  // the title screen's (the entrances whoosh with each fighter's recorded swing)
+  whoosh: { layers: ['heavy_whoosh'] },
+  // the title screen's (silent in the Ronin's entrance)
+  tink: { layers: ['glass_tink'] },
+  // the title screen's (the Monk's entrance chimes with his glitter)
+  chime: { layers: ['riser_chime'] },
+  // the title screen's (the Ronin's entrance blows with his own howl and sweep)
+  wind: { layers: ['title_wind'] },
+  // the lobby's ring duel: the Warden's entrance gong (a barrel slam over a big kick)
+  gong: { layers: ['juggernaut_slam', 'juggernaut_thud'] },
+  // the title screen's: the first touch, and the seal stamped as the name is taken
+  taiko: { layers: ['title_taiko'] },
+};
 
 export interface Placed {
   /** distance volume from the caller (0..1) */
@@ -102,6 +131,8 @@ class AudioEngine {
       if (!Ctx) return;
       this.ctx = new Ctx();
       this.mix = new Mixer(this.ctx);
+      // the title's first-touch drum decodes ahead of everything else
+      void primeSample(this.ctx, 'title_taiko');
       void loadSamples(this.ctx);
       this.mix.setRoom(this.roomId);
       this.tunes = new Music(this.ctx);
@@ -126,6 +157,29 @@ class AudioEngine {
     // the fight's first song loads while the fighters are picked
     if (bed === 'select') this.tunes.cue('combat');
   }
+
+  /**
+   * The match intro's song: the fue running up its scale, with the strong wind gusting under the
+   * establishing shot and again as your own entrance begins (`at`: seconds into the intro, when
+   * joining part way). At the music's volume; stopped early with introSongStop().
+   */
+  introSong(at = 0, windAgain = 6.1): void {
+    this.introStop();
+    const level = settings.music;
+    if (level <= 0.01) return;
+    const song = this.emit((o) => void R.playLayers(o, ['intro_fue'], 1, undefined, at), { level, vol: 1, wet: 0.15, priority: 2 });
+    const wind = at < 2 ? this.emit((o) => void R.playLayers(o, ['title_wind'], 1, undefined, at), { level: LEVEL.legacy * 0.9, vol: 1, wet: 0.2, priority: 1 }) : null;
+    const again = at < windAgain ? this.emit((o) => void R.playLayers(o, ['title_wind'], 1), { level: LEVEL.legacy * 0.55, vol: 1, wet: 0.2, priority: 1, delay: windAgain - at }) : null;
+    this.intro = [song, wind, again].filter((v): v is Voice => !!v);
+  }
+
+  /** The intro song fading out (`fade` s), e.g. as the fight starts. */
+  introStop(fade = 0.6): void {
+    for (const v of this.intro) v.stop(fade);
+    this.intro = [];
+  }
+
+  private intro: Voice[] = [];
 
   /** Under an execution. */
   musicDuck(on: boolean): void {
@@ -194,7 +248,7 @@ class AudioEngine {
     let gain = e.level * Math.min(1, e.vol);
     if (e.key) {
       const now = ctx.currentTime;
-      const last = this.recent.get(e.key) ?? -1;
+      const last = this.recent.get(e.key) ?? -Infinity;
       const gap = e.gap ?? 0.03;
       if (now - last < gap) return null;
       if (now - last < gap * 2.5) gain *= 0.6;
@@ -213,37 +267,59 @@ class AudioEngine {
     return v;
   }
 
-  /** A named sound (menus, the countdown, entrances, the title screen). */
-  play(name: Sfx, volume = 1, pos?: V3): void {
-    const ui = name === 'click' || name === 'countdown' || name === 'matchFound' || name === 'fight' || name === 'victory' || name === 'defeat';
-    this.emit((o) => legacy(o, name), {
+  /**
+   * A recorded named sound wanted right as audio starts (the title's first touch): played the moment
+   * its recording has decoded, or (after `wait` s) whatever is ready, so it is never the stand-in.
+   */
+  playSoon(name: Sfx, volume = 1, wait = 0.4): void {
+    const ctx = this.ctx;
+    const rec = RECORDED[name];
+    if (!ctx || !rec) return this.play(name, volume);
+    const ready = Promise.all(rec.layers.map((l) => primeSample(ctx, l)));
+    const late = new Promise((res) => setTimeout(res, wait * 1000));
+    void Promise.race([ready, late]).then(() => this.play(name, volume));
+  }
+
+  /** A named sound (menus, the countdown, entrances, the title screen); `take` picks which of its recordings. */
+  play(name: Sfx, volume = 1, pos?: V3, take?: number): void {
+    const ui = name === 'click' || name === 'type' || name === 'countdown' || name === 'matchFound' || name === 'fight' || name === 'victory' || name === 'defeat';
+    const rec = RECORDED[name];
+    this.emit((o) => void ((rec && R.playLayers(o, rec.layers, 1, take, rec.offset)) || legacy(o, name)), {
       level: (ui ? LEVEL.ui : LEVEL.legacy) * (LEGACY_LEVEL[name] ?? 1),
       vol: volume,
       pos,
       wet: ui ? 0 : 0.25,
-      key: name === 'click' ? 'click' : undefined,
-      gap: 0.02,
+      // clicks and typing don't machine-gun, and a challenge's horn over one still sounding is dropped
+      key: name === 'click' || name === 'type' || name === 'matchFound' ? name : undefined,
+      gap: name === 'matchFound' ? 2 : 0.02,
       priority: ui ? 2 : 1,
     });
   }
 
+  /** The countdown at `n` (3, 2, 1): each number plays its own cycle of the recorded loop, in order. */
+  countdown(n: number, volume = 1): void {
+    this.play('countdown', volume, undefined, Math.max(0, 3 - n));
+  }
+
   /**
    * A ring-entrance cue. They were the old synthesised effects (chimes, bells, plucks); now each
-   * plays one of the recordings where one fits, the bell-like ones give way to the fighter's own
-   * shimmer or are dropped, and the drums, gongs, wind and rumbles stay as they were.
+   * plays one of the recordings where one fits, and the bell-like ones give way to the fighter's own
+   * shimmer or are dropped. The Ronin's wind and taiko, the Warden's rumble and gong, the Wraith's
+   * breathing, scrape and whoosh, the Assassin's grind, the Knight's shield clang, the Monk's breath and the stomps have
+   * (layered) recordings of their own.
    */
   entrance(char: CharacterId, name: Sfx, volume = 1): void {
-    const swing = char === 'reaper' ? 'reaper_swing' : char === 'duelist' ? 'duelist_swing' : char === 'lancer' ? 'lancer_swing' : 'ronin_swing';
+    const swing = char === 'duelist' ? 'duelist_swing' : char === 'lancer' ? 'lancer_swing' : char === 'juggernaut' ? 'juggernaut_swing' : 'ronin_swing';
     const shine = char === 'paladin' ? 'paladin_shimmer' : char === 'monk' ? 'monk_glitter' : null;
-    const INTRO: Partial<Record<Sfx, [string | null, number, number?]>> = {
+    const INTRO: Partial<Record<Sfx, [string | string[] | null, number, number?]>> = {
       whoosh: [swing, 1.2],
       shing: ['ronin_unsheathe', 1, 0.05],
       draw: ['ronin_unsheathe', 1, 0.05],
       clang: ['block', 1.2],
-      stomp: ['paladin_deflect', 1.1],
+      stomp: ['entrance_stomp', 1],
       thump: ['paladin_deflect', 0.9],
-      zap: ['lancer_spark', 1.6],
-      thunder: ['lancer_bolt', 2.2],
+      zap: ['lancer_spark', 2.6],
+      thunder: [['lancer_bolt', 'bolt_crackle'], 3.4],
       chime: [shine, 1.6],
       bell: [shine, 1.6],
       tink: [shine, 1.2],
@@ -251,11 +327,37 @@ class AudioEngine {
       fanfare: [shine, 1.8],
       whisper: [null, 0],
     };
+    if (char === 'ronin') {
+      INTRO.wind = [['wind_howl', 'ronin_wind_sweep'], 1];
+      INTRO.taiko = [['ronin_taiko', 'ronin_flute'], 1];
+    } else if (char === 'juggernaut') {
+      // arriving: his finishing blow's bass hit under a dark triumphant stinger, level with his gong
+      INTRO.rumble = [['juggernaut_finish_bass', 'juggernaut_triumph'], 1.2];
+      INTRO.gong = [['juggernaut_slam', 'juggernaut_thud'], 1];
+    } else if (char === 'reaper') {
+      INTRO.scrape = [['reaper_scrape', 'reaper_groan'], 1];
+      // a demon breathing as he comes out of the fog, and a void whoosh round his spin (started
+      // part way in, so it peaks with it)
+      INTRO.whisper = ['reaper_breath', 1];
+      INTRO.whoosh = ['reaper_void', 1.2, 0.3];
+    }
+    else if (char === 'shade') INTRO.scrape = ['shade_scrape', 1];
+    else if (char === 'paladin') INTRO.clang = [['paladin_shield_clang', 'paladin_shield_ring'], 1];
+    else if (char === 'monk') INTRO.breath = ['monk_breath', 1];
     const m = INTRO[name];
     if (!m) return this.play(name, volume);
     const [rec, gain, offset] = m;
     if (!rec) return;
-    this.emit((o) => void (R.playRecorded(o, rec, gain, 1, offset ?? 0) || legacy(o, name)), { level: LEVEL.legacy, vol: volume, wet: 0.25, gap: 0.02, priority: 1 });
+    const layers = typeof rec === 'string' ? [rec] : rec;
+    // the Lancer's thunder rolls on after the crack
+    const roll = name === 'thunder' && char === 'lancer';
+    this.emit(
+      (o) => {
+        if (!R.playLayers(o, layers, gain, undefined, offset ?? 0)) legacy(o, name);
+        if (roll) R.thunderRoll(o, volume);
+      },
+      { level: LEVEL.legacy * (roll ? 1.4 : 1), vol: volume, wet: 0.25, gap: 0.02, priority: 1, hero: roll },
+    );
   }
 
   // ---------------------------------------------------------------- fighters
@@ -286,7 +388,9 @@ class AudioEngine {
     const tags = e.tags ?? [];
     switch (e.k) {
       case 'deflect':
-        this.emit((out) => R.deflect(out, A, D, { heavy, anim, streak: o.streak }), { ...at, level: LEVEL.deflect, wet: WET.deflect, key: 'deflect', gap: 0.03, priority: 2 });
+        // yours rides over everything: the rest of the world dips for a beat so it rings out
+        this.emit((out) => R.deflect(out, A, D, { heavy, anim, streak: o.streak }), { ...at, level: LEVEL.deflect, wet: WET.deflect, key: 'deflect', gap: 0.03, priority: 3, hero: o.mine });
+        if (o.mine) this.mix?.duck(0.55, 0.004, 0.18, 0.7);
         break;
       case 'block':
         this.emit((out) => R.block(out, A, D, { heavy, anim }), { ...at, level: LEVEL.block, wet: WET.block, key: `blk:${e.d}`, gap: 0.04, priority: 2 });
@@ -331,13 +435,15 @@ class AudioEngine {
         this.emit((out) => R.counter(out, A, D, { anim }), { ...at, level: LEVEL.deflect, wet: WET.deflect, priority: 2 });
         break;
       case 'evade':
-        if (tags.includes('blink')) this.emit((out) => legacy(out, 'blink'), { ...at, level: LEVEL.dodge, wet: 0.3 });
+        // the blink: the recorded dash, over one of its two magic whooshes
+        if (tags.includes('blink')) this.emit((out) => void (R.playLayers(out, ['blink_dash', 'blink_magic']) || legacy(out, 'blink')), { ...at, level: LEVEL.dodge, wet: 0.3 });
         break;
       case 'feint':
         this.emit((out) => R.feint(out, D), { ...at, vol: o.vol * 0.8, level: LEVEL.swing, wet: WET.swing });
         break;
       case 'lava':
-        if (o.mine && e.d) this.emit((out) => legacy(out, 'burn'), { ...at, level: LEVEL.legacy, key: 'burn', gap: 0.15 });
+        // the recorded burn, from near its flare (it swells for a second first)
+        if (o.mine && e.d) this.emit((out) => void (R.playLayers(out, ['lava_burn'], 1, undefined, 0.8) || legacy(out, 'burn')), { ...at, level: LEVEL.legacy, key: 'burn', gap: 0.15 });
         break;
       case 'fall':
         this.emit((out) => R.fall(out), { ...at, level: LEVEL.cue, wet: 0.4 });
@@ -407,6 +513,95 @@ class AudioEngine {
     this.swings.delete(fighterId);
   }
 
+  /**
+   * An execution's finishing strike: a heavy swing started so it swells into the blow (the strike
+   * itself is over in a blink), the tip-speed whooshes held off meanwhile so it doesn't double. The
+   * Ronin's iai is the blade drawn.
+   */
+  executionStrike(fighterId: string, char: CharacterId, o: Placed): void {
+    const w = this.walkers.get(fighterId);
+    if (w && this.ctx) w.lastWhoosh = this.ctx.currentTime + 0.1;
+    this.emit((out) => R.swing(out, profile(char), { heavy: true, anim: char === 'ronin' ? 'draw' : undefined }), { level: LEVEL.swing, vol: o.vol, pos: o.pos, wet: WET.swing, hero: true, priority: 2 });
+  }
+
+  /** The finishing blow's recordings that swell into it, started EXEC_LEAD (1.7 s) before it lands. */
+  executionLead(char: CharacterId, o: Placed): void {
+    const p = profile(char);
+    if (R.hasLead(p)) this.emit((out) => R.execLead(out, p), { level: LEVEL.finish, vol: o.vol, pos: o.pos, wet: WET.finish, hero: true, priority: 3 });
+  }
+
+  /** A stray arc of the Lancer's lightning snapping off him (`k`: how big). */
+  zap(k: number, o: Placed): void {
+    this.emit((out) => R.zap(out, k), { level: LEVEL.cue * 1.35, vol: o.vol, pos: o.pos, wet: WET.swing, key: 'zap', gap: 0.15, priority: 0 });
+  }
+
+  // ---------------------------------------------------------------- feedback (yours alone)
+
+  /** Your blow landing: a tight punch under its sound (a deeper one under a heavy). */
+  hitConfirm(heavy: boolean): void {
+    this.emit((o) => R.hitConfirm(o, heavy), { level: LEVEL.hit * 0.6, vol: 1, wet: 0.05, key: 'confirm', gap: 0.04, priority: 2 });
+  }
+
+  /** A blow landing on you: a dull whump through the bone. */
+  hitTaken(heavy: boolean): void {
+    this.emit((o) => R.hitTaken(o, heavy), { level: LEVEL.hit * 0.55, vol: 1, wet: 0.03, key: 'taken', gap: 0.05, priority: 2 });
+  }
+
+  /** The blow that kills, when you dealt it or took it. */
+  killBlow(o: Placed): void {
+    this.emit((out) => R.killBlow(out), { level: LEVEL.finish * 0.8, vol: o.vol, pos: o.pos, wet: WET.big, hero: true, priority: 3 });
+  }
+
+  /** A heartbeat while you're nearly dead (`k` 0..1: louder and the closer to death). */
+  lowHealth(k: number): void {
+    this.emit((o) => R.lowHealth(o, k), { level: 0.9, vol: 1, wet: 0.02, key: 'heart', gap: 0.35, priority: 1 });
+  }
+
+  /** A round won or lost. */
+  roundEnd(won: boolean): void {
+    this.emit((o) => R.roundEnd(o, won), { level: LEVEL.ui, vol: 1, wet: 0.3, priority: 2 });
+  }
+
+  /** Your special or ability charged again. */
+  ready(kind: 'special' | 'ability'): void {
+    this.emit((o) => R.ready(o, kind), { level: LEVEL.ui * 0.8, vol: 1, wet: 0.2, key: `ready:${kind}`, gap: 1, priority: 1 });
+  }
+
+  /** Locking on to someone, or letting go. */
+  lockOn(on: boolean): void {
+    this.emit((o) => R.lockOn(o, on), { level: LEVEL.ui, vol: 1, wet: 0, key: 'lock', gap: 0.08, priority: 1 });
+  }
+
+  /** An entrance's name card slamming in. */
+  cardSlam(): void {
+    this.emit((o) => R.cardSlam(o), { level: LEVEL.legacy, vol: 1, wet: 0.25, hero: true, priority: 2 });
+  }
+
+  /** The pointer finding a button. */
+  hover(): void {
+    this.emit((o) => R.hover(o), { level: LEVEL.ui, vol: 1, wet: 0, key: 'hover', gap: 0.05, priority: 0 });
+  }
+
+  /** Coins coming in (`n`: how many). */
+  coins(n: number): void {
+    this.emit((o) => R.coins(o, n), { level: LEVEL.ui, vol: 1, wet: 0.15, key: 'coins', gap: 0.3, priority: 1 });
+  }
+
+  /** A fighter or arena unlocked. */
+  unlocked(): void {
+    this.emit((o) => R.unlock(o), { level: LEVEL.ui, vol: 1, wet: 0.3, key: 'unlock', gap: 0.3, priority: 2 });
+  }
+
+  /** A fighter picked on the roster: their signature sound. */
+  fighterPick(id: CharacterId): void {
+    this.emit((o) => R.fighterPick(o, id), { level: LEVEL.ui, vol: 1, wet: 0.15, key: 'pick', gap: 0.08, priority: 1 });
+  }
+
+  /** One of an execution's flourish strikes landing on the victim. */
+  executionBlow(a: CharacterId, d: CharacterId, o: Placed): void {
+    this.emit((out) => R.execBlow(out, profile(a), profile(d)), { level: LEVEL.hit, vol: o.vol, pos: o.pos, wet: WET.hit, hero: true, priority: 2 });
+  }
+
   dodge(char: CharacterId, kind: 'roll' | 'vanish' | 'leap', o: Placed): void {
     const p = profile(char);
     this.emit((out) => R.dodge(out, p, kind), { level: LEVEL.dodge, vol: o.vol, pos: o.pos, wet: WET.swing });
@@ -416,8 +611,9 @@ class AudioEngine {
     this.emit((out) => R.jump(out, profile(char)), { level: LEVEL.dodge, vol: o.vol, pos: o.pos, wet: WET.step });
   }
 
-  perilous(char: CharacterId, o: Placed): void {
-    this.emit((out) => R.perilous(out, profile(char)), { level: LEVEL.legacy, vol: o.vol, pos: o.pos, wet: 0.3, priority: 2 });
+  /** A perilous attack starting, `windup` seconds before it strikes. */
+  perilous(char: CharacterId, o: Placed, windup?: number): void {
+    this.emit((out) => R.perilous(out, profile(char), windup), { level: LEVEL.legacy, vol: o.vol, pos: o.pos, wet: 0.3, priority: 2 });
   }
 
   buff(o: Placed): void {
@@ -428,7 +624,11 @@ class AudioEngine {
   cue(kind: string, char: CharacterId, scale: number, o: Placed & { hero?: boolean }): void {
     if (!R.CUES.has(kind)) return;
     const p: Profile = profile(char);
-    this.emit((out) => void R.cue(out, p, kind, scale), { level: LEVEL.cue, vol: o.vol, pos: o.pos, wet: WET.big, hero: o.hero, key: `cue:${kind}:${char}`, gap: 0.08 });
+    // the Lancer's lightning: well over the mix, never ducked, and the world holds its breath under
+    // the thunder when it's near
+    const storm = char === 'lancer' && kind === 'bolt';
+    this.emit((out) => void R.cue(out, p, kind, scale), { level: LEVEL.cue * (storm ? 1.6 : 1), vol: o.vol, pos: o.pos, wet: WET.big, hero: o.hero || storm, key: `cue:${kind}:${char}`, gap: 0.08 });
+    if (storm && o.vol > 0.45) this.mix?.duck(0.5, 0.006, 0.3, 0.9);
   }
 }
 

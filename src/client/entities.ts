@@ -67,6 +67,8 @@ export class ClientFighter {
   sd = 0;
   a: string | undefined;
   aw = 0;
+  /** where the current zone attack is aimed: the ground it marks (FighterSnap.am) */
+  am: { x: number; z: number } | null = null;
   hp = 100;
   po = 0;
   b = false;
@@ -92,6 +94,8 @@ export class ClientFighter {
   lastPerilousSerial = -1;
   lastSwingSerial = -1;
   lastCueSerial = -1;
+  /** the last area attack whose blow has landed (its ground mark is done with) */
+  lastAreaSerial = -1;
   lastStateKey = '';
   private tmpBase = new THREE.Vector3();
   /** which way the weapon tip was last travelling fast (impact sparks fly that way) */
@@ -183,6 +187,7 @@ export class ClientFighter {
     this.sd = f.sd;
     this.a = f.a;
     this.aw = f.aw ?? 0;
+    this.am = f.am ? { x: f.am[0], z: f.am[1] } : null;
     this.hp = f.hp;
     this.po = f.po;
     this.b = f.b === 1;

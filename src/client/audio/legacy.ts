@@ -25,6 +25,7 @@ export type Sfx =
   | 'feint'
   | 'step'
   | 'click'
+  | 'type'
   | 'matchFound'
   | 'countdown'
   | 'fight'
@@ -75,6 +76,7 @@ const RONIN = PROFILES.ronin;
 /** Mix level for each named sound (applied on top of the caller's volume). */
 export const LEGACY_LEVEL: Partial<Record<Sfx, number>> = {
   click: 0.8,
+  type: 0.8,
   step: 0.6,
 };
 
@@ -120,6 +122,7 @@ export function legacy(o: Out, name: Sfx): void {
     case 'death':
       return R.death(o, RONIN);
     case 'click':
+    case 'type':
       tone(o, 'square', 900, 1200, 0.04, 0.06);
       noise(o, { type: 'highpass', f: 4000, dur: 0.008, gain: 0.05 });
       return;

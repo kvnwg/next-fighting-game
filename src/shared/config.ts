@@ -1,7 +1,7 @@
 /** Global tuning shared by the client and the server. Times are milliseconds, distances meters. */
 
 export const GAME_TITLE = 'DEFLECT';
-export const GAME_SUBTITLE = 'a samurai dueling arena';
+export const GAME_SUBTITLE = 'a dueling arena';
 
 // ---- Networking ---------------------------------------------------------------
 export const SERVER_TICK_HZ = 60;
@@ -63,6 +63,8 @@ export const COMBAT = {
   /** While staggered you may start guarding (and deflect) after this long. */
   staggerDefendAfter: 100,
   blockstunTime: 200,
+  /** A light, then guarding: a light thrown from guard within this long (ms) carries the chain on. */
+  chainThroughGuard: 900,
   /**
    * Recoil after being deflected scales with how heavy the deflected attack was:
    * base + posture * perPosture, clamped. Pokes give a small opening, heavies a big one.
@@ -162,7 +164,8 @@ export const MATCH = {
   /** Drawn rounds don't count; after this many rounds the leader (or healthier fighter) wins. */
   maxRounds: 5,
   /** a wide shot, both ring entrances (see client/entrances.ts) and the swing behind you */
-  introTime: 9800,
+  // the establishing shot, two entrances each holding under its name card, and the swing round
+  introTime: 12500,
   countdownTime: 3000,
   // health doubled for longer, posture-driven fights: rounds have the time for it
   roundTime: 120_000,

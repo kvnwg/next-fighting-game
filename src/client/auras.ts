@@ -16,17 +16,20 @@ export interface Aura {
   size: number;
   grow: number;
   life: number;
+  /** how see-through a puff starts (thinning out from there), so it never hides the fight */
+  alpha: number;
 }
 
 export const AURAS: Partial<Record<CharacterId, Aura>> = {
   ronin: {
     colors: ['#f4f4f6', '#e2e3e8', '#c9cbd2', '#aeb1ba'],
-    rate: 9,
-    moveRate: 14,
-    swingRate: 55,
+    rate: 26,
+    moveRate: 32,
+    swingRate: 120,
     rise: 0.55,
-    size: 0.05,
-    grow: 3.2,
-    life: 1.4,
+    size: 0.06,
+    grow: 3.6,
+    life: 1.7,
+    alpha: 0.3,
   },
 };

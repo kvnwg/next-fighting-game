@@ -67,6 +67,44 @@ describe('cancel table', () => {
     expect(f.attackKey).toBe('l1');
   });
 
+  it('a light, then guard, then a light throws the next light in the chain', () => {
+    const f = fighter();
+    f.input('light', 1000);
+    let t = recovery(f, 0.4);
+    f.update(t);
+    expect(f.input('blockDown', t)).toBe(true);
+    expect(f.state).toBe('block');
+    t += 150;
+    f.update(t);
+    expect(f.input('light', t)).toBe(true);
+    expect(f.attackKey).toBe('l1');
+    // and again from the second
+    t = recovery(f, 0.4);
+    f.update(t);
+    f.input('blockDown', t);
+    t += 100;
+    f.update(t);
+    f.input('light', t);
+    expect(f.attackKey).toBe('l2');
+  });
+
+  it('the chain waits in guard only a moment, and not at all without guarding', () => {
+    const f = fighter();
+    f.input('light', 1000);
+    const done = recovery(f, 1) + 20;
+    f.update(done);
+    expect(f.state).toBe('idle');
+    f.input('light', done + 50);
+    expect(f.attackKey).toBe('l0');
+    const late = recovery(f, 1) + 20;
+    f.update(late);
+    f.input('blockDown', late);
+    const t = late + 1500;
+    f.update(t);
+    f.input('light', t);
+    expect(f.attackKey).toBe('l0');
+  });
+
   it('an air light drops into the plunge only if it connected', () => {
     const f = fighter();
     f.input('jump', 1000);

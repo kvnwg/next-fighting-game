@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyHit, decideOutcome, defenseAt, executeBlow, pushDefense } from '../src/shared/combat';
+import { NO_DEFENSE, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pushDefense, thrownSpan } from '../src/shared/combat';
 import { CHARACTERS } from '../src/shared/characters';
 import { COMBAT, GRAVITY } from '../src/shared/config';
 import { DefenseEvent, Fighter } from '../src/shared/fighter';
@@ -251,6 +251,121 @@ describe('hit resolution', () => {
     const tHit = 1000 + A.atkWindup;
     D.input('blockDown', tHit + 50, { pressTime: tHit + 10 });
     expect(decideOutcome(A, D, A.attack!, tHit, defenseAt(logOf(D), tHit))).toBe('deflect');
+  });
+});
+
+describe("the Duelist's Prise de Fer", () => {
+  it('parries an attack into it and ripostes with a hit that lands on the instant', () => {
+    const { A, D } = duel('ronin', 'duelist');
+    D.input('ability', 900);
+    expect(D.state).toBe('stance');
+    A.input('light', 1000);
+    const tHit = 1000 + A.atkWindup;
+    const out = decideOutcome(A, D, A.attack!, tHit, defenseAt([], tHit));
+    expect(out).toBe('counter');
+    const hp = A.hp;
+    const r = applyHit(A, D, A.attack!, A.attackKey!, out, tHit, { distance: 2 });
+    // the riposte is no swing the attacker could guard: its damage is dealt with the parry
+    expect(r.damage).toBe(Math.round(CHARACTERS.duelist.ability.kind === 'counter' ? CHARACTERS.duelist.ability.attack.damage * COMBAT.hitDamageMult : 0));
+    expect(A.hp).toBe(hp - r.damage);
+    expect(A.state === 'stagger' || A.state === 'broken').toBe(true);
+    expect(D.attackKey).toBe('ct');
+  });
+
+  it('cannot take a grab', () => {
+    const { A, D } = duel('monk', 'duelist');
+    D.input('ability', 900);
+    A.input('special', 1000);
+    const tHit = 1000 + A.atkWindup;
+    expect(decideOutcome(A, D, A.attack!, tHit, defenseAt([], tHit))).not.toBe('counter');
+  });
+});
+
+describe('special shapes', () => {
+  const special = (id: string) => CHARACTERS[id as 'juggernaut'].special;
+
+  it("the Warden's Fault Line runs out along a straight line, and only along it", () => {
+    const { A, D } = duel('juggernaut', 'ronin');
+    const atk = special('juggernaut');
+    D.z = 8.5;
+    expect(inAttackCone(A, D, atk, 0.45)).not.toBeNull();
+    D.x = 2.2;
+    D.z = 5;
+    expect(inAttackCone(A, D, atk, 0.45)).toBeNull();
+    D.x = 0;
+    D.z = -2;
+    expect(inAttackCone(A, D, atk, 0.45)).toBeNull();
+  });
+
+  it('the fissure is jumped, and no guard holds it', () => {
+    const { A, D } = duel('juggernaut', 'ronin');
+    const atk = special('juggernaut');
+    expect(decideOutcome(A, D, atk, 1000, { ...NO_DEFENSE, airborne: true })).toBe('evade');
+    expect(decideOutcome(A, D, atk, 1000, { ...NO_DEFENSE, guarding: true, parrying: true })).toBe('hit');
+  });
+
+  it("the Wraith's Requiem rings him: close in or far out is safe, the band between is not", () => {
+    const { A, D } = duel('reaper', 'ronin');
+    const atk = special('reaper');
+    for (const [x, z, hit] of [[0, 4, true], [-3.5, -2, true], [0, 0.9, false], [0, 7.2, false]] as const) {
+      D.x = x;
+      D.z = z;
+      expect(inAttackCone(A, D, atk, 0.45) !== null).toBe(hit);
+    }
+  });
+
+  it('an area attack cannot be jumped, guarded or countered, only dodged through', () => {
+    const { A, D } = duel('reaper', 'monk');
+    const atk = special('reaper');
+    expect(decideOutcome(A, D, atk, 1000, { ...NO_DEFENSE, airborne: true })).toBe('hit');
+    expect(decideOutcome(A, D, atk, 1000, { ...NO_DEFENSE, guarding: true, parrying: true })).toBe('hit');
+    expect(decideOutcome(A, D, atk, 1000, { ...NO_DEFENSE, iframes: true })).toBe('evade');
+    D.input('ability', 900);
+    expect(D.state).toBe('stance');
+    expect(decideOutcome(A, D, atk, 1000, NO_DEFENSE)).not.toBe('counter');
+  });
+
+  it("the Lancer's thrown spear reaches only as far as it has flown, out and back", () => {
+    const { A, D } = duel('lancer', 'ronin');
+    const atk = special('lancer');
+    expect(atk.thrown).toBe(true);
+    D.z = 10;
+    // just thrown, nowhere near them yet; then at the end of its line, past them
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.05))).toBeNull();
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.45))).not.toBeNull();
+    // on the way back: not back to them yet, then past them
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.55))).toBeNull();
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.8))).not.toBeNull();
+    // and only along its line
+    D.x = 1.5;
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.45))).toBeNull();
+  });
+
+  it('the thrown spear holds its line while it is out', () => {
+    const A = new Fighter('a', 'lancer');
+    A.input('special', 1000);
+    expect(A.turnRate(1000 + A.atkWindup / 2)).toBeGreaterThan(0);
+    expect(A.turnRate(1000 + A.atkWindup + A.attack!.active / 2)).toBe(0);
+  });
+
+  it("the Lancer's Vault Strike carries him 5m through the air, untouchable, and hits all round on landing", () => {
+    const A = new Fighter('a', 'lancer');
+    A.input('ability', 1000);
+    expect(A.attackKey).toBe('ab');
+    let travelled = 0;
+    for (let t = 1000; t < 1000 + A.atkWindup + A.attack!.active; t += 5) {
+      if (t < 1000 + A.atkWindup) expect(A.vaulting(t)).toBe(true);
+      travelled += A.lungeSpeed(t) * 0.005;
+    }
+    expect(travelled).toBeCloseTo(5, 0);
+    expect(A.vaulting(1000 + A.atkWindup + 1)).toBe(false);
+    expect(A.invulnUntil).toBeGreaterThan(1000 + A.atkWindup * 0.8);
+    // landed behind someone who never turned: their guard faces the other way
+    const D = new Fighter('d', 'ronin');
+    D.z = -1.5;
+    D.yaw = Math.PI;
+    expect(inAttackCone(A, D, A.attack!, 0.45)).not.toBeNull();
+    expect(decideOutcome(A, D, A.attack!, 1600, { ...NO_DEFENSE, guarding: true, parrying: true })).toBe('hit');
   });
 });
 

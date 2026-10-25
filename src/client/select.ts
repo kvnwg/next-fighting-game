@@ -2,10 +2,12 @@
  * The map and fighter select before a match, laid out like the reference: a dark band across the
  * screen with the title and countdown over a grid of arenas (and Random), and the fighters in one
  * row of square cards along the bottom. Each side's picks carry their portrait badge, green for
- * you and red for the opponent; a pick both sides share turns gold.
+ * you and red for the opponent; a pick both sides share turns gold. Arenas neither of you owns, and
+ * fighters you don't own, are shown locked; an arena only your opponent owns is open to you for
+ * this match, and says so.
  */
 import { CHARACTERS, CHARACTER_IDS, CharacterId } from '../shared/characters';
-import { MAPS } from '../shared/maps';
+import { ARENA_MAPS, MAPS } from '../shared/maps';
 import type { SelectView } from '../shared/protocol';
 import { icon } from './pixelicons';
 import bamboo from './assets/maps/bamboo.jpg';
@@ -16,7 +18,10 @@ import sakura from './assets/maps/sakura.jpg';
 import summit from './assets/maps/summit.jpg';
 
 /** Arena thumbnails, rendered from each map (see the viewer's map mode). */
-const THUMBS: Record<string, string> = { sakura, bamboo, summit, forge, bridge, ruins };
+export const THUMBS: Record<string, string> = { sakura, bamboo, summit, forge, bridge, ruins };
+
+/** What you own (null: not known yet, treat everything as open). */
+export type Owned = () => { chars: readonly CharacterId[]; maps: readonly string[] } | null;
 
 export interface SelectVote {
   map?: string;
@@ -35,6 +40,7 @@ export class SelectScreen {
     private readonly parent: HTMLElement,
     private readonly portrait: (id: CharacterId) => string,
     private readonly onVote: (v: SelectVote) => void,
+    private readonly owned: Owned = () => null,
   ) {}
 
   get open(): boolean {
@@ -68,15 +74,23 @@ export class SelectScreen {
   }
 
   private build(v: SelectView): void {
+    const mine = this.owned();
+    const lock = `<span class="sel-lock">${icon('lock')}</span>`;
     const mapTile = (id: string) => {
       const m = MAPS[id];
       const art = THUMBS[id] ? `<img class="sel-art" src="${THUMBS[id]}" alt="" draggable="false">` : '';
-      return `<button class="sel-tile" data-map="${id}">${art}<span class="sel-jp">${esc(m?.jp ?? '')}</span><span class="sel-label">${esc(m?.name ?? id)}</span><span class="sel-badges"></span></button>`;
+      const open = v.maps.includes(id);
+      // open to you this match only because your opponent owns it
+      const theirs = open && !!mine && !mine.maps.includes(id);
+      const cls = open ? (theirs ? ' theirs-map' : '') : ' locked';
+      const tag = !open ? lock : theirs ? '<span class="sel-tag">Opponent’s</span>' : '';
+      return `<button class="sel-tile${cls}" data-map="${id}"${open ? '' : ' disabled'}>${art}<span class="sel-jp">${esc(m?.jp ?? '')}</span><span class="sel-label">${esc(m?.name ?? id)}</span>${tag}<span class="sel-badges"></span></button>`;
     };
     const random = `<button class="sel-tile random" data-map="random">${icon('dice', 'sel-random')}<span class="sel-label">Random</span><span class="sel-badges"></span></button>`;
     const charCard = (id: CharacterId) => {
       const c = CHARACTERS[id];
-      return `<button class="sel-card" data-char="${id}" style="--c2:${c.palette.accent}" title="${esc(`${c.name} · ${c.weapon}`)}"><img class="sel-art" src="${this.portrait(id)}" alt="" draggable="false"><span class="sel-jp">${c.jp}</span><span class="sel-label">${esc(c.name)}</span><span class="sel-badges"></span></button>`;
+      const open = !mine || mine.chars.includes(id);
+      return `<button class="sel-card${open ? '' : ' locked'}" data-char="${id}" style="--c2:${c.palette.accent}" title="${esc(open ? `${c.name} · ${c.weapon}` : `${c.name}: locked`)}"><img class="sel-art" src="${this.portrait(id)}" alt="" draggable="false"><span class="sel-jp">${c.jp}</span><span class="sel-label">${esc(c.name)}</span>${open ? '' : lock}<span class="sel-badges"></span></button>`;
     };
     const el = document.createElement('div');
     el.className = 'select-screen';
@@ -84,11 +98,11 @@ export class SelectScreen {
       <div class="sel-band">
         <h2 class="sel-title">${icon('swords')}<span class="jp">選択</span>Select Map &amp; Fighter</h2>
         <div class="sel-count"></div>
-        <div class="sel-maps">${random}${v.maps.map(mapTile).join('')}</div>
+        <div class="sel-maps">${random}${ARENA_MAPS.map((m) => mapTile(m.id)).join('')}</div>
       </div>
       <div class="sel-chars">${CHARACTER_IDS.map(charCard).join('')}</div>`;
-    for (const t of el.querySelectorAll<HTMLElement>('[data-map]')) t.addEventListener('click', () => this.onVote({ map: t.dataset.map }));
-    for (const t of el.querySelectorAll<HTMLElement>('[data-char]')) t.addEventListener('click', () => this.onVote({ char: t.dataset.char as CharacterId }));
+    for (const t of el.querySelectorAll<HTMLElement>('[data-map]:not(.locked)')) t.addEventListener('click', () => this.onVote({ map: t.dataset.map }));
+    for (const t of el.querySelectorAll<HTMLElement>('[data-char]:not(.locked)')) t.addEventListener('click', () => this.onVote({ char: t.dataset.char as CharacterId }));
     this.parent.appendChild(el);
     this.parent.classList.add('selecting');
     this.el = el;

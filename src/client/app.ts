@@ -1,14 +1,16 @@
 /** The client application: wires networking, input, simulation, rendering and UI together. */
 import * as THREE from 'three';
-import { AttackKey, CHARACTERS, CharacterId, executeSpacing, getAttack, isHeavyKey } from '../shared/characters';
+import { AttackDef, AttackKey, AttackShape, CHARACTERS, CharacterId, executeSpacing, getAttack, isHeavyKey } from '../shared/characters';
 import { COMBAT, MATCH, PLAYER_RADIUS } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, hazardAt, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
+import { thrownOut, zoneAim } from '../shared/combat';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RingView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
 import { audio } from './audio';
-import { CameraRig, executionShots } from './camera';
-import { CARD_AT, ENTRANCES, entranceStarts, introSequence } from './entrances';
+import { EXEC_LEAD } from './audio/recipes';
+import { CAMERA_BULK, CameraRig, executionShots } from './camera';
+import { CARD_AT, ENTRANCES, ENTRANCE_HOLD, entranceStarts, introSequence } from './entrances';
 import { ENTRANCE_MS } from './render/anim/animator';
 import { buildBlockers, constrainCamera } from './cameraClip';
 import { ClientFighter } from './entities';
@@ -24,12 +26,15 @@ import { portraitURL } from './render/portrait';
 import { SelectScreen } from './select';
 import { MapView } from './render/world';
 import { RingWalls } from './render/rings';
+import { Telegraph } from './render/telegraph';
 import { TITLE_MAP } from './render/maps/title';
 import { TitleScene } from './title/scene';
 import { TitleScreen } from './title/screen';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
-import { RotateGuard } from './rotate';
+import { Sideways } from './rotate';
+import { watchAd } from './adbreak';
+import { TutorialOverlay } from './tutorial';
 import { TouchControls, isTouchDevice } from './touch';
 import { CardData, Preview, UI, esc } from './ui';
 
@@ -37,6 +42,38 @@ type MatchMsg = Extract<ServerMsg, { t: 'match' }>;
 
 /** kanji numerals for countdowns and round titles */
 const KANJI_NUM = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+/** each step of an execution's impact frame (ink on white, then on red), in ms */
+const IMPACT_MS = 70;
+/** how long before the finishing blow its swing starts, so the recorded whoosh peaks on the hit (ms) */
+const EXEC_WHOOSH_LEAD = 160;
+/** and the finishing blow's recorded lead-ins (audio's EXEC_LEAD) */
+const EXEC_SOUND_LEAD = EXEC_LEAD * 1000;
+/** the colour an area attack's ground flashes as it lands: a fissure's embers, lightning, soulfire */
+const AREA_HIT: Record<AttackShape['kind'], string> = { line: '#ff8a3a', zone: '#ffe27a', ring: '#3cff8a' };
+/** the Lancer's golden lightning */
+const BOLT = '#ffe27a';
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+
+/** A thrown spear in the air (see App.spearFlight). */
+interface SpearFlight {
+  /** the copy of the spear that flies */
+  mesh: THREE.Object3D;
+  serial: number;
+  /** where it left the hand, its line (a unit vector), and how far down it the grip goes */
+  from: THREE.Vector3;
+  dir: THREE.Vector3;
+  reach: number;
+  /** grip to tip (m) */
+  len: number;
+  /** 0..1 through the flight: out to the end of the line by 0.5, then back */
+  u: number;
+  /** the flight's length (ms) */
+  ms: number;
+  turned: boolean;
+  spin: number;
+  spark: number;
+  lastTip: THREE.Vector3 | null;
+}
 
 export function startApp(root: HTMLElement, offline = false): void {
   new App(root, offline);
@@ -53,10 +90,17 @@ class App {
   private ui: UI;
   private select: SelectScreen;
   private touch: TouchControls | null = null;
-  private rotate: RotateGuard;
   private mapView: MapView | null = null;
   private map: MapDef = LOBBY_MAP;
   private fighters = new Map<string, ClientFighter>();
+  /** the button the pointer is over (for the hover tick) */
+  private hoverEl: HTMLElement | null = null;
+  /** the ground marked under each fighter's perilous area attack while it winds up, by fighter id */
+  private marks = new Map<string, { tg: Telegraph; serial: number; aim: { x: number; z: number } | null }>();
+  /** marks whose blow has landed or was stopped, fading out */
+  private fadingMarks: Telegraph[] = [];
+  /** thrown spears in the air, by thrower id */
+  private spears = new Map<string, SpearFlight>();
   private local: LocalController | null = null;
   private myId = '';
   private profile: ProfileView | null = null;
@@ -66,12 +110,14 @@ class App {
   /** seconds left of the red-and-black beat after a posture break */
   private drama = 0;
   /** the execution cinematic running (only for one you're in) */
-  private exec: { a: ClientFighter; d: ClientFighter; t: number; start: number; hitDone: boolean } | null = null;
+  private exec: { a: ClientFighter; d: ClientFighter; t: number; start: number; hitDone: boolean; whooshed: boolean; led: boolean } | null = null;
   /** the map's own fighter rim strength, restored after an execution */
   private rimBase = 0.6;
   /** back-to-back deflects build up the spectacle */
   private deflectStreak = 0;
   private lastDeflectAt = -Infinity;
+  /** when the last impact frame began (performance.now) */
+  private impactStart = -Infinity;
   /** the ring entrances playing in the match intro: whose, when, and which cues have fired */
   private intro: { start: number; turns: { f: ClientFighter; r: RosterEntry; mine: boolean; at: number }[]; fired: Set<string> } | null = null;
   private queue: { since: number; count: number } | null = null;
@@ -85,11 +131,17 @@ class App {
   private tmp = new THREE.Vector3();
   private tmp2 = new THREE.Vector3();
   private tmp3 = new THREE.Vector3();
+  private tmpQ = new THREE.Quaternion();
   /** the title screen: the Ronin on the cliff (3D) and the menus over it, until the game starts */
   private titleScene: TitleScene | null = null;
   private titleScreen: TitleScreen | null = null;
   /** which lobby we're in and how full it is */
   private lobbyInfo: { n: number; count: number; cap: number } | null = null;
+  /** the tutorial is still to come for this player (it starts once the lobby is up) */
+  private tutorialDue = false;
+  /** the tutorial's lessons drawn over the fight, while it runs */
+  private tutorial: TutorialOverlay | null = null;
+  private tutorialStep: string | null = null;
   /** the lobby's dueling rings, and the walls of light around the sealed ones */
   private rings: RingView[] = [];
   private ringWalls: RingWalls | null = null;
@@ -115,7 +167,11 @@ class App {
       onRanked: () => this.net.send({ t: 'queue', mode: 'ranked' }),
       onPractice: (diff) => this.net.send({ t: 'queue', mode: 'practice', diff }),
       onCancelQueue: () => this.net.send({ t: 'unqueue' }),
-      onSelectChar: (id) => this.selectChar(id),
+      onSelectChar: (id) => {
+        this.selectChar(id);
+        audio.play('taiko', 0.8);
+      },
+      onRosterPick: (id) => audio.fighterPick(id),
       onLeaderboard: () => this.net.send({ t: 'leaderboard' }),
       onChat: (text) => this.net.send({ t: 'chat', text }),
       onChallengeReply: (from, accept) => this.net.send({ t: 'challengeReply', from, accept }),
@@ -144,16 +200,34 @@ class App {
       onPrompt: () => this.sendChallenge(),
       createPreview: (el) => createPreview(el),
       portrait: (id) => portraitURL(this.renderer.renderer, id),
+      onUnlock: (kind, id, free) => this.net.send({ t: 'unlock', kind, id, ...(free ? { free: true } : {}) }),
+      onWatchAd: async (kind) => {
+        this.input.exitLock();
+        const ok = await watchAd();
+        // the server pays out (it checks the offer is still good)
+        if (ok) this.net.send({ t: 'ad', kind });
+        return ok;
+      },
+      onTutorial: () => this.net.send({ t: 'tutorial', a: 'start' }),
     }, offline, touch);
+    // a soft tick as a real pointer finds a button
+    root.addEventListener('pointerover', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const b = (e.target as HTMLElement).closest<HTMLElement>('button, [role="tab"], .fs-tile, .sel-tile, .sel-card');
+      if (b === this.hoverEl) return;
+      this.hoverEl = b;
+      if (b && !(b as HTMLButtonElement).disabled) audio.hover();
+    });
     this.select = new SelectScreen(root, (id) => portraitURL(this.renderer.renderer, id), (v) => {
       this.net.send({ t: 'vote', ...v });
       audio.play('click', 0.5);
+      if (v.char) audio.fighterPick(v.char);
       if (v.char) {
         settings.char = v.char;
         saveSettings();
         this.ui.setLobbyChar(v.char);
       }
-    });
+    }, () => this.profile);
     if (touch) {
       this.touch = new TouchControls(this.ui.hud, this.input, {
         onMenu: () => this.ui.setTouchMenu(),
@@ -163,12 +237,11 @@ class App {
         },
       });
     }
-    // any touchscreen counts here: held upright, it's a phone or a tablet
-    this.rotate = new RotateGuard(touch || navigator.maxTouchPoints > 0, (blocked) => {
-      if (!blocked) return;
+    // any touchscreen counts here: held upright, it's a phone or a tablet, and the game turns itself
+    new Sideways(touch || navigator.maxTouchPoints > 0, () => {
       this.input.releaseAll();
-      this.input.exitLock();
       this.touch?.cancel();
+      this.renderer.resize();
     });
     this.openTitle();
     this.titleScreen!.boot();
@@ -273,6 +346,7 @@ class App {
       this.ui.setCharsLocked(false);
       this.match = null;
       audio.music(null, 1);
+      audio.introStop();
       this.cam.stopShots();
       this.endEntrances();
       this.select.hide();
@@ -292,7 +366,14 @@ class App {
     n.on('welcome', (m) => {
       this.myId = m.id;
       settings.token = m.token;
+      // you play a fighter you own: a locked one (or a fresh profile) means the Ronin
+      if (!m.profile.chars.includes(settings.char)) {
+        settings.char = 'ronin';
+        this.ui.setLobbyChar('ronin');
+      }
       saveSettings();
+      // a first visit starts with the tutorial, once the lobby is up
+      this.tutorialDue = !m.profile.tutorial;
       this.profile = m.profile;
       this.online = m.online;
       this.ui.setProfile(m.profile);
@@ -333,16 +414,36 @@ class App {
       this.ui.toast(m.reason, 'warn');
     });
     n.on('result', (m) => {
-      this.ui.showResult(m, this.profile);
+      // coins on the card, and an offer to double them: free the cursor to take it
+      if (m.coins) this.input.exitLock();
+      // the usual break for an ad comes once the card is gone, unless one was just watched from it
+      this.ui.showResult(m, this.profile, (watched) => {
+        if (!watched) void platform.requestMidgameAd(() => audio.setMuted('ad', true)).then(() => audio.setMuted('ad', false));
+      });
+      audio.introStop();
       audio.play(m.won ? 'victory' : 'defeat');
       audio.music(null, 3);
       platform.gameplayStop();
       // a ranked promotion is the rare moment CrazyGames' celebration is for
       if (m.before && m.after && rankOf(m.after.mmr, m.after.placements).label !== rankOf(m.before.mmr, m.before.placements).label && (m.delta ?? 0) > 0) platform.happytime();
-      // after a match is the natural break for an ad: never mid-fight
-      setTimeout(() => {
-        void platform.requestMidgameAd(() => audio.setMuted('ad', true)).then(() => audio.setMuted('ad', false));
-      }, 1200);
+    });
+    n.on('tutorial', (m) => {
+      if (!this.tutorial) this.tutorial = new TutorialOverlay(this.ui.hud, this.ui.touch, () => this.net.send({ t: 'tutorial', a: 'skip' }));
+      const was = this.tutorialStep;
+      this.tutorialStep = m.step;
+      this.tutorial.show(m.step, m.n, m.need, m.note);
+      if (m.step !== was) audio.cardSlam();
+      else if (m.note === 'good') audio.ready('special');
+    });
+    n.on('coins', (m) => {
+      this.ui.coinsGained(m.gained);
+      audio.coins(m.gained);
+      if (m.why === 'tutorial') this.ui.toast(`Lesson learned: +${m.gained} coins`, 'good');
+    });
+    n.on('unlocked', (m) => {
+      audio.unlocked();
+      const name = m.kind === 'char' ? (CHARACTERS[m.id as CharacterId]?.name ?? m.id) : (MAPS[m.id]?.name ?? m.id);
+      this.ui.toast(m.kind === 'char' ? `${name} unlocked${m.free ? ' (your free pick)' : ''}!` : `${name} unlocked: pick it before a match`, 'good');
     });
     n.on('profile', (m) => {
       this.profile = m.profile;
@@ -395,6 +496,7 @@ class App {
   }
 
   private enterInstance(m: Extract<ServerMsg, { t: 'enter' }>): void {
+    audio.introStop();
     this.cam.stopShots();
     this.endEntrances();
     this.select.hide();
@@ -420,6 +522,13 @@ class App {
     this.ui.setLobbyMode(m.kind === 'lobby');
     this.ui.setDeath(null);
     if (m.kind === 'lobby') {
+      this.tutorial?.destroy();
+      this.tutorial = null;
+      this.tutorialStep = null;
+      if (this.tutorialDue) {
+        this.tutorialDue = false;
+        this.net.send({ t: 'tutorial', a: 'start' });
+      }
       this.match = null;
       audio.music('lobby');
       this.ui.setMatch(null, 0);
@@ -553,7 +662,7 @@ class App {
       if (secs !== this.ringCount && secs > 0 && secs <= 3) {
         this.ringCount = secs;
         this.ui.banner(String(secs), 'Ring duel', 950, 'count', KANJI_NUM[secs]);
-        audio.play('countdown');
+        audio.countdown(secs);
       }
     }
   }
@@ -573,8 +682,13 @@ class App {
     const changed = !prev || prev.phase !== m.phase || prev.round !== m.round;
     if (!changed) return;
     if (this.local) this.local.frozen = m.phase === 'intro' || m.phase === 'countdown';
-    // the fight's music starts as they walk into the ring and runs to the result
-    if (m.phase === 'intro' || m.phase === 'countdown' || m.phase === 'fight') audio.music('combat');
+    // the intro has its own song (see startEntrances); the fight's music comes in on "Fight!" and
+    // runs to the result
+    if (m.phase === 'intro') audio.music(null, 1.5);
+    else if (m.phase === 'fight') {
+      audio.introStop(1.2);
+      audio.music('combat');
+    }
     const oppId = m.players[m.you === 0 ? 1 : 0].id;
     switch (m.phase) {
       case 'intro': {
@@ -595,12 +709,15 @@ class App {
         // a slow device can still be mid-intro: the fight always starts on the follow camera
         this.cam.stopShots();
         this.endEntrances();
-        this.ui.banner('Fight', '', 900, 'fight', '始め');
-        audio.play('fight');
+        if (m.mode !== 'tutorial') {
+          this.ui.banner('Fight', '', 900, 'fight', '始め');
+          audio.play('fight');
+        }
         this.lock = this.fighters.get(oppId) ?? null;
         break;
       case 'roundEnd': {
         const w = m.roundWinner;
+        if (w !== -1) audio.roundEnd(w === m.you);
         this.ui.banner(w === -1 ? 'Draw' : w === m.you ? 'Round won' : 'Round lost', `${m.scores[m.you]} - ${m.scores[m.you === 0 ? 1 : 0]}`, 2500, w === -1 ? 'draw' : w === m.you ? 'win' : 'lose', w === -1 ? '引分' : w === m.you ? '勝' : '敗');
         break;
       }
@@ -628,8 +745,10 @@ class App {
     };
     const subject = (f: ClientFighter) => ({ pos: f.pos, yaw: f.yaw, scale: f.model.scale, char: f.roster.char });
     const end = this.cam.restPose(me.pos, op.pos);
-    this.cam.playShots(introSequence(subject(me), subject(op), end), Math.max(0, this.net.serverNow() - start) / 1000);
+    const into = Math.max(0, this.net.serverNow() - start) / 1000;
+    this.cam.playShots(introSequence(subject(me), subject(op), end), into);
     this.ui.setCinematic(true);
+    audio.introSong(into, (at.me - 200) / 1000);
   }
 
   private endEntrances(): void {
@@ -644,6 +763,8 @@ class App {
     const intro = this.intro;
     if (!intro) return;
     if (now > intro.start + MATCH.introTime + 500) return this.endEntrances();
+    // the camera keeps to the intro's clock, so a slow frame never leaves it behind the entrances
+    this.cam.syncShots((now - intro.start) / 1000);
     for (const t of intro.turns) {
       const s = (now - t.at) / ENTRANCE_MS;
       if (s < 0 || s > 1) continue;
@@ -659,7 +780,9 @@ class App {
       const key = `${t.r.id}:card`;
       if (s >= CARD_AT && s < CARD_AT + 0.15 && !intro.fired.has(key)) {
         intro.fired.add(key);
-        this.ui.nameCard(t.r, t.mine, e.title, e.line, (1 - CARD_AT) * ENTRANCE_MS + 250);
+        // up through the rest of the entrance and the hold after it
+        this.ui.nameCard(t.r, t.mine, e.title, e.line, (1 - CARD_AT) * ENTRANCE_MS + ENTRANCE_HOLD + 200);
+        audio.cardSlam();
       }
     }
   }
@@ -671,6 +794,7 @@ class App {
     if (b === 'escape') {
       if (!pressed) return;
       if (this.ui.chatOpen) this.ui.closeChat();
+      else if (this.ui.closeLegend()) return;
       else if (this.ui.modalOpen) this.ui.closeModal();
       else if (this.ui.closePlayPanel()) return;
       else this.input.exitLock();
@@ -687,9 +811,9 @@ class App {
       }
       return;
     }
-    if (pressed && (b === 'chars' || b === 'leaderboard' || b === 'help')) {
+    if (pressed && (b === 'chars' || b === 'shop' || b === 'leaderboard' || b === 'help')) {
       if (this.ui.chatOpen) return;
-      this.ui.toggleModal(b === 'chars' ? 'chars' : b === 'leaderboard' ? 'ladder' : 'help');
+      this.ui.toggleModal(b === 'leaderboard' ? 'ladder' : b);
       return;
     }
     if (pressed && (b === 'ranked' || b === 'practice')) {
@@ -733,9 +857,11 @@ class App {
   private toggleLock(): void {
     if (this.lock) {
       this.lock = null;
+      audio.lockOn(false);
       return;
     }
     this.lock = this.bestLockTarget();
+    if (this.lock) audio.lockOn(true);
   }
 
   private bestLockTarget(): ClientFighter | null {
@@ -809,24 +935,35 @@ class App {
     if (meA && this.local && (e.k === 'hit' || e.k === 'armor' || e.k === 'block' || e.k === 'guardBreak')) this.local.sim.contactSerial = this.local.sim.attackSerial;
     switch (e.k) {
       case 'deflect': {
-        // the clash, as Dueling Grounds does it: a gold streak and flash at the blades, a brief
-        // orange tint, embers falling. No freeze, no shake, no zoom, no text.
+        // the clash: unmistakable every time. A freeze on the blades, a burst of gold light rings
+        // facing you with a star at the contact, a gold streak and a shower of sparks, the
+        // attacker's weapon lit up as it's thrown back; for your own, a flash and a kick of the
+        // camera. A streak of them builds it all up.
         const nowMs = performance.now();
         const streak = (this.deflectStreak = nowMs - this.lastDeflectAt < 2500 ? this.deflectStreak + 1 : 1);
         this.lastDeflectAt = nowMs;
-        const big = (heavy ? 1.2 : 1) * (1 + 0.1 * Math.min(3, streak - 1));
+        const big = (heavy ? 1.2 : 1) * (1 + 0.12 * Math.min(3, streak - 1));
         const toCam = this.tmp3.subVectors(this.renderer.camera.position, pos).normalize();
-        this.effects.flash(pos, '#fff6d0', 0.9 * big, 0.1);
-        this.effects.flash(pos, '#ffb02a', 1.6 * big, 0.2);
-        this.effects.slash(pos, this.tmp2.set(0, 1, 0).cross(toCam).normalize(), '#ffd24a', 1.3 * big, 0.06);
-        this.effects.burst(pos, { count: Math.round(14 * big), color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 9, life: 0.25, size: 0.04, gravity: 6, drag: 3, stretch: 0.1 });
-        this.effects.burst(pos, { count: Math.round(16 * big), color: ['#ffd24a', '#ff9a2a', '#fff6c0'], speed: 3, up: 2, life: 0.45, size: 0.035, gravity: 9, drag: 0.8 });
+        const across = this.tmp2.set(0, 1, 0).cross(toCam).normalize();
+        this.effects.flash(pos, '#ffffff', 1.3 * big, 0.12);
+        this.effects.flash(pos, '#ffb02a', 2.4 * big, 0.24);
+        this.effects.ring(pos, '#ffd24a', 1.8 * big, 0.32, toCam, true);
+        this.effects.ring(pos, '#fff6d0', 1.0 * big, 0.22, toCam, true);
+        this.effects.hitFlare(pos, across, toCam, '#ffd24a', 1.4 * big);
+        this.effects.slash(pos, across, '#ffd24a', 1.8 * big, 0.08);
+        this.effects.burst(pos, { count: Math.round(30 * big), color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 12, life: 0.3, size: 0.045, gravity: 6, drag: 2.5, stretch: 0.12 });
+        this.effects.burst(pos, { count: Math.round(24 * big), color: ['#ffd24a', '#ff9a2a', '#fff6c0'], speed: 3.5, up: 2.4, life: 0.6, size: 0.04, gravity: 9, drag: 0.8 });
         d?.model.react('deflect');
         a?.model.react('blocked');
-        a?.model.flash('#ffc34a', 0.8);
+        a?.model.flash('#ffc34a', 1);
+        d?.model.flash('#fff2c0', 0.5);
+        // the blades bite and hold for a beat
+        a?.hitstop(90, 0.035);
+        d?.hitstop(70);
         if (mine) {
-          this.renderer.flash = 0.2;
-          this.renderer.flashColor.set('#ff9a2a');
+          this.renderer.flash = Math.max(this.renderer.flash, 0.32);
+          this.renderer.flashColor.set('#ffd88a');
+          this.cam.shake(0.12 * big, 0.14);
         }
         if (meD) this.local?.onDeflected();
         break;
@@ -907,6 +1044,12 @@ class App {
           if (d) this.cam.punchIn(d.pos, 0.45);
           this.renderer.flash = 0.3;
           this.renderer.flashColor.set('#ffffff');
+          // the impact frame (not with reduced shake: it's a hard flash)
+          if (!settings.reduceShake) {
+            const p = pos.clone().project(this.renderer.camera);
+            this.renderer.impactAt.set(p.x * 0.5 + 0.5, p.y * 0.5 + 0.5);
+            this.impactStart = performance.now();
+          }
         }
         break;
       }
@@ -922,12 +1065,15 @@ class App {
           this.effects.burst(pos, { count: 26, color: ['#9b6bff', '#3a2a5a', '#d0b8ff'], speed: 3, life: 0.6, size: 0.12, gravity: -1, up: 1 });
         } else if (mine) say('EVADED', head(d).x, head(d).y, head(d).z, 'muted');
         break;
-      case 'counter':
-        this.effects.burst(pos, { count: 24, color: ['#ffd24a', '#ffffff'], speed: 6, life: 0.45 });
+      case 'counter': {
+        // the Duelist's Prise de Fer takes the blade aside in white sparks and ripostes
+        const riposte = d?.roster.char === 'duelist';
+        this.effects.burst(pos, { count: riposte ? 32 : 24, color: riposte ? ['#ffffff', '#ffd6e0', '#ff8aa0'] : ['#ffd24a', '#ffffff'], speed: riposte ? 8 : 6, life: 0.45 });
         a?.model.react('hit');
-        say('COUNTER!', head(d).x, head(d).y, head(d).z, 'good big', '返し');
+        say(riposte ? 'RIPOSTE!' : 'COUNTER!', head(d).x, head(d).y, head(d).z, 'good big', riposte ? '突き返し' : '返し');
         if (e.dmg) say(`-${e.dmg}`, head(a).x, head(a).y - 0.5, head(a).z, meA ? 'dmg me' : 'dmg');
         break;
+      }
       case 'feint':
         if (d) say('FEINT', head(d).x, head(d).y, head(d).z, 'warn small');
         break;
@@ -958,6 +1104,11 @@ class App {
     }
     // the sound of it all: who hit whom, with what, on what (audio.ts / audio/recipes.ts)
     audio.combat(e, { a: a?.roster.char, d: d?.roster.char, vol, pos, heavy, mine, streak: e.k === 'deflect' ? this.deflectStreak : 1 });
+    // and what only you feel: your blow landing, a blow landing on you, the one that kills
+    const landed = e.k === 'hit' || e.k === 'armor' || e.k === 'deathblow' || e.k === 'guardBreak';
+    if (meA && landed) audio.hitConfirm(heavy || e.k !== 'hit');
+    if (meD && (e.k === 'hit' || e.k === 'deathblow')) audio.hitTaken(heavy);
+    if (mine && e.k !== 'execute' && e.tags?.includes('kill')) audio.killBlow({ vol, pos });
   }
 
   /** Effects a move's choreography asks for: dust on a stomp, a shockwave under a slam, petals off an iai cut. */
@@ -979,7 +1130,7 @@ class App {
     const k = f.model.scale;
     const fx = this.effects;
     const color = () => aura.colors[Math.floor(Math.random() * aura.colors.length)];
-    const opts = { life: aura.life, size: aura.size * k, gravity: -aura.rise * 0.35, drag: 1.1, grow: aura.grow };
+    const opts = { life: aura.life, size: aura.size * k, gravity: -aura.rise * 0.35, drag: 1.1, grow: aura.grow, alpha: aura.alpha };
     // off the blade, anywhere along it: rising and streaming back against the way he moves,
     // and boiling off much harder as it cuts
     const base = this.tmp2;
@@ -1004,13 +1155,13 @@ class App {
   }
 
   /** Per-fighter signature particles: the Lancer's lightning, the Ronin's smoke trail, the Knight's holy light. */
-  private sigState = new Map<string, { arc: number; step: string | null; dodge: number }>();
+  private sigState = new Map<string, { arc: number; body: number; ground: number; step: string | null; dodge: number }>();
 
   private signatureFx(f: ClientFighter, dt: number): void {
     if (dt <= 0 || !f.model.root.visible) return;
     if (f.pos.distanceToSquared(this.renderer.camera.position) > 40 * 40) return;
     let st = this.sigState.get(f.id);
-    if (!st) this.sigState.set(f.id, (st = { arc: 0, step: null, dodge: -1 }));
+    if (!st) this.sigState.set(f.id, (st = { arc: 0, body: 0, ground: 1, step: null, dodge: -1 }));
     const fx = this.effects;
     const k = f.model.scale;
     const swing = f.model.swingMain;
@@ -1030,28 +1181,65 @@ class App {
     }
     switch (f.roster.char) {
       case 'lancer': {
-        // sparks crawling up the spear, and arcs jumping along it now and then (all the time as it swings)
-        const sparks = Math.round((swing ? 70 : 16) * dt + Math.random());
+        // sparks crawling up the spear, and arcs jumping along it (all the time as it swings)
+        const sparks = Math.round((swing ? 90 : 28) * dt + Math.random());
         for (let i = 0; i < sparks; i++) {
           const p = along(rnd(0.15, 1));
           fx.emit(p.x, p.y, p.z, rnd(-1, 1), rnd(-0.5, 1.5), rnd(-1, 1), Math.random() < 0.5 ? '#bfe6ff' : '#ffffff', { life: 0.16, size: 0.028, gravity: 0, drag: 6, stretch: 0.04 });
         }
         st.arc -= dt;
         if (st.arc <= 0) {
-          st.arc = swing ? 0.04 : rnd(0.25, 0.8);
+          st.arc = swing ? 0.03 : rnd(0.1, 0.35);
           const a = along(rnd(0.1, 0.5));
           const b = along(rnd(0.6, 1)).add(new THREE.Vector3(rnd(-0.3, 0.3), rnd(-0.2, 0.35), rnd(-0.3, 0.3)).multiplyScalar(k));
           fx.arc(a, b, '#8fd0ff', 5, 0.12 * k, swing ? 0.07 : 0.09);
+        }
+        // the charge he carries radiates off him: short arcs leaping out of his body
+        st.body -= dt;
+        if (st.body <= 0) {
+          st.body = rnd(0.08, 0.25);
+          const a = new THREE.Vector3(f.pos.x + rnd(-0.22, 0.22) * k, f.pos.y + rnd(0.35, 1.75) * k, f.pos.z + rnd(-0.22, 0.22) * k);
+          const out = new THREE.Vector3(a.x - f.pos.x, rnd(-0.3, 0.7), a.z - f.pos.z).normalize().multiplyScalar(rnd(0.35, 0.8) * k);
+          fx.arc(a, out.add(a), Math.random() < 0.5 ? '#8fd0ff' : '#bfe6ff', 4, 0.09 * k, 0.07, 0.018);
+        }
+        // and every so often one snaps down to the ground beside him with a crack
+        st.ground -= dt;
+        if (st.ground <= 0) {
+          st.ground = swing ? rnd(0.3, 0.7) : rnd(0.8, 1.9);
+          const a = Math.random() < 0.5 ? along(rnd(0.4, 1)) : new THREE.Vector3(f.pos.x, f.pos.y + rnd(0.8, 1.6) * k, f.pos.z);
+          const ang = rnd(0, Math.PI * 2);
+          const r = rnd(0.7, 1.6) * k;
+          const g = new THREE.Vector3(f.pos.x + Math.cos(ang) * r, f.pos.y + 0.04, f.pos.z + Math.sin(ang) * r);
+          fx.arc(a, g, '#bfe6ff', 7, 0.16 * k, 0.11, 0.035);
+          fx.arc(a, g, '#8fd0ff', 6, 0.22 * k, 0.07, 0.02);
+          fx.sparkle(g, '#bfe6ff', 0.8);
+          fx.ring(g, '#8fd0ff', 0.7, 0.25, undefined, true);
+          audio.zap(swing ? 1 : 0.75, { vol: this.volumeAt(g.x, g.z), pos: g });
         }
         break;
       }
       case 'ronin': {
         // the cut leaves a ribbon of smoke along the blade's path, drifting and spreading as it hangs
         if (swing) {
-          for (let i = 0; i < Math.round(110 * dt + Math.random()); i++) {
-            const p = along(rnd(0.25, 1));
+          for (let i = 0; i < Math.round(170 * dt + Math.random()); i++) {
+            const p = along(rnd(0.2, 1));
             const c = ['#f4f4f6', '#dcdde2', '#c4c6cd', '#a9acb5'][Math.floor(Math.random() * 4)];
-            fx.emit(p.x, p.y, p.z, rnd(-0.15, 0.15), rnd(0.05, 0.3), rnd(-0.15, 0.15), c, { life: rnd(0.9, 1.4), size: 0.06 * k, gravity: -0.12, drag: 1.6, grow: 3.4 });
+            fx.emit(p.x, p.y, p.z, rnd(-0.15, 0.15), rnd(0.05, 0.3), rnd(-0.15, 0.15), c, { life: rnd(1.0, 1.6), size: 0.065 * k, gravity: -0.12, drag: 1.6, grow: 3.6, alpha: 0.35 });
+          }
+        }
+        // his special and his iai tear through the air in a thick black smoke shot with embers,
+        // left hanging along the blade's path and the line he lunged down
+        const tearing = v.state === 'attack' && (v.key === 'sp' || v.key === 'ia') ? v.attack : null;
+        if (tearing && v.elapsed > v.windup * 0.45 && v.elapsed < v.windup + tearing.active + 260) {
+          for (let i = 0; i < Math.round(420 * dt + Math.random()); i++) {
+            const p = Math.random() < 0.7 ? along(rnd(0.05, 1)) : this.tmp.set(f.pos.x + rnd(-0.3, 0.3) * k, f.pos.y + rnd(0.3, 1.6) * k, f.pos.z + rnd(-0.3, 0.3) * k);
+            const c = ['#141012', '#1f1718', '#2b1d1e', '#3a2322', '#4a1616'][Math.floor(Math.random() * 5)];
+            fx.emit(p.x, p.y, p.z, rnd(-0.25, 0.25), rnd(0.0, 0.25), rnd(-0.25, 0.25), c, { life: rnd(1.6, 2.6), size: 0.075 * k, gravity: -0.06, drag: 1.4, grow: 3.8, alpha: 0.5 });
+          }
+          for (let i = 0; i < Math.round(110 * dt + Math.random()); i++) {
+            const p = along(rnd(0.2, 1));
+            const c = ['#ff3a1a', '#ff6a2a', '#ffb04a'][Math.floor(Math.random() * 3)];
+            fx.emit(p.x, p.y, p.z, rnd(-1.2, 1.2), rnd(0.2, 1.4), rnd(-1.2, 1.2), c, { life: rnd(0.6, 1.2), size: 0.03, gravity: -0.4, drag: 1.4, stretch: 0.05 });
           }
         }
         break;
@@ -1071,6 +1259,35 @@ class App {
         break;
       }
     }
+  }
+
+  /**
+   * One of an execution's flourish strikes lands: the victim takes it like any heavy hit, knocked
+   * the way the blow travelled, with a flash, a moment's freeze, blood and the hit's sound.
+   */
+  private executionBlow(a: ClientFighter): void {
+    let d: ClientFighter | null = null;
+    let best = 6;
+    for (const f of this.fighters.values()) {
+      if (f === a || f.s !== 'executed') continue;
+      const dd = dist2D(a.pos.x, a.pos.z, f.pos.x, f.pos.z);
+      if (dd < best) {
+        best = dd;
+        d = f;
+      }
+    }
+    if (!d) return;
+    const swing = a.swingDir;
+    const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.1 * d.model.scale, d.pos.z);
+    d.model.react('hit', { side: Math.max(-1, Math.min(1, swing.x * Math.cos(d.yaw) - swing.z * Math.sin(d.yaw))), heavy: true });
+    d.model.flash('#ffffff', 0.7);
+    // the executioner's freeze is shorter: flourishes can come 120 ms apart, and the lag must be
+    // made up before the finishing blow
+    d.hitstop(110, 0.08);
+    a.hitstop(70);
+    this.effects.blood(chest, swing, 0.9);
+    audio.executionBlow(a.roster.char, d.roster.char, { vol: this.volumeAt(chest.x, chest.z), pos: chest });
+    if (a === this.local?.cf || d === this.local?.cf) this.cam.shake(0.22, 0.22);
   }
 
   private moveFx(f: ClientFighter): void {
@@ -1155,6 +1372,9 @@ class App {
         case 'shake':
           this.shakeNear(f, 0.1 * sc, 0.15);
           break;
+        case 'blow':
+          this.executionBlow(f);
+          break;
         case 'bolt':
           pos.y = Math.max(0, f.pos.y);
           fx.bolt(pos, cue.color ?? '#ffe27a', sc);
@@ -1171,6 +1391,247 @@ class App {
       }
     }
     f.fxQueue.length = 0;
+  }
+
+  /**
+   * A perilous area attack's ground, marked from the first frame of its windup so you can get off
+   * it: the strip ahead a fissure will split, the band around the Wraith his ring of fire will
+   * sweep, the circle lightning will strike where you stood. The fill reaches the edge as the blow
+   * lands, and the attack's own effect goes off across the whole of it.
+   */
+  private areaFx(f: ClientFighter, now: number): void {
+    const v = f.view(now);
+    const atk = v.state === 'attack' && v.attack?.perilous ? v.attack : null;
+    const shape = atk?.shape;
+    let m = this.marks.get(f.id);
+    if (m && (!shape || m.serial !== v.serial)) {
+      // stopped before it landed
+      m.tg.cancel();
+      this.fadingMarks.push(m.tg);
+      this.marks.delete(f.id);
+      m = undefined;
+    }
+    if (!atk || !shape || f.lastAreaSerial === v.serial) return;
+    // a thrown spear's line stays marked until the spear is back in his hand
+    const lands = v.windup + (atk.thrown ? atk.active : 0);
+    if (!m) {
+      if (v.elapsed >= lands) return;
+      const tg = atk.thrown ? new Telegraph(shape, atk.range, '#ff2a2a', BOLT, false) : new Telegraph(shape, atk.range, '#ff2a2a', AREA_HIT[shape.kind]);
+      this.effects.group.add(tg.mesh);
+      m = { tg, serial: v.serial, aim: null };
+      this.marks.set(f.id, m);
+    }
+    if (shape.kind === 'zone') {
+      // where the server says it's aimed; until that arrives (your own), the same choice made here
+      m.aim = f.am ?? m.aim ?? zoneAim({ x: f.pos.x, z: f.pos.z, yaw: f.yaw }, [...this.fighters.values()].filter((o) => o !== f && o.s !== 'dead').map((o) => o.pos), atk.range);
+      m.tg.place(m.aim.x, m.aim.z, 0);
+    } else m.tg.place(f.pos.x, f.pos.z, f.yaw);
+    m.tg.progress = v.elapsed / v.windup;
+    if (v.elapsed < lands) return;
+    f.lastAreaSerial = v.serial;
+    m.tg.strike();
+    this.fadingMarks.push(m.tg);
+    this.marks.delete(f.id);
+    if (!atk.thrown) this.areaStrike(f, atk, shape, m.tg.mesh.position.clone(), f.yaw);
+  }
+
+  /**
+   * The Lancer's thrown spear (an attack with `thrown`): the spear leaves his hand as the windup
+   * ends and a copy of it flies the length of the line and back to the hand (thrownOut, the pace
+   * the server judges the hits by), while the one in his hand is hidden. Out, it streaks lightning
+   * and lights the line behind it; at the far end the sky answers with a bolt; coming back it's
+   * pulled home on a lightning tether, and lands in his palm with a crack. If the throw is cut
+   * short it still flies back. Runs before the fighter's model updates, so the hand is empty the
+   * same frame.
+   */
+  private spearFlight(f: ClientFighter, dt: number, now: number): void {
+    const v = f.view(now);
+    const atk = v.state === 'attack' ? v.attack : null;
+    const flying = !!atk?.thrown && v.elapsed >= v.windup && v.elapsed < v.windup + atk.active;
+    let s = this.spears.get(f.id);
+    if (flying && atk && (!s || s.serial !== v.serial)) {
+      if (s) this.landSpear(f, s, false);
+      s = this.throwSpear(f, atk, v.serial);
+    }
+    if (!s) return;
+    if (flying && atk && s.serial === v.serial) s.u = (v.elapsed - v.windup) / atk.active;
+    else {
+      // home, or the throw cut short: straight back the way it would have come
+      if (s.u < 0.5) s.u = 1 - s.u;
+      s.u += (dt * 1000) / (s.ms * 0.4);
+    }
+    if (s.u >= 1) {
+      this.landSpear(f, s, true);
+      return;
+    }
+    f.model.thrown = true;
+    const fx = this.effects;
+    const hand = f.model.weaponXf('main', this.tmp, this.tmpQ, this.tmp2) ? this.tmp : f.pos;
+    const far = this.tmp3.copy(s.from).addScaledVector(s.dir, s.reach);
+    const back = s.u > 0.5;
+    const grip = (back ? hand : s.from).clone().lerp(far, thrownOut(s.u));
+    const dir = back ? far.clone().sub(hand).normalize() : s.dir;
+    if (dir.lengthSq() < 0.5) dir.copy(s.dir);
+    s.spin += dt * 26;
+    s.mesh.position.copy(grip);
+    s.mesh.quaternion.setFromUnitVectors(Z_AXIS, dir).multiply(this.tmpQ.setFromAxisAngle(Z_AXIS, s.spin));
+    const tip = grip.clone().addScaledVector(dir, s.len);
+    const butt = grip.clone().addScaledVector(dir, -s.len * 0.35);
+    // the shaft blazing with lightning, the streak it leaves, and sparks spitting off it
+    fx.beam(butt, tip, BOLT, 0.2, 0.05);
+    fx.beam(butt, tip, '#ffffff', 0.07, 0.04);
+    if (s.lastTip) {
+      fx.beam(back ? tip : s.lastTip, back ? s.lastTip : tip, BOLT, 0.09, 0.14);
+      fx.beam(back ? tip : s.lastTip, back ? s.lastTip : tip, '#ffffff', 0.03, 0.1);
+    }
+    s.lastTip = tip.clone();
+    s.spark += dt;
+    if (s.spark > 0.035) {
+      s.spark = 0;
+      for (let i = 0; i < 3; i++) {
+        const p = butt.clone().lerp(tip, Math.random());
+        fx.emit(p.x, p.y, p.z, (Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3, i ? BOLT : '#ffffff', { life: 0.3, size: 0.05, gravity: 4, drag: 2, stretch: 0.05 });
+      }
+      fx.arc(tip, tip.clone().add(this.tmp2.set((Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 1.4)), BOLT, 3, 0.12, 0.07, 0.022);
+      // coming back it's pulled home along a tether of lightning
+      if (back) {
+        fx.arc(hand.clone(), butt, '#fff3b0', 9, 0.3, 0.07, 0.03);
+        audio.zap(0.7, { vol: this.volumeAt(butt.x, butt.z), pos: butt });
+      }
+    }
+    // the far end: the sky answers, and the whole line it flew lights up behind it
+    if (back && !s.turned) {
+      s.turned = true;
+      const ground = new THREE.Vector3(tip.x, Math.max(0, f.pos.y) + 0.05, tip.z);
+      fx.bolt(tip, BOLT, 1.3);
+      fx.bolt(tip, '#cfe8ff', 0.7);
+      fx.shockwave(ground, 0.9, BOLT);
+      fx.flash(tip, '#fff6d0', 3.2, 0.22);
+      fx.beam(s.from, tip, '#fff3b0', 0.05, 0.7);
+      fx.beam(s.from, tip, BOLT, 0.16, 0.45);
+      const me = this.local?.cf;
+      const k = me ? Math.max(0, 1 - Math.min(dist2D(me.pos.x, me.pos.z, tip.x, tip.z), dist2D(me.pos.x, me.pos.z, f.pos.x, f.pos.z)) / 14) : 0;
+      this.renderer.flash = Math.max(this.renderer.flash, 0.3 + 0.35 * k);
+      this.renderer.flashColor.set('#fff8e0');
+      if (k > 0.05) this.cam.shake(0.3 * k, 0.4);
+      audio.cue('bolt', f.roster.char, 1.8, { vol: this.volumeAt(tip.x, tip.z), pos: tip, hero: true });
+    }
+  }
+
+  /** Thunderreach leaves the hand: the copy that flies, set off along his line. */
+  private throwSpear(f: ClientFighter, atk: AttackDef, serial: number): SpearFlight {
+    const m = f.model;
+    const mesh = m.weapon.main.clone(true);
+    mesh.traverse((o) => (o.visible = true));
+    const from = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    m.weaponXf('main', from, this.tmpQ, scale);
+    mesh.scale.copy(scale);
+    this.scene.add(mesh);
+    const len = from.distanceTo(f.weaponTip(this.tmp));
+    // out along his facing, from the hand down to chest height, the tip reaching the line's end
+    const fw = forward(f.yaw);
+    const reachXZ = Math.max(1, atk.range - len);
+    const far = new THREE.Vector3(f.pos.x + fw.x * reachXZ, Math.max(0, f.pos.y) + 1.15 * m.scale, f.pos.z + fw.z * reachXZ);
+    const dir = far.clone().sub(from);
+    const reach = dir.length();
+    dir.divideScalar(reach);
+    const s: SpearFlight = { mesh, serial, from, dir, reach, len, u: 0, ms: atk.active, turned: false, spin: 0, spark: 0, lastTip: null };
+    this.spears.set(f.id, s);
+    // the release: a flash off the hand and a crack of lightning
+    const fx = this.effects;
+    fx.flash(from, '#fff6d0', 2.2, 0.16);
+    fx.spray(from, dir, [BOLT, '#ffffff'], 18, 9, 0.35, { life: 0.3, size: 0.05, gravity: 2, stretch: 0.06 });
+    audio.zap(1.6, { vol: this.volumeAt(from.x, from.z), pos: from });
+    this.shakeNear(f, 0.12, 0.2);
+    return s;
+  }
+
+  /** The spear back in his hand (`caught`), or put away (a new throw, or he's gone). */
+  private landSpear(f: ClientFighter, s: SpearFlight, caught: boolean): void {
+    s.mesh.removeFromParent();
+    this.spears.delete(f.id);
+    f.model.thrown = false;
+    if (!caught) return;
+    const fx = this.effects;
+    const hand = f.model.weaponXf('main', this.tmp, this.tmpQ, this.tmp2) ? this.tmp.clone() : f.pos.clone();
+    fx.flash(hand, '#fff6d0', 1.8, 0.16);
+    fx.sparkle(hand, BOLT, 1.3);
+    fx.spray(hand, s.dir.clone().negate(), [BOLT, '#ffffff'], 16, 6, 0.6, { life: 0.35, size: 0.05, gravity: 5, stretch: 0.05 });
+    for (let i = 0; i < 3; i++) fx.arc(hand, new THREE.Vector3(hand.x + (Math.random() - 0.5) * 1.6, Math.max(0, f.pos.y) + 0.05, hand.z + (Math.random() - 0.5) * 1.6), BOLT, 5, 0.18, 0.1, 0.025);
+    audio.zap(1.8, { vol: this.volumeAt(hand.x, hand.z), pos: hand });
+    audio.cue('shockwave', f.roster.char, 0.7, { vol: this.volumeAt(hand.x, hand.z), pos: hand });
+    this.shakeNear(f, 0.14, 0.18);
+  }
+
+  /** The blow of an area attack landing across the ground it marked. */
+  private areaStrike(f: ClientFighter, atk: AttackDef, shape: AttackShape, at: THREE.Vector3, yaw: number): void {
+    const fx = this.effects;
+    const me = this.local?.cf;
+    const near = (p: THREE.Vector3): number => (me ? Math.max(0, 1 - dist2D(me.pos.x, me.pos.z, p.x, p.z) / 14) : 0);
+    at.y = 0.05;
+    switch (shape.kind) {
+      case 'line': {
+        // the ground splits from the hammer out to the end of the strip, earth thrown up along it
+        const fw = forward(yaw);
+        const dir = new THREE.Vector3(fw.x, 0, fw.z);
+        for (let s = 0.8; s <= atk.range; s += 0.7) {
+          const p = new THREE.Vector3(at.x + fw.x * s, 0.05, at.z + fw.z * s);
+          fx.after(s * 0.02, () => {
+            fx.quake(p, dir, 0.8);
+            if (Math.random() < 0.5) fx.debris(p, 0.7);
+          });
+        }
+        const end = new THREE.Vector3(at.x + fw.x * atk.range, 0.05, at.z + fw.z * atk.range);
+        fx.after(atk.range * 0.02, () => fx.shockwave(end, 0.7, AREA_HIT.line));
+        const mid = at.clone().addScaledVector(dir, atk.range / 2);
+        audio.cue('quake', f.roster.char, 1.8, { vol: this.volumeAt(mid.x, mid.z), pos: mid });
+        const k = Math.max(near(at), near(mid), near(end));
+        if (k > 0.05) this.cam.shake(0.2 * k, 0.4);
+        break;
+      }
+      case 'zone': {
+        // lightning out of a clear sky onto the mark
+        fx.bolt(at, AREA_HIT.zone, 1.7);
+        fx.bolt(at, '#cfe8ff', 0.9);
+        fx.shockwave(at, 0.7, AREA_HIT.zone);
+        const k = near(at);
+        this.renderer.flash = Math.max(this.renderer.flash, 0.25 + 0.4 * k);
+        this.renderer.flashColor.set('#fff8e0');
+        if (k > 0.05) this.cam.shake(0.32 * k, 0.35);
+        audio.cue('bolt', f.roster.char, 2, { vol: this.volumeAt(at.x, at.z), pos: at });
+        break;
+      }
+      case 'ring': {
+        // soulfire bursts up all through the band and a green wave rolls out across it
+        for (let i = 0; i < 30; i++) {
+          const a = (i / 30) * Math.PI * 2 + Math.random() * 0.2;
+          const r = shape.inner + Math.random() * (atk.range - shape.inner);
+          fx.soulfire(new THREE.Vector3(at.x + Math.cos(a) * r, 0.05, at.z + Math.sin(a) * r), 0.7);
+        }
+        fx.ring(at, AREA_HIT.ring, atk.range, 0.55, undefined, true);
+        fx.ring(at, '#b8ffd0', shape.inner, 0.35, undefined, true);
+        const k = near(at);
+        if (k > 0.05) this.cam.shake(0.18 * k, 0.25);
+        break;
+      }
+    }
+  }
+
+  private updateMarks(dt: number): void {
+    for (const [id, m] of this.marks) {
+      if (this.fighters.has(id)) m.tg.update(dt);
+      else {
+        m.tg.cancel();
+        this.fadingMarks.push(m.tg);
+        this.marks.delete(id);
+      }
+    }
+    for (let i = this.fadingMarks.length - 1; i >= 0; i--) {
+      if (this.fadingMarks[i].update(dt)) continue;
+      this.fadingMarks[i].dispose();
+      this.fadingMarks.splice(i, 1);
+    }
   }
 
   /** Shake the camera for an impact, fading with distance from the local player. */
@@ -1192,7 +1653,7 @@ class App {
       const vol = this.volumeAt(f.pos.x, f.pos.z);
       if (v.state === 'attack' && v.attack?.perilous && f.lastPerilousSerial !== v.serial) {
         f.lastPerilousSerial = v.serial;
-        audio.perilous(f.roster.char, { vol, pos: f.pos });
+        audio.perilous(f.roster.char, { vol, pos: f.pos }, Math.max(0, v.attack.windup - v.elapsed) / 1000);
         this.effects.flash(this.tmp.set(f.pos.x, f.pos.y + 2.4 * f.model.scale, f.pos.z), '#ff2a2a', 1.4, 0.3);
       }
       if (v.state === 'dodge' && v.elapsed < 200) audio.dodge(f.roster.char, v.dodgeKind ?? 'roll', { vol: vol * 0.8, pos: f.pos });
@@ -1243,7 +1704,7 @@ class App {
    * away as they go down.
    */
   private startExecution(a: ClientFighter, d: ClientFighter): void {
-    this.exec = { a, d, t: 0, start: this.net.serverNow(), hitDone: false };
+    this.exec = { a, d, t: 0, start: this.net.serverNow(), hitDone: false, whooshed: false, led: false };
     audio.musicDuck(true);
     this.ui.setCinematic(true);
     // laid out the way the server stands them (the victim straight ahead at the execution distance),
@@ -1266,6 +1727,16 @@ class App {
       // on the server's clock, like the paired animation, so the camera can't drift off it
       ex.t = now - ex.start;
       this.cam.syncShots(ex.t / 1000);
+      // the finishing blow's recordings that swell into it
+      if (!ex.led && ex.t >= COMBAT.executeHitAt - EXEC_SOUND_LEAD) {
+        ex.led = true;
+        audio.executionLead(ex.a.roster.char, { vol: this.volumeAt(ex.a.pos.x, ex.a.pos.z), pos: ex.a.pos });
+      }
+      // the finishing strike's heavy swing, started to swell into the blow
+      if (!ex.whooshed && ex.t >= COMBAT.executeHitAt - EXEC_WHOOSH_LEAD) {
+        ex.whooshed = true;
+        audio.executionStrike(ex.a.id, ex.a.roster.char, { vol: this.volumeAt(ex.a.pos.x, ex.a.pos.z), pos: ex.a.pos });
+      }
       const T = COMBAT.executeTime;
       dark = Math.min(1, ex.t / 350) * (1 - Math.max(0, Math.min(1, (ex.t - (T - 450)) / 450)));
       if (ex.t >= T || !this.fighters.has(ex.a.id) || !this.fighters.has(ex.d.id)) {
@@ -1291,6 +1762,9 @@ class App {
     this.last = t;
     const now = this.net.serverNow();
     this.renderer.flash = Math.max(0, this.renderer.flash - dt * 3);
+    // the impact frame: ink on white, then on red, IMPACT_MS each
+    const sinceImpact = performance.now() - this.impactStart;
+    this.renderer.impact = sinceImpact < IMPACT_MS ? 1 : sinceImpact < 2 * IMPACT_MS ? 2 : 0;
     this.stepExecution(dt, now);
     if (this.drama > 0) {
       // the screen sinks to a deep red, holds and comes back
@@ -1302,10 +1776,10 @@ class App {
     const mouse = this.input.consumeMouse();
     this.cam.addMouse(mouse.dx, mouse.dy, settings.sensitivity, settings.invertY, !!this.lock);
     // the title screen has its own keys (and a name being typed)
-    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active || this.rotate.blocked;
+    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active;
     this.entranceCues(now);
     const left = this.select.tick(now);
-    if (left !== null && left > 0 && left <= 3) audio.play('countdown', 0.5);
+    if (left !== null && left > 0 && left <= 3) audio.countdown(left, 0.5);
 
     if (this.lock && (this.lock.s === 'dead' || !this.fighters.has(this.lock.id) || (this.local && dist2D(this.local.cf.pos.x, this.local.cf.pos.z, this.lock.pos.x, this.lock.pos.z) > 30))) {
       if (this.kind !== 'arena' || !this.fighters.has(this.lock.id)) this.lock = null;
@@ -1325,11 +1799,18 @@ class App {
       else if (this.local && f === this.local.cf) f.lookAt = lockOn?.pos ?? null;
       else f.lookAt = lockOn === f && this.local ? this.local.cf.pos : null;
     }
+    for (const [id, s] of this.spears) {
+      if (this.fighters.has(id)) continue;
+      s.mesh.removeFromParent();
+      this.spears.delete(id);
+    }
     for (const f of this.fighters.values()) {
       f.interpolate(now);
       const buff = (f.flags & 1) === 1 || (!!f.sim && f.sim.buffActive(now));
+      this.spearFlight(f, dt, now);
       f.updateVisual(dt, now, buff);
       this.stateCues(f, now);
+      this.areaFx(f, now);
       this.moveFx(f);
       this.auraFx(f, dt);
       this.signatureFx(f, dt);
@@ -1348,6 +1829,7 @@ class App {
       this.cam.shakeScale = settings.reduceShake ? 0.35 : this.touch ? 0.8 : 1;
       this.cam.subjectScale = this.local.cf.model.scale;
       this.cam.targetScale = this.lock?.model.scale ?? 1;
+      this.cam.subjectBulk = CAMERA_BULK[this.local.cf.roster.char] ?? 1;
       this.cam.update(dt, p, this.lock ? this.lock.pos : null, { dodging: this.local.sim.state === 'dodge' });
       this.mapView?.update(dt, p);
     } else if (this.titleScene) {
@@ -1358,6 +1840,7 @@ class App {
     this.titleScreen?.update(dt);
     this.ringWalls?.update(dt);
     this.effects.update(dt, this.renderer.camera);
+    this.updateMarks(dt);
     this.updateHud(dt, now);
     this.renderer.render();
     if (this.snapWant) {
@@ -1385,6 +1868,27 @@ class App {
     return this.renderer.project(this.tmp.set(x, y, z), out) ? out : null;
   }
 
+  /** whether your special and ability were last seen charged (so each comes back with a sound) */
+  private readySeen = { special: true, ability: true };
+  /** when your heart next beats, while you're nearly dead */
+  private heartAt = 0;
+
+  /** Your special and ability coming back, and your heartbeat when you're nearly dead. */
+  private feedbackCues(sim: LocalController['sim'], now: number): void {
+    const fighting = sim.isAlive() && (!this.match || this.match.phase === 'fight');
+    const special = fighting && now >= sim.specialReadyAt;
+    const ability = fighting && now >= sim.abilityReadyAt;
+    if (special && !this.readySeen.special) audio.ready('special');
+    if (ability && !this.readySeen.ability) audio.ready('ability');
+    // outside a fight they count as seen, so nothing chimes the moment it starts
+    this.readySeen = { special: special || !fighting, ability: ability || !fighting };
+    const left = sim.hp / sim.maxHp;
+    if (fighting && left > 0 && left <= 0.25 && now >= this.heartAt) {
+      audio.lowHealth(left <= 0.1 ? 1 : 0.7);
+      this.heartAt = now + (left <= 0.1 ? 650 : 900);
+    }
+  }
+
   private updateHud(dt: number, now: number): void {
     this.ui.updateFloaters(dt, (x, y, z) => this.project(x, y, z));
     const local = this.local;
@@ -1404,6 +1908,17 @@ class App {
       });
     }
     this.ui.setPostureMain(sim.posture / sim.char.stats.posture, sim.state === 'broken');
+    this.feedbackCues(sim, now);
+    // no giving up a match that's over, or while you're finishing them off
+    const m0 = this.match;
+    const rival = m0 ? this.fighters.get(m0.players[m0.you === 0 ? 1 : 0].id) : undefined;
+    this.ui.setForfeitable(!!m0 && m0.mode !== 'tutorial' && m0.phase !== 'matchEnd' && sim.state !== 'execute' && rival?.s !== 'executed' && rival?.s !== 'dead');
+    // the tutorial's arrow and timing ring follow the sensei
+    if (this.tutorial && rival) {
+      const v = rival.view(now);
+      const blow = v.state === 'attack' && v.attack ? { left: v.windup - v.elapsed, windup: v.windup } : null;
+      this.tutorial.update({ foe: this.project(rival.pos.x, rival.pos.y + 1.2 * rival.model.scale, rival.pos.z), blow });
+    }
     this.ui.setZone(this.kind === 'lobby' && inSafeZone(this.map, me.pos.x, me.pos.z));
     this.ui.setClickHint(!this.input.locked && !this.ui.modalOpen && !this.ui.chatOpen, this.input.locked, this.input.lockFailed);
     this.ui.setQueue(!!this.queue, this.queue?.since ?? 0, this.queue?.count ?? 0, now);
@@ -1415,7 +1930,7 @@ class App {
       if (secs !== this.lastCountdown && secs > 0 && secs <= 3) {
         this.lastCountdown = secs;
         this.ui.banner(String(secs), `第${KANJI_NUM[this.match.round] ?? this.match.round}戦 · Round ${this.match.round}`, 950, 'count', KANJI_NUM[secs]);
-        audio.play('countdown');
+        audio.countdown(secs);
       }
     }
 
@@ -1573,6 +2088,10 @@ function createPreview(container: HTMLElement): Preview {
       }
       model = new CharacterModel(id);
       scene.add(model.root);
+      // framed close on the fighter, whatever their size, so they fill the tall frame
+      const k = model.scale;
+      r.camera.position.set(0, 1.25 * k, 3.1 * k);
+      r.camera.lookAt(0, 0.95 * k, 0);
       idx = 0;
       stateT = 0;
     },

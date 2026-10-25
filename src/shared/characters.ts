@@ -49,8 +49,19 @@ export type AttackAnim =
  *  - thrust: deflect it, or dodge *into* it for a Mikiri counter
  *  - sweep:  jump over it
  *  - grab:   dodge or jump away
+ *  - area:   get out of the ground it marks (or dodge through it as it lands): no jumping it,
+ *            and no counter stance takes it
  */
-export type Perilous = 'thrust' | 'sweep' | 'grab';
+export type Perilous = 'thrust' | 'sweep' | 'grab' | 'area';
+
+/**
+ * Where an attack can hit, instead of the cone in front of the attacker:
+ *  - line: a strip straight ahead out to `range`, `width` either side of the attacker's line
+ *  - ring: all round the attacker, between `inner` and `range` (inner 0: a disc)
+ *  - zone: a disc of `radius` round a spot chosen as the attack starts (the nearest foe in front,
+ *          out to `range`): see Fighter.aim
+ */
+export type AttackShape = { kind: 'line'; width: number } | { kind: 'ring'; inner: number } | { kind: 'zone'; radius: number };
 
 /**
  * l0..l2 = light chain, h/h1/h2 = heavy chain, dl/dh = dash light/heavy (out of a forward dodge),
@@ -97,6 +108,20 @@ export interface AttackDef {
   pull?: number;
   /** Purely cosmetic attack (e.g. the counter strike, which is applied directly). */
   noHitbox?: boolean;
+  /** Where it hits, if not the cone in front (see AttackShape). */
+  shape?: AttackShape;
+  /**
+   * A vault: the lunge carries the attacker through the air over anyone in the way, untouchable,
+   * landing as the windup ends; the hit comes on landing.
+   */
+  vault?: boolean;
+  /**
+   * Thrown (a line attack): the weapon leaves the hand as the windup ends, flies out to the end of
+   * the line over the first half of the active frames and comes back to the hand over the second.
+   * Each hit lands only where the weapon has got to (see thrownSpan); the thrower can't turn while
+   * it's out.
+   */
+  thrown?: boolean;
 }
 
 export type AbilityDef =
@@ -266,7 +291,9 @@ const juggernaut: BaseDef = {
     { name: 'Shoulder Chop', anim: 'uppercut', windup: 520, active: 120, recovery: 520, damage: 16, posture: 20, blockPosture: 26, range: 3.6, arc: 38, lunge: 0.7 },
   ],
   heavy: { name: 'Windmill Slam', anim: 'slam', windup: 780, active: 140, recovery: 650, damage: 26, posture: 34, blockPosture: 46, range: 3.8, arc: 28, lunge: 1.0, feintable: true, knockback: 1.2 },
-  special: { name: 'Cyclone', anim: 'sweep', windup: 800, active: 180, recovery: 700, damage: 24, posture: 30, blockPosture: 30, range: 4.4, arc: 55, perilous: 'sweep', cooldown: 7500 },
+  // the hammer brought down so hard the ground splits in a straight line out ahead of him: jump the
+  // fissure as it opens under you, or be off its line
+  special: { name: 'Fault Line', anim: 'slam', windup: 820, active: 160, recovery: 760, damage: 24, posture: 30, blockPosture: 30, range: 9, arc: 8, shape: { kind: 'line', width: 0.9 }, perilous: 'sweep', cooldown: 7500 },
   ability: {
     kind: 'buff',
     name: 'War Cry',
@@ -298,12 +325,15 @@ const duelist: BaseDef = {
   ],
   heavy: { name: 'Moulinet', anim: 'thrust', windup: 560, active: 100, recovery: 480, damage: 15, posture: 22, blockPosture: 28, range: 3.7, arc: 16, lunge: 1.5, feintable: true },
   special: { name: 'Coup de Grace', anim: 'thrust', windup: 620, active: 140, recovery: 600, damage: 20, posture: 30, blockPosture: 30, range: 4.7, arc: 15, lunge: 3.5, perilous: 'thrust', cooldown: 6500 },
+  // the parry that answers: struck in it, he takes the blade aside and runs them through before
+  // they can guard (the riposte lands on the instant, like the Monk's counter)
   ability: {
-    kind: 'attack',
-    name: 'Fleche',
-    description: 'Explode forward in a 6m running thrust.',
-    cooldown: 7000,
-    attack: { name: 'Fleche', anim: 'thrust', windup: 280, active: 200, recovery: 500, damage: 12, posture: 18, blockPosture: 24, range: 2.9, arc: 22, lunge: 6.5 },
+    kind: 'counter',
+    name: 'Prise de Fer',
+    description: 'Salute and hold a parry for 0.8s. If struck by a normal or thrust attack, take the blade aside and riposte: Coup Droit, a thrust that cannot be blocked.',
+    cooldown: 8000,
+    duration: 800,
+    attack: { name: 'Coup Droit', anim: 'thrust', windup: 80, active: 80, recovery: 420, damage: 14, posture: 32, blockPosture: 32, range: 3.4, arc: 30, noHitbox: true },
   },
   passive: {
     name: 'Riposte',
@@ -320,7 +350,7 @@ const lancer: BaseDef = {
   weapon: 'Golden Spear',
   weaponKind: 'spear',
   role: 'Zoner',
-  description: 'A horned knight with a lightning spear. Controls space with the longest reach in the game; tip hits hurt more, and he vaults out when crowded.',
+  description: 'A horned knight with a lightning spear. Controls space with the longest reach in the game; tip hits hurt more, he hurls the spear the length of the field and it flies back to his hand, and he vaults clean over you to strike your back.',
   stats: { hp: 200, posture: 200, speed: 2.5, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 5, defense: 2, difficulty: 3 },
   lights: [
@@ -330,15 +360,18 @@ const lancer: BaseDef = {
     { name: 'Flat Sweep', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 4.1, arc: 44 },
   ],
   heavy: { name: 'Lunging Cut', anim: 'thrust', windup: 640, active: 110, recovery: 520, damage: 18, posture: 24, blockPosture: 30, range: 4.7, arc: 15, lunge: 1.4, feintable: true },
-  special: { name: 'Whirlwind', anim: 'spin', windup: 760, active: 220, recovery: 650, damage: 20, posture: 26, blockPosture: 26, range: 4.4, arc: 55, perilous: 'sweep', cooldown: 7000 },
+  // Thunderreach raised to the sky until the lightning pours down it, then thrown the length of the
+  // field along the line marked on the ground; it flies back to his hand, through anyone still on
+  // the line: get off it before it goes, and stay off it until it's home
+  special: { name: 'Light the Way', anim: 'thrust', windup: 900, active: 720, recovery: 420, damage: 13, posture: 18, blockPosture: 18, range: 13, arc: 6, hits: 2, shape: { kind: 'line', width: 0.75 }, thrown: true, perilous: 'area', cooldown: 8000 },
+  // planted and vaulted over you, untouchable in the air, and driven down behind him as he lands,
+  // lightning bursting all round: it takes you in the back unless you turn to meet it
   ability: {
-    kind: 'leap',
-    name: 'Pole Vault',
-    description: 'Vault 6m backwards, invulnerable for most of the jump.',
-    cooldown: 6000,
-    distance: 6,
-    duration: 460,
-    iframes: 320,
+    kind: 'attack',
+    name: 'Vault Strike',
+    description: 'Vault 5m forward on the spear, untouchable in the air, and drive it down behind you as you land: lightning bursts all round, taking them in the back unless they turn to face you.',
+    cooldown: 7000,
+    attack: { name: 'Vault Strike', anim: 'thrust', windup: 520, active: 120, recovery: 520, damage: 14, posture: 22, blockPosture: 26, range: 2.4, arc: 180, lunge: 5, vault: true, shape: { kind: 'ring', inner: 0 } },
   },
   passive: { name: 'Reach', description: 'Hits with the outer 30% of a swing deal 25% more damage and posture.', mods: { tipperBonus: 0.25 } },
   palette: { primary: '#26242a', secondary: '#d9d4c8', accent: '#f2c14e', skin: '#e4a672', hair: '#3e2731', metal: '#f2d27a' },
@@ -391,7 +424,9 @@ const reaper: BaseDef = {
     { name: 'Gyre', anim: 'spin', windup: 420, active: 160, recovery: 500, damage: 12, posture: 14, blockPosture: 18, range: 3.8, arc: 55 },
   ],
   heavy: { name: 'Execution', anim: 'overhead', windup: 680, active: 120, recovery: 560, damage: 20, posture: 26, blockPosture: 34, range: 3.9, arc: 25, lunge: 0.8, feintable: true },
-  special: { name: 'Reaping Arc', anim: 'sweep', windup: 780, active: 200, recovery: 680, damage: 22, posture: 28, blockPosture: 28, range: 4.5, arc: 55, perilous: 'sweep', cooldown: 7000 },
+  // the sickle planted and a ring of soulfire bursting up out of the ground round him, from 2m out to
+  // 6m: hug him inside it, or be beyond it
+  special: { name: 'Requiem', anim: 'overhead', windup: 820, active: 160, recovery: 700, damage: 22, posture: 28, blockPosture: 28, range: 6, arc: 180, shape: { kind: 'ring', inner: 2 }, perilous: 'area', cooldown: 7500 },
   ability: {
     kind: 'attack',
     name: 'Soul Hook',

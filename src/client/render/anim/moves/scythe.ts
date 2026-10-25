@@ -103,29 +103,19 @@ const rites = seq([
 ]);
 const ritesHit = hitAt(rites, 3, 1);
 
-// Reaping Arc: wheeled at the right side, faster and lower, then swept flat round along the ground
-const reaping = seq(
+// Requiem: lifted high over the head and whirled there once on a short chain, then driven straight
+// down into the ground at his feet, the blade buried and the haft stood up out of it
+const REQUIEM_HIT = 0.45;
+const requiem = seq(
   [
-    [-1.6, -0.2, whirl([-0.46, 0.26, 0.08], [0, 1, 0.1], [0, 0.1, 1], 1.75, 90, 0.12, [-0.5, 0.12, 0.06])],
-    [-0.2, 1.07, cast([[-0.15, 0.2, -1], [-0.95, 0.12, -0.2], [-0.75, 0.1, 0.66], [-0.02, 0.12, 1], [0.6, 0.1, 0.8], [0.9, 0.12, 0.4]], 0.3, [-0.2, 0.2, 0.12])],
+    [-1.6, -0.75, line([-0.32, 0.22, 0.12], [-0.12, 0.95, 0.05], [0, -0.2, 1], [0, 1, 0.12], [0, 0, 1])],
+    [-0.75, 0.0, whirl([-0.12, 0.95, 0.05], [0, 0.25, 1], [-1, 0.25, 0], -1, 0, 0.1)],
+    [0.0, REQUIEM_HIT, line([-0.12, 0.95, 0.05], [-0.1, 0.06, 0.42], [0, 1, 0.12], [0.02, -1, 0.15], [0, 0, 1])],
+    [REQUIEM_HIT, 1.5, line([-0.1, 0.06, 0.42], [-0.1, 0.08, 0.42], [0.02, -1, 0.15], [0.02, -1, 0.15], [0, 0, 1])],
   ],
   0.1,
 );
-const reapingHit = hitAt(reaping, 3, 1);
 
-/** The sickle keyed along s (the entrance): straight moves between keyed grips [s, pos, dir, edge], held outside them. */
-type Grip = [number, V3, V3, V3];
-const keyed = (ks: Grip[], blend = 0.03): Motion => {
-  const hold = (k: Grip, from: number, to: number): [number, number, Motion] => [from, to, line(k[1], k[1], k[2], k[2], k[3])];
-  const parts: [number, number, Motion][] = [hold(ks[0], ks[0][0] - 1, ks[0][0])];
-  for (let i = 1; i < ks.length; i++) {
-    const a = ks[i - 1];
-    const b = ks[i];
-    parts.push([a[0], b[0], line(a[1], b[1], a[2], b[2], b[3])]);
-  }
-  parts.push(hold(ks[ks.length - 1], ks[ks.length - 1][0], ks[ks.length - 1][0] + 1));
-  return seq(parts, blend);
-};
 const BLOOD = '#ff3a3a';
 
 /** The guard: both hands low, the sickle at the right hip with its head raised toward them, the left
@@ -460,37 +450,44 @@ export const scythe: Style = {
       fx: [fx(ritesHit, 'shockwave', 'tip', 1.0), fx(ritesHit, 'soulfire', 'tip', 1.0), fx(ritesHit, 'wisps', 'tip', 1.2), fx(ritesHit, 'stomp', 'feet', 0.7)],
       trail: { life: 0.24, glow: 0.6 },
     }),
-    // Reaping Arc: the sickle wheeled at the right side, faster and lower as the Wraith sinks into a
-    // wide crouch, then swept round flat along the ground at their ankles in green fire
+    // Requiem: the sickle raised high and whirled once over the head as the Wraith stands tall, then
+    // driven down into the ground at his feet as he sinks to one knee over it: a ring of soulfire
+    // bursts up out of the ground round him (hug him inside it, or be beyond it)
     sp: mv({
       keys: [
-        K(-1.6, B({ ...body, twist: -0.4, lean: 0.1, crouch: -0.09 })),
-        K(-0.5, B({ ...body, twist: -1.15, hipTwist: -0.5, crouch: -0.16, lean: 0.12, step: 0.14, back: 0.28, width: 0.28, side: 0.12 })),
-        K(reapingHit + 0.1, B({ ...body, twist: 0.0, hipTwist: 0.0, crouch: -0.17, lean: 0.36, step: 0.26, back: 0.2, width: 0.3 })),
-        K(1.05, B({ ...body, twist: 1.0, hipTwist: 0.45, crouch: -0.2, lean: 0.36, step: 0.26, back: 0.2, width: 0.3 })),
+        K(-1.6, B({ ...body, twist: -0.3, lean: 0.08, crouch: -0.07 })),
+        K(-0.75, B({ ...body, twist: -0.05, hipTwist: 0, lean: -0.22, crouch: 0.02, step: 0.16, back: 0.16, headPitch: -0.32 })),
+        K(0.0, B({ ...body, twist: 0.0, hipTwist: 0, lean: -0.26, crouch: 0.03, step: 0.16, back: 0.16, headPitch: -0.36 })),
+        K(REQUIEM_HIT, B({ ...body, twist: 0.0, hipTwist: 0, lean: 0.46, crouch: -0.44, step: 0.3, back: 0.34, width: 0.18, headPitch: 0.1 })),
+        K(1.2, B({ ...body, twist: 0.0, hipTwist: 0, lean: 0.42, crouch: -0.44, step: 0.3, back: 0.34, width: 0.18, headPitch: 0.15 })),
+        K(1.5, B({ ...body })),
       ],
-      main: reaping,
+      main: requiem,
+      // the free hand spread out over the ground as he sinks
       free: track([
         [-1.6, [0.3, 0.2, 0.25]],
-        [-0.5, [0.38, 0.3, 0.3]],
-        [reapingHit, [0.45, 0.25, 0.1]],
-        [1.0, [0.35, 0.2, 0.15]],
+        [-0.75, [0.45, 0.62, 0.2]],
+        [REQUIEM_HIT, [0.42, 0.05, 0.42]],
+        [1.5, [0.3, 0.2, 0.25]],
       ]),
-      impacts: [reapingHit],
+      impacts: [REQUIEM_HIT],
       start: -1.6,
-      chamber: -1.5,
-      flow: 1.25,
+      chamber: -0.75,
+      flow: 1.2,
       blendIn: 0.3,
+      end: 1.2,
+      rest: 1.5,
+      settle: 0.6,
       fx: [
-        fx(-1.2, 'whirl', 'root', 0.7, BLOOD),
-        fx(-0.6, 'whirl', 'root', 1.0, BLOOD),
-        fx(hitAt(reaping, 2, 1), 'soulfire', 'tip', 0.8),
-        fx(reapingHit, 'soulfire', 'tip', 1.2),
-        fx(reapingHit, 'wisps', 'tip', 0.8),
-        fx(hitAt(reaping, 4, 1), 'soulfire', 'tip', 0.8),
-        fx(0.95, 'soulfire', 'tip', 0.6),
+        fx(-1.2, 'wisps', 'tip', 0.8),
+        fx(-0.5, 'whirl', 'root', 0.9, SOUL),
+        fx(-0.1, 'soulfire', 'tip', 0.7),
+        fx(REQUIEM_HIT, 'soulfire', 'tip', 1.6),
+        fx(REQUIEM_HIT, 'shockwave', 'tip', 1.3, SOUL),
+        fx(REQUIEM_HIT + 0.01, 'wisps', 'tip', 1.4),
+        fx(REQUIEM_HIT + 0.02, 'stomp', 'feet', 0.7),
       ],
-      trail: { life: 0.24, glow: 0.7 },
+      trail: { life: 0.26, glow: 0.75 },
     }),
     // Soul Hook: the sickle swung up over the shoulder and thrown overhand straight at them; a chain
     // of souls reaches out after it, and the Wraith hauls it back in hand over hand
@@ -524,59 +521,80 @@ export const scythe: Style = {
       trail: { life: 0.2, glow: 0.6 },
     }),
   },
-  // Ring entrance, Out of the Mist: fog rolls in and the Wraith rises out of it bent double with its
-  // back turned, turns slowly to face them with the sickle dragged along the floor in green fire,
-  // then whirls once round under the sickle raised over the head and comes down into guard
+  // Ring entrance, Out of the Mist: the Wraith rises out of the fog bent double with its back
+  // turned, and snaps round to face them; the sickle whirled out at arm's length through a full
+  // turn of the body, trailing green fire; raised overhead and hooked down into the floor ahead in
+  // a burst of soulfire; crouched over it, the head tilting; then torn free into guard
   entrance: mv({
     keys: [
       // sunk in the mist, rising, turned away
       K(0.0, B({ ...body, lift: -1.05, crouch: -0.2, lean: 0.85, twist: 0.2, side: 0.12, headPitch: 0.6 }), { spin: 0.42 }),
-      K(0.1, B({ ...body, lift: -0.9, crouch: -0.2, lean: 0.8, twist: 0.2, side: 0.12, headPitch: 0.6 })),
-      K(0.22, B({ ...body, lift: -0.4, crouch: -0.14, lean: 0.5, twist: 0.15, side: 0.06, headPitch: 0.45 })),
-      K(0.34, B({ ...body, lift: 0.04, crouch: -0.07, lean: 0.2, twist: 0.05, headPitch: 0.25 })),
-      // the slow turn to face them, the head leading
-      K(0.4, B({ ...body, lift: 0.04, crouch: -0.08, lean: 0.24, twist: 0.0, headPitch: 0.2 }), { spin: 0.42 }),
-      K(0.52, B({ ...body, lift: 0.04, crouch: -0.09, lean: 0.28, twist: -0.7, hipTwist: 0.0, headPitch: 0.1 }), { spin: 0.3 }),
-      K(0.66, B({ ...body, lift: 0.03, crouch: -0.09, lean: 0.26, twist: -0.4, headPitch: 0.0 }), { spin: 0.0 }),
-      // one whirl round under the raised sickle
-      K(0.72, B({ ...body, lift: 0.08, crouch: -0.03, lean: -0.08, twist: 0.0, headPitch: -0.15 }), { spin: 0.0 }),
-      K(0.8, B({ ...body, lift: 0.22, crouch: 0.0, lean: -0.1, twist: 0.0, side: 0.06, headPitch: -0.1 }), { spin: -0.55 }),
-      K(0.86, B({ ...body, lift: 0.14, crouch: -0.03, lean: 0.0, twist: -0.1, headPitch: -0.05 }), { spin: -1 }),
+      K(0.12, B({ ...body, lift: -0.6, crouch: -0.18, lean: 0.6, twist: 0.18, side: 0.1, headPitch: 0.5 })),
+      K(0.22, B({ ...body, lift: 0.0, crouch: -0.08, lean: 0.3, twist: 0.1, side: 0.04, headPitch: 0.3 })),
+      // snapped round to face them
+      K(0.25, B({ ...body, lift: 0.0, crouch: -0.08, lean: 0.28, twist: 0.0, headPitch: 0.25 }), { spin: 0.42 }),
+      K(0.32, B({ ...body, lift: 0.02, crouch: -0.1, lean: 0.15, twist: -0.1, headPitch: 0.1 }), { spin: 0 }),
+      // the harvest: a full turn after the sickle
+      K(0.36, B({ ...body, crouch: -0.12, lean: 0.1, twist: 0.2, headPitch: 0.05 }), { spin: 0 }),
+      K(0.46, B({ ...body, crouch: -0.14, lean: 0.05, twist: -0.1, side: 0.06, headPitch: 0.0 }), { spin: -0.5 }),
+      K(0.56, B({ ...body, crouch: -0.12, lean: 0.05, twist: -0.2, headPitch: 0.0 }), { spin: -1 }),
+      // tall and arched back under the raised sickle
+      K(0.62, B({ ...body, crouch: -0.02, lean: -0.18, twist: 0.0, headPitch: -0.2 })),
+      K(0.68, B({ ...body, lift: 0.05, crouch: 0.0, lean: -0.22, twist: 0.0, headPitch: -0.25 })),
+      // down over it as it goes into the floor
+      K(0.745, B({ ...body, crouch: -0.45, lean: 0.55, step: 0.3, back: 0.3, width: 0.18, headPitch: 0.3 })),
+      // still, the head tilting
+      K(0.82, B({ ...body, crouch: -0.46, lean: 0.52, step: 0.3, back: 0.3, width: 0.18, side: 0.1, headPitch: 0.15 })),
+      K(0.88, B({ ...body, crouch: -0.4, lean: 0.45, step: 0.28, back: 0.28, width: 0.16, side: -0.04, headPitch: 0.0 })),
       K(0.97, body),
     ],
-    main: keyed([
-      [0.0, [-0.34, 0.08, 0.0], [-0.15, 0.6, -0.8], [-0.4, 0.0, -0.2]],
-      [0.3, [-0.34, 0.06, 0.02], [-0.2, 0.2, -1], [0, -1, 0]],
-      // dragged along the floor, trailing behind on the right
-      [0.4, [-0.36, -0.08, 0.02], [-0.25, -0.75, -0.6], [-0.7, -0.5, 0.2]],
-      [0.66, [-0.4, -0.06, 0.08], [-0.6, -0.75, -0.15], [-0.4, -0.5, 0.7]],
-      // raised over the head, the point out ahead
-      [0.74, [-0.16, 0.98, 0.12], [-0.3, 0.3, 1], [0, -1, 0]],
-      [0.86, [-0.16, 0.98, 0.12], [-0.3, 0.3, 1], [0, -1, 0]],
-      [0.97, GUARD_POS, GUARD_DIR, GUARD_EDGE],
-    ]),
+    main: seq(
+      [
+        // hanging behind as it rises
+        [-1, 0.24, line([-0.34, 0.06, 0.02], [-0.34, 0.06, 0.02], [-0.2, 0.2, -1], [-0.2, 0.2, -1], [0, -1, 0])],
+        // swung out to the right as it turns, and round to the front
+        [0.24, 0.3, line([-0.34, 0.06, 0.02], [-0.5, 0.3, 0.05], [-0.2, 0.2, -1], [-1, 0.1, -0.1], [0, -1, 0])],
+        [0.3, 0.36, line([-0.5, 0.3, 0.05], [-0.55, 0.434, 0.239], [-1, 0.1, -0.1], [0, 0.1, 1], [0, -1, 0])],
+        // whirled flat at arm's length while the body turns under it
+        [0.36, 0.58, whirl([-0.55, 0.42, 0.1], [0, 0.1, 1], [-1, 0.1, 0], -2.5, 0, 0.14)],
+        // raised overhead, the point back
+        [0.58, 0.68, line([-0.55, 0.406, -0.04], [-0.16, 0.98, 0.12], [0, -0.1, -1], [-0.3, 0.6, -0.75], [0, -1, 0])],
+        // over the top and hooked down into the floor ahead
+        [0.68, 0.745, cast([[-0.3, 0.6, -0.75], [-0.2, 0.98, 0.0], [-0.05, 0.6, 0.8], [0, -0.2, 0.98], [0.05, -0.75, 0.65]], 0.44, [-0.2, 0.62, 0.0], { pivot1: [-0.1, 0.25, 0.2] })],
+        [0.745, 0.86, line([-0.078, -0.082, 0.488], [-0.078, -0.082, 0.488], [0.05, -0.75, 0.65], [0.05, -0.75, 0.65], [0, 0.6, 0.8])],
+        // torn free into guard
+        [0.86, 0.97, line([-0.078, -0.082, 0.488], GUARD_POS, [0.05, -0.75, 0.65], GUARD_DIR, GUARD_EDGE)],
+        [0.97, 2, line(GUARD_POS, GUARD_POS, GUARD_DIR, GUARD_DIR, GUARD_EDGE)],
+      ],
+      0.04,
+    ),
     free: track([
       [0.0, [0.3, 0.2, 0.2]],
-      [0.34, [0.34, 0.26, 0.28]],
-      [0.5, [0.38, 0.3, 0.34]],
-      [0.66, [0.34, 0.3, 0.3]],
-      [0.86, [0.4, 0.45, 0.1]],
+      [0.3, [0.34, 0.26, 0.28]],
+      [0.36, [0.5, 0.5, 0.1]],
+      [0.56, [0.5, 0.5, 0.1]],
+      [0.62, [0.3, 0.7, 0.1]],
+      [0.745, [0.3, 0.1, 0.45]],
+      [0.86, [0.32, 0.12, 0.42]],
       [0.97, GUARD_FREE],
     ]),
     lead: 0,
-    ghosts: [0.74, 0.88],
+    ghosts: [0.36, 0.58],
     fx: [
       fx(0.0, 'fog', 'root', 1.6),
       fx(0.12, 'fog', 'root', 1.0),
-      fx(0.26, 'wisps', 'root', 0.8),
-      fx(0.4, 'soulfire', 'tip', 0.7),
-      fx(0.47, 'soulfire', 'tip', 0.8),
-      fx(0.5, 'wisps', 'tip', 0.7),
-      fx(0.55, 'soulfire', 'tip', 0.9),
-      fx(0.63, 'soulfire', 'tip', 0.8),
-      fx(0.75, 'whirl', 'root', 1.1, BLOOD),
-      fx(0.8, 'wisps', 'tip', 0.8, BLOOD),
-      fx(0.84, 'whirl', 'root', 0.8, BLOOD),
+      fx(0.2, 'wisps', 'root', 0.8),
+      fx(0.3, 'wisps', 'tip', 0.6),
+      fx(0.38, 'soulfire', 'tip', 0.8),
+      fx(0.4, 'whirl', 'root', 1.1, SOUL),
+      fx(0.44, 'soulfire', 'tip', 0.9),
+      fx(0.5, 'soulfire', 'tip', 0.9),
+      fx(0.56, 'soulfire', 'tip', 0.8),
+      fx(0.745, 'soulfire', 'root', 1.6),
+      fx(0.745, 'shockwave', 'front', 1.1, SOUL),
+      fx(0.745, 'stomp', 'feet', 0.8),
+      fx(0.75, 'wisps', 'tip', 1.0),
+      fx(0.82, 'wisps', 'root', 0.7, BLOOD),
       fx(0.9, 'wisps', 'tip', 0.6),
     ],
   }),

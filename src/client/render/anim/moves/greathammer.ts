@@ -56,12 +56,20 @@ const chop = [
   H(1.07, [0.06, 0.24, 0.42], aim(-26, -36)),
 ];
 
-// Cyclone (ref2 1.1-1.9 s): the head dragged out to his left along the floor, then whirled round
-// flat at chest height one whole turn and a quarter, the fists up in front of his chest and the
-// body upright over a wide base; the hit as it comes round the front, then he drops into a lunge
-const cyc: ReturnType<typeof H>[] = [H(-1.3, LOW, GUARD_DIR), H(-1.0, [0.0, 0.26, 0.2], aim(170, -18))];
-for (let i = 1; i <= 10; i++) cyc.push(H(-1.0 + (1.45 * i) / 10, [0.0, 0.42 - 0.012 * i, 0.4 + 0.006 * i], aim(95 - 45.5 * i, Math.min(8, -20 + 6 * i))));
-cyc.push(H(0.62, [-0.05, 0.28, 0.46], aim(-410, -10)), H(0.82, REST, aim(-440, -28)), H(1.07, REST, aim(-450, -36)));
+// Fault Line: hoisted up in front of him as he crouches to spring, then up over his head as he
+// leaps, hung right back over his back at the top of the leap, and brought over and down with his
+// whole weight into the floor ahead as he lands, splitting it in a line out in front of him
+const fault = [
+  H(-1.2, LOW, GUARD_DIR),
+  H(-0.85, [-0.04, 0.42, 0.34], aim(8, 24)),
+  H(-0.5, [-0.06, 0.86, 0.2], aim(150, 66)),
+  H(0.05, [-0.1, 0.95, 0.12], aim(180, 60)),
+  H(0.27, [-0.03, 0.86, 0.34], aim(0, 64)),
+  H(0.37, [-0.04, 0.56, 0.44], aim(0, 36)),
+  H(0.45, OUT, aim(0, -6)),
+  H(0.58, REST, aim(0, -28)),
+  H(1.07, REST, aim(0, -32)),
+];
 
 // Charging Uppercut (ref2 #27-#29): the head trailed behind on the floor at his left through the
 // dash, then swung down past his left foot and up under the target, the arms carrying on up until
@@ -193,41 +201,44 @@ export const greathammer: Style = {
       fx: [fx(0.48, 'shockwave', 'tip', 1.0), fx(0.48, 'shake', 'root', 0.8), fx(0.5, 'dust', 'tip', 1.2), fx(0.46, 'stomp', 'feet', 0.8)],
       trail: { life: 0.2, glow: 0.5 },
     }), chop),
-    // Cyclone: the perilous whirl (ref2 1.1-1.9 s). The head dragged out to his left along the
-    // floor, wound left and sunk; then the hips lead off and the hammer hauls him round a whole turn
-    // and on, upright and leaning out against its pull over a wide base, the fists up at his chest;
-    // it tears through at chest height as it comes round the front and he drops into a long lunge
+    // Fault Line: the perilous slam. Sunk low to spring with the hammer hoisted in front, then up off
+    // both feet with it raised over his head, arched back under it at the top of the leap, and down
+    // with everything into the floor ahead as he lands in a crouch over it: the ground splits open in
+    // a straight line out in front of him (jump the fissure, or be off its line)
     sp: heave(mv({
       keys: [
-        K(-1.3, body, { spin: 0 }),
-        // the pull-back: wound left to the end of the turn and sunk on the rear leg, the head dragged far back
-        K(-1.0, B({ ...body, twist: 1.15, hipTwist: 0.6, lean: 0.3, crouch: -0.34, step: 0.3, back: 0.5, width: 0.26, side: 0.1 }), { spin: 0 }),
-        // up off the drag into the whirl, the chest up
-        K(-0.6, B({ ...body, twist: 0.35, hipTwist: -0.2, lean: 0.1, crouch: -0.24, step: 0.32, back: 0.36, width: 0.32, side: 0.16, headPitch: -0.1 }), { spin: -0.25 }),
-        K(-0.15, B({ ...body, twist: 0.3, hipTwist: -0.2, lean: 0.08, crouch: -0.24, step: 0.34, back: 0.36, width: 0.32, side: 0.18, headPitch: -0.1 }), { spin: -0.62 }),
-        // through the target and down into the lunge behind it
-        K(0.45, B({ ...body, twist: -0.3, hipTwist: -0.35, lean: 0.42, crouch: -0.32, step: 0.56, back: 0.42, width: 0.3, side: 0.06, headPitch: -0.2 }), { spin: -1.02 }),
-        K(0.8, B({ ...body, twist: -0.65, hipTwist: -0.5, lean: 0.64, crouch: -0.47, step: 0.57, back: 0.49, width: 0.3, headPitch: -0.22 }), { spin: -1.15 }),
-        K(1.07, B({ ...body, twist: -0.62, hipTwist: -0.48, lean: 0.6, crouch: -0.47, step: 0.57, back: 0.49, width: 0.3 }), { spin: -1.14 }),
+        K(-1.2, body, { hop: 0 }),
+        // the crouch to spring, the hammer coming up in front
+        K(-0.85, B({ ...body, twist: 0.0, hipTwist: 0.0, lean: 0.3, crouch: -0.4, step: 0.3, back: 0.32, width: 0.26 }), { hop: 0 }),
+        // up off both feet, the hammer going up over the helm
+        K(-0.5, B({ ...body, twist: 0.0, hipTwist: 0.0, lean: -0.2, crouch: 0.02, step: 0.24, back: 0.3, width: 0.2, headPitch: -0.3 }), { hop: 0.45 }),
+        // the top of the leap: arched back under it
+        K(0.05, B({ ...body, twist: 0.0, lean: -0.42, crouch: 0.04, step: 0.22, back: 0.34, width: 0.2, headPitch: -0.45 }), { hop: 0.62 }),
+        // jack-knifing forward over it on the way down
+        K(0.3, B({ ...body, twist: 0.0, lean: 0.34, crouch: -0.16, step: 0.42, back: 0.4, width: 0.24, headPitch: -0.25 }), { hop: 0.22 }),
+        // landed in a crouch over the haft as the head goes in
+        K(0.45, B({ ...body, twist: -0.06, lean: 0.66, crouch: -0.52, step: 0.6, back: 0.5, width: 0.3, headPitch: -0.25 }), { hop: 0 }),
+        K(1.07, B({ ...body, twist: -0.1, lean: 0.62, crouch: -0.52, step: 0.6, back: 0.5, width: 0.3, headPitch: -0.15 }), { hop: 0 }),
       ],
       main: { kind: 'hold' },
-      start: -1.3,
-      chamber: -1.0,
-      flow: 1.6,
+      start: -1.2,
+      chamber: -0.5,
+      flow: 1.35,
       blendIn: 0.3,
       lead: 0.05,
+      ghosts: [-0.5, 0.45],
       fx: [
-        fx(-1.2, 'dust', 'tip', 1),
-        fx(-0.8, 'whirl', 'root', 1.2, '#ffb347'),
-        fx(-0.5, 'whirl', 'root', 1.0, '#ffb347'),
-        fx(-0.1, 'whirl', 'root', 1.2, '#ff7a2a'),
-        fx(0.45, 'flashline', 'tip', 1.2),
-        fx(0.45, 'whirl', 'root', 1.5, '#ff7a2a'),
-        fx(0.46, 'stomp', 'feet', 1),
-        fx(0.6, 'dust', 'feet', 1.2),
+        fx(-0.9, 'dust', 'feet', 1.0),
+        fx(-0.55, 'dust', 'feet', 1.3),
+        fx(-0.2, 'sparkle', 'tip', 1.2, '#ff7a2a'),
+        fx(0.45, 'shockwave', 'tip', 1.6),
+        fx(0.45, 'shake', 'root', 1.2),
+        fx(0.46, 'quake', 'tip', 1.4),
+        fx(0.47, 'stomp', 'feet', 1.0),
+        fx(0.6, 'dust', 'tip', 1.4),
       ],
-      trail: { life: 0.26, glow: 0.65 },
-    }), cyc, G2),
+      trail: { life: 0.28, glow: 0.75 },
+    }), fault, G2),
     // Charging Uppercut (ref2 2.1-2.4 s): bent low into the dash with the head trailing on the floor
     // behind his left heel, wound left; the lead foot strides out, the hips turn first and it comes
     // down past his foot and up under the target, the legs straightening under it until he is up on

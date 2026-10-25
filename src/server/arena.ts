@@ -7,6 +7,7 @@ import { BOT_PROFILES, BotBrain, botProfileForRating } from './bot';
 import { Player, ServerFighter } from './entities';
 import type { Game } from './game';
 import { Instance } from './instance';
+import { TutorialCoach } from './tutorial';
 
 let botCounter = 0;
 
@@ -32,6 +33,8 @@ export class Arena extends Instance {
   /** humans by slot (null for a bot) */
   readonly humans: [Player | null, Player | null];
   private readonly rosters: [RosterEntry, RosterEntry];
+  /** the tutorial's sensei, when this match is the tutorial */
+  readonly coach: TutorialCoach | null = null;
 
   constructor(
     game: Game,
@@ -66,7 +69,33 @@ export class Arena extends Instance {
     this.slots = [fa, fb];
     this.humans = [a, b];
     this.rosters = [fa.roster(), fb.roster()];
+    if (mode === 'tutorial') {
+      // straight into the lesson: no entrances, no countdown, no clock
+      const now = game.now();
+      this.coach = new TutorialCoach(fb, fa, a, (t) => this.tutorialDone(t));
+      fb.brain = this.coach;
+      // face to face in the middle of the arena, a few steps apart
+      const mx = (s0.x + s1.x) / 2;
+      const mz = (s0.z + s1.z) / 2;
+      const len = Math.hypot(s1.x - s0.x, s1.z - s0.z) || 1;
+      const ux = (s1.x - s0.x) / len;
+      const uz = (s1.z - s0.z) / len;
+      this.revive(fa, mx - ux * 2, mz - uz * 2, s0.yaw, now, 0);
+      this.revive(fb, mx + ux * 2, mz + uz * 2, s1.yaw, now, 0);
+      this.setPhase('fight', now + 3_600_000);
+      this.coach.start(now);
+      return;
+    }
     this.setPhase('intro', game.now() + (game.options.introTime ?? MATCH.introTime));
+  }
+
+  /** The last lesson is learned: a moment to take it in, then back to the lobby. */
+  private tutorialDone(now: number): void {
+    if (this.finished) return;
+    this.finished = true;
+    const p = this.humans[0];
+    if (p) this.game.endTutorial(p, true);
+    this.setPhase('matchEnd', now + 4500);
   }
 
   isFrozen(): boolean {
@@ -119,6 +148,11 @@ export class Arena extends Instance {
   }
 
   protected onKill(victim: ServerFighter, _killer: ServerFighter | null, _how: string, now: number): void {
+    if (this.coach) {
+      // nobody dies in a lesson: up again where they fell
+      this.revive(victim, victim.x, victim.z, victim.yaw, now, 0);
+      return;
+    }
     if (this.phase !== 'fight') return;
     const slot = this.slotOf(victim);
     if (slot < 0) return;
@@ -141,6 +175,11 @@ export class Arena extends Instance {
   }
 
   protected rules(now: number): void {
+    if (this.coach) {
+      this.coach.observe(this.fx, now);
+      if (this.phase === 'matchEnd' && now >= this.phaseEndsAt) this.game.closeArena(this);
+      return;
+    }
     if (this.phase === 'fight') {
       // keep both fighters inside the match even if they somehow left
       if (now >= this.phaseEndsAt) {
@@ -171,11 +210,26 @@ export class Arena extends Instance {
     }
   }
 
-  /** A player left or gave up. */
-  forfeit(p: Player): void {
+  /**
+   * A player left (`chose` false) or gave up. Giving up is refused while they're finishing their
+   * opponent off: the round is theirs, it only counts when the execution ends.
+   */
+  forfeit(p: Player, chose = false): void {
+    if (this.coach) {
+      // giving up the tutorial skips it; dropping out of it leaves it for next time
+      if (this.finished) return;
+      this.finished = true;
+      if (chose) {
+        this.game.endTutorial(p, false);
+        this.game.closeArena(this);
+      } else this.setPhase('matchEnd', this.game.now());
+      return;
+    }
     if (this.finished) return;
     const slot = this.humans[0] === p ? 0 : this.humans[1] === p ? 1 : -1;
     if (slot < 0) return;
+    const [me, foe] = slot === 0 ? this.slots : [this.slots[1], this.slots[0]];
+    if (chose && (me.state === 'execute' || foe.state === 'executed' || foe.state === 'dead')) return;
     this.finish(slot === 0 ? 1 : 0, 'forfeit', this.game.now());
   }
 

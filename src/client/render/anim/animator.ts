@@ -341,6 +341,46 @@ interface MoveFrame {
   kick: KickTarget | null;
 }
 
+/** An execution's finishing strike: from its loaded pose into the hit, as long as a heavy's. */
+const EXEC_STRIKE_MS = 130;
+
+/**
+ * Where an execution's choreography is (its s) at `e` ms, before the finishing blow: the strike
+ * (from sStrike) lands in EXEC_STRIKE_MS, accelerating into the hit like any attack's, and the
+ * choreography before it fills the rest of the time, so its loaded pose hangs a beat longer.
+ */
+function execS(def: MoveDef, e: number): number {
+  const hitAt = COMBAT.executeHitAt;
+  const last = def.impacts[def.impacts.length - 1];
+  const w = execStrikeMs(def);
+  if (w === 0) return def.sStart + (last - def.sStart) * (e / hitAt);
+  const strike = def.sStrike!;
+  const t0 = hitAt - w;
+  if (e < t0) return def.sStart + (strike - def.sStart) * (e / t0);
+  const q = (e - t0) / w;
+  return strike + (last - strike) * q * q;
+}
+
+/** When (ms) an execution reaches s: the inverse of execS (for the victim's flinches). */
+function execT(def: MoveDef, s: number): number {
+  const hitAt = COMBAT.executeHitAt;
+  const last = def.impacts[def.impacts.length - 1];
+  const w = execStrikeMs(def);
+  if (w === 0) return ((s - def.sStart) / Math.max(1e-6, last - def.sStart)) * hitAt;
+  const strike = def.sStrike!;
+  const t0 = hitAt - w;
+  if (s <= strike) return ((s - def.sStart) / Math.max(1e-6, strike - def.sStart)) * t0;
+  return t0 + w * Math.sqrt((s - strike) / Math.max(1e-6, last - strike));
+}
+
+/** How long the finishing strike takes (0: the move keeps its authored spacing). Never slower than authored. */
+function execStrikeMs(def: MoveDef): number {
+  const last = def.impacts[def.impacts.length - 1];
+  if (def.sStrike === null || def.sStrike <= def.sStart || def.sStrike >= last) return 0;
+  const authored = ((last - def.sStrike) / (last - def.sStart)) * COMBAT.executeHitAt;
+  return Math.min(EXEC_STRIKE_MS, authored);
+}
+
 export class Animator {
   readonly style: Style;
   private current: ResolvedPose;
@@ -771,8 +811,11 @@ export class Animator {
     const hitAt = COMBAT.executeHitAt;
     const dur = Math.max(hitAt + 1, a.dur || COMBAT.executeTime);
     const last = def.impacts[def.impacts.length - 1];
-    const s = e < hitAt ? def.sStart + (last - def.sStart) * (e / hitAt) : last + (def.sRest - last) * clamp01((e - hitAt) / (dur - hitAt - 300));
+    const s = e < hitAt ? execS(def, e) : last + (def.sRest - last) * clamp01((e - hitAt) / (dur - hitAt - 300));
+    const from = this.fxMaxS === -Infinity ? Math.min(def.sStart, def.sChamber) - 1e-3 : this.fxMaxS;
     this.cues(def, s, out);
+    // each flourish strike lands on the victim (the finishing blow is the server's 'execute')
+    for (const at of def.impacts.slice(0, -1)) if (at > from && at <= s) out.fx.push({ s: at, kind: 'blow', at: 'tip', scale: 1 });
     out.trail = def.trail;
     out.ghost = !!def.ghosts && s >= def.ghosts[0] && s <= def.ghosts[1];
     const swinging = s >= def.sChamber && s <= def.sEnd;
@@ -799,16 +842,19 @@ export class Animator {
     const react: ExecuteReact = by?.executeReact ?? 'crumple';
     const p = this.statePose({ ...a, state: 'broken' }).target;
     const rot: Rot = { ...ZERO_ROT };
-    // flinches at the flourish strikes before the last
+    // reeling from each flourish strike before the last: thrown back and twisted away (left and right
+    // in turn), the head snapped round, slow to come back (the app adds the hit's own knock on top)
     if (def && def.impacts.length > 1) {
-      const last = def.impacts[def.impacts.length - 1];
-      for (const at of def.impacts.slice(0, -1)) {
-        const t = ((at - def.sStart) / Math.max(1e-6, last - def.sStart)) * hitAt;
-        const k = e > t ? kick((e - t) / 90) * Math.exp(-(e - t) / 260) : 0;
-        p.body.lean -= 0.25 * k;
-        p.body.headPitch -= 0.4 * k;
-        p.body.twist += 0.18 * k;
-      }
+      def.impacts.slice(0, -1).forEach((at, i) => {
+        const t = execT(def, at);
+        const k = e > t ? kick((e - t) / 70) * Math.exp(-(e - t) / 380) : 0;
+        const way = i % 2 === 0 ? 1 : -1;
+        p.body.lean -= 0.45 * k;
+        p.body.headPitch -= 0.75 * k;
+        p.body.twist += 0.4 * way * k;
+        p.body.side += 0.2 * way * k;
+        p.body.back += 0.08 * k;
+      });
     }
     if (e >= hitAt) {
       const t = e - hitAt;
@@ -1067,10 +1113,30 @@ export class Animator {
       const to = C.body[c];
       if (to !== undefined) b[c] += (to - b[c]) * w;
     }
-    // the hands go from the guard to the carry
-    pose.main.pos.lerp(C.main.pos, w);
-    pose.main.quat.slerp(C.main.quat, w);
-    pose.main.hold2 += (C.main.hold2 - pose.main.hold2) * w;
+    // the hands go from the guard to the carry, by way of its waypoint if it has one: the blend is
+    // split where the waypoint falls along the whole turn, so the weapon turns at an even pace
+    const m = pose.main;
+    if (C.via) {
+      const a1 = m.quat.angleTo(C.via.quat);
+      const h = a1 / Math.max(1e-6, a1 + C.via.quat.angleTo(C.main.quat));
+      if (w < h) {
+        const t = w / h;
+        m.pos.lerp(C.via.pos, t);
+        m.quat.slerp(C.via.quat, t);
+        m.grip2 += (C.via.grip2 - m.grip2) * t;
+        m.hold2 += (C.via.hold2 - m.hold2) * t;
+      } else {
+        const t = (w - h) / Math.max(1e-6, 1 - h);
+        m.pos.lerpVectors(C.via.pos, C.main.pos, t);
+        m.quat.slerpQuaternions(C.via.quat, C.main.quat, t);
+        m.grip2 = C.via.grip2;
+        m.hold2 = C.via.hold2 + (C.main.hold2 - C.via.hold2) * t;
+      }
+    } else {
+      m.pos.lerp(C.main.pos, w);
+      m.quat.slerp(C.main.quat, w);
+      m.hold2 += (C.main.hold2 - m.hold2) * w;
+    }
     if (pose.off && C.off) {
       pose.off.pos.lerp(C.off.pos, w);
       pose.off.quat.slerp(C.off.quat, w);
@@ -1193,7 +1259,7 @@ export class Animator {
     for (let i = this.reactions.length - 1; i >= 0; i--) {
       const r = this.reactions[i];
       r.t += dt;
-      const life = r.kind === 'roar' ? 0.95 : r.hit?.heavy ? 0.6 : 0.35;
+      const life = r.kind === 'roar' ? 0.95 : r.hit?.heavy ? 0.6 : r.kind === 'deflect' ? 0.45 : 0.35;
       if (r.t > life) {
         this.reactions.splice(i, 1);
         continue;
@@ -1201,11 +1267,17 @@ export class Animator {
       const b = pose.body;
       switch (r.kind) {
         case 'deflect': {
-          // a crisp flick of the blade as it turns the strike aside
+          // a hard snap of the blade up and out as it turns the strike aside, the body bracing
+          // behind it and rocking back a touch, then driving forward again
           const k = kick(r.t / 0.05);
-          tilt(pose.main, -0.5 * k);
-          shiftHands(pose, UP, 0.05 * k);
-          b.twist += 0.12 * k;
+          const after = Math.max(0, r.t - 0.12);
+          tilt(pose.main, -0.95 * k);
+          shiftHands(pose, UP, 0.09 * k);
+          shiftHands(pose, BACK, 0.04 * k);
+          b.twist += 0.24 * k;
+          b.lean -= 0.1 * k - 0.06 * Math.min(1, after * 6) * k;
+          b.crouch -= 0.06 * k;
+          b.headPitch -= 0.08 * k;
           break;
         }
         case 'blocked': {

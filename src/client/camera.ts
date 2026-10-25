@@ -7,12 +7,19 @@ import * as THREE from 'three';
 import { angleDiff, clamp, forward, yawTo } from '../shared/math';
 import { G } from './render/gfx/globals';
 import { COMBAT } from '../shared/config';
+import type { CharacterId } from '../shared/characters';
 
 /** Wide, like Dueling Grounds (Roblox's 70): the camera sits close behind you, so it needs the width. */
 export const CAMERA_FOV = 70;
 /** Sideways offset of the camera (and its aim) to the player's right, in metres. */
 const SHOULDER = 1.4;
 /** The fixed framing while locked on: pitch and boom length (scaled with your fighter's size). */
+
+/**
+ * How much wider a fighter is than their height accounts for: the Warden's plate and slung hammer
+ * fill the view from behind him, so the duel camera swings further round him (see duelAim).
+ */
+export const CAMERA_BULK: Partial<Record<CharacterId, number>> = { juggernaut: 1.7 };
 
 /** A camera pose for cinematic shots. */
 export interface CamPose {
@@ -57,6 +64,8 @@ export class CameraRig {
   subjectScale = 1;
   /** the same for the opponent being framed */
   targetScale = 1;
+  /** your fighter's bulk (CAMERA_BULK): how much further round you the duel camera swings */
+  subjectBulk = 1;
   private locked = false;
   private shakes: Shake[] = [];
   private time = 0;
@@ -210,9 +219,10 @@ export class CameraRig {
     const rz = u.x;
     // just off the line between you: ~24° up close (so your own back doesn't hide them), ~11° apart
     const close = THREE.MathUtils.smoothstep(d, 1.5, 7);
-    const phi = THREE.MathUtils.lerp(0.42, 0.2, close);
+    // (further round a bulky fighter, so they don't hide them)
+    const phi = THREE.MathUtils.lerp(0.42, 0.2, close) * this.subjectBulk;
     // and the whole view nudged over your right shoulder, so you stand a little left of centre
-    const sh = THREE.MathUtils.lerp(0.55, 0.3, close) * k;
+    const sh = THREE.MathUtils.lerp(0.55, 0.3, close) * k * this.subjectBulk;
     // about two body heights behind you, a little further when they're far off
     const boom = THREE.MathUtils.clamp(3.3 + d * 0.08, 3.4, 4.2) * k;
     const bx = -u.x * Math.cos(phi) + rx * Math.sin(phi);
@@ -223,7 +233,9 @@ export class CameraRig {
     const lift = Math.max(0, player.y - ground);
     // and when they're in the air it sinks a little to look up at them
     const above = Math.max(0, target.y - ground);
-    const pos = new THREE.Vector3(player.x + bx * boom + rx * sh, ground + 2.3 * k + lift * 0.3 - above * 0.2, player.z + bz * boom + rz * sh);
+    // (a bulky fighter's camera rides a little higher, to look over their shoulder at them)
+    const eye = (2.3 + 0.6 * (this.subjectBulk - 1)) * k;
+    const pos = new THREE.Vector3(player.x + bx * boom + rx * sh, ground + eye + lift * 0.3 - above * 0.2, player.z + bz * boom + rz * sh);
     const subject = new THREE.Vector3(target.x, target.y + 1.2 * k, target.z);
     // only what's behind you pulls it in (it mustn't end up inside a tree or a wall). Something
     // between you and them doesn't move it at all: the prop dissolves instead (see G.uSee)

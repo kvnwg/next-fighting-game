@@ -5,9 +5,12 @@ import { BotDifficulty, LeaderboardEntry, MatchMode, ProfileView, RosterEntry, S
 import { PLACEMENT_MATCHES, RankInfo, TIERS, rankOf } from '../shared/ranks';
 import { CANCELS, CANCEL_NAMES, CancelInto, CancelWindow, MoveClass } from '../shared/cancels';
 import { LobbyBar } from './lobbybar';
-import { ICON, IconName, icon, pixelSVG, recolor } from './pixelicons';
+import { ICON, IconName, icon, pixelSVG, recolor, slashRows } from './pixelicons';
 import { TRACKS } from './audio/music';
 import { settings } from './settings';
+import { LORE, readingMinutes } from './lore';
+import { FREE_PICK_GAMES, MAP_PRICE, AD_REWARD, charPrice, freePickReady, gamesToFreePick, isPremium, reachedGold } from '../shared/progress';
+import { THUMBS } from './select';
 
 const h = (html: string): HTMLElement => {
   const t = document.createElement('template');
@@ -41,6 +44,7 @@ const PERILOUS_TIP: Record<Perilous, string> = {
   thrust: 'Perilous THRUST — deflect it, or dodge into it for a Mikiri Counter',
   sweep: 'Perilous SWEEP — jump over it',
   grab: 'Perilous GRAB — dodge or jump away',
+  area: 'Perilous AREA — get off the marked ground, or dodge through it as it lands',
 };
 
 export interface UIHandlers {
@@ -49,6 +53,8 @@ export interface UIHandlers {
   onPractice(diff: BotDifficulty): void;
   onCancelQueue(): void;
   onSelectChar(id: CharacterId): void;
+  /** a fighter brought up on the roster (not yet chosen) */
+  onRosterPick(id: CharacterId): void;
   onLeaderboard(): void;
   onChat(text: string): void;
   onChallengeReply(from: string, accept: boolean): void;
@@ -60,7 +66,18 @@ export interface UIHandlers {
   createPreview(container: HTMLElement): Preview;
   /** data URL of a character's portrait (rendered in-engine) */
   portrait(id: CharacterId): string;
+  /** buy a fighter or an arena with coins, or (free) take the free fighter */
+  onUnlock(kind: 'char' | 'map', id: string, free?: boolean): void;
+  /** watch an ad for coins (the shop's reward, or to double the last match's); true if earned */
+  onWatchAd(kind: 'double' | 'bonus'): Promise<boolean>;
+  /** play the tutorial (again) */
+  onTutorial(): void;
 }
+
+export type ModalKind = 'chars' | 'ladder' | 'help' | 'shop';
+
+/** Coins as written: 1,250. */
+const coinText = (n: number): string => Math.max(0, Math.floor(n)).toLocaleString('en-US');
 
 export interface CardData {
   name: string;
@@ -127,6 +144,10 @@ export class UI {
   private preview: Preview | null = null;
   private challengeFrom: string | null = null;
   modalOpen: string | null = null;
+  /** a fighter's legend open over the fighter select (see openLegend) */
+  private legend: HTMLElement | null = null;
+  /** repaints the open fighter select's locks and buttons (what you own changed) */
+  private charsRefresh: (() => void) | null = null;
   /** in a match you fight with who you brought: the fighter picker stays shut */
   private charsLocked = false;
   profile: ProfileView | null = null;
@@ -190,6 +211,7 @@ export class UI {
           </div>
           <div class="esc-hint hidden">Esc to free the cursor</div>
         </div>
+        <button class="purse" title="Coins · open the shop">${icon('coin', 'purse-ico')}<b class="purse-n">0</b><span class="purse-plus">+</span></button>
         <div class="feed"></div>
         <div class="center">
           <div class="banner hidden"></div>
@@ -232,6 +254,7 @@ export class UI {
       onRanked: () => this.handlers.onRanked(),
       onCancelQueue: () => this.handlers.onCancelQueue(),
       onFighters: () => this.toggleModal('chars'),
+      onShop: () => this.toggleModal('shop'),
       onLadder: () => this.toggleModal('ladder'),
       onHelp: () => this.toggleModal('help'),
       onSettings: () => {
@@ -281,6 +304,8 @@ export class UI {
       btnRanked: '#btn-ranked',
       btnPractice: '#btn-practice',
       btnForfeit: '#btn-forfeit',
+      purse: '.purse',
+      purseN: '.purse-n',
     })) {
       this.els[k] = q(sel);
     }
@@ -291,6 +316,7 @@ export class UI {
     q('#btn-chars').addEventListener('click', () => this.toggleModal('chars'));
     q('#btn-ladder').addEventListener('click', () => this.toggleModal('ladder'));
     q('#btn-help').addEventListener('click', () => this.toggleModal('help'));
+    q('.purse').addEventListener('click', () => this.toggleModal('shop'));
     q('.prompt').addEventListener('click', () => this.handlers.onPrompt());
     // touch: the menu is a dropdown under the menu button; picking anything closes it
     this.els.menuButtons.addEventListener('click', (e) => {
@@ -344,6 +370,22 @@ export class UI {
 
   setProfile(p: ProfileView): void {
     this.profile = p;
+    this.setText(this.els.purseN, coinText(p.coins));
+    this.lobbyBar.setFreePick(Math.min(p.games, FREE_PICK_GAMES), FREE_PICK_GAMES, freePickReady(p), p.freePicked);
+    // what's owned or affordable may have changed under an open menu
+    if (this.modalOpen === 'chars') this.charsRefresh?.();
+    else if (this.modalOpen === 'shop') this.renderShop();
+  }
+
+  /** Coins just came in: the purse jumps and the amount floats up off it. */
+  coinsGained(n: number): void {
+    const purse = this.els.purse;
+    purse.classList.remove('bump');
+    void purse.offsetWidth;
+    purse.classList.add('bump');
+    const pop = h(`<div class="coin-pop">${icon('coin')}+${coinText(n)}</div>`);
+    purse.appendChild(pop);
+    setTimeout(() => pop.remove(), 1400);
   }
 
   /** Small, dim connection line: players online, round-trip time, fps. */
@@ -368,6 +410,11 @@ export class UI {
     for (const id of ['btnRanked', 'btnPractice']) (this.els[id] as HTMLButtonElement).disabled = !inLobby;
     this.els.btnForfeit.classList.toggle('hidden', inLobby);
     if (!inLobby) this.els.queue.classList.add('hidden');
+  }
+
+  /** Whether giving up is on the table (not once the match is decided, nor while you finish them). */
+  setForfeitable(on: boolean): void {
+    this.els.btnForfeit.classList.toggle('gone', !on);
   }
 
   setQueue(searching: boolean, since: number, count: number, serverNow: number): void {
@@ -473,13 +520,22 @@ export class UI {
     this.postureBar(this.els.postureMain, frac, broken);
   }
 
-  /** The same bar above the opponent's head (null hides it). */
+  /**
+   * The execution mark on a posture-broken opponent (null hides it): two katana cuts slash across
+   * it one after the other, lock-on brackets snap in round them and 斬 (slay) drops in under it,
+   * then it throbs, a hard-edged diamond pulsing out from it, until they recover or are cut down.
+   * Showing it again (it is display: none when hidden) plays the cuts again.
+   */
   setBrokenMark(at: { x: number; y: number } | null): void {
     let el = this.hud.querySelector<HTMLElement>('.broken-mark');
     if (!el) {
       el = document.createElement('div');
       el.className = 'broken-mark hidden';
-      el.innerHTML = '<i></i><i></i>';
+      el.innerHTML =
+        '<span class="bm-wave"></span><span class="bm-wave late"></span>' +
+        '<span class="bm-lock"><i></i><i></i><i></i><i></i></span>' +
+        `<span class="bm-x">${pixelSVG(slashRows(21), { cls: 'bm-cut a' })}${pixelSVG(slashRows(21, true), { cls: 'bm-cut b' })}</span>` +
+        '<b class="bm-tag jp">斬</b>';
       this.hud.querySelector('.plates')!.after(el);
     }
     el.classList.toggle('hidden', !at);
@@ -521,9 +577,11 @@ export class UI {
   }
 
   setMatch(m: Extract<ServerMsg, { t: 'match' }> | null, serverNow: number): void {
-    this.els.timer.classList.toggle('hidden', !m);
-    this.els.round.classList.toggle('hidden', !m);
-    if (!m) return;
+    // a lesson has no rounds and no clock
+    const shown = !!m && m.mode !== 'tutorial';
+    this.els.timer.classList.toggle('hidden', !shown);
+    this.els.round.classList.toggle('hidden', !shown);
+    if (!m || !shown) return;
     let secs = 0;
     if (m.phase === 'fight') secs = Math.max(0, Math.ceil((m.endsAt - serverNow) / 1000));
     this.setText(this.els.round, `Round ${m.round}`);
@@ -737,7 +795,7 @@ export class UI {
 
   // ------------------------------------------------------------------ modals
 
-  toggleModal(kind: 'chars' | 'ladder' | 'help'): void {
+  toggleModal(kind: ModalKind): void {
     if (this.modalOpen === kind) this.closeModal();
     else this.openModal(kind);
   }
@@ -745,6 +803,8 @@ export class UI {
   closeModal(): void {
     if (!this.modalOpen) return;
     this.modalOpen = null;
+    this.legend = null;
+    this.charsRefresh = null;
     this.modal.classList.add('hidden');
     this.preview?.dispose();
     this.preview = null;
@@ -752,12 +812,94 @@ export class UI {
     this.handlers.onModalChange(false);
   }
 
-  private frame(title: string, body: string, wide = false, kanji = '', ico?: IconName): void {
+  private frame(title: string, body: string, wide = false, kanji = '', ico?: IconName, cls = ''): void {
     this.preview?.dispose();
     this.preview = null;
-    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''}"><div class="modal-head"><h2>${ico ? icon(ico, 'mh-ico') : ''}${kanji ? `<span class="mk">${kanji}</span>` : ''}${title}</h2><button class="btn small close" aria-label="Close">${icon('close')}<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
+    this.legend = null;
+    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''} ${cls}"><div class="modal-head"><h2>${ico ? icon(ico, 'mh-ico') : ''}${kanji ? `<span class="mk">${kanji}</span>` : ''}${title}</h2><button class="btn small close" aria-label="Close">${icon('close')}<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
     this.modal.classList.remove('hidden');
     this.modal.querySelector('.close')!.addEventListener('click', () => this.closeModal());
+  }
+
+  /**
+   * A fighter's legend, opened over the fighter select like a scroll unrolled across it: the
+   * title, the five parts with their numerals stamped beside them (and a row of those numerals up
+   * top to jump between parts, lit as you read through each), a bar filling as you go, and the
+   * line they're known by at the end. Esc or Back rolls it up again.
+   */
+  private openLegend(id: CharacterId): void {
+    this.closeLegend();
+    const box = this.modal.querySelector<HTMLElement>('.fs-box');
+    if (!box) return;
+    const l = LORE[id];
+    const c = CHARACTERS[id];
+    const part = (h: string) => {
+      const m = /^([IVX]+)\.\s*(.*)$/.exec(h);
+      return m ? { n: m[1], name: m[2] } : { n: '', name: h };
+    };
+    const el = document.createElement('div');
+    el.className = 'lg';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', `${l.title}: ${l.subtitle}`);
+    el.style.setProperty('--c2', c.palette.accent);
+    el.innerHTML = `
+      <div class="lg-bar">
+        <span class="lg-kanji">${esc(c.jp)}</span>
+        <div class="lg-heads"><div class="lg-title">${esc(l.title)}</div><div class="lg-sub">${esc(l.subtitle)}</div></div>
+        <nav class="lg-nav">${l.sections.map((s, i) => `<button data-i="${i}" title="${esc(part(s.heading).name)}">${esc(part(s.heading).n || String(i + 1))}</button>`).join('')}</nav>
+        <button class="lg-close">${icon('back')}Back<span class="key"> Esc</span></button>
+      </div>
+      <div class="lg-progress"><i></i></div>
+      <div class="lg-page" tabindex="0">
+        <article class="lg-text">
+          <div class="lg-epithet">${esc(c.name)} · ${esc(l.epithet)}</div>
+          ${l.sections
+            .map((s) => {
+              const p = part(s.heading);
+              return `<section class="lg-sec"><h3 class="lg-h">${p.n ? `<span class="lg-n">${esc(p.n)}</span>` : ''}<span>${esc(p.name)}</span></h3>${s.paragraphs.map((t) => `<p>${esc(t)}</p>`).join('')}</section>`;
+            })
+            .join('')}
+          <div class="lg-end"><span class="lg-quote">“${esc(l.quote)}”</span><span class="lg-fin">${esc(c.jp)}</span></div>
+        </article>
+      </div>`;
+    box.appendChild(el);
+    this.legend = el;
+    const page = el.querySelector<HTMLElement>('.lg-page')!;
+    const secs = [...el.querySelectorAll<HTMLElement>('.lg-sec')];
+    const nav = [...el.querySelectorAll<HTMLElement>('.lg-nav button')];
+    const bar = el.querySelector<HTMLElement>('.lg-progress i')!;
+    const track = () => {
+      const max = page.scrollHeight - page.clientHeight;
+      bar.style.width = `${max > 0 ? Math.min(100, (page.scrollTop / max) * 100) : 100}%`;
+      // the part being read: the last one whose heading has passed the top third of the page
+      const line = page.scrollTop + page.clientHeight * 0.33;
+      let at = 0;
+      secs.forEach((s, i) => {
+        if (s.offsetTop - page.offsetTop <= line) at = i;
+      });
+      if (page.scrollTop >= max - 2) at = secs.length - 1;
+      nav.forEach((b, i) => b.classList.toggle('on', i === at));
+    };
+    page.addEventListener('scroll', track, { passive: true });
+    nav.forEach((b, i) =>
+      b.addEventListener('click', () => {
+        page.scrollTop = secs[i].offsetTop - page.offsetTop - 4;
+        page.focus({ preventScroll: true });
+      }),
+    );
+    el.querySelector('.lg-close')!.addEventListener('click', () => this.closeLegend());
+    track();
+    page.focus({ preventScroll: true });
+  }
+
+  /** Roll the legend up if it's open; true if it was. */
+  closeLegend(): boolean {
+    const el = this.legend;
+    if (!el) return false;
+    this.legend = null;
+    el.classList.add('lg-out');
+    window.setTimeout(() => el.remove(), 220);
+    return true;
   }
 
   /** Lock the fighter picker for the length of a match (and shut it if it's open). */
@@ -767,68 +909,223 @@ export class UI {
     if (on && this.modalOpen === 'chars') this.closeModal();
   }
 
-  openModal(kind: 'chars' | 'ladder' | 'help', currentChar: CharacterId = settings.char): void {
+  openModal(kind: ModalKind, currentChar: CharacterId = settings.char): void {
     if (kind === 'chars' && this.charsLocked) return;
     this.modalOpen = kind;
     this.handlers.onModalChange(true);
     if (kind === 'chars') this.renderChars(currentChar);
+    else if (kind === 'shop') this.renderShop();
     else if (kind === 'ladder') {
       this.frame('Ranked Ladder', `<div class="ladder">Loading…</div>`, false, '番付', 'ladder');
       this.handlers.onLeaderboard();
     } else this.renderHelp();
   }
 
+  /**
+   * The fighter select: the roster along the bottom and, above it, the chosen fighter large (their
+   * model turning through their moves), their name, kanji and role, and nothing more until you
+   * open one of the tabs: their moves, their numbers, or their story. Fighters you don't own wear a
+   * padlock; the button under the chosen one plays them, unlocks them with coins (the Lancer and the
+   * Warden once you've reached Gold), or takes the free fighter once it's yours to take.
+   */
   private renderChars(selected: CharacterId): void {
-    const cards = CHARACTER_IDS.map((id) => {
+    const tiles = CHARACTER_IDS.map((id) => {
       const c = CHARACTERS[id];
-      return `<button class="char-card ${id === selected ? 'sel' : ''}" data-id="${id}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}">
-        <span class="cc-port"><img src="${this.handlers.portrait(id)}" alt="" draggable="false"></span><span class="cc-text"><span class="cc-jp" aria-hidden="true">${c.jp}</span><span class="cc-name">${c.name}</span><span class="cc-weapon">${c.weapon}</span></span></button>`;
+      return `<button class="fs-tile" data-id="${id}" style="--c2:${c.palette.accent}" aria-label="${esc(c.name)}"><img src="${this.handlers.portrait(id)}" alt="" draggable="false"><span>${esc(c.name)}</span><i class="fs-lock">${icon('lock')}</i></button>`;
     }).join('');
-    this.frame('Choose your fighter', `<div class="char-select"><div class="char-grid">${cards}</div><div class="char-detail"></div></div>`, true, '武者', 'fighters');
-    const detail = this.modal.querySelector<HTMLElement>('.char-detail')!;
-    const show = (id: CharacterId) => {
-      const c = CHARACTERS[id];
-      const bar = (ico: IconName, label: string, v: number) => `<div class="rating">${icon(ico)}<span>${label}</span><div>${'<i class="on"></i>'.repeat(v)}${'<i></i>'.repeat(5 - v)}</div></div>`;
-      const atkRow = (name: string, dmg: number, extra = '') => `<li><b>${esc(name)}</b> <span class="muted">${dmg} dmg${extra}</span></li>`;
-      detail.innerHTML = `
-        <div class="cd-top">
-          <div class="cd-preview"></div>
-          <div class="cd-info">
-            <h3><span class="cd-jp">${c.jp}</span>${c.name} <span class="muted">· ${c.weapon}</span></h3>
-            <div class="role">${c.role}</div>
-            <p>${esc(c.description)}</p>
-            <div class="cd-stats"><span>${icon('heart')}HP ${c.stats.hp}</span><span>${icon('shield')}Posture ${c.stats.posture}</span><span>${icon('dash')}Speed ${c.stats.speed}</span></div>
-            ${bar('fist', 'Power', c.ratings.power)}${bar('bolt', 'Speed', c.ratings.speed)}${bar('target', 'Reach', c.ratings.reach)}${bar('shield', 'Defense', c.ratings.defense)}${bar('skull', 'Difficulty', c.ratings.difficulty)}
+    this.frame(
+      'Choose your fighter',
+      `<div class="fs">
+        <div class="fs-stage">
+          <div class="fs-preview"></div>
+          <div class="fs-hero">
+            <div class="fs-id"><span class="fs-kanji"></span><div><div class="fs-name"></div><div class="fs-role"></div></div></div>
+            <div class="fs-tabs" role="tablist">
+              <button class="fs-tab" role="tab" data-tab="moves" aria-selected="false">${icon('sword')}Moves</button>
+              <button class="fs-tab" role="tab" data-tab="stats" aria-selected="false">${icon('gauge')}Stats</button>
+              <button class="fs-tab" role="tab" data-tab="story" aria-selected="false">${icon('eye')}Story</button>
+            </div>
+            <div class="fs-panel hidden" role="tabpanel"></div>
+            <div class="fs-go"><button class="fs-play" id="pick-char"></button><button class="fs-free hidden" id="free-char">${icon('star')}Take free</button><span class="fs-note"></span></div>
           </div>
         </div>
-        <div class="moves">
-          <div>${iconHead('sword', 'Light chain [LMB ×3]')}<ul>${c.lights.map((l) => atkRow(l.name, l.damage * (l.hits ?? 1))).join('')}</ul>
-            ${iconHead('hammer', 'Heavy chain [F ×3]')}<ul>${[c.heavy, c.extra.h1, c.extra.h2].map((h, i) => atkRow(h.name, h.damage * (h.hits ?? 1), i === 0 && h.feintable ? ' · feint with RMB' : '')).join('')}</ul></div>
-          <div>${iconHead('dash', 'Dash [dodge forward, then LMB / F]')}<ul>${atkRow(c.extra.dl.name, c.extra.dl.damage * (c.extra.dl.hits ?? 1))}${atkRow(c.extra.dh.name, c.extra.dh.damage)}</ul>
-            ${iconHead('back', 'Backstep [walk away + LMB / F]')}<ul>${atkRow(c.extra.bl.name, c.extra.bl.damage)}${atkRow(c.extra.bh.name, c.extra.bh.damage)}</ul>
-            ${iconHead('jump', 'Air [jump, then LMB / F]')}<ul>${atkRow(c.extra.jl.name, c.extra.jl.damage)}${atkRow(c.extra.jh.name, c.extra.jh.damage)}</ul>
-            ${iconHead('peril', 'Perilous [E]')}<ul>${atkRow(c.special.name, c.special.damage, ` · ${c.special.cooldown / 1000}s`)}<li class="tip">${PERILOUS_TIP[c.special.perilous!]}</li></ul></div>
-          <div>${iconHead('bolt', `Ability [R] · ${c.ability.name}`)}<p>${esc(c.ability.description)} <span class="muted">(${c.ability.cooldown / 1000}s)</span></p>
-            ${iconHead('eye', `Passive · ${c.passive.name}`)}<p>${esc(c.passive.description)}</p></div>
-        </div>
-        <div class="cd-actions"><button class="btn big" id="pick-char">${jpLabel('選', `Play ${c.name}`, 'swords')}</button><span class="muted">Switch characters inside the lobby safe zone.</span></div>`;
-      detail.querySelector('#pick-char')!.addEventListener('click', () => {
-        this.handlers.onSelectChar(id);
-        this.closeModal();
-      });
-      const pv = detail.querySelector<HTMLElement>('.cd-preview')!;
+        <div class="fs-roster">${tiles}</div>
+      </div>`,
+      true,
+      '武者',
+      'fighters',
+      'fs-box',
+    );
+    const root = this.modal.querySelector<HTMLElement>('.fs')!;
+    const panel = root.querySelector<HTMLElement>('.fs-panel')!;
+    const tabs = [...root.querySelectorAll<HTMLElement>('.fs-tab')];
+    const roster = [...root.querySelectorAll<HTMLElement>('.fs-tile')];
+    let current = selected;
+    let tab: string | null = null;
+    const keys = this.touch ? { light: 'Light', heavy: 'Heavy', special: 'Special', ability: 'Ability' } : { light: 'LMB', heavy: 'F', special: 'E', ability: 'R' };
+    const row = (key: string, label: string, body: string) => `<div class="fs-row"><span class="fs-key">${key}</span><div><b>${label}</b><p>${body}</p></div></div>`;
+    const chain = (list: { name: string }[]) => list.map((a) => esc(a.name)).join(' <i>›</i> ');
+    const fill = () => {
+      const c = CHARACTERS[current];
+      if (tab === 'moves') {
+        panel.innerHTML =
+          row(keys.special, `Perilous · ${esc(c.special.name)}`, PERILOUS_TIP[c.special.perilous!]) +
+          row(keys.ability, esc(c.ability.name), esc(c.ability.description)) +
+          row('Passive', esc(c.passive.name), esc(c.passive.description)) +
+          row(keys.light, 'Light chain', chain(c.lights)) +
+          row(keys.heavy, 'Heavy chain', chain([c.heavy, c.extra.h1, c.extra.h2]));
+      } else if (tab === 'stats') {
+        const bar = (label: string, v: number) => `<div class="fs-bar"><span>${label}</span><div>${'<i class="on"></i>'.repeat(v)}${'<i></i>'.repeat(5 - v)}</div></div>`;
+        panel.innerHTML = `<p class="fs-blurb">${esc(c.description)}</p>
+          <div class="fs-bars">${bar('Power', c.ratings.power)}${bar('Speed', c.ratings.speed)}${bar('Reach', c.ratings.reach)}${bar('Defense', c.ratings.defense)}${bar('Difficulty', c.ratings.difficulty)}</div>
+          <div class="fs-nums"><span>${icon('heart')}HP <b>${c.stats.hp}</b></span><span>${icon('shield')}Posture <b>${c.stats.posture}</b></span><span>${icon('dash')}Speed <b>${c.stats.speed}</b></span></div>`;
+      } else if (tab === 'story') {
+        const l = LORE[current];
+        panel.innerHTML = `<div class="fs-epithet">${esc(l.epithet)}</div>
+          <div class="fs-lg-title">${esc(l.title)}<span>${esc(l.subtitle)}</span></div>
+          <p class="fs-teaser">${esc(l.teaser)}</p>
+          <div class="fs-lg-go"><button class="fs-read">${icon('scroll')}Read the legend<span>${readingMinutes(l)} min</span></button><div class="fs-quote">“${esc(l.quote)}”</div></div>`;
+        panel.querySelector('.fs-read')!.addEventListener('click', () => this.openLegend(current));
+      }
+      panel.scrollTop = 0;
+    };
+    const setTab = (t: string | null) => {
+      tab = t;
+      for (const b of tabs) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+      panel.classList.toggle('hidden', !t);
+      root.classList.toggle('fs-open', !!t);
+      if (t) {
+        fill();
+        // replay the panel's opening
+        panel.classList.remove('fs-pop');
+        void panel.offsetWidth;
+        panel.classList.add('fs-pop');
+      }
+    };
+    const show = (id: CharacterId) => {
+      current = id;
+      this.handlers.onRosterPick(id);
+      const c = CHARACTERS[id];
+      root.style.setProperty('--c1', c.palette.primary);
+      root.style.setProperty('--c2', c.palette.accent);
+      for (const b of roster) b.classList.toggle('sel', b.dataset.id === id);
+      root.querySelector('.fs-kanji')!.textContent = c.jp;
+      root.querySelector('.fs-name')!.textContent = c.name;
+      root.querySelector('.fs-role')!.textContent = `${c.role} · ${c.weapon}`;
+      paintLocks();
+      const hero = root.querySelector<HTMLElement>('.fs-id')!;
+      hero.classList.remove('fs-in');
+      void hero.offsetWidth;
+      hero.classList.add('fs-in');
+      if (tab) fill();
+      const pv = root.querySelector<HTMLElement>('.fs-preview')!;
       if (!this.preview) this.preview = this.handlers.createPreview(pv);
-      else pv.appendChild(this.preview.el);
+      else if (this.preview.el.parentElement !== pv) pv.appendChild(this.preview.el);
       this.preview.setChar(id);
     };
-    this.modal.querySelectorAll<HTMLElement>('.char-card').forEach((b) =>
-      b.addEventListener('click', () => {
-        this.modal.querySelectorAll('.char-card').forEach((x) => x.classList.remove('sel'));
-        b.classList.add('sel');
-        show(b.dataset.id as CharacterId);
-      }),
-    );
+    const play = root.querySelector<HTMLButtonElement>('#pick-char')!;
+    const free = root.querySelector<HTMLButtonElement>('#free-char')!;
+    const note = root.querySelector<HTMLElement>('.fs-note')!;
+    const owns = (id: CharacterId) => !this.profile || this.profile.chars.includes(id);
+    // padlocks on the roster, and what the button under the chosen fighter does
+    const paintLocks = () => {
+      const p = this.profile;
+      for (const b of roster) b.classList.toggle('locked', !owns(b.dataset.id as CharacterId));
+      const c = CHARACTERS[current];
+      free.classList.add('hidden');
+      play.classList.remove('buy');
+      if (!p || owns(current)) {
+        play.disabled = false;
+        play.innerHTML = `${icon('swords')}Play ${esc(c.name)}`;
+        const left = p ? gamesToFreePick(p) : 0;
+        note.innerHTML = p && freePickReady(p) ? `${icon('star')}A free fighter is waiting: pick a locked one` : p && left > 0 ? `${left} more match${left === 1 ? '' : 'es'} to a free fighter` : 'Switch fighters in the lobby safe zone';
+        return;
+      }
+      const price = charPrice(current);
+      const gold = reachedGold(p);
+      if (isPremium(current) && !gold) {
+        play.disabled = true;
+        play.innerHTML = `${icon('lock')}Reach Gold to unlock`;
+        note.textContent = `Then ${coinText(price)} coins. Climb the ranked ladder to Gold first.`;
+        return;
+      }
+      if (freePickReady(p)) free.classList.remove('hidden');
+      play.classList.add('buy');
+      play.disabled = p.coins < price;
+      play.innerHTML = `${icon('coin')}Unlock · ${coinText(price)}`;
+      note.textContent = p.coins >= price ? `You have ${coinText(p.coins)} coins` : `${coinText(price - p.coins)} more coins needed · watch an ad in the shop`;
+    };
+    this.charsRefresh = paintLocks;
+    for (const b of tabs) b.addEventListener('click', () => setTab(tab === b.dataset.tab ? null : b.dataset.tab!));
+    for (const b of roster) b.addEventListener('click', () => show(b.dataset.id as CharacterId));
+    play.addEventListener('click', () => {
+      if (!owns(current)) {
+        this.handlers.onUnlock('char', current);
+        return;
+      }
+      this.handlers.onSelectChar(current);
+      this.closeModal();
+    });
+    free.addEventListener('click', () => this.handlers.onUnlock('char', current, true));
+    // the arrow keys walk the roster
+    root.addEventListener('keydown', (e) => {
+      const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!step || this.legend || (e.target as HTMLElement).closest('.fs-panel')) return;
+      e.preventDefault();
+      const i = (CHARACTER_IDS.indexOf(current) + step + CHARACTER_IDS.length) % CHARACTER_IDS.length;
+      show(CHARACTER_IDS[i]);
+      roster[i].focus();
+    });
     show(selected);
+    if (!this.touch) roster[CHARACTER_IDS.indexOf(selected)]?.focus({ preventScroll: true });
+  }
+
+  /**
+   * The shop: your coins, an ad to watch for more (as often as you like), the free fighter's
+   * progress, the arenas to unlock and a way to the fighters.
+   */
+  private renderShop(): void {
+    const p = this.profile;
+    const coins = p?.coins ?? 0;
+    const left = p ? gamesToFreePick(p) : FREE_PICK_GAMES;
+    const pips = Array.from({ length: FREE_PICK_GAMES }, (_, i) => `<i class="${p && (p.freePicked || i < p.games) ? 'on' : ''}"></i>`).join('');
+    const freeLine = !p ? '' : p.freePicked ? 'Free fighter taken' : freePickReady(p) ? 'Ready! Pick any fighter free' : `${left} more match${left === 1 ? '' : 'es'} to a free fighter`;
+    const mapCard = (id: string) => {
+      const m = MAPS[id];
+      const owned = !p || p.maps.includes(id);
+      const action = owned
+        ? `<span class="sh-owned">${icon('check')}Owned</span>`
+        : `<button class="sh-buy" data-map="${id}"${coins < MAP_PRICE ? ' disabled' : ''}>${icon('coin')}${coinText(MAP_PRICE)}</button>`;
+      return `<div class="sh-map${owned ? ' owned' : ''}"><img src="${THUMBS[id] ?? ''}" alt="" draggable="false"><span class="sh-jp">${esc(m?.jp ?? '')}</span><span class="sh-name">${esc(m?.name ?? id)}</span>${owned ? '' : `<i class="sh-lock">${icon('lock')}</i>`}${action}</div>`;
+    };
+    this.frame(
+      'Shop',
+      `<div class="shop">
+        <div class="sh-top">
+          <div class="sh-purse">${icon('coin')}<b>${coinText(coins)}</b><span>coins</span></div>
+          <button class="sh-ad">${icon('watch')}<span><b>Watch an ad</b><i>+${AD_REWARD} coins · as often as you like</i></span></button>
+          <div class="sh-free${p && freePickReady(p) ? ' ready' : ''}"><span class="sh-pips">${pips}</span><span>${esc(freeLine)}</span></div>
+        </div>
+        ${iconHead('mountain', 'Arenas')}
+        <p class="muted">Anyone you fight can pick any arena either of you owns.</p>
+        <div class="sh-maps">${ARENA_MAPS.map((m) => mapCard(m.id)).join('')}</div>
+        ${iconHead('fighters', 'Fighters')}
+        <button class="sh-fighters">${icon('fighters')}Unlock fighters<span>${coinText(charPrice('ronin'))} coins each · Lancer and Warden ${coinText(charPrice('lancer'))} at Gold</span></button>
+        <p class="muted">Every finished match pays coins (watch an ad afterwards to double them).</p>
+      </div>`,
+      true,
+      '店',
+      'coin',
+      'shop-box',
+    );
+    const box = this.modal.querySelector<HTMLElement>('.shop')!;
+    const ad = box.querySelector<HTMLButtonElement>('.sh-ad')!;
+    ad.addEventListener('click', () => {
+      ad.disabled = true;
+      void this.handlers.onWatchAd('bonus').finally(() => (ad.disabled = false));
+    });
+    for (const b of box.querySelectorAll<HTMLElement>('[data-map]')) b.addEventListener('click', () => this.handlers.onUnlock('map', b.dataset.map!));
+    box.querySelector('.sh-fighters')!.addEventListener('click', () => this.openModal('chars'));
   }
 
   showLeaderboard(entries: LeaderboardEntry[], you: number | null, total: number, me: ProfileView | null): void {
@@ -901,6 +1198,7 @@ export class UI {
             </table>
           </div>
           <div>
+            <button class="help-tutorial">${icon('dummy')}Play the tutorial<span>The sensei shows you posture and deflects</span></button>
             ${iconHead('shield', 'Posture & deflects')}
             <p>Every fighter has <b>health</b> and <b>posture</b>. Blocking a hit costs posture. <b>Deflecting</b> (pressing guard just before the hit lands) costs almost nothing and instead hammers the attacker's posture, staggering them for a free counter.</p>
             <p>When posture fills up you are <b>posture broken</b>: helpless for a moment, and the next hit is a <b>Deathblow</b> for ${40} damage. Posture recovers slowly, and only once you stop: not while you attack, dodge or reel, and not until a while after the last posture damage (faster while guarding, slower when hurt). After a break, the guard comes back whole.</p>
@@ -953,6 +1251,10 @@ export class UI {
     bind('#set-inv', (el) => (settings.invertY = el.checked));
     bind('#set-shake', (el) => (settings.reduceShake = el.checked));
     bind('#set-fps', (el) => (settings.showFps = el.checked));
+    this.modal.querySelector('.help-tutorial')!.addEventListener('click', () => {
+      this.closeModal();
+      this.handlers.onTutorial();
+    });
   }
 
   // ------------------------------------------------------------------ match screens
@@ -992,10 +1294,21 @@ export class UI {
 
   /** Letterbox the screen and hide the duel HUD while the intro camera runs. */
   setCinematic(on: boolean): void {
+    const was = this.hud.classList.contains('cinematic');
     this.hud.classList.toggle('cinematic', on);
+    // coming out of it, the HUD fades back in behind the retreating bars instead of popping on
+    clearTimeout(this.revealTimer);
+    this.hud.classList.toggle('reveal', was && !on);
+    if (was && !on) this.revealTimer = window.setTimeout(() => this.hud.classList.remove('reveal'), 900);
   }
 
-  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null): void {
+  private revealTimer = 0;
+
+  /**
+   * The result card. With coins earned it says how many, and offers an ad to double them (the
+   * card waits while it plays). `closed` hears whether an ad was watched from it.
+   */
+  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null, closed?: (watchedAd: boolean) => void): void {
     let ratingHtml = '';
     if (r.before && r.after && r.delta !== undefined) {
       const before = rankOf(r.before.mmr, r.before.placements);
@@ -1012,16 +1325,36 @@ export class UI {
       </div>`;
     }
     const reason = r.reason === 'forfeit' ? (r.won ? 'Opponent forfeited' : 'You forfeited') : r.reason === 'timeout' ? 'Time' : '';
+    const coinsHtml = r.coins
+      ? `<div class="res-coins">${icon('coin')}+${coinText(r.coins)} coins</div>${r.double ? `<button class="res-double">${icon('watch')}Watch an ad · +${coinText(r.double)} more</button>` : ''}`
+      : '';
     const el = h(`<div class="result ${r.won ? 'win' : 'lose'}">
       <div class="res-jp">${r.won ? '勝利' : '敗北'}</div>
       <div class="res-icon">${icon(r.won ? 'crown' : 'skull')}</div>
       <div class="res-title">${r.won ? 'VICTORY' : 'DEFEAT'}</div>
       <div class="res-score">${r.scores.join(' - ')}${reason ? ` · ${reason}` : ''}</div>
       ${ratingHtml}
+      ${coinsHtml}
       <div class="muted">Returning to the lobby…</div></div>`);
     void me;
     this.hud.appendChild(el);
-    setTimeout(() => el.classList.add('out'), 6300);
-    setTimeout(() => el.remove(), 7000);
+    let watched = false;
+    let timers: number[] = [];
+    const close = (after: number) => {
+      timers.forEach((t) => clearTimeout(t));
+      timers = [window.setTimeout(() => el.classList.add('out'), after), window.setTimeout(() => (el.remove(), closed?.(watched)), after + 700)];
+    };
+    const dbl = el.querySelector<HTMLButtonElement>('.res-double');
+    dbl?.addEventListener('click', () => {
+      dbl.disabled = true;
+      timers.forEach((t) => clearTimeout(t));
+      void this.handlers.onWatchAd('double').then((ok) => {
+        watched = true;
+        dbl.innerHTML = ok ? `${icon('check')}Doubled!` : 'No reward this time';
+        close(2200);
+      });
+    });
+    // a card with an offer on it stays up a little longer
+    close(dbl ? 9300 : 6300);
   }
 }

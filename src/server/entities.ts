@@ -4,7 +4,7 @@ import { HIT_CONFIRM_SLACK_MS, INTEREST, MAX_LAG_COMP_MS } from '../shared/confi
 import { PLACEMENT_MATCHES } from '../shared/ranks';
 import { Fighter, DefenseEvent } from '../shared/fighter';
 import { BotDifficulty, QueueMode, RosterEntry, ServerMsg } from '../shared/protocol';
-import type { BotBrain } from './bot';
+import type { Brain } from './bot';
 import type { Instance } from './instance';
 import { Profile } from './store';
 
@@ -20,7 +20,7 @@ export interface SocketLike {
 export class ServerFighter extends Fighter {
   name: string;
   owner: Player | null = null;
-  brain: BotBrain | null = null;
+  brain: Brain | null = null;
   dummy: 'passive' | 'sparring' | undefined;
   /** Rating of an AI opponent in a rated (offline ranked) match. */
   rating: number | undefined;
@@ -105,6 +105,10 @@ export class Player {
   msgWindowStart = 0;
   msgCount = 0;
   closed = false;
+  /** the last match's coins, which an ad can double until `until` (server ms) */
+  doubleOffer: { coins: number; until: number } | null = null;
+  /** when an ad last paid out (server ms) */
+  lastAdAt = -Infinity;
 
   constructor(ws: SocketLike, profile: Profile, charId: CharacterId) {
     this.id = profile.id;

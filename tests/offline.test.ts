@@ -14,6 +14,9 @@ describe('offline mode', () => {
     const inbox: ServerMsg[] = [];
     const ws = { readyState: 1, send: (d: string) => inbox.push(JSON.parse(d)), close() {}, on() {} };
     const p = new Player(ws as never, game.store.create('Solo'), 'ronin');
+    // a second arena and the Monk bought, so there's a choice to vote on
+    p.profile.maps.push('bamboo');
+    p.profile.chars.push('monk');
     game.lobby.addPlayer(p, game.lobby.spawnPoint());
     const roamers = [...game.lobby.fighters.values()].filter((f) => f.id.startsWith('roamer-'));
     expect(roamers).toHaveLength(3);

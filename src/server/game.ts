@@ -2,6 +2,7 @@
 import { CHARACTER_IDS, CharacterId, isCharacterId } from '../shared/characters';
 import { MATCH, SERVER_TICK_HZ } from '../shared/config';
 import { ARENA_MAPS, MapDef } from '../shared/maps';
+import { AD_MIN_GAP_MS, AD_REWARD, DOUBLE_WINDOW_MS, FREE_PICK_GAMES, MATCH_REWARD, TUTORIAL_REWARD, UnlockRefusal, canUnlockChar, canUnlockMap, freePickReady, sharedMaps } from '../shared/progress';
 import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, SelectView, ServerMsg } from '../shared/protocol';
 import { eloDelta } from '../shared/ranks';
 import { Arena, botName } from './arena';
@@ -10,6 +11,15 @@ import { Lobby } from './lobby';
 import { Store, profileView } from './store';
 
 const MAX_MSGS_PER_SEC = 160;
+
+/** Why an unlock was refused, as the player is told. */
+const REFUSED: Record<UnlockRefusal, string> = {
+  owned: 'You already have that.',
+  gold: 'Reach Gold rank to unlock this fighter.',
+  coins: 'Not enough coins.',
+  free: 'Your free fighter isn\'t ready yet.',
+  unknown: 'Nothing to unlock there.',
+};
 const DIFFICULTIES: BotDifficulty[] = ['easy', 'normal', 'hard'];
 
 export function sanitizeName(raw: unknown): string {
@@ -237,7 +247,8 @@ export class Game {
     }
     profile.lastSeen = Date.now();
     this.store.markDirty();
-    const char: CharacterId = isCharacterId(msg.char) ? msg.char : 'ronin';
+    // you play a fighter you own (a locked one falls back to the Ronin)
+    const char: CharacterId = isCharacterId(msg.char) && profile.chars.includes(msg.char) ? msg.char : 'ronin';
     const p = new Player(ws, profile, char);
     this.players.set(p.id, p);
     p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.players.size, serverTime: this.now() });
@@ -284,7 +295,8 @@ export class Game {
         break;
       case 'char':
         if (!isCharacterId(msg.id)) return;
-        if (p.instance instanceof Lobby) p.instance.changeCharacter(p, msg.id);
+        if (!p.profile.chars.includes(msg.id)) p.send({ t: 'notice', text: 'Unlock that fighter first.', kind: 'warn' });
+        else if (p.instance instanceof Lobby) p.instance.changeCharacter(p, msg.id);
         else p.send({ t: 'notice', text: 'Finish your match before switching characters.', kind: 'warn' });
         break;
       case 'queue':
@@ -307,10 +319,23 @@ export class Game {
         break;
       }
       case 'forfeit':
-        if (p.instance instanceof Arena) p.instance.forfeit(p);
+        if (p.instance instanceof Arena) p.instance.forfeit(p, true);
         break;
       case 'leaderboard':
         p.send({ t: 'leaderboard', entries: this.store.leaderboard(25), you: this.store.position(p.profile), total: this.store.placedCount() });
+        break;
+      case 'unlock':
+        this.unlock(p, msg.kind, msg.id, !!msg.free);
+        break;
+      case 'ad':
+        this.adReward(p, msg.kind);
+        break;
+      case 'tutorial':
+        if (msg.a === 'start') this.startTutorial(p);
+        else if (msg.a === 'skip') {
+          if (p.instance instanceof Arena && p.instance.coach) p.instance.forfeit(p, true);
+          else this.endTutorial(p, false);
+        }
         break;
       case 'fell': {
         const f = p.fighter;
@@ -466,6 +491,21 @@ export class Game {
       }
       this.store.markDirty();
     }
+    // coins for everyone who saw it through (giving up or leaving earns nothing and doesn't count
+    // towards the free fighter); an ad afterwards can double them
+    const earned: [number, number] = [0, 0];
+    const table = arena.mode === 'tutorial' ? null : MATCH_REWARD[arena.mode];
+    for (const i of [0, 1] as const) {
+      const p = humans[i];
+      if (!p || !table || (reason === 'forfeit' && winner !== i)) continue;
+      const prof = p.profile;
+      earned[i] = winner === i ? table.win : table.loss;
+      prof.coins += earned[i];
+      prof.games++;
+      p.doubleOffer = { coins: earned[i], until: this.now() + DOUBLE_WINDOW_MS };
+      if (prof.games === FREE_PICK_GAMES && freePickReady(prof)) p.send({ t: 'notice', text: 'Your free fighter is ready! Open Fighters to pick one.', kind: 'good' });
+      this.store.markDirty();
+    }
     for (const i of [0, 1] as const) {
       const p = humans[i];
       if (!p) continue;
@@ -477,8 +517,9 @@ export class Game {
         reason,
         scores: arena.scores,
         ...(counted ? { before: before[i]!, after: { mmr: p.profile.mmr, placements: p.profile.placements }, delta: deltas[i] } : {}),
+        ...(earned[i] > 0 ? { coins: earned[i], double: earned[i] } : {}),
       });
-      if (counted) p.send({ t: 'profile', profile: profileView(p.profile) });
+      if (counted || earned[i] > 0) p.send({ t: 'profile', profile: profileView(p.profile) });
     }
     const [pa, pb] = humans;
     if (rated && pa && pb) {
@@ -486,6 +527,71 @@ export class Game {
       const l = winner === 0 ? pb : pa;
       this.broadcastAll({ t: 'chat', name: '', text: `${w.name} defeated ${l.name} in a ranked duel.`, sys: true });
     }
+  }
+
+  // ------------------------------------------------------------------ coins, unlocks and the tutorial
+
+  /** Buy a fighter or an arena, or take the free fighter. */
+  private unlock(p: Player, kind: unknown, id: unknown, free: boolean): void {
+    const prof = p.profile;
+    let cost = 0;
+    if (kind === 'char' && isCharacterId(id)) {
+      const can = canUnlockChar(prof, id, free);
+      if (!can.ok) return p.send({ t: 'notice', text: REFUSED[can.why], kind: 'warn' });
+      cost = can.cost;
+      prof.chars.push(id);
+      if (free) prof.freePicked = true;
+    } else if (kind === 'map' && typeof id === 'string') {
+      const can = canUnlockMap(prof, id, ARENA_MAPS.map((m) => m.id));
+      if (!can.ok) return p.send({ t: 'notice', text: REFUSED[can.why], kind: 'warn' });
+      cost = can.cost;
+      prof.maps.push(id);
+    } else return;
+    prof.coins -= cost;
+    this.store.markDirty();
+    p.send({ t: 'unlocked', kind, id, free: free && kind === 'char' });
+    p.send({ t: 'profile', profile: profileView(prof) });
+  }
+
+  /**
+   * An ad watched to the end: the last match's coins again, or the shop's ad reward. Ads can't be
+   * verified from here, so they pay at most once per AD_MIN_GAP_MS (no ad is shorter).
+   */
+  private adReward(p: Player, kind: unknown): void {
+    const now = this.now();
+    if (now - p.lastAdAt < AD_MIN_GAP_MS) return;
+    let gained = 0;
+    if (kind === 'double') {
+      const offer = p.doubleOffer;
+      if (!offer || now > offer.until) return;
+      gained = offer.coins;
+      p.doubleOffer = null;
+    } else if (kind === 'bonus') gained = AD_REWARD;
+    else return;
+    p.lastAdAt = now;
+    p.profile.coins += gained;
+    this.store.markDirty();
+    p.send({ t: 'coins', gained, why: kind === 'double' ? 'double' : 'ad' });
+    p.send({ t: 'profile', profile: profileView(p.profile) });
+  }
+
+  /** The tutorial: a lesson against the sensei on Sakura (see tutorial.ts). */
+  startTutorial(p: Player): void {
+    if (!(p.instance instanceof Lobby) || p.instance.inDuel(p) || this.selecting.has(p)) return;
+    const map = ARENA_MAPS.find((m) => m.id === 'sakura') ?? ARENA_MAPS[0];
+    this.startMatch('tutorial', p, null, 'easy', map, undefined, { char: 'monk', name: 'Sensei' });
+  }
+
+  /** The tutorial is over: learned (the first time pays), or skipped. Either way it won't come up again. */
+  endTutorial(p: Player, learned: boolean): void {
+    const prof = p.profile;
+    if (learned && !prof.tutorial) {
+      prof.coins += TUTORIAL_REWARD;
+      p.send({ t: 'coins', gained: TUTORIAL_REWARD, why: 'tutorial' });
+    }
+    prof.tutorial = true;
+    this.store.markDirty();
+    p.send({ t: 'profile', profile: profileView(prof) });
   }
 
   // ------------------------------------------------------------------ challenges
@@ -555,7 +661,8 @@ export class Game {
       botRating,
       bot: b ? null : { char: CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)], name: botName(diff ?? 'normal', botRating), voteAt: now + 1200 + Math.random() * 2200 },
       endsAt: now + (this.options.selectTime ?? MATCH.selectTime),
-      maps: fixed ? [fixed.id] : ARENA_MAPS.map((m) => m.id),
+      // an arena either of you owns can be fought in
+      maps: fixed ? [fixed.id] : sharedMaps(ARENA_MAPS.map((m) => m.id), a.profile, b?.profile),
       votes: { map: [null, null], char: [null, null] },
     };
     for (const p of pm.players) if (p) this.selecting.set(p, pm);
@@ -575,7 +682,7 @@ export class Game {
     if (!pm) return;
     const i = pm.players[0] === p ? 0 : 1;
     if (typeof map === 'string' && (map === 'random' || pm.maps.includes(map))) pm.votes.map[i] = map;
-    if (isCharacterId(char)) pm.votes.char[i] = char;
+    if (isCharacterId(char) && p.profile.chars.includes(char)) pm.votes.char[i] = char;
     this.sendSelect(pm);
   }
 

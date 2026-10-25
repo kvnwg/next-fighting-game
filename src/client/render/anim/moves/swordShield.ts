@@ -430,14 +430,14 @@ export const swordShield: Style = {
     }),
   },
   // Execution, Last Rites: a knight's salute to the fallen, the blade upright before the face; then
-  // its point laid under their chin to lift the head and make them look up; the sword raised to the
-  // sky, where the light strikes it; cocked back over the right shoulder, the body arched; and the
-  // wrath cut, high right to low left through the neck and collarbone, the knight dropping onto his
-  // rear knee to put his whole weight behind it, the shield flung back. The blood flicked off the
-  // blade, and he rises into the salute again.
-  // (s runs in seconds: the point under the chin at 1.05, the cut at 2.15)
+  // the sword dropped to his left hip and swung in a rising backhand cut across them, up past his
+  // right shoulder and on up to the sky, where the light strikes it; cocked back over the right
+  // shoulder, the body arched; and the wrath cut, high right to low left through the neck and
+  // collarbone, the knight dropping onto his rear knee to put his whole weight behind it, the shield
+  // flung back. The blood flicked off the blade, and he rises into the salute again.
+  // (s runs in seconds: the rising cut lands at 1.05, the wrath cut at 2.15)
   execute: (() => {
-    const T_CHIN = 1.05;
+    const T_RISE = 1.05;
     const T_CUT = 2.15;
     const FLAT: V3 = [1, 0, 0];
     const salute: ItemKey = [0, [-0.06, 0.52, 0.3], [0, 1, 0.06], FLAT];
@@ -455,6 +455,14 @@ export const swordShield: Style = {
     const cutA = arc(PIV_A, R, [CHAMBER, [-0.28, 0.85, -0.45], TOP], NaN, { pivot1: PIV_B });
     const cutB = arc(PIV_B, R, [TOP, [-0.1, 0.75, 0.65], [0.15, 0.25, 1], [0.6, -0.55, 0.6], [0.8, -0.6, -0.1]], NaN, { pivot1: PIV_C });
     const LEN_B = 0.34;
+    // the rising cut: from the left hip (the blade back and down past it), forward through them at
+    // chest height, and up past the right shoulder
+    const PIV_R: V3 = [0.0, 0.4, 0.12];
+    const RISE_END: V3 = [-0.55, 0.8, 0.15];
+    const rise = arc(PIV_R, R * 0.95, [[0.75, -0.35, -0.55], [0.8, -0.3, 0.5], [0.0, 0.05, 1], [-0.6, 0.45, 0.65], RISE_END], NaN, { pivot1: [-0.08, 0.5, 0.15] });
+    const LEN_R = 0.3;
+    const riseFrom = T_RISE - hitAt(rise, 2) * LEN_R;
+    const riseEnd = riseFrom + LEN_R;
     const cutBFrom = T_CUT - hitAt(cutB, 2) * LEN_B;
     const cutAFrom = cutBFrom - 0.14;
     const cutEnd = cutBFrom + LEN_B;
@@ -467,6 +475,10 @@ export const swordShield: Style = {
       return [piv[0] + u[0] * R, piv[1] + u[1] * R, piv[2] + u[2] * R];
     };
     const cockedAt = (t: number): ItemKey => [t, along(PIV_A, CHAMBER), CHAMBER, [0.3, 0.9, 0.2]];
+    const lowLeft: V3 = [0.75, -0.35, -0.55];
+    const atHip = (t: number): ItemKey => [t, [PIV_R[0] + lowLeft[0] * R * 0.95 * 0.95, PIV_R[1] + lowLeft[1] * R * 0.95 * 0.95, PIV_R[2] + lowLeft[2] * R * 0.95 * 0.95], lowLeft, [0, 1, 0]];
+    const upRight = n(RISE_END);
+    const risen: ItemKey = [riseEnd, [-0.08 + upRight[0] * R * 0.95, 0.5 + upRight[1] * R * 0.95, 0.15 + upRight[2] * R * 0.95], RISE_END, [0, -1, 0]];
     const after: ItemKey = [cutEnd, along(PIV_C, [0.8, -0.6, -0.1]), [0.8, -0.6, -0.1], [0, -1, 0]];
     const stand = B({ ...body, twist: -0.2, hipTwist: -0.05, side: 0, crouch: -0.04, lean: 0.02, step: 0.16, back: 0.14, width: 0.15, headPitch: 0.1 });
     const coil = B({ ...stand, twist: -0.95, hipTwist: -0.38, crouch: -0.12, lean: -0.32, step: 0.36, back: 0.2, width: 0.18, side: 0.12, headPitch: -0.05 });
@@ -476,11 +488,12 @@ export const swordShield: Style = {
         K(0.0, B({ ...stand, headPitch: 0.0 })),
         K(0.35, B({ ...stand, headPitch: 0.25 })),
         K(0.55, B({ ...stand, headPitch: 0.22 })),
-        // a step in as the point drops and draws back low (the flick's pull-back)...
-        K(0.88, B({ ...stand, twist: -0.48, hipTwist: -0.2, crouch: -0.16, lean: 0.06, step: 0.34, back: 0.24, width: 0.17, headPitch: 0.05 })),
-        // ...and lifted under the chin, the body following it in
-        K(T_CHIN, B({ ...stand, twist: -0.25, hipTwist: -0.12, crouch: -0.1, lean: 0.18, step: 0.34, back: 0.24, width: 0.17, headPitch: 0.0 })),
-        K(1.25, B({ ...stand, twist: -0.25, hipTwist: -0.12, crouch: -0.08, lean: 0.12, step: 0.34, back: 0.24, width: 0.17, headPitch: -0.05 })),
+        // wound up to the left as the sword drops to the hip, a step in...
+        K(0.8, B({ ...stand, twist: 0.45, hipTwist: 0.15, crouch: -0.16, lean: 0.08, step: 0.34, back: 0.22, width: 0.17, side: -0.05, headPitch: 0.1 })),
+        K(riseFrom, B({ ...stand, twist: 0.52, hipTwist: 0.18, crouch: -0.18, lean: 0.1, step: 0.36, back: 0.22, width: 0.17, side: -0.06, headPitch: 0.1 })),
+        // ...and unwound through the cut, rising onto it
+        K(T_RISE, B({ ...stand, twist: -0.3, hipTwist: -0.14, crouch: -0.12, lean: 0.14, step: 0.38, back: 0.26, width: 0.17, headPitch: 0.0 })),
+        K(1.22, B({ ...stand, twist: -0.55, hipTwist: -0.2, crouch: -0.04, lean: -0.04, step: 0.34, back: 0.24, width: 0.17, headPitch: -0.15 })),
         // raised to the sky, tall, chin up to the light
         K(T_SKY, B({ ...stand, twist: -0.1, hipTwist: -0.1, crouch: 0.02, lean: -0.14, step: 0.32, back: 0.24, width: 0.17, headPitch: -0.35 })),
         // the coil: the hips and shoulders turned right away, the weight back over the rear foot and
@@ -506,12 +519,15 @@ export const swordShield: Style = {
             [0.08, [-0.4, 0.2, 0.16], [0, 1, 0.3], FLAT],
             [0.5, salute[1], salute[2], salute[3]],
             [0.58, salute[1], salute[2], salute[3]],
-            // swept down to point at them, drawn back low
-            [0.88, [-0.26, 0.12, 0.28], [0.05, -0.45, 1], [0, 1, 0]],
-            // and flicked up under the chin
-            [T_CHIN, [-0.16, 0.24, 0.46], [0.03, 0.1, 1], [0, 1, 0], 'in'],
-            [1.25, [-0.16, 0.27, 0.45], [0.03, 0.14, 1], [0, 1, 0], 'out'],
-            // up to the sky
+            // dropped to the left hip, the blade back past it, and held a beat
+            atHip(0.8),
+            atHip(riseFrom),
+          ]),
+          // the rising cut
+          [riseFrom, riseEnd, rise],
+          ...keyed([
+            risen,
+            // and carried on up to the sky
             [T_SKY, [-0.16, 1.04, 0.14], [0, 1, 0.04], FLAT],
             // laid back past the shoulder to the end of its range, and held
             cockedAt(T_COCK),
@@ -538,7 +554,10 @@ export const swordShield: Style = {
             [-10, [0.3, 0.2, 0.14], [0.35, 0, 1], SHIELD_UP],
             [0.0, [0.3, 0.2, 0.14], [0.35, 0, 1], SHIELD_UP],
             [0.55, [0.3, 0.2, 0.14], [0.35, 0, 1], SHIELD_UP],
-            [1.0, [0.26, 0.36, 0.3], [0.2, 0.05, 1], SHIELD_UP],
+            // swung out wide as the sword drops across to the hip, then driven back through the cut
+            [0.8, [0.42, 0.3, -0.02], [0.75, 0.05, 0.6], SHIELD_UP],
+            [riseFrom, [0.44, 0.3, -0.04], [0.8, 0.05, 0.55], SHIELD_UP],
+            [1.1, [0.26, 0.36, 0.3], [0.2, 0.05, 1], SHIELD_UP],
             [T_SKY, [0.12, 0.5, 0.42], [-0.1, 0.15, 1], SHIELD_UP],
             [T_COCK, [0.0, 0.5, 0.5], [-0.25, 0.1, 1], SHIELD_UP],
             [cutAFrom, [-0.02, 0.5, 0.52], [-0.28, 0.1, 1], SHIELD_UP],
@@ -551,7 +570,9 @@ export const swordShield: Style = {
         ],
         0.015,
       ),
-      impacts: [T_CHIN, T_CUT],
+      impacts: [T_RISE, T_CUT],
+      // the greatsword brought down from the top
+      strike: 1.86,
       start: 0,
       chamber: cutAFrom - 0.05,
       end: 2.42,
@@ -561,8 +582,9 @@ export const swordShield: Style = {
       fx: [
         fx(0.3, 'sparkle', 'tip', 0.9, '#ffffff'),
         fx(0.4, 'holy', 'main', 0.5),
-        fx(0.85, 'dust', 'feet', 0.6),
-        fx(T_CHIN, 'sparkle', 'tip', 0.9, '#ffe8a0'),
+        fx(0.8, 'dust', 'feet', 0.6),
+        fx(T_RISE, 'flashline', 'tip', 1.0, '#ffe8a0'),
+        fx(T_RISE, 'dust', 'feet', 0.7),
         fx(1.4, 'sparkle', 'tip', 1.2, '#ffffff'),
         fx(T_SKY, 'bolt', 'tip', 1.0),
         fx(T_SKY + 0.02, 'holy', 'tip', 1.3),
@@ -581,8 +603,9 @@ export const swordShield: Style = {
   })(),
   executeReact: 'crumple',
   // Ring entrance, By Oath: a heavy march in place with the sword carried upright and the shield's
-  // face shown to them; the sword turned point-down and driven into the floor, both hands stacked
-  // on the pommel; then wrenched free and its flat beaten twice on the shield in challenge
+  // face shown to them; the sword raised to the sky, where the light strikes it, and chopped down
+  // point-first into the floor; knelt behind it in oath, the hand on the pommel; then torn free
+  // up over the head and its flat beaten twice on the shield in challenge
   entrance: (() => {
     const march = B({ ...body, twist: -0.1, hipTwist: 0, side: 0, lean: 0.04, crouch: -0.05, step: 0.08, back: 0.08, width: 0.14, headPitch: 0.0 });
     // the left foot lifts with the hips held level while the legs fold under them
@@ -606,50 +629,57 @@ export const swordShield: Style = {
         K(0.29, march),
         K(0.315, liftL),
         K(0.35, B({ ...march, crouch: -0.08 })),
-        // signature: the sword raised point-down, and driven into the floor
-        K(0.42, B({ ...march, crouch: -0.02, lean: -0.04, headPitch: 0.05 })),
-        K(0.5, B({ ...march, crouch: -0.02, lean: -0.06, twist: 0.0, headPitch: 0.15 })),
-        K(0.55, B({ ...march, crouch: -0.1, lean: 0.0, twist: 0.0, headPitch: 0.2 })),
-        K(0.6, B({ ...march, crouch: -0.06, lean: 0.0, twist: 0.0, headPitch: 0.28 })),
-        K(0.69, B({ ...march, crouch: -0.05, lean: 0.0, twist: 0.0, headPitch: 0.22 })),
-        // challenge: pulled free, turned to the shield, two beats, chin up
+        // signature: the sword raised to the sky, chin up to the light
+        K(0.4, B({ ...march, crouch: -0.02, lean: -0.1, twist: 0.0, headPitch: -0.25 })),
+        K(0.45, B({ ...march, crouch: -0.03, lean: -0.12, twist: 0.0, headPitch: -0.28 })),
+        // chopped down into the floor, and down onto one knee behind it, head bowed
+        K(0.5, B({ ...march, crouch: -0.3, lean: 0.2, twist: 0.0, headPitch: 0.25, step: 0.16, back: 0.2 })),
+        K(0.55, B({ ...march, crouch: -0.5, lean: 0.12, twist: 0.0, headPitch: 0.45, step: 0.2, back: 0.3 })),
+        K(0.63, B({ ...march, crouch: -0.5, lean: 0.1, twist: 0.0, headPitch: 0.4, step: 0.2, back: 0.3 })),
+        // rising, tearing it free
+        K(0.69, B({ ...march, crouch: -0.12, lean: -0.05, twist: -0.2, headPitch: 0.0, step: 0.16, back: 0.16 })),
+        // challenge: turned to the shield, two beats, chin up
         K(0.74, B({ ...march, crouch: -0.08, lean: 0.02, twist: 0.15, headPitch: 0.0, step: 0.16, back: 0.14, width: 0.16 })),
-        K(0.79, B({ ...march, crouch: -0.1, lean: 0.06, twist: 0.25, headPitch: -0.08, step: 0.18, back: 0.16, width: 0.17 })),
+        K(0.77, B({ ...march, crouch: -0.1, lean: 0.06, twist: 0.25, headPitch: -0.08, step: 0.18, back: 0.16, width: 0.17 })),
         K(0.86, B({ ...march, crouch: -0.1, lean: 0.06, twist: 0.25, headPitch: -0.1, step: 0.2, back: 0.18, width: 0.17 })),
         K(1.0, body),
       ],
       main: seq(
         [
           // carried upright before the right shoulder
-          [-0.1, 0.38, line([-0.28, 0.3, 0.22], [-0.28, 0.3, 0.22], [0, 1, 0.1], [0, 1, 0.1], [0, 0, 1])],
-          // brought forward, point at them, then turned point-down at the chest
-          [0.38, 0.45, line([-0.28, 0.3, 0.22], [-0.16, 0.5, 0.36], [0, 1, 0.1], [0.05, 0.1, 1], [0, 1, 0])],
-          [0.45, 0.51, line([-0.16, 0.5, 0.36], [-0.04, 0.62, 0.42], [0.05, 0.1, 1], [0, -1, 0.04], [0, 0, 1])],
-          // driven down into the floor and held there
-          [0.51, 0.55, line([-0.04, 0.62, 0.42], [-0.03, 0.36, 0.44], [0, -1, 0.04], [0, -1, 0], [0, 0, 1])],
-          [0.55, 0.6, line([-0.03, 0.36, 0.44], [-0.03, 0.29, 0.44], [0, -1, 0], [0, -1, 0], [0, 0, 1])],
-          [0.6, 0.7, line([-0.03, 0.29, 0.44], [-0.03, 0.29, 0.44], [0, -1, 0], [0, -1, 0], [0, 0, 1])],
-          // wrenched free and swung up to the right
-          [0.7, 0.75, line([-0.03, 0.29, 0.44], [-0.32, 0.44, 0.3], [0, -1, 0], OFF, flat)],
+          [-0.1, 0.36, line([-0.28, 0.3, 0.22], [-0.28, 0.3, 0.22], [0, 1, 0.1], [0, 1, 0.1], [0, 0, 1])],
+          // raised straight up to the sky, and held for the light
+          [0.36, 0.42, line([-0.28, 0.3, 0.22], [-0.12, 1.02, 0.16], [0, 1, 0.1], [0, 1, 0.05], [0, 0, 1])],
+          [0.42, 0.45, line([-0.12, 1.02, 0.16], [-0.12, 1.04, 0.16], [0, 1, 0.05], [0, 1, 0.05], [0, 0, 1])],
+          // chopped forward and down, point-first into the floor
+          [0.45, 0.475, line([-0.12, 1.04, 0.16], [-0.06, 0.8, 0.42], [0, 1, 0.05], [0, 0.1, 1], [0, 1, 0])],
+          [0.475, 0.5, line([-0.06, 0.8, 0.42], [-0.03, 0.36, 0.44], [0, 0.1, 1], [0, -1, 0.04], [0, 0, 1])],
+          // held in the floor through the oath
+          [0.5, 0.55, line([-0.03, 0.36, 0.44], [-0.03, 0.29, 0.44], [0, -1, 0.04], [0, -1, 0], [0, 0, 1])],
+          [0.55, 0.63, line([-0.03, 0.29, 0.44], [-0.03, 0.29, 0.44], [0, -1, 0], [0, -1, 0], [0, 0, 1])],
+          // torn free and swung up over the head to the right
+          [0.63, 0.69, line([-0.03, 0.29, 0.44], [-0.24, 0.86, 0.2], [0, -1, 0], [-0.3, 0.9, -0.3], [0, 0, 1])],
+          [0.69, 0.74, line([-0.24, 0.86, 0.2], [-0.32, 0.44, 0.3], [-0.3, 0.9, -0.3], OFF, flat)],
           // two beats of the flat on the shield
-          [0.75, 0.79, line([-0.32, 0.44, 0.3], beatAt, OFF, ON, flat)],
-          [0.79, 0.82, line(beatAt, [-0.32, 0.48, 0.3], ON, OFF, flat)],
-          [0.82, 0.85, line([-0.32, 0.48, 0.3], beatAt, OFF, ON, flat)],
-          [0.85, 1.0, line(beatAt, [-0.4, 0.3, 0.24], ON, [0.2, 0.5, 1], flat)],
+          [0.74, 0.77, line([-0.32, 0.44, 0.3], beatAt, OFF, ON, flat)],
+          [0.77, 0.8, line(beatAt, [-0.32, 0.48, 0.3], ON, OFF, flat)],
+          [0.8, 0.83, line([-0.32, 0.48, 0.3], beatAt, OFF, ON, flat)],
+          [0.83, 1.0, line(beatAt, [-0.4, 0.3, 0.24], ON, [0.2, 0.5, 1], flat)],
         ],
         0.03,
       ),
       off: seq(
         [
           // the face shown square to them through the march
-          [-0.1, 0.42, shieldLine([0.16, 0.42, 0.38], [0.16, 0.42, 0.38], [0, 0.05, 1], [0, 0.05, 1])],
-          // swung aside, then the hand set on the pommel with the shield hung to the left
-          [0.42, 0.53, shieldLine([0.16, 0.42, 0.38], [0.04, 0.5, 0.44], [0, 0.05, 1], [1, 0, 0.12])],
-          [0.53, 0.56, shieldLine([0.04, 0.5, 0.44], [0.0, 0.43, 0.45], [1, 0, 0.12], [1, 0, 0.12])],
-          [0.56, 0.7, shieldLine([0.0, 0.43, 0.45], [0.0, 0.43, 0.45], [1, 0, 0.12], [1, 0, 0.12])],
+          [-0.1, 0.36, shieldLine([0.16, 0.42, 0.38], [0.16, 0.42, 0.38], [0, 0.05, 1], [0, 0.05, 1])],
+          // out to the left for balance under the raised sword
+          [0.36, 0.44, shieldLine([0.16, 0.42, 0.38], [0.4, 0.35, 0.2], [0, 0.05, 1], [0.6, 0.05, 0.8])],
+          // the hand set on the pommel with the shield hung to the left, through the oath
+          [0.44, 0.52, shieldLine([0.4, 0.35, 0.2], [0.0, 0.43, 0.45], [0.6, 0.05, 0.8], [1, 0, 0.12])],
+          [0.52, 0.64, shieldLine([0.0, 0.43, 0.45], [0.0, 0.43, 0.45], [1, 0, 0.12], [1, 0, 0.12])],
           // raised before the chest to take the beats
-          [0.7, 0.76, shieldLine([0.0, 0.43, 0.45], [0.2, 0.42, 0.42], [1, 0, 0.12], [-0.25, 0.05, 1])],
-          [0.76, 1.0, shieldLine([0.2, 0.42, 0.42], [0.2, 0.43, 0.43], [-0.25, 0.05, 1], [-0.2, 0.05, 1])],
+          [0.64, 0.74, shieldLine([0.0, 0.43, 0.45], [0.2, 0.42, 0.42], [1, 0, 0.12], [-0.25, 0.05, 1])],
+          [0.74, 1.0, shieldLine([0.2, 0.42, 0.42], [0.2, 0.43, 0.43], [-0.25, 0.05, 1], [-0.2, 0.05, 1])],
         ],
         0.03,
       ),
@@ -676,15 +706,22 @@ export const swordShield: Style = {
         fx(0.27, 'stomp', 'feet', 0.6),
         fx(0.3, 'sparkle', 'offTip', 0.8, '#ffe8a0'),
         fx(0.35, 'stomp', 'feet', 0.7),
-        fx(0.45, 'sparkle', 'tip', 0.7, '#ffffff'),
-        fx(0.55, 'stomp', 'tip', 1.0),
-        fx(0.55, 'sparkle', 'tip', 1.2, '#ffe8a0'),
-        fx(0.555, 'shake', 'root', 0.6),
-        fx(0.79, 'sparkle', 'off', 1.0, '#ffe8a0'),
-        fx(0.79, 'shake', 'root', 0.25),
-        fx(0.85, 'sparkle', 'off', 1.1, '#ffe8a0'),
-        fx(0.85, 'shake', 'root', 0.3),
-        fx(0.87, 'holy', 'off', 1.0),
+        fx(0.39, 'sparkle', 'tip', 0.8, '#ffffff'),
+        fx(0.42, 'bolt', 'tip', 0.9),
+        fx(0.42, 'holy', 'tip', 1.2),
+        fx(0.5, 'shockwave', 'front', 1.2, '#ffd86a'),
+        fx(0.5, 'stomp', 'tip', 1.0),
+        fx(0.5, 'holy', 'root', 1.0),
+        fx(0.505, 'shake', 'root', 0.7),
+        fx(0.55, 'dust', 'feet', 0.8),
+        fx(0.58, 'holy', 'main', 0.6),
+        fx(0.66, 'flashline', 'tip', 1.0, '#ffe8a0'),
+        fx(0.66, 'dust', 'feet', 0.7),
+        fx(0.77, 'sparkle', 'off', 1.0, '#ffe8a0'),
+        fx(0.77, 'shake', 'root', 0.25),
+        fx(0.83, 'sparkle', 'off', 1.1, '#ffe8a0'),
+        fx(0.83, 'shake', 'root', 0.3),
+        fx(0.85, 'holy', 'off', 1.0),
       ],
     });
   })(),

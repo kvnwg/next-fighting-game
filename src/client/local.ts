@@ -190,7 +190,7 @@ export class LocalController {
     if (lunge !== 0) {
       const fw = forward(sim.yaw);
       // stop short of lunging into someone (retreating attacks always back off)
-      const blocked = lunge > 0 && ctx.others.some((o) => {
+      const blocked = lunge > 0 && !sim.vaulting(now) && ctx.others.some((o) => {
         const ox = o.pos.x - sim.x;
         const oz = o.pos.z - sim.z;
         return Math.hypot(ox, oz) < 1.15 && ox * fw.x + oz * fw.z > 0;
@@ -214,7 +214,7 @@ export class LocalController {
 
     const obstacles = ctx.others.filter((o) => o.s !== 'dead').map((o) => ({ x: o.pos.x, z: o.pos.z }));
     sim.airControl(now, dt);
-    const res = stepBody(sim, vx, vz, dt, this.map, sim.state === 'dodge' ? [] : obstacles);
+    const res = stepBody(sim, vx, vz, dt, this.map, sim.state === 'dodge' || sim.vaulting(now) ? [] : obstacles);
     this.fence?.(sim);
     if (res.fell && !this.fellSent) {
       this.fellSent = true;

@@ -18,6 +18,7 @@ export type Bind =
   | 'lock'
   | 'chat'
   | 'chars'
+  | 'shop'
   | 'leaderboard'
   | 'help'
   | 'challenge'
@@ -43,6 +44,7 @@ export const KEYS: Record<Bind, string[]> = {
   lock: ['Tab', 'KeyQ'],
   chat: ['Enter'],
   chars: ['KeyC'],
+  shop: ['KeyB'],
   leaderboard: ['KeyL'],
   help: ['KeyH'],
   challenge: ['KeyG'],

@@ -21,6 +21,8 @@ interface Particle {
   stretch: number;
   /** size multiplier reached at the end of its life (smoke billows out) */
   grow: number;
+  /** 0: solid. Otherwise see-through (smoke), starting at this opacity and thinning out over its life */
+  alpha: number;
   color: THREE.Color;
 }
 
@@ -51,7 +53,7 @@ const _c = new THREE.Vector3();
 const DUST = ['#c8b49a', '#a8957c', '#ddd0bc'];
 const DEBRIS = ['#6b5a48', '#4a3d31', '#8a7660'];
 
-const MAX_PARTICLES = 900;
+const MAX_PARTICLES = 2400;
 const MAX_SPLATS = 72;
 const BLOOD = ['#a80c1a', '#7a0812', '#c41824', '#560610'];
 
@@ -77,6 +79,9 @@ export class Effects {
   readonly group = new THREE.Group();
   private particles: Particle[] = [];
   private mesh: THREE.InstancedMesh;
+  /** see-through particles (smoke): drawn after the solid ones, without writing depth */
+  private soft: THREE.InstancedMesh;
+  private softAlpha: THREE.InstancedBufferAttribute;
   private flashes: { mesh: THREE.Mesh; life: number; max: number; sx: number; sy: number }[] = [];
   private rings: { mesh: THREE.Mesh; life: number; max: number; grow: number }[] = [];
   private beams: { mesh: THREE.Mesh; life: number; max: number; width: number }[] = [];
@@ -89,6 +94,8 @@ export class Effects {
   private splatMesh: THREE.InstancedMesh;
   private splats: { x: number; z: number; r: number; rot: number; stretch: number; delay: number; life: number; max: number; color: THREE.Color }[] = [];
   private splatNext = 0;
+  /** bursts waiting to go off (a fissure splitting outwards) */
+  private timers: { t: number; run: () => void }[] = [];
 
   constructor(readonly scene: THREE.Scene) {
     const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -97,11 +104,28 @@ export class Effects {
     this.mesh.frustumCulled = false;
     this.mesh.layers.set(FX_LAYER);
     for (let i = 0; i < MAX_PARTICLES; i++) {
-      this.particles.push({ alive: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 1, size: 0.1, gravity: 0, drag: 0, stretch: 0, grow: 1, color: new THREE.Color() });
+      this.particles.push({ alive: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 1, size: 0.1, gravity: 0, drag: 0, stretch: 0, grow: 1, alpha: 0, color: new THREE.Color() });
       this.mesh.setColorAt(i, new THREE.Color('#ffffff'));
     }
     this.mesh.count = 0;
     this.group.add(this.mesh);
+    // the see-through ones (smoke) in a pool of their own, each with its own opacity
+    this.softAlpha = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES), 1);
+    this.softAlpha.setUsage(THREE.DynamicDrawUsage);
+    const softGeo = new THREE.BoxGeometry(1, 1, 1);
+    softGeo.setAttribute('aAlpha', this.softAlpha);
+    const softMat = new THREE.MeshBasicMaterial({ toneMapped: false, transparent: true, depthWrite: false });
+    softMat.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aAlpha;\nvarying float vAlpha;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvAlpha = aAlpha;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vAlpha;').replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= vAlpha;');
+    };
+    this.soft = new THREE.InstancedMesh(softGeo, softMat, MAX_PARTICLES);
+    this.soft.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.soft.frustumCulled = false;
+    this.soft.layers.set(FX_LAYER);
+    for (let i = 0; i < MAX_PARTICLES; i++) this.soft.setColorAt(i, new THREE.Color('#ffffff'));
+    this.soft.count = 0;
+    this.group.add(this.soft);
     const disc = new THREE.CircleGeometry(0.5, 10).rotateX(-Math.PI / 2);
     this.splatMesh = new THREE.InstancedMesh(disc, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.7, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), MAX_SPLATS);
     this.splatMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -160,8 +184,16 @@ export class Effects {
     this.weather = kind ? new WeatherSystem(kind, this.group) : null;
   }
 
+  /** where the search for a free particle picks up (a ring, so a busy pool isn't rescanned from the start) */
+  private nextFree = 0;
   private spawn(): Particle | null {
-    for (const p of this.particles) if (!p.alive) return p;
+    const n = this.particles.length;
+    for (let i = 0; i < n; i++) {
+      const p = this.particles[(this.nextFree + i) % n];
+      if (p.alive) continue;
+      this.nextFree = (this.nextFree + i + 1) % n;
+      return p;
+    }
     return null;
   }
 
@@ -189,12 +221,13 @@ export class Effects {
       p.drag = opts.drag ?? 1.5;
       p.stretch = opts.stretch ?? 0;
       p.grow = opts.grow ?? 1;
+      p.alpha = 0;
       p.color.set(colors[Math.floor(Math.random() * colors.length)]);
     }
   }
 
   /** One particle with an explicit velocity (spirals, wisps, sweeps). */
-  emit(x: number, y: number, z: number, vx: number, vy: number, vz: number, color: string, o: { life?: number; size?: number; gravity?: number; drag?: number; stretch?: number; grow?: number } = {}): void {
+  emit(x: number, y: number, z: number, vx: number, vy: number, vz: number, color: string, o: { life?: number; size?: number; gravity?: number; drag?: number; stretch?: number; grow?: number; alpha?: number } = {}): void {
     const p = this.spawn();
     if (!p) return;
     p.alive = true;
@@ -210,6 +243,7 @@ export class Effects {
     p.drag = o.drag ?? 1.5;
     p.stretch = o.stretch ?? 0;
     p.grow = o.grow ?? 1;
+    p.alpha = o.alpha ?? 0;
     p.color.set(color);
   }
 
@@ -565,8 +599,21 @@ export class Effects {
     this.burst(_a.copy(pos).setY(pos.y + 1), { count: 24, color: ['#ff6a2a', '#ffb030', '#ff2a1a'], speed: 5, up: 1, life: 0.5, size: 0.07, gravity: -2, drag: 2 });
   }
 
+  /** Run `run` after `delay` seconds, to stagger a sequence of bursts. */
+  after(delay: number, run: () => void): void {
+    this.timers.push({ t: delay, run });
+  }
+
   update(dt: number, camera: THREE.Camera): void {
+    for (let i = this.timers.length - 1; i >= 0; i--) {
+      const tm = this.timers[i];
+      tm.t -= dt;
+      if (tm.t > 0) continue;
+      this.timers.splice(i, 1);
+      tm.run();
+    }
     let n = 0;
+    let ns = 0;
     for (const p of this.particles) {
       if (!p.alive) continue;
       p.life -= dt;
@@ -600,6 +647,14 @@ export class Effects {
         this.tmpS.set(s, s, s);
       }
       this.tmpM.compose(this.tmpP, this.tmpQ, this.tmpS);
+      if (p.alpha > 0) {
+        // smoke thins out as it spreads
+        this.soft.setMatrixAt(ns, this.tmpM);
+        this.soft.setColorAt(ns, p.color);
+        this.softAlpha.setX(ns, p.alpha * Math.min(1, (p.life / p.max) * 1.6));
+        ns++;
+        continue;
+      }
       this.mesh.setMatrixAt(n, this.tmpM);
       this.mesh.setColorAt(n, p.color);
       n++;
@@ -607,6 +662,10 @@ export class Effects {
     this.mesh.count = n;
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    this.soft.count = ns;
+    this.soft.instanceMatrix.needsUpdate = true;
+    if (this.soft.instanceColor) this.soft.instanceColor.needsUpdate = true;
+    this.softAlpha.needsUpdate = true;
 
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       const f = this.flashes[i];
