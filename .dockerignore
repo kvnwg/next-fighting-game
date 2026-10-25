@@ -1,0 +1,13 @@
+.git
+node_modules
+dist
+data
+*.log
+.env
+.env.*
+# the client builds the fighters from characters/*/model.js (on tools/voxel/builder.js); their
+# sheets and renders stay out
+characters/*/renders
+characters/*/export
+characters/**/*.html
+docs

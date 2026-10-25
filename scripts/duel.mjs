@@ -1,0 +1,51 @@
+// Two browser players queue ranked against each other. Usage: node scripts/duel.mjs <baseUrl> <outDir>
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const [base, outDir] = process.argv.slice(2);
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const logs = [];
+async function player(name) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => logs.push(`[${name} pageerror] ${e.message}`));
+  page.on('console', (m) => { if (m.type() === 'error') logs.push(`[${name} console] ${m.text()}`); });
+  await page.goto(base, { waitUntil: 'load' });
+  await page.waitForTimeout(800);
+  await page.fill('#name-input', name);
+  await page.click('#enter-btn');
+  await page.waitForTimeout(1500);
+  return page;
+}
+const a = await player('Alpha');
+const b = await player('Bravo');
+await a.screenshot({ path: `${outDir}/duel-lobby-a.png` });
+await a.keyboard.press('KeyK');
+await b.keyboard.press('KeyK');
+await a.waitForTimeout(2500);
+await a.screenshot({ path: `${outDir}/duel-intro-a.png` });
+await a.waitForTimeout(6500);
+// both advance and trade blows
+await a.keyboard.down('KeyW');
+await b.keyboard.down('KeyW');
+await a.waitForTimeout(1100);
+await a.keyboard.up('KeyW');
+await b.keyboard.up('KeyW');
+await a.mouse.click(640, 360);
+await b.waitForTimeout(150);
+await b.keyboard.press('KeyF');
+await a.waitForTimeout(250);
+await a.screenshot({ path: `${outDir}/duel-clash-a.png` });
+await b.screenshot({ path: `${outDir}/duel-clash-b.png` });
+await a.waitForTimeout(800);
+b.on('dialog', (d) => d.accept().catch(() => {}));
+await b.keyboard.press('Escape');
+await b.waitForTimeout(200);
+await b.click('#btn-forfeit', { force: true }).catch((e) => logs.push(`forfeit click failed: ${e.message}`));
+await a.waitForTimeout(1500);
+await a.screenshot({ path: `${outDir}/duel-result-a.png` });
+await b.screenshot({ path: `${outDir}/duel-result-b.png` });
+await a.waitForTimeout(7000);
+await a.screenshot({ path: `${outDir}/duel-back-a.png` });
+console.log(logs.join('\n') || 'no errors');
+await browser.close();
