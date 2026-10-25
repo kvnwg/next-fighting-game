@@ -603,8 +603,9 @@ export const swordShield: Style = {
   })(),
   executeReact: 'crumple',
   // Ring entrance, By Oath: a heavy march in place with the sword carried upright and the shield's
-  // face shown to them; the sword turned point-down and driven into the floor, both hands stacked
-  // on the pommel; then wrenched free and its flat beaten twice on the shield in challenge
+  // face shown to them; the sword raised to the sky, where the light strikes it, and chopped down
+  // point-first into the floor; knelt behind it in oath, the hand on the pommel; then torn free
+  // up over the head and its flat beaten twice on the shield in challenge
   entrance: (() => {
     const march = B({ ...body, twist: -0.1, hipTwist: 0, side: 0, lean: 0.04, crouch: -0.05, step: 0.08, back: 0.08, width: 0.14, headPitch: 0.0 });
     // the left foot lifts with the hips held level while the legs fold under them
@@ -628,50 +629,57 @@ export const swordShield: Style = {
         K(0.29, march),
         K(0.315, liftL),
         K(0.35, B({ ...march, crouch: -0.08 })),
-        // signature: the sword raised point-down, and driven into the floor
-        K(0.42, B({ ...march, crouch: -0.02, lean: -0.04, headPitch: 0.05 })),
-        K(0.5, B({ ...march, crouch: -0.02, lean: -0.06, twist: 0.0, headPitch: 0.15 })),
-        K(0.55, B({ ...march, crouch: -0.1, lean: 0.0, twist: 0.0, headPitch: 0.2 })),
-        K(0.6, B({ ...march, crouch: -0.06, lean: 0.0, twist: 0.0, headPitch: 0.28 })),
-        K(0.69, B({ ...march, crouch: -0.05, lean: 0.0, twist: 0.0, headPitch: 0.22 })),
-        // challenge: pulled free, turned to the shield, two beats, chin up
+        // signature: the sword raised to the sky, chin up to the light
+        K(0.4, B({ ...march, crouch: -0.02, lean: -0.1, twist: 0.0, headPitch: -0.25 })),
+        K(0.45, B({ ...march, crouch: -0.03, lean: -0.12, twist: 0.0, headPitch: -0.28 })),
+        // chopped down into the floor, and down onto one knee behind it, head bowed
+        K(0.5, B({ ...march, crouch: -0.3, lean: 0.2, twist: 0.0, headPitch: 0.25, step: 0.16, back: 0.2 })),
+        K(0.55, B({ ...march, crouch: -0.5, lean: 0.12, twist: 0.0, headPitch: 0.45, step: 0.2, back: 0.3 })),
+        K(0.63, B({ ...march, crouch: -0.5, lean: 0.1, twist: 0.0, headPitch: 0.4, step: 0.2, back: 0.3 })),
+        // rising, tearing it free
+        K(0.69, B({ ...march, crouch: -0.12, lean: -0.05, twist: -0.2, headPitch: 0.0, step: 0.16, back: 0.16 })),
+        // challenge: turned to the shield, two beats, chin up
         K(0.74, B({ ...march, crouch: -0.08, lean: 0.02, twist: 0.15, headPitch: 0.0, step: 0.16, back: 0.14, width: 0.16 })),
-        K(0.79, B({ ...march, crouch: -0.1, lean: 0.06, twist: 0.25, headPitch: -0.08, step: 0.18, back: 0.16, width: 0.17 })),
+        K(0.77, B({ ...march, crouch: -0.1, lean: 0.06, twist: 0.25, headPitch: -0.08, step: 0.18, back: 0.16, width: 0.17 })),
         K(0.86, B({ ...march, crouch: -0.1, lean: 0.06, twist: 0.25, headPitch: -0.1, step: 0.2, back: 0.18, width: 0.17 })),
         K(1.0, body),
       ],
       main: seq(
         [
           // carried upright before the right shoulder
-          [-0.1, 0.38, line([-0.28, 0.3, 0.22], [-0.28, 0.3, 0.22], [0, 1, 0.1], [0, 1, 0.1], [0, 0, 1])],
-          // brought forward, point at them, then turned point-down at the chest
-          [0.38, 0.45, line([-0.28, 0.3, 0.22], [-0.16, 0.5, 0.36], [0, 1, 0.1], [0.05, 0.1, 1], [0, 1, 0])],
-          [0.45, 0.51, line([-0.16, 0.5, 0.36], [-0.04, 0.62, 0.42], [0.05, 0.1, 1], [0, -1, 0.04], [0, 0, 1])],
-          // driven down into the floor and held there
-          [0.51, 0.55, line([-0.04, 0.62, 0.42], [-0.03, 0.36, 0.44], [0, -1, 0.04], [0, -1, 0], [0, 0, 1])],
-          [0.55, 0.6, line([-0.03, 0.36, 0.44], [-0.03, 0.29, 0.44], [0, -1, 0], [0, -1, 0], [0, 0, 1])],
-          [0.6, 0.7, line([-0.03, 0.29, 0.44], [-0.03, 0.29, 0.44], [0, -1, 0], [0, -1, 0], [0, 0, 1])],
-          // wrenched free and swung up to the right
-          [0.7, 0.75, line([-0.03, 0.29, 0.44], [-0.32, 0.44, 0.3], [0, -1, 0], OFF, flat)],
+          [-0.1, 0.36, line([-0.28, 0.3, 0.22], [-0.28, 0.3, 0.22], [0, 1, 0.1], [0, 1, 0.1], [0, 0, 1])],
+          // raised straight up to the sky, and held for the light
+          [0.36, 0.42, line([-0.28, 0.3, 0.22], [-0.12, 1.02, 0.16], [0, 1, 0.1], [0, 1, 0.05], [0, 0, 1])],
+          [0.42, 0.45, line([-0.12, 1.02, 0.16], [-0.12, 1.04, 0.16], [0, 1, 0.05], [0, 1, 0.05], [0, 0, 1])],
+          // chopped forward and down, point-first into the floor
+          [0.45, 0.475, line([-0.12, 1.04, 0.16], [-0.06, 0.8, 0.42], [0, 1, 0.05], [0, 0.1, 1], [0, 1, 0])],
+          [0.475, 0.5, line([-0.06, 0.8, 0.42], [-0.03, 0.36, 0.44], [0, 0.1, 1], [0, -1, 0.04], [0, 0, 1])],
+          // held in the floor through the oath
+          [0.5, 0.55, line([-0.03, 0.36, 0.44], [-0.03, 0.29, 0.44], [0, -1, 0.04], [0, -1, 0], [0, 0, 1])],
+          [0.55, 0.63, line([-0.03, 0.29, 0.44], [-0.03, 0.29, 0.44], [0, -1, 0], [0, -1, 0], [0, 0, 1])],
+          // torn free and swung up over the head to the right
+          [0.63, 0.69, line([-0.03, 0.29, 0.44], [-0.24, 0.86, 0.2], [0, -1, 0], [-0.3, 0.9, -0.3], [0, 0, 1])],
+          [0.69, 0.74, line([-0.24, 0.86, 0.2], [-0.32, 0.44, 0.3], [-0.3, 0.9, -0.3], OFF, flat)],
           // two beats of the flat on the shield
-          [0.75, 0.79, line([-0.32, 0.44, 0.3], beatAt, OFF, ON, flat)],
-          [0.79, 0.82, line(beatAt, [-0.32, 0.48, 0.3], ON, OFF, flat)],
-          [0.82, 0.85, line([-0.32, 0.48, 0.3], beatAt, OFF, ON, flat)],
-          [0.85, 1.0, line(beatAt, [-0.4, 0.3, 0.24], ON, [0.2, 0.5, 1], flat)],
+          [0.74, 0.77, line([-0.32, 0.44, 0.3], beatAt, OFF, ON, flat)],
+          [0.77, 0.8, line(beatAt, [-0.32, 0.48, 0.3], ON, OFF, flat)],
+          [0.8, 0.83, line([-0.32, 0.48, 0.3], beatAt, OFF, ON, flat)],
+          [0.83, 1.0, line(beatAt, [-0.4, 0.3, 0.24], ON, [0.2, 0.5, 1], flat)],
         ],
         0.03,
       ),
       off: seq(
         [
           // the face shown square to them through the march
-          [-0.1, 0.42, shieldLine([0.16, 0.42, 0.38], [0.16, 0.42, 0.38], [0, 0.05, 1], [0, 0.05, 1])],
-          // swung aside, then the hand set on the pommel with the shield hung to the left
-          [0.42, 0.53, shieldLine([0.16, 0.42, 0.38], [0.04, 0.5, 0.44], [0, 0.05, 1], [1, 0, 0.12])],
-          [0.53, 0.56, shieldLine([0.04, 0.5, 0.44], [0.0, 0.43, 0.45], [1, 0, 0.12], [1, 0, 0.12])],
-          [0.56, 0.7, shieldLine([0.0, 0.43, 0.45], [0.0, 0.43, 0.45], [1, 0, 0.12], [1, 0, 0.12])],
+          [-0.1, 0.36, shieldLine([0.16, 0.42, 0.38], [0.16, 0.42, 0.38], [0, 0.05, 1], [0, 0.05, 1])],
+          // out to the left for balance under the raised sword
+          [0.36, 0.44, shieldLine([0.16, 0.42, 0.38], [0.4, 0.35, 0.2], [0, 0.05, 1], [0.6, 0.05, 0.8])],
+          // the hand set on the pommel with the shield hung to the left, through the oath
+          [0.44, 0.52, shieldLine([0.4, 0.35, 0.2], [0.0, 0.43, 0.45], [0.6, 0.05, 0.8], [1, 0, 0.12])],
+          [0.52, 0.64, shieldLine([0.0, 0.43, 0.45], [0.0, 0.43, 0.45], [1, 0, 0.12], [1, 0, 0.12])],
           // raised before the chest to take the beats
-          [0.7, 0.76, shieldLine([0.0, 0.43, 0.45], [0.2, 0.42, 0.42], [1, 0, 0.12], [-0.25, 0.05, 1])],
-          [0.76, 1.0, shieldLine([0.2, 0.42, 0.42], [0.2, 0.43, 0.43], [-0.25, 0.05, 1], [-0.2, 0.05, 1])],
+          [0.64, 0.74, shieldLine([0.0, 0.43, 0.45], [0.2, 0.42, 0.42], [1, 0, 0.12], [-0.25, 0.05, 1])],
+          [0.74, 1.0, shieldLine([0.2, 0.42, 0.42], [0.2, 0.43, 0.43], [-0.25, 0.05, 1], [-0.2, 0.05, 1])],
         ],
         0.03,
       ),
@@ -698,15 +706,22 @@ export const swordShield: Style = {
         fx(0.27, 'stomp', 'feet', 0.6),
         fx(0.3, 'sparkle', 'offTip', 0.8, '#ffe8a0'),
         fx(0.35, 'stomp', 'feet', 0.7),
-        fx(0.45, 'sparkle', 'tip', 0.7, '#ffffff'),
-        fx(0.55, 'stomp', 'tip', 1.0),
-        fx(0.55, 'sparkle', 'tip', 1.2, '#ffe8a0'),
-        fx(0.555, 'shake', 'root', 0.6),
-        fx(0.79, 'sparkle', 'off', 1.0, '#ffe8a0'),
-        fx(0.79, 'shake', 'root', 0.25),
-        fx(0.85, 'sparkle', 'off', 1.1, '#ffe8a0'),
-        fx(0.85, 'shake', 'root', 0.3),
-        fx(0.87, 'holy', 'off', 1.0),
+        fx(0.39, 'sparkle', 'tip', 0.8, '#ffffff'),
+        fx(0.42, 'bolt', 'tip', 0.9),
+        fx(0.42, 'holy', 'tip', 1.2),
+        fx(0.5, 'shockwave', 'front', 1.2, '#ffd86a'),
+        fx(0.5, 'stomp', 'tip', 1.0),
+        fx(0.5, 'holy', 'root', 1.0),
+        fx(0.505, 'shake', 'root', 0.7),
+        fx(0.55, 'dust', 'feet', 0.8),
+        fx(0.58, 'holy', 'main', 0.6),
+        fx(0.66, 'flashline', 'tip', 1.0, '#ffe8a0'),
+        fx(0.66, 'dust', 'feet', 0.7),
+        fx(0.77, 'sparkle', 'off', 1.0, '#ffe8a0'),
+        fx(0.77, 'shake', 'root', 0.25),
+        fx(0.83, 'sparkle', 'off', 1.1, '#ffe8a0'),
+        fx(0.83, 'shake', 'root', 0.3),
+        fx(0.85, 'holy', 'off', 1.0),
       ],
     });
   })(),

@@ -744,26 +744,33 @@ export const daggers: Style = {
     fx: [fx(0.8, 'smoke', 'feet', 1.2)],
   }),
   // Ring entrance, From Above: out of smoke he drops from high overhead through a front flip into a
-  // low landing crouch, stays down with the head bowed and rises slowly as the hands go to the
-  // sheaths, then both blades are drawn and crossed before the hood, points up, and lowered into
-  // the guard
+  // low landing crouch; springs up in a full spin, both blades drawn and flung out wide; cuts an X
+  // across the front; sinks into a predator's crouch, one blade low ahead and one raised behind,
+  // the eyes flaring; and crosses them before the hood, points up, then down into the guard
   entrance: mv({
     keys: [
       // the drop
-      K(0.0, B({ ...body, crouch: -0.04, lean: 0.0, twist: 0, step: 0.12, back: 0.12, width: 0.1, headPitch: 0.3 }), { hop: 3.4, flip: 0 }),
+      K(0.0, B({ ...body, crouch: -0.04, lean: 0.0, twist: 0, step: 0.12, back: 0.12, width: 0.1, headPitch: 0.3 }), { hop: 3.4, flip: 0, spin: 0 }),
       K(0.09, B({ ...body, crouch: -0.12, lean: 0.3, twist: 0, step: 0.06, back: 0.06, width: 0.1, headPitch: 0.4 }), { hop: 3.1, flip: 0.2 }),
       K(0.17, B({ ...body, crouch: -0.2, lean: 0.5, twist: 0, step: 0.04, back: 0.04, width: 0.1, headPitch: 0.4 }), { hop: 2.2, flip: 0.65 }),
       K(0.24, B({ ...body, crouch: -0.1, lean: 0.15, twist: 0, step: 0.16, back: 0.16, width: 0.16, headPitch: 0.2 }), { hop: 0.95, flip: 0.95 }),
       K(0.29, B({ ...body, crouch: -0.2, lean: 0.25, twist: 0, step: 0.24, back: 0.28, width: 0.22, headPitch: 0.3 }), { hop: 0, flip: 1 }),
-      // the landing crouch, head down
-      K(0.33, B({ ...body, crouch: -0.56, lean: 0.62, twist: 0.05, step: 0.32, back: 0.38, width: 0.26, headPitch: 0.55 }), { hop: 0 }),
-      K(0.48, B({ ...body, crouch: -0.54, lean: 0.6, twist: 0.05, step: 0.32, back: 0.38, width: 0.26, headPitch: 0.6 })),
-      // rising slowly, the hands going to the sheaths
-      K(0.68, B({ ...body, crouch: -0.3, lean: 0.3, twist: -0.05, step: 0.28, back: 0.32, width: 0.2, headPitch: 0.3 })),
-      // the draw, crossed before the hood
-      K(0.76, B({ ...body, crouch: -0.2, lean: 0.1, twist: 0, step: 0.24, back: 0.28, width: 0.18, headPitch: -0.05 })),
-      K(0.86, B({ ...body, crouch: -0.2, lean: 0.1, twist: 0, step: 0.24, back: 0.28, width: 0.18, headPitch: -0.05 })),
-      K(0.97, body),
+      // the landing crouch, head down, only a beat
+      K(0.33, B({ ...body, crouch: -0.56, lean: 0.62, twist: 0.05, step: 0.32, back: 0.38, width: 0.26, headPitch: 0.55 })),
+      K(0.37, B({ ...body, crouch: -0.54, lean: 0.58, twist: 0.05, step: 0.32, back: 0.38, width: 0.26, headPitch: 0.5 }), { spin: 0 }),
+      // springing up through a full turn as the blades come out
+      K(0.44, B({ ...body, crouch: -0.24, lean: 0.12, twist: 0, step: 0.22, back: 0.24, width: 0.18, headPitch: 0.1 }), { spin: 0.55, hop: 0.12 }),
+      K(0.5, B({ ...body, crouch: -0.16, lean: 0.04, twist: 0, step: 0.22, back: 0.24, width: 0.18, headPitch: 0.0 }), { spin: 1, hop: 0 }),
+      // the X: the chest pitches in behind both blades
+      K(0.555, B({ ...body, crouch: -0.32, lean: 0.36, twist: 0.08, step: 0.32, back: 0.3, width: 0.2, headPitch: 0.1 })),
+      K(0.6, B({ ...body, crouch: -0.33, lean: 0.36, twist: 0.08, step: 0.32, back: 0.3, width: 0.2, headPitch: 0.1 })),
+      // the predator's crouch, the eyes coming up out of the hood
+      K(0.68, B({ ...body, crouch: -0.48, lean: 0.45, twist: -0.2, step: 0.36, back: 0.36, width: 0.26, headPitch: 0.25 })),
+      K(0.76, B({ ...body, crouch: -0.49, lean: 0.44, twist: -0.2, step: 0.36, back: 0.36, width: 0.26, headPitch: 0.05 })),
+      // crossed before the hood
+      K(0.82, B({ ...body, crouch: -0.2, lean: 0.1, twist: 0, step: 0.24, back: 0.28, width: 0.18, headPitch: -0.05 })),
+      K(0.88, B({ ...body, crouch: -0.2, lean: 0.1, twist: 0, step: 0.24, back: 0.28, width: 0.18, headPitch: -0.05 })),
+      K(0.98, body),
     ],
     main: keyed([
       [0.0, [-0.3, 0.3, 0.1], SHEATH_R, UP],
@@ -772,14 +779,22 @@ export const daggers: Style = {
       [0.3, [-0.42, 0.34, -0.02], [-0.3, -0.3, -1], UP],
       // the right arm held back for balance on landing
       [0.34, [-0.4, 0.18, -0.16], [-0.2, -0.2, -1], UP],
-      [0.5, [-0.38, 0.16, -0.12], [-0.2, -0.2, -1], UP],
-      // down to the right thigh
-      gR(0.68, [-0.3, -0.02, 0.06], [0, -1, -0.2]),
-      // drawn, raised and crossed before the hood, points up and out
-      gR(0.76, [-0.08, 0.66, 0.36], [0.5, 0.7, 0.5]),
-      gR(0.86, [-0.08, 0.64, 0.36], [0.5, 0.7, 0.5]),
+      [0.37, [-0.38, 0.16, -0.12], [-0.2, -0.2, -1], UP],
+      // drawn off the right thigh and flung out wide through the turn
+      gR(0.4, [-0.3, -0.02, 0.06], [0, -1, -0.2]),
+      gR(0.45, [-0.62, 0.42, 0.12], [-1, 0.15, 0.3]),
+      gR(0.5, [-0.62, 0.44, 0.18], [-0.9, 0.2, 0.4]),
+      // the X: swept across to the left
+      gR(0.555, [0.15, 0.4, 0.45], [0.8, 0.0, 0.6]),
+      gR(0.6, [0.2, 0.38, 0.42], [0.75, -0.1, 0.65]),
+      // low ahead, at their knees
+      gR(0.68, [-0.25, 0.1, 0.42], [-0.1, -0.2, 1]),
+      gR(0.76, [-0.25, 0.12, 0.44], [-0.1, -0.15, 1]),
+      // crossed before the hood, points up and out
+      gR(0.82, [-0.08, 0.66, 0.36], [0.5, 0.7, 0.5]),
+      gR(0.88, [-0.08, 0.64, 0.36], [0.5, 0.7, 0.5]),
       // and lowered into the guard
-      gR(...at(0.97, G_R)),
+      gR(...at(0.98, G_R)),
     ]),
     off: keyed([
       [0.0, [0.3, 0.3, 0.1], SHEATH_L, UP],
@@ -788,23 +803,38 @@ export const daggers: Style = {
       [0.3, [0.3, 0.1, 0.3], [0.1, -0.3, -1], UP],
       // the left hand down to the ground on landing
       [0.34, [0.22, -0.06, 0.42], [0.2, -0.3, -1], UP],
-      [0.5, [0.22, -0.06, 0.42], [0.2, -0.3, -1], UP],
-      // round to the small of the back
-      [0.68, [0.24, 0.02, -0.14], [-0.2, -0.6, -0.8], UP],
-      gL(0.76, [0.08, 0.68, 0.38], [-0.5, 0.7, 0.5]),
-      gL(0.86, [0.08, 0.66, 0.38], [-0.5, 0.7, 0.5]),
-      gL(...at(0.97, G_L)),
+      [0.37, [0.22, -0.06, 0.42], [0.2, -0.3, -1], UP],
+      // round to the small of the back, drawn and flung out wide
+      [0.41, [0.24, 0.02, -0.14], [-0.2, -0.6, -0.8], UP],
+      gL(0.46, [0.62, 0.42, 0.12], [1, 0.15, 0.3]),
+      gL(0.5, [0.62, 0.44, 0.18], [0.9, 0.2, 0.4]),
+      // the X: across to the right, over the other
+      gL(0.555, [-0.15, 0.46, 0.45], [-0.8, 0.05, 0.6]),
+      gL(0.6, [-0.2, 0.44, 0.42], [-0.75, -0.05, 0.65]),
+      // raised behind, point forward over the shoulder
+      gL(0.68, [0.35, 0.55, -0.1], [0.3, 0.45, 0.85]),
+      gL(0.76, [0.36, 0.57, -0.1], [0.3, 0.45, 0.85]),
+      gL(0.82, [0.08, 0.68, 0.38], [-0.5, 0.7, 0.5]),
+      gL(0.88, [0.08, 0.66, 0.38], [-0.5, 0.7, 0.5]),
+      gL(...at(0.98, G_L)),
     ]),
     lead: 0,
-    ghosts: [0.04, 0.3],
+    ghosts: [0.04, 0.6],
     fx: [
       fx(0.0, 'smoke', 'root', 1.4),
       fx(0.31, 'dust', 'feet', 1.1),
       fx(0.31, 'smoke', 'feet', 1.3),
       fx(0.31, 'stomp', 'feet', 0.5),
-      fx(0.74, 'smoke', 'feet', 0.6),
-      fx(0.77, 'sparkle', 'tip', 0.9, '#ff2a6a'),
-      fx(0.78, 'sparkle', 'offTip', 0.9, '#ff2a6a'),
+      fx(0.4, 'smoke', 'feet', 0.9),
+      fx(0.45, 'sparkle', 'tip', 0.8, '#ff2a6a'),
+      fx(0.46, 'sparkle', 'offTip', 0.8, '#ff2a6a'),
+      fx(0.555, 'flashline', 'tip', 1.0, '#ff2a6a'),
+      fx(0.555, 'flashline', 'offTip', 1.0, '#ff2a6a'),
+      fx(0.56, 'smoke', 'root', 0.7),
+      fx(0.68, 'dust', 'feet', 0.7),
+      fx(0.74, 'sparkle', 'root', 0.6, '#ff2a2a'),
+      fx(0.83, 'sparkle', 'tip', 0.9, '#ff2a6a'),
+      fx(0.84, 'sparkle', 'offTip', 0.9, '#ff2a6a'),
     ],
   }),
 };

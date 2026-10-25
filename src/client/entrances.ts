@@ -91,20 +91,24 @@ export const ENTRANCES: Record<CharacterId, Entrance> = {
   },
   duelist: {
     title: 'The Green Flourish',
-    trails: [[0.69, 0.8]],
+    trails: [[0.22, 0.36], [0.56, 0.66], [0.76, 0.82]],
     line: 'Shall we dance?',
     shots: [
       // beside him as he swaggers, cape flick
       { from: [1.2, 2.6, 1.4], to: [2.0, 2.2, 1.45], look: [[0, 0, 1.3], [0, 0, 1.35]], fov: [40, 38] },
-      // a slow orbit round the salute
-      { from: [1.8, -1.0, 1.6], via: [2.4, 0, 1.75], to: [1.8, 1.0, 1.6], look: [[0, 0, 1.55], [0, 0, 1.6]], fov: [34, 32] },
+      // a slow orbit round the salute and the thrusts
+      { from: [2.0, -1.2, 1.5], via: [2.8, 0, 1.65], to: [2.0, 1.2, 1.5], look: [[0, 0, 1.4], [0.3, 0, 1.45]], fov: [40, 38] },
       // eye level from the front: the point comes down the lens
       { from: [2.8, -0.2, 1.65], to: [2.3, -0.1, 1.65], look: [[0, 0, 1.55], [0, 0, 1.6]], fov: [40, 38] },
     ],
     sfx: [
       { s: 0, sound: 'pluck' },
-      { s: 0.38, sound: 'shing' },
-      { s: 0.74, sound: 'whoosh', vol: 0.7 },
+      { s: 0.23, sound: 'whoosh', vol: 0.6 },
+      { s: 0.3, sound: 'whoosh', vol: 0.6 },
+      { s: 0.42, sound: 'shing' },
+      { s: 0.57, sound: 'whoosh', vol: 0.8 },
+      { s: 0.62, sound: 'whoosh', vol: 0.8 },
+      { s: 0.7, sound: 'whoosh', vol: 0.5 },
       { s: 0.82, sound: 'chime' },
     ],
   },
@@ -129,42 +133,46 @@ export const ENTRANCES: Record<CharacterId, Entrance> = {
   },
   shade: {
     title: 'The Unseen',
-    trails: [[0.68, 0.77]],
+    trails: [[0.4, 0.62]],
     line: 'You never heard me.',
     shots: [
       // straight down on the spot he drops onto
       { from: [1.0, 0, 6.0], to: [0.9, 0, 4.6], look: [[0, 0, 0], [0, 0, 0.3]], fov: [50, 48] },
-      // tight and low as he rises out of the crouch
-      { from: [1.6, -0.4, 0.6], to: [1.6, -0.3, 1.3], look: [[0, 0, 0.5], [0, 0, 1.45]], fov: [36, 34] },
+      // low and wide as he springs up spinning and cuts the X, sliding round his front
+      { from: [2.4, -1.4, 0.7], via: [2.8, 0, 0.9], to: [2.2, 1.0, 1.1], look: [[0, 0, 0.8], [0, 0, 1.2]], fov: [44, 40] },
       // tight on the hood, a slow push
       { from: [2.0, 0.15, 1.6], to: [1.5, 0.1, 1.6], look: [[0, 0, 1.5], [0, 0, 1.55]], fov: [38, 34] },
     ],
     sfx: [
       { s: 0, sound: 'whisper' },
       { s: 0.28, sound: 'stomp', vol: 0.5 },
-      // a metal grind as he rises, swelling out as the knives come out
-      { s: 0.3, sound: 'scrape' },
-      { s: 0.72, sound: 'shing' },
-      { s: 0.77, sound: 'shing' },
+      // a metal grind as he springs up, swelling out as the knives come out
+      { s: 0.36, sound: 'scrape' },
+      { s: 0.42, sound: 'shing' },
+      { s: 0.46, sound: 'shing' },
+      { s: 0.53, sound: 'whoosh' },
+      { s: 0.81, sound: 'shing', vol: 0.7 },
     ],
   },
   reaper: {
     title: 'Hollow Harvest',
-    trails: [[0.73, 0.88]],
+    trails: [[0.36, 0.58], [0.68, 0.75]],
     line: 'Shhh…',
     shots: [
       // a crane coming down over the fog
       { from: [4.0, 2.0, 4.6], to: [3.0, 1.5, 2.2], look: [[0, 0, 0.6], [0, 0, 0.9]], fov: [48, 46] },
-      // waist height alongside as it turns to face front
-      { from: [0.6, 2.4, 1.0], to: [1.4, 2.2, 1.05], look: [[0, 0, 0.9], [0, 0, 1.2]], fov: [40, 38] },
-      // low from the front for the spin
-      { from: [2.6, -0.5, 0.6], to: [3.4, 0, 0.9], look: [[0, 0, 1.6], [0, 0, 1.5]], fov: [50, 50] },
+      // wide across the front for the whirl
+      { from: [3.4, 2.2, 1.4], via: [3.8, 0.4, 1.3], to: [3.0, -1.2, 1.2], look: [[0, 0, 1.0], [0, 0, 1.1]], fov: [48, 46] },
+      // low from the front as the sickle goes in, pushing in on the tilting head
+      { from: [2.8, -0.5, 0.6], to: [2.1, -0.3, 0.8], look: [[0, 0, 0.9], [0, 0, 1.0]], fov: [46, 42] },
     ],
     sfx: [
       { s: 0, sound: 'whisper' },
       { s: 0.1, sound: 'chime', vol: 0.5 },
-      { s: 0.4, sound: 'scrape' },
-      { s: 0.74, sound: 'whoosh' },
+      { s: 0.24, sound: 'scrape' },
+      { s: 0.37, sound: 'whoosh' },
+      { s: 0.48, sound: 'whoosh', vol: 0.8 },
+      { s: 0.745, sound: 'stomp' },
     ],
   },
   monk: {
@@ -190,13 +198,13 @@ export const ENTRANCES: Record<CharacterId, Entrance> = {
   },
   paladin: {
     title: 'Oath of Bronze',
-    trails: [[0.76, 0.87]],
+    trails: [[0.45, 0.5], [0.63, 0.84]],
     line: 'By oath, I stand.',
     shots: [
       // low beside the marching boots
       { from: [0.8, 1.8, 0.3], to: [1.6, 1.6, 0.35], look: [[0, 0, 0.4], [0, 0, 0.55]], fov: [42, 40] },
-      // from the planted blade up to the helm
-      { from: [2.4, -0.4, 0.8], to: [2.2, -0.3, 1.0], look: [[0.6, 0, 0.3], [0, 0, 1.75]], fov: [40, 38] },
+      // low and wide in front: the sword raised to the light, driven down, the oath
+      { from: [3.2, -0.9, 0.6], to: [2.6, -0.6, 0.8], look: [[0, 0, 1.5], [0, 0, 1.0]], fov: [46, 42] },
       // wide hero shot, low, for the clash on the shield
       { from: [4.0, -0.6, 0.4], to: [3.4, -0.5, 0.45], look: [[0, 0, 1.3], [0, 0, 1.35]], fov: [46, 44] },
     ],
@@ -204,9 +212,12 @@ export const ENTRANCES: Record<CharacterId, Entrance> = {
       { s: 0, sound: 'fanfare' },
       { s: 0.1, sound: 'stomp', vol: 0.6 },
       { s: 0.22, sound: 'stomp', vol: 0.6 },
-      { s: 0.5, sound: 'clang' },
-      { s: 0.8, sound: 'clang' },
-      { s: 0.88, sound: 'clang' },
+      { s: 0.42, sound: 'chime' },
+      { s: 0.5, sound: 'stomp' },
+      { s: 0.5, sound: 'thump' },
+      { s: 0.66, sound: 'whoosh', vol: 0.7 },
+      { s: 0.77, sound: 'clang' },
+      { s: 0.83, sound: 'clang' },
     ],
   },
 };

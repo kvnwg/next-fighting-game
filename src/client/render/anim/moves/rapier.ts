@@ -37,7 +37,7 @@
  * Weapon paths are authored relative to the hips (`body: true`): +z is the opponent whatever way
  * the torso is turned or pitched. Free-hand tracks are in torso space.
  */
-import { B, K, P, Style, X, fx, line, mv, seq, track } from '../author';
+import { B, K, P, Style, X, arc, circle, fx, line, mv, seq, track } from '../author';
 import type { BodyPose, Motion, V3 } from '../author';
 
 const FT = 0.75; // the chest turned left: the right shoulder faces the opponent
@@ -401,25 +401,41 @@ const X_LUNGE = tb({ crouch: -0.47, lean: 0.56, step: 0.66, back: 0.74, twist: F
 
 // ------------------------------------------------------------------------------------ entrance
 
-// Entrance: the blade hanging loose by the right leg, raised in salute (hilt at the chin, blade
-// straight up), snapped down to the side, flicked through a falling petal and levelled at them,
-// then settled into the en garde
+// Entrance: the blade hanging loose by the right leg as he swaggers in; spun twice round the wrist
+// at his side (a moulinet), brought up in salute (hilt at the chin, blade straight up) and snapped
+// down to the side; two quick thrusts at the air off a step; held up as he turns on his heel; and
+// levelled at their eyes, then settled into the en garde
 const IN_LOW: V3 = [-0.38, 0.04, 0.12];
 const IN_LOW_D: V3 = [-0.42, -0.58, 0.68];
 const IN_SALUTE: V3 = [-0.04, 0.62, 0.3];
 const IN_SIDE: V3 = [-0.36, 0.1, 0.2];
 const IN_SIDE_D: V3 = [-0.42, -0.62, 0.66];
 const IN_AIM: V3 = [-0.14, 0.56, 0.78];
+const IN_MOUL: V3 = [-0.38, 0.24, 0.3];
+const IN_MOUL_U: V3 = [0, -0.4, 1];
+const IN_UP: V3 = [-0.2, 0.72, 0.28];
+const IN_UP_D: V3 = [-0.2, 0.95, 0.2];
 const entranceBlade = seq(
   [
-    [0.0, 0.34, line(IN_LOW, [-0.37, 0.05, 0.15], IN_LOW_D, [-0.38, -0.6, 0.7], [1, 0, 0], NaN, NaN, H)],
-    [0.34, 0.46, line([-0.37, 0.05, 0.15], IN_SALUTE, [-0.38, -0.6, 0.7], [0.02, 1, 0.06], [0, 0, 1], NaN, NaN, H)],
-    [0.46, 0.56, line(IN_SALUTE, [-0.04, 0.64, 0.3], [0.02, 1, 0.06], [0.02, 1, 0.08], [0, 0, 1], NaN, NaN, H)],
-    [0.56, 0.61, line([-0.04, 0.64, 0.3], IN_SIDE, [0.02, 1, 0.08], IN_SIDE_D, [0, 0, 1], NaN, NaN, H)],
-    [0.61, 0.7, line(IN_SIDE, [-0.36, 0.14, 0.22], IN_SIDE_D, [-0.5, -0.52, 0.66], [0, 0, 1], NaN, NaN, H)],
-    [0.7, 0.78, line([-0.36, 0.14, 0.22], [-0.14, 0.46, 0.56], [-0.5, -0.52, 0.66], [0.5, 0.2, 0.84], [0, 0, 1], NaN, NaN, H)],
-    [0.78, 0.84, line([-0.14, 0.46, 0.56], IN_AIM, [0.5, 0.2, 0.84], [0.02, 0.06, 1], DOWN, NaN, NaN, H)],
-    [0.84, 0.92, line(IN_AIM, [-0.14, 0.56, 0.8], [0.02, 0.06, 1], [0.02, 0.06, 1], DOWN, NaN, NaN, H)],
+    [0.0, 0.18, line(IN_LOW, [-0.37, 0.05, 0.15], IN_LOW_D, [-0.38, -0.6, 0.7], [1, 0, 0], NaN, NaN, H)],
+    [0.18, 0.22, line([-0.37, 0.05, 0.15], IN_MOUL, [-0.38, -0.6, 0.7], IN_MOUL_U, [1, 0, 0], NaN, NaN, H)],
+    // the moulinet: two turns round the wrist, up and over at his right side
+    [0.22, 0.36, arc(IN_MOUL, -0.04, circle(IN_MOUL_U, [0, 1, 0.1], 2, 0, 16), NaN, H)],
+    // up into the salute, held, and snapped down to the side
+    [0.36, 0.44, line(IN_MOUL, IN_SALUTE, IN_MOUL_U, [0.02, 1, 0.06], [0, 0, 1], NaN, NaN, H)],
+    [0.44, 0.5, line(IN_SALUTE, [-0.04, 0.64, 0.3], [0.02, 1, 0.06], [0.02, 1, 0.08], [0, 0, 1], NaN, NaN, H)],
+    [0.5, 0.53, line([-0.04, 0.64, 0.3], IN_SIDE, [0.02, 1, 0.08], IN_SIDE_D, [0, 0, 1], NaN, NaN, H)],
+    // on guard, and two thrusts off a step, high then higher
+    [0.53, 0.56, line(IN_SIDE, GUARD_POS, IN_SIDE_D, GUARD_DIR, DOWN, NaN, NaN, H)],
+    [0.56, 0.585, line(GUARD_POS, [-0.12, 0.5, 0.94], GUARD_DIR, [0.03, 0.05, 1], DOWN, NaN, NaN, H)],
+    [0.585, 0.61, line([-0.12, 0.5, 0.94], [-0.16, 0.38, 0.6], [0.03, 0.05, 1], [0.04, 0.3, 1], DOWN, NaN, NaN, H)],
+    [0.61, 0.635, line([-0.16, 0.38, 0.6], [-0.12, 0.58, 0.96], [0.04, 0.3, 1], [0.02, 0.1, 1], DOWN, NaN, NaN, H)],
+    // raised up as he turns on his heel
+    [0.635, 0.66, line([-0.12, 0.58, 0.96], IN_UP, [0.02, 0.1, 1], IN_UP_D, [0, 0, 1], NaN, NaN, H)],
+    [0.66, 0.76, line(IN_UP, IN_UP, IN_UP_D, IN_UP_D, [0, 0, 1], NaN, NaN, H)],
+    // and brought down the line at their eyes
+    [0.76, 0.82, line(IN_UP, IN_AIM, IN_UP_D, [0.02, 0.06, 1], DOWN, NaN, NaN, H)],
+    [0.82, 0.92, line(IN_AIM, [-0.14, 0.56, 0.8], [0.02, 0.06, 1], [0.02, 0.06, 1], DOWN, NaN, NaN, H)],
     [0.92, 1.0, line([-0.14, 0.56, 0.8], GUARD_POS, [0.02, 0.06, 1], GUARD_DIR, DOWN, NaN, NaN, H)],
   ],
   0.025,
@@ -857,27 +873,37 @@ export const rapier: Style = {
     ],
     trail: { life: 0.26, glow: 0.9 },
   }),
-  // Entrance: a loose swagger and the cape flicked back over the shoulder, a salute snapped down to
-  // the side, then a flick through a falling petal and the point levelled at their eyes, settling
-  // into the en garde
+  // Entrance, The Green Flourish (see entranceBlade): the swagger and the cape flicked back, the
+  // moulinet, the salute, two thrusts, a turn on the heel, and the point levelled at their eyes
   entrance: mv({
     keys: [
-      K(0.0, tb({ twist: 0.3, hipTwist: 0.15, crouch: -0.04, lean: -0.07, step: 0.24, back: 0.18, width: 0.1, side: 0.08, headPitch: -0.08 })),
+      K(0.0, tb({ twist: 0.3, hipTwist: 0.15, crouch: -0.04, lean: -0.07, step: 0.24, back: 0.18, width: 0.1, side: 0.08, headPitch: -0.08 }), { spin: 0 }),
       K(0.1, tb({ twist: 0.32, hipTwist: 0.15, crouch: -0.05, lean: -0.05, step: 0.3, back: 0.16, width: 0.1, side: -0.04, headPitch: -0.08 })),
       K(0.2, tb({ twist: 0.12, hipTwist: 0.1, crouch: -0.03, lean: -0.08, step: 0.28, back: 0.18, width: 0.1, side: 0.06, headPitch: -0.16 })),
-      K(0.32, tb({ twist: 0.3, hipTwist: 0.15, crouch: -0.04, lean: -0.07, step: 0.26, back: 0.18, width: 0.1, side: 0.07, headPitch: -0.06 })),
-      K(0.42, tb({ twist: 0.35, hipTwist: 0.2, crouch: -0.02, lean: -0.02, step: 0.14, back: 0.12, width: 0.08, headPitch: 0 })),
-      K(0.55, tb({ twist: 0.35, hipTwist: 0.2, crouch: -0.02, lean: -0.02, step: 0.14, back: 0.12, width: 0.08, headPitch: -0.02 })),
-      K(0.6, tb({ twist: 0.4, hipTwist: 0.2, crouch: -0.04, lean: 0.05, step: 0.14, back: 0.12, width: 0.08, headPitch: 0.14 })),
-      K(0.69, tb({ twist: 0.45, hipTwist: 0.25, crouch: -0.06, lean: 0.0, step: 0.2, back: 0.16, width: 0.08, headPitch: -0.04 })),
-      K(0.76, tb({ twist: FT - 0.1, crouch: -0.14, lean: 0.06, step: 0.34, back: 0.3 })),
-      K(0.84, tb({ twist: FT + 0.1, crouch: -0.2, lean: 0.0, step: 0.42, back: 0.38, headPitch: -0.06 })),
-      K(0.92, tb({ twist: FT + 0.1, crouch: -0.2, lean: 0.0, step: 0.42, back: 0.38, headPitch: -0.06 })),
+      // watching the blade spin at his side
+      K(0.28, tb({ twist: 0.35, hipTwist: 0.2, crouch: -0.06, lean: -0.04, step: 0.2, back: 0.16, width: 0.1, headPitch: 0.05 })),
+      K(0.36, tb({ twist: 0.35, hipTwist: 0.2, crouch: -0.05, lean: -0.04, step: 0.18, back: 0.14, width: 0.09, headPitch: 0.0 })),
+      // the salute, tall, with a nod
+      K(0.44, tb({ twist: 0.35, hipTwist: 0.2, crouch: -0.02, lean: -0.02, step: 0.14, back: 0.12, width: 0.08, headPitch: 0 })),
+      K(0.5, tb({ twist: 0.38, hipTwist: 0.2, crouch: -0.03, lean: 0.02, step: 0.14, back: 0.12, width: 0.08, headPitch: 0.14 })),
+      K(0.53, tb({ twist: 0.42, hipTwist: 0.22, crouch: -0.05, lean: 0.05, step: 0.16, back: 0.14, width: 0.08, headPitch: 0.0 })),
+      // on guard, and the two thrusts off a step
+      K(0.56, tb({ crouch: -0.24, lean: 0.08 })),
+      K(0.585, tb({ twist: FT + 0.1, crouch: -0.32, lean: 0.3, step: 0.58, back: 0.52 })),
+      K(0.61, tb({ crouch: -0.26, lean: 0.12, step: 0.46, back: 0.44 })),
+      K(0.635, tb({ twist: FT + 0.12, crouch: -0.34, lean: 0.34, step: 0.62, back: 0.56 })),
+      // up onto the ball of the foot and round on the heel, the cape flaring
+      K(0.66, tb({ twist: FT - 0.2, crouch: -0.1, lean: 0.0, step: 0.24, back: 0.2 }), { spin: 0 }),
+      K(0.71, tb({ twist: FT - 0.25, crouch: -0.04, lean: -0.04, step: 0.18, back: 0.16, headPitch: -0.05 }), { spin: 0.5, hop: 0.05 }),
+      K(0.76, tb({ twist: FT - 0.1, crouch: -0.14, lean: 0.06, step: 0.34, back: 0.3 }), { spin: 1, hop: 0 }),
+      // the point at their eyes
+      K(0.82, tb({ twist: FT + 0.1, crouch: -0.24, lean: 0.12, step: 0.48, back: 0.42, headPitch: -0.06 })),
+      K(0.92, tb({ twist: FT + 0.1, crouch: -0.24, lean: 0.12, step: 0.48, back: 0.42, headPitch: -0.06 })),
       K(1.0, body),
     ],
     main: entranceBlade,
     // the back hand on the hip, swept up and over the left shoulder to throw the cape back, behind
-    // the back for the salute, then out behind for balance as the point comes on line
+    // the back for the salute, raised behind for the thrusts, out wide through the turn
     free: track([
       [0.0, [0.3, 0.02, 0.06]],
       [0.1, [0.3, 0.02, 0.06]],
@@ -886,20 +912,27 @@ export const rapier: Style = {
       [0.26, [0.44, 0.5, -0.3]],
       [0.32, [0.3, 0.02, 0.04]],
       [0.4, [0.16, 0.06, -0.28]],
-      [0.68, [0.16, 0.06, -0.28]],
-      [0.8, F_GUARD],
+      [0.52, [0.16, 0.06, -0.28]],
+      [0.57, F_GUARD],
+      [0.64, F_GUARD],
+      [0.7, [0.62, 0.55, 0.05]],
+      [0.78, F_GUARD],
     ]),
     lead: 0,
+    ghosts: [0.56, 0.66],
     fx: [
       fx(0.0, 'petals', 'root', 1.4),
       fx(0.08, 'dust', 'feet', 0.35),
       fx(0.21, 'petals', 'root', 1.0),
+      fx(0.29, 'sparkle', 'tip', 0.7, '#ffffff'),
       fx(0.47, 'sparkle', 'tip', 0.9, '#ffffff'),
-      fx(0.6, 'sparkle', 'tip', 0.8),
-      fx(0.7, 'petals', 'front', 0.5),
-      fx(0.75, 'flashline', 'tip', 1.0),
-      fx(0.75, 'petals', 'tip', 0.7),
-      fx(0.84, 'sparkle', 'tip', 0.6, '#ffffff'),
+      fx(0.585, 'flashline', 'tip', 0.9),
+      fx(0.585, 'dust', 'feet', 0.4),
+      fx(0.635, 'flashline', 'tip', 1.0),
+      fx(0.635, 'petals', 'tip', 0.6),
+      fx(0.71, 'petals', 'root', 0.9),
+      fx(0.82, 'flashline', 'tip', 0.8),
+      fx(0.84, 'sparkle', 'tip', 0.7, '#ffffff'),
     ],
   }),
 };
