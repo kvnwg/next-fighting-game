@@ -1175,9 +1175,12 @@ h4.ih .pi { width: 20px; height: 20px; }
 body.chars-locked #btn-chars, body.chars-locked #lb-fighters { display: none !important; }
 .lb-play-key { font-family: var(--ui); font-size: 12px; font-weight: 700; line-height: 1; padding: 3px 5px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 3px; color: rgba(255, 255, 255, 0.75); text-shadow: none; letter-spacing: 0; }
 
-/* ---------------------------------------------------------------- portrait: turn the device (rotate.ts) */
-.rotate-guard { position: fixed; inset: 0; z-index: 2147483000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 24px; background: #07060a; color: #fff; text-align: center; touch-action: none; -webkit-user-select: none; user-select: none; }
-.rotate-guard.hidden { display: none; }
+/* ---------------------------------------------------------------- portrait: the game turns itself (rotate.ts) */
+/* the page laid out landscape (the screen's height wide) and turned a quarter turn onto the screen */
+html.sideways #app { inset: auto; top: 0; left: 0; width: var(--sh); height: var(--sw); transform-origin: 0 0; transform: translate(var(--sw), 0) rotate(90deg); }
+/* and a moment's prompt to turn the phone, over the game and letting every touch through */
+.rotate-hint { position: fixed; left: 50%; top: 50%; z-index: 2147483000; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 26px 28px; background: rgba(7, 6, 10, 0.86); color: #fff; text-align: center; pointer-events: none; transition: opacity 0.4s; -webkit-user-select: none; user-select: none; }
+.rotate-hint.hidden { opacity: 0; }
 .rg-text { font-family: var(--display, var(--ui)); font-weight: 700; font-size: 22px; letter-spacing: 0.1em; text-transform: uppercase; max-width: 16em; line-height: 1.4; }
 .rg-phone { width: 54px; height: 92px; border: 4px solid #fff; border-radius: 10px; position: relative; animation: rg-turn 2.4s ease-in-out infinite; }
 .rg-phone span { position: absolute; left: 50%; bottom: 6px; width: 10px; height: 4px; margin-left: -5px; border-radius: 2px; background: #fff; }

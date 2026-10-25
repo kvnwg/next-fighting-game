@@ -32,7 +32,7 @@ import { TitleScene } from './title/scene';
 import { TitleScreen } from './title/screen';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
-import { RotateGuard } from './rotate';
+import { Sideways } from './rotate';
 import { TouchControls, isTouchDevice } from './touch';
 import { CardData, Preview, UI, esc } from './ui';
 
@@ -64,7 +64,6 @@ class App {
   private ui: UI;
   private select: SelectScreen;
   private touch: TouchControls | null = null;
-  private rotate: RotateGuard;
   private mapView: MapView | null = null;
   private map: MapDef = LOBBY_MAP;
   private fighters = new Map<string, ClientFighter>();
@@ -195,12 +194,11 @@ class App {
         },
       });
     }
-    // any touchscreen counts here: held upright, it's a phone or a tablet
-    this.rotate = new RotateGuard(touch || navigator.maxTouchPoints > 0, (blocked) => {
-      if (!blocked) return;
+    // any touchscreen counts here: held upright, it's a phone or a tablet, and the game turns itself
+    new Sideways(touch || navigator.maxTouchPoints > 0, () => {
       this.input.releaseAll();
-      this.input.exitLock();
       this.touch?.cancel();
+      this.renderer.resize();
     });
     this.openTitle();
     this.titleScreen!.boot();
@@ -1557,7 +1555,7 @@ class App {
     const mouse = this.input.consumeMouse();
     this.cam.addMouse(mouse.dx, mouse.dy, settings.sensitivity, settings.invertY, !!this.lock);
     // the title screen has its own keys (and a name being typed)
-    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active || this.rotate.blocked;
+    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active;
     this.entranceCues(now);
     const left = this.select.tick(now);
     if (left !== null && left > 0 && left <= 3) audio.countdown(left, 0.5);

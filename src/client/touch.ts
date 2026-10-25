@@ -5,6 +5,7 @@
  */
 import { Bind, Input } from './input';
 import { icon } from './pixelicons';
+import { frameWidth, toFrame } from './rotate';
 
 /** Touch-first device (or forced with ?touch / ?touch=0). */
 export function isTouchDevice(): boolean {
@@ -97,29 +98,32 @@ export class TouchControls {
       // a new touch on the left always takes the stick: if the last thumb's lift got lost (the
       // controls hidden under a cinematic, a system gesture), the stick would otherwise stay
       // pushed with no way to grab it back
-      if (e.clientX < window.innerWidth * 0.45) {
+      // (positions in the game's frame: the screen, or the screen turned, see rotate.ts)
+      const p = toFrame(e.clientX, e.clientY);
+      if (p.x < frameWidth() * 0.45) {
         if (this.stickId !== null) this.resetStick();
         this.stickId = e.pointerId;
-        this.stickOrigin = { x: e.clientX, y: e.clientY };
+        this.stickOrigin = { x: p.x, y: p.y };
         this.base.classList.remove('idle');
-        this.base.style.left = `${e.clientX}px`;
-        this.base.style.top = `${e.clientY}px`;
-        this.moveStick(e.clientX, e.clientY);
-      } else this.looks.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        this.base.style.left = `${p.x}px`;
+        this.base.style.top = `${p.y}px`;
+        this.moveStick(p.x, p.y);
+      } else this.looks.set(e.pointerId, p);
     });
     // moves and lifts are watched on the window, not the pad: a pointer whose capture was lost
     // (the controls hidden mid-touch) still reports there
     window.addEventListener('pointermove', (e) => {
+      const p = toFrame(e.clientX, e.clientY);
       if (e.pointerId === this.stickId) {
-        this.moveStick(e.clientX, e.clientY);
+        this.moveStick(p.x, p.y);
         return;
       }
       const last = this.looks.get(e.pointerId);
       if (!last || this.input.suspended) return;
-      this.input.mouseDX += (e.clientX - last.x) * LOOK_GAIN;
-      this.input.mouseDY += (e.clientY - last.y) * LOOK_GAIN;
-      last.x = e.clientX;
-      last.y = e.clientY;
+      this.input.mouseDX += (p.x - last.x) * LOOK_GAIN;
+      this.input.mouseDY += (p.y - last.y) * LOOK_GAIN;
+      last.x = p.x;
+      last.y = p.y;
     });
     const end = (e: PointerEvent) => {
       if (e.pointerId === this.stickId) this.resetStick();
