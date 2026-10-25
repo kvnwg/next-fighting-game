@@ -72,6 +72,8 @@ export class Game {
   private readonly t0 = performance.now();
   /** set when the server is going down: players leaving then haven't walked out on anything */
   closing = false;
+  /** how long ticks take (ms): a running average, and the slowest in the last few seconds */
+  readonly tickTime = { avg: 0, max: 0, maxSince: 0 };
   /** Server clock in ms (monotonic). Clients sync to this. Injectable for simulations. */
   readonly now: () => number;
 
@@ -150,6 +152,19 @@ export class Game {
   }
 
   tick(): void {
+    const t0 = performance.now();
+    this.step();
+    const ms = performance.now() - t0;
+    const tt = this.tickTime;
+    tt.avg += (ms - tt.avg) * 0.02;
+    if (t0 - tt.maxSince > 5000) {
+      tt.max = 0;
+      tt.maxSince = t0;
+    }
+    tt.max = Math.max(tt.max, ms);
+  }
+
+  private step(): void {
     const now = this.now();
     // one broken instance must never take the whole server down
     for (const inst of [...this.lobbies, ...this.arenas]) {

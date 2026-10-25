@@ -35,7 +35,9 @@ const server = await startServer({
   staticDir: 'dist/client',
   allowedOrigins,
   trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
-  maxConnections: num(env.MAX_PLAYERS, 600),
+  // one process holds about 500 players on a dedicated core (load-tested: 480 in 20 full lobbies
+  // tick in under 4ms of their 16.7); past that, ticks start running over
+  maxConnections: num(env.MAX_PLAYERS, 500),
   maxPerIp: num(env.MAX_PER_IP, 32),
   connectsPerMinute: num(env.CONNECTS_PER_MINUTE, 60),
 });

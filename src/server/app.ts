@@ -221,12 +221,16 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (req.url === '/healthz') {
       // for the host's health checks and a quick look at how busy it is
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-      res.end(JSON.stringify({ ok: true, players: game.players.size, lobbies: game.lobbies.length, matches: game.arenas.size, lobbyCap: LOBBY_CAP, uptime: Math.round((Date.now() - started) / 1000) }));
+      // tickMs: a tick has 1000/60 ≈ 16.7ms; an average near that means the server is full
+      const tickMs = { avg: Math.round(game.tickTime.avg * 100) / 100, max: Math.round(game.tickTime.max * 100) / 100 };
+      res.end(JSON.stringify({ ok: true, players: game.players.size, lobbies: game.lobbies.length, matches: game.arenas.size, lobbyCap: LOBBY_CAP, tickMs, uptime: Math.round((Date.now() - started) / 1000) }));
       return;
     }
     serveStatic(req, res);
   });
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 });
+  // no permessage-deflate: it cuts a lobby's bandwidth tenfold, but compressing 20 snapshots a
+  // second for every player costs several times the CPU and, past a few dozen players, seconds of lag
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024, perMessageDeflate: false });
   const maxConnections = opts.maxConnections ?? Infinity;
   const maxPerIp = opts.maxPerIp ?? Infinity;
   const connectsPerMinute = opts.connectsPerMinute ?? Infinity;
