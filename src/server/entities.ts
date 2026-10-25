@@ -102,6 +102,7 @@ export class Player {
   lastPingS = 0;
   queue: { mode: QueueMode; since: number; diff?: BotDifficulty } | null = null;
   lastChatAt = 0;
+  lastBoardAt = -Infinity;
   msgWindowStart = 0;
   msgCount = 0;
   closed = false;

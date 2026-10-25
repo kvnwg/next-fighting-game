@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { pipeline } from 'node:stream';
 import { promisify } from 'node:util';
 import zlib from 'node:zlib';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -34,6 +35,8 @@ const HEARTBEAT_MS = 10_000;
  * missed ping isn't a dead player.
  */
 const MAX_MISSED_PINGS = 4;
+/** a refused socket gets this long to take its goodbye before it's cut (ms) */
+const REFUSED_GRACE = 2000;
 
 export interface ServerOptions {
   port: number;
@@ -48,8 +51,12 @@ export interface ServerOptions {
    * domain's subdomains ('*.crazygames.com'). Unset or empty allows any page.
    */
   allowedOrigins?: string[];
-  /** Take the player's address from the proxy in front (Fly-Client-IP, X-Forwarded-For). Only set it behind one. */
-  trustProxy?: boolean;
+  /**
+   * Where the player's address comes from behind a proxy: 'fly' reads Fly-Client-IP (Fly's proxy
+   * sets it; anywhere else a client could), 'forwarded' the last X-Forwarded-For entry. Unset: the
+   * socket's own address.
+   */
+  trustProxy?: 'fly' | 'forwarded' | false;
   /** Most players connected at once; anyone past it is told the server is full. */
   maxConnections?: number;
   /** Most connections open from one address (a school or a café shares one). */
@@ -90,16 +97,36 @@ export function originAllowed(origin: string | undefined, allowed: string[] | un
 }
 
 /** The player's address: the socket's, or what the proxy in front of us saw. */
-function clientIp(req: http.IncomingMessage, trustProxy: boolean): string {
-  if (trustProxy) {
+function clientIp(req: http.IncomingMessage, trustProxy: ServerOptions['trustProxy']): string {
+  if (trustProxy === 'fly') {
     const fly = req.headers['fly-client-ip'];
     if (typeof fly === 'string' && fly) return fly;
+  } else if (trustProxy === 'forwarded') {
     // the last entry is the one our proxy added; anything before it the client could have sent
     const xff = req.headers['x-forwarded-for'];
     const last = (Array.isArray(xff) ? xff.join(',') : xff)?.split(',').pop()?.trim();
     if (last) return last;
   }
   return req.socket.remoteAddress ?? 'unknown';
+}
+
+/**
+ * What the per-address limits count by: an IPv4 address, or an IPv6 address's /64 (one home or
+ * office gets a whole /64, so counting single addresses would let anyone rotate past the limits).
+ */
+export function addressKey(ip: string): string {
+  const bare = ip.replace(/%.*$/, '');
+  const v4 = /^(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)$/i.exec(bare);
+  if (v4) return v4[1];
+  if (!bare.includes(':')) return bare;
+  const [head, tail] = bare.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const groups = tail === undefined ? h : [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t];
+  return `${groups
+    .slice(0, 4)
+    .map((g) => g.toLowerCase().replace(/^0+(?=.)/, ''))
+    .join(':')}::/64`;
 }
 
 const brotli = promisify(zlib.brotliCompress);
@@ -159,7 +186,9 @@ async function serveFile(root: string, req: http.IncomingMessage, res: http.Serv
       if (body instanceof fs.ReadStream) body.destroy();
       res.end();
     } else if (Buffer.isBuffer(body)) res.end(body);
-    else body.pipe(res);
+    // pipeline, not pipe: a download the player abandons must close its file, or the server runs
+    // out of them
+    else pipeline(body, res, () => undefined);
   };
 
   if (COMPRESSIBLE.has(ext) && size > 1024) {
@@ -219,11 +248,12 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
   const started = Date.now();
   const server = http.createServer((req, res) => {
     if (req.url === '/healthz') {
-      // for the host's health checks and a quick look at how busy it is
-      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      // for the host's health checks, a quick look at how busy it is, and clients waiting out a
+      // restart (from other sites too: the CrazyGames build)
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'access-control-allow-origin': '*' });
       // tickMs: a tick has 1000/60 ≈ 16.7ms; an average near that means the server is full
       const tickMs = { avg: Math.round(game.tickTime.avg * 100) / 100, max: Math.round(game.tickTime.max * 100) / 100 };
-      res.end(JSON.stringify({ ok: true, players: game.players.size, lobbies: game.lobbies.length, matches: game.arenas.size, lobbyCap: LOBBY_CAP, tickMs, uptime: Math.round((Date.now() - started) / 1000) }));
+      res.end(JSON.stringify({ ok: true, restarting: game.closing, players: game.players.size, lobbies: game.lobbies.length, matches: game.arenas.size, lobbyCap: LOBBY_CAP, tickMs, uptime: Math.round((Date.now() - started) / 1000) }));
       return;
     }
     serveStatic(req, res);
@@ -237,10 +267,15 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
   /** open connections, and connections made this minute, by address */
   const open = new Map<string, number>();
   const recent = new Map<string, number>();
+  /** players let in (sockets being turned away don't count against the cap) */
+  let accepted = 0;
   /** pings each socket has left unanswered in a row */
   const missed = new WeakMap<WebSocket, number>();
 
   server.on('upgrade', (req, socket, head) => {
+    // once a request upgrades, the http server stops handling its socket's errors: a client that
+    // resets mid-refusal would otherwise throw out of here and take the process down
+    socket.on('error', () => socket.destroy());
     if (!req.url?.startsWith('/ws')) {
       socket.destroy();
       return;
@@ -249,27 +284,32 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       return;
     }
-    const ip = clientIp(req, !!opts.trustProxy);
+    const ip = addressKey(clientIp(req, opts.trustProxy));
     wss.handleUpgrade(req, socket, head, (ws) => {
-      // turned away on an open socket, so the player is told why (1013: try again later)
+      // turned away on an open socket, so the player is told why (1013: try again later). The
+      // address's own limits come first, so one address can't fill the server for everyone else.
       const attempts = (recent.get(ip) ?? 0) + 1;
       recent.set(ip, attempts);
       const refusal =
         game.closing ? 'The server is restarting. Try again in a moment.'
-        : wss.clients.size > maxConnections ? 'The server is full right now. Try again in a minute.'
         : (open.get(ip) ?? 0) >= maxPerIp ? 'Too many players connected from your network.'
         : attempts > connectsPerMinute ? 'Too many connection attempts. Wait a minute and try again.'
+        : accepted >= maxConnections ? 'The server is full right now. Try again in a minute.'
         : null;
       if (refusal) {
         // 1012 tells the client to wait for the restart and walk back in
         ws.close(game.closing ? 1012 : 1013, refusal);
+        // and one that never answers the goodbye is cut, rather than held for ws's 30s
+        setTimeout(() => ws.terminate(), REFUSED_GRACE).unref();
         return;
       }
+      accepted++;
       open.set(ip, (open.get(ip) ?? 0) + 1);
       missed.set(ws, 0);
       ws.on('pong', () => missed.set(ws, 0));
       ws.on('message', () => missed.set(ws, 0));
       ws.on('close', () => {
+        accepted--;
         const n = (open.get(ip) ?? 1) - 1;
         if (n > 0) open.set(ip, n);
         else open.delete(ip);

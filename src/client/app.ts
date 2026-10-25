@@ -28,7 +28,7 @@ import { RingWalls } from './render/rings';
 import { TITLE_MAP } from './render/maps/title';
 import { TitleScene } from './title/scene';
 import { TitleAction, TitleScreen } from './title/screen';
-import { hasServer, reloadAs, serverURL } from './endpoint';
+import { hasServer, healthURL, reloadAs, serverURL } from './endpoint';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
 import { RotateGuard } from './rotate';
@@ -110,6 +110,8 @@ class App {
   private ringCount = -1;
   /** a lobby to join on connecting: a friend's, from an invite */
   private pendingLobby: string | null = null;
+  /** the lobby the last hello asked for */
+  private askedLobby: string | null = null;
   /** a connection attempt is under way (one at a time) */
   private connecting = false;
   /** when the server went down for a restart, while we wait to walk back in (performance.now) */
@@ -305,6 +307,7 @@ class App {
     this.net.onHeld = (m) => {
       if (m.t === 'welcome') void this.onWelcomeHeld(m.profile, isNew);
     };
+    this.askedLobby = this.pendingLobby;
     this.net.send({ t: 'hello', v: PROTOCOL_VERSION, token: settings.token || undefined, name, char: settings.char, lobby: this.pendingLobby ?? undefined });
   }
 
@@ -335,17 +338,15 @@ class App {
         this.titleScreen.failed('The server is taking longer than usual to come back. Press Enter to try again.', SINGLE_PLAYER);
         return;
       }
-      // knock first, so the screen doesn't flicker through "forging" while it's still down
-      const probe = new WebSocket(serverURL());
-      let up = false;
-      probe.onopen = () => {
-        up = true;
-        probe.close();
-        void this.connect(settings.name);
-      };
-      probe.onclose = () => {
-        if (!up) this.rejoinWhenBack();
-      };
+      // knock first, so the screen doesn't flicker through "forging" while it's still down. Over
+      // plain HTTP: a whole school rejoining at once mustn't spend its connection attempts knocking.
+      fetch(healthURL(), { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null)
+        .then((h: { ok?: boolean; restarting?: boolean } | null) => {
+          if (h?.ok && !h.restarting) void this.connect(settings.name);
+          else this.rejoinWhenBack();
+        });
     }, 3000);
   }
 
@@ -405,7 +406,10 @@ class App {
     n.on('welcome', (m) => {
       this.myId = m.id;
       this.rejoinSince = 0;
+      // a friend's room picked while the welcome was playing: over there now
+      if (this.pendingLobby && this.pendingLobby !== this.askedLobby) this.net.send({ t: 'joinLobby', id: this.pendingLobby });
       this.pendingLobby = null;
+      this.askedLobby = null;
       settings.token = m.token;
       saveSettings();
       this.profile = m.profile;

@@ -22,6 +22,14 @@ export function toSocketURL(raw: string): string {
   return u.toString();
 }
 
+/** The server's health check, beside its WebSocket: wss://host/ws → https://host/healthz */
+export function healthURL(): string {
+  const u = new URL(serverURL());
+  u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:';
+  u.pathname = '/healthz';
+  return u.toString();
+}
+
 /** The build talks to a server somewhere (it isn't the single-player build). */
 export const hasServer = import.meta.env.VITE_OFFLINE !== '1';
 

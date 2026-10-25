@@ -1,12 +1,13 @@
 /** What a public server has to survive: bad requests, dead sockets, floods, restarts mid-match, and a ladder that grows. */
 import fs from 'node:fs';
 import http from 'node:http';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
-import { originAllowed, RunningServer, ServerOptions, startServer } from '../src/server/app';
+import { addressKey, originAllowed, RunningServer, ServerOptions, startServer } from '../src/server/app';
 import { Game } from '../src/server/game';
 import { sqliteStore } from '../src/server/sqliteStore';
 import { Profile, Store, StorePersistence } from '../src/server/store';
@@ -86,6 +87,7 @@ describe('http', () => {
   fs.mkdirSync(path.join(dist, 'assets'), { recursive: true });
   fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html><title>Deflect</title>');
   fs.writeFileSync(path.join(dist, 'assets', 'app-abc123.js'), `console.log(${JSON.stringify('x'.repeat(20000))});`);
+  fs.writeFileSync(path.join(dist, 'song.mp3'), Buffer.alloc(8 * 1024 * 1024, 7));
   fs.mkdirSync(path.join(tmp, 'dist-secret'), { recursive: true });
   fs.writeFileSync(path.join(tmp, 'dist-secret', 'key.txt'), 'secret');
 
@@ -123,6 +125,26 @@ describe('http', () => {
     expect(plain.body.length).toBeGreaterThan(20000);
   });
 
+  it('closes the file of a download the player abandons', async () => {
+    if (!fs.existsSync('/proc/self/fd')) return;
+    const s = await serve({ staticDir: dist });
+    const fds = () => fs.readdirSync('/proc/self/fd').length;
+    const before = fds();
+    for (let i = 0; i < 20; i++) {
+      await new Promise<void>((done) => {
+        const req = http.get({ port: s.port, path: '/song.mp3' }, (res) => {
+          // a song started and skipped: the first chunk, then gone
+          res.once('data', () => {
+            req.destroy();
+            done();
+          });
+        });
+        req.on('error', () => done());
+      });
+    }
+    await until(() => fds() <= before + 3, 3000, 'files closed');
+  });
+
   it('answers health checks with how busy it is', async () => {
     const s = await serve();
     await new Client(s.port).hello('Healthy');
@@ -142,6 +164,49 @@ describe('connections', () => {
     expect(originAllowed('https://crazygames.com.evil.example', rules)).toBe(false);
     expect(originAllowed('https://evilcrazygames.com', rules)).toBe(false);
     expect(originAllowed(undefined, rules)).toBe(false);
+  });
+
+  it('survives refused upgrades whose clients hang up mid-refusal (it used to crash)', async () => {
+    const s = await serve({ allowedOrigins: ['https://deflect.example.com'] });
+    for (let i = 0; i < 200; i++) {
+      const c = net.connect(s.port, '127.0.0.1', () => {
+        c.write(`GET /ws HTTP/1.1\r\nHost: x\r\nOrigin: https://evil.example\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n`);
+        c.resetAndDestroy();
+      });
+      c.on('error', () => undefined);
+      if (i % 20 === 0) await new Promise((r) => setTimeout(r, 5));
+    }
+    await new Promise((r) => setTimeout(r, 500));
+    const good = await new Client(s.port, { origin: 'https://deflect.example.com' }).hello('StillHere');
+    expect(good.id).not.toBe('');
+  });
+
+  it("doesn't let one address fill the server for everyone else", async () => {
+    const s = await serve({ maxConnections: 5, maxPerIp: 2, connectsPerMinute: 1000, trustProxy: 'forwarded' });
+    // one address opens 20 sockets and never reads a byte, so it never answers a goodbye
+    const attacker: net.Socket[] = [];
+    for (let i = 0; i < 20; i++) {
+      const c = net.connect(s.port, '127.0.0.1');
+      c.on('error', () => undefined);
+      c.write(`GET /ws HTTP/1.1\r\nHost: x\r\nX-Forwarded-For: 10.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n`);
+      c.pause();
+      attacker.push(c);
+    }
+    await new Promise((r) => setTimeout(r, 300));
+    const player = await new Client(s.port, { headers: { 'x-forwarded-for': '10.0.0.2' } }).hello('Real');
+    expect(player.id).not.toBe('');
+    for (const c of attacker) c.destroy();
+  });
+
+  it('counts IPv6 addresses by their /64, so nobody rotates past the limits', () => {
+    expect(addressKey('203.0.113.7')).toBe('203.0.113.7');
+    expect(addressKey('::ffff:203.0.113.7')).toBe('203.0.113.7');
+    expect(addressKey('2001:db8:1:2:aaaa:bbbb:cccc:dddd')).toBe('2001:db8:1:2::/64');
+    expect(addressKey('2001:db8:1:2::9')).toBe('2001:db8:1:2::/64');
+    expect(addressKey('2001:DB8:0001:0002::1')).toBe('2001:db8:1:2::/64');
+    expect(addressKey('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(addressKey('::1')).toBe('0:0:0:0::/64');
+    expect(addressKey('fe80::1%eth0')).toBe('fe80:0:0:0::/64');
   });
 
   it('turns away pages that are not on the list', async () => {
@@ -189,6 +254,17 @@ describe('connections', () => {
     await new Promise((r) => setTimeout(r, 1200));
     expect(pings).toBeGreaterThan(6);
     expect(s.game.players.has(slow.id)).toBe(true);
+  });
+
+  it('throttles chat before moderating it, so spam costs nothing', () => {
+    let cleaned = 0;
+    const censor = { clean: (t: string) => (cleaned++, t), allowed: () => true };
+    const game = new Game(new Store(null), () => 5000, { censor });
+    const on: Record<string, (d?: unknown) => void> = {};
+    game.handleConnection({ readyState: 1, send: () => undefined, close: () => undefined, on: (ev: string, cb: (d?: unknown) => void) => (on[ev] = cb) } as never);
+    on.message!(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Spammer', char: 'ronin' }));
+    for (let i = 0; i < 100; i++) on.message!(JSON.stringify({ t: 'chat', text: 'a a a a a a a a a a a a a a a a a a' }));
+    expect(cleaned).toBe(1);
   });
 
   it('drops a connection that never says hello', () => {

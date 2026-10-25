@@ -37,7 +37,7 @@ the lobby.
 **Keep it to one machine.** Lobbies and matches live in the process's memory, so two machines would
 be two separate worlds with two ladders. `fly scale count 1` if it ever drifts.
 
-**Deploys from GitHub:** `.github/workflows/deploy.yml` deploys every push to `main` once the
+**Deploys from GitHub:** `.github/workflows/deploy.yml` deploys each push to `main` that passes CI, once the
 repository has a `FLY_API_TOKEN` secret (`fly tokens create deploy`, then *Settings → Secrets and
 variables → Actions*). `ci.yml` typechecks, tests and builds every push and pull request.
 
@@ -65,7 +65,7 @@ All optional; `fly.toml` sets the ones a Fly deploy needs.
 | `MAX_PLAYERS` | `500` | players connected at once; the rest are told it's full |
 | `MAX_PER_IP` | `32` | connections from one address (generous: a school shares one) |
 | `CONNECTS_PER_MINUTE` | `60` | new connections from one address per minute |
-| `TRUST_PROXY` | off | `1`: take the player's address from `Fly-Client-IP` / `X-Forwarded-For` |
+| `TRUST_PROXY` | off | `1`: take the player's address from the proxy: `Fly-Client-IP` on Fly, else the last `X-Forwarded-For` entry |
 | `ALLOWED_ORIGINS` | any | comma-separated pages allowed to connect: `https://deflect.example.com,*.crazygames.com` |
 
 A `profiles.json` from before is imported into `deflect.db` the first time the server starts.

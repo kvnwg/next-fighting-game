@@ -11,18 +11,17 @@ const legacyJson = path.join(dataDir, 'profiles.json');
 /** a whole number from the environment, or the default */
 const num = (v: string | undefined, fallback: number) => (v && Number.isFinite(Number(v)) ? Number(v) : fallback);
 
-// SQLite when this Node has it built in (22.13+), else the JSON file of before
-let persistence: StorePersistence;
-let where: string;
+// SQLite when this Node has it built in (22.13+), else the JSON file of before. Only a missing
+// node:sqlite falls back: a database that won't open stops the server, rather than quietly
+// playing on from the old JSON file and losing everything played meanwhile.
+let sqlite: typeof import('./sqliteStore') | null = null;
 try {
-  const { sqliteStore } = await import('./sqliteStore');
-  where = path.join(dataDir, 'deflect.db');
-  persistence = sqliteStore(where, legacyJson);
+  sqlite = await import('./sqliteStore');
 } catch (err) {
   console.warn(`[${GAME_TITLE}] node:sqlite unavailable (${(err as Error).message}); keeping profiles in a JSON file`);
-  where = legacyJson;
-  persistence = fileStore(legacyJson);
 }
+const where = sqlite ? path.join(dataDir, 'deflect.db') : legacyJson;
+const persistence: StorePersistence = sqlite ? sqlite.sqliteStore(where, legacyJson) : fileStore(legacyJson);
 
 const allowedOrigins = (env.ALLOWED_ORIGINS ?? '')
   .split(',')
@@ -34,7 +33,8 @@ const server = await startServer({
   persistence,
   staticDir: 'dist/client',
   allowedOrigins,
-  trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
+  // on Fly its proxy's Fly-Client-IP; behind any other proxy, the X-Forwarded-For it appends
+  trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true' ? (env.FLY_APP_NAME ? 'fly' : 'forwarded') : false,
   // one process holds about 500 players on a dedicated core (load-tested: 480 in 20 full lobbies
   // tick in under 4ms of their 16.7); past that, ticks start running over
   maxConnections: num(env.MAX_PLAYERS, 500),

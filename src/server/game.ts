@@ -72,6 +72,8 @@ export class Game {
   private readonly t0 = performance.now();
   /** set when the server is going down: players leaving then haven't walked out on anything */
   closing = false;
+  /** names already through the filter, as shown (the ladder asks for the same 25 again and again) */
+  private shownNames = new Map<string, string>();
   /** how long ticks take (ms): a running average, and the slowest in the last few seconds */
   readonly tickTime = { avg: 0, max: 0, maxSince: 0 };
   /** Server clock in ms (monotonic). Clients sync to this. Injectable for simulations. */
@@ -291,7 +293,15 @@ export class Game {
 
   /** a name as others see it: one from before the filter that it wouldn't let through is hidden */
   private shownName(name: string): string {
-    return !this.options.censor || this.options.censor.allowed(name) ? name : '*'.repeat(name.length);
+    const censor = this.options.censor;
+    if (!censor) return name;
+    let shown = this.shownNames.get(name);
+    if (shown === undefined) {
+      if (this.shownNames.size > 5000) this.shownNames.clear();
+      shown = censor.allowed(name) ? name : '*'.repeat(name.length);
+      this.shownNames.set(name, shown);
+    }
+    return shown;
   }
 
   leave(p: Player): void {
@@ -347,16 +357,20 @@ export class Game {
         this.challengeReply(p, msg.from, !!msg.accept);
         break;
       case 'chat': {
-        const text = this.options.censor?.clean(sanitizeChat(msg.text)) ?? sanitizeChat(msg.text);
-        if (!text || now - p.lastChatAt < 600) return;
+        // the throttle first: the filter is the costly part, and spam never needs it
+        if (now - p.lastChatAt < 600) return;
+        const raw = sanitizeChat(msg.text);
+        if (!raw) return;
         p.lastChatAt = now;
-        this.broadcastAll({ t: 'chat', name: p.name, text });
+        this.broadcastAll({ t: 'chat', name: p.name, text: this.options.censor?.clean(raw) ?? raw });
         break;
       }
       case 'forfeit':
         if (p.instance instanceof Arena) p.instance.forfeit(p);
         break;
       case 'leaderboard':
+        if (now - p.lastBoardAt < 250) return;
+        p.lastBoardAt = now;
         p.send({ t: 'leaderboard', entries: this.store.leaderboard(25).map((e) => ({ ...e, name: this.shownName(e.name) })), you: this.store.position(p.profile), total: this.store.placedCount() });
         break;
       case 'joinLobby':
