@@ -403,36 +403,141 @@ h3 { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.03
 h4.ih { display: flex; align-items: center; gap: 8px; }
 h4.ih .pi { width: 20px; height: 20px; }
 
-.char-select { display: grid; grid-template-columns: 310px 1fr; gap: 22px; }
-.char-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; }
-.char-card { position: relative; overflow: hidden; display: flex; align-items: center; gap: 9px; padding: 6px; background: color-mix(in srgb, var(--c1) 34%, #0c0c12); border: none; cursor: pointer; color: var(--text); box-shadow: inset 0 0 0 1px var(--line); text-align: left; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); transition: box-shadow 0.12s, transform 0.08s; }
-.char-card:hover { box-shadow: inset 0 0 0 1px var(--line-hi); }
-.char-card.sel { box-shadow: inset 0 0 0 2px var(--gold), 0 0 18px rgba(242, 193, 78, 0.25); }
-.cc-port { position: relative; flex: none; width: 48px; height: 48px; background: color-mix(in srgb, var(--c2) 80%, #101018); box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.3); }
-.cc-port img { display: block; width: 100%; height: 100%; }
-.cc-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.cc-jp { position: absolute; right: 6px; bottom: -6px; font-family: var(--jp); font-weight: 800; font-size: 34px; line-height: 1; color: rgba(255, 255, 255, 0.08); pointer-events: none; }
-.cc-name { position: relative; font-weight: 800; font-style: italic; font-size: 16px; letter-spacing: 0.03em; text-transform: uppercase; color: #fff; }
-.cc-weapon { position: relative; font-size: 12px; line-height: 1.15; letter-spacing: 0.04em; color: var(--muted); }
-.cd-top { display: grid; grid-template-columns: 270px 1fr; gap: 20px; }
-.cd-preview { width: 270px; height: 310px; background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 1px var(--line), inset 0 -70px 0 rgba(242, 193, 78, 0.05); }
+/* ---- the fighter select: a pixel HUD. Chunky stepped frames (box-shadows with no blur, one
+   "pixel" out on each side, so the corners notch like a sprite), flat colour, motion in steps().
+   Light by default: the fighter, their name, kanji and role; the rest waits behind three tabs. */
 .preview-holder { width: 100%; height: 100%; }
-.cd-jp { font-family: var(--jp); font-weight: 800; font-style: normal; font-size: 0.6em; color: var(--red-hi); margin-right: 12px; vertical-align: middle; }
-.cd-info p { margin: 6px 0; font-size: 16px; line-height: 1.45; color: #dcd8d0; }
-.role { font-weight: 700; font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
-.cd-stats { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
-.cd-stats .pi { width: 16px; height: 16px; margin-right: 5px; }
-.rating { display: flex; align-items: center; gap: 10px; font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; }
-.rating .pi { width: 17px; height: 17px; }
-.rating span { width: 90px; color: var(--muted); }
-.rating div { display: flex; gap: 3px; }
-.rating i { width: 18px; height: 6px; background: rgba(255, 255, 255, 0.12); transform: skewX(-24deg); }
-.rating i.on { background: var(--gold); }
-.moves { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-top: 16px; padding-top: 6px; border-top: 1px solid var(--line); }
-.moves ul { margin: 0; padding-left: 16px; font-size: 15px; line-height: 1.5; }
-.moves p { font-size: 15px; margin: 4px 0 10px; line-height: 1.45; color: #dcd8d0; }
-.moves .tip { color: var(--gold); list-style: none; margin-left: -16px; font-size: 14px; }
-.cd-actions { display: flex; align-items: center; gap: 16px; margin-top: 18px; font-size: 14px; }
+.fs-box { --px: 4px; --frame: #efe4cf; width: min(1040px, 96vw); background: #0e0d14; clip-path: none; animation: fs-open 0.4s steps(8) both;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--frame), 0 var(--px) 0 0 var(--frame), calc(-1 * var(--px)) 0 0 0 var(--frame), var(--px) 0 0 0 var(--frame), inset 0 0 0 var(--px) #1c1a26, calc(var(--px) * 3) calc(var(--px) * 3) 0 var(--px) rgba(0, 0, 0, 0.5); }
+@keyframes fs-open { from { clip-path: inset(48% -16px 48% -16px); } to { clip-path: inset(-16px -16px -16px -16px); } }
+.fs-box::before { display: none; }
+.fs-box .modal-head { padding: 14px 22px 10px; border-bottom: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 1' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%23efe4cf' fill-opacity='.35'/%3E%3C/svg%3E") 0 100% / calc(var(--px) * 2) var(--px) repeat-x; }
+.fs-box .modal-head h2 { font-family: var(--display); font-weight: 700; font-size: 26px; letter-spacing: 0.08em; text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6); }
+.fs-box .mk { clip-path: none; min-width: 34px; height: 34px; font-size: 15px; box-shadow: 0 -3px 0 0 var(--red), 0 3px 0 0 var(--red), -3px 0 0 0 var(--red), 3px 0 0 0 var(--red), 4px 4px 0 2px rgba(0, 0, 0, 0.45); transform: rotate(-4deg); }
+.fs-box .mh-ico { width: 34px; height: 34px; }
+.fs-box .modal-body { padding: 14px 22px 22px; }
+.fs { display: flex; flex-direction: column; gap: 22px; }
+/* a fixed height, so opening a tab scrolls its sheet rather than resizing the whole box */
+.fs-stage { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 26px; align-items: stretch; height: clamp(300px, 52vh, 400px); }
+
+/* the fighter, turning through their moves, framed in their colour */
+.fs-preview { position: relative; min-height: 0; background: #1c1a24;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--c2), 0 var(--px) 0 0 var(--c2), calc(-1 * var(--px)) 0 0 0 var(--c2), var(--px) 0 0 0 var(--c2), inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.35), calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px) rgba(0, 0, 0, 0.45);
+  transition: box-shadow 0.2s steps(2); }
+.fs-preview::after { content: ''; position: absolute; left: 8px; top: 8px; width: 12px; height: 12px; background: var(--c2); box-shadow: 4px 4px 0 -2px #0e0d14; pointer-events: none; }
+.fs-preview .preview-holder { position: absolute; inset: 0; }
+
+/* who they are: the kanji stamped beside the name, the role under it */
+.fs-hero { display: flex; flex-direction: column; justify-content: center; gap: 18px; min-width: 0; min-height: 0; }
+.fs-id { display: flex; align-items: center; gap: 20px; }
+.fs-kanji { flex: none; display: grid; place-items: center; min-width: 76px; height: 76px; padding: 0 8px; font-family: var(--jp); font-size: 34px; line-height: 1; color: #fff; background: var(--red); transform: rotate(-4deg);
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--red), 0 var(--px) 0 0 var(--red), calc(-1 * var(--px)) 0 0 0 var(--red), var(--px) 0 0 0 var(--red), inset 0 0 0 3px #ffb4a8, calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px) rgba(40, 6, 14, 0.5); }
+.fs-name { font-family: var(--display); font-weight: 700; font-size: 52px; line-height: 1; letter-spacing: 0.04em; text-transform: uppercase; color: #fff7ea; text-shadow: var(--px) var(--px) 0 color-mix(in srgb, var(--c2) 45%, #000); overflow-wrap: anywhere; }
+.fs-role { margin-top: 8px; font-size: 15px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--gold); text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6); }
+.fs-id.fs-in .fs-kanji { animation: ts-stamp 0.36s steps(5) both; }
+.fs-id.fs-in .fs-name, .fs-id.fs-in .fs-role { animation: ts-fade 0.32s steps(4) both; }
+.fs-id.fs-in .fs-role { animation-delay: 0.08s; }
+
+/* the tabs: pixel keys, the open one lit gold */
+.fs-tabs { display: flex; gap: 14px; flex-wrap: wrap; }
+.fs-tab { --tb: #3a3648; display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px 6px; font: 600 15px var(--ui); letter-spacing: 0.16em; text-transform: uppercase; color: #e8e2d6; background: #1d1b27; border: none; cursor: pointer;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--tb), 0 var(--px) 0 0 var(--tb), calc(-1 * var(--px)) 0 0 0 var(--tb), var(--px) 0 0 0 var(--tb), inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.35);
+  transition: background 0.12s steps(2), color 0.12s steps(2); }
+.fs-tab .pi { width: 18px; height: 18px; }
+.fs-tab:hover { --tb: #6a6480; background: #282535; }
+.fs-tab:focus-visible, .fs-tile:focus-visible, .fs-play:focus-visible { outline: 2px dashed var(--gold-hi); outline-offset: 7px; }
+.fs-tab[aria-selected='true'] { --tb: var(--gold); color: #1a1206; background: var(--gold); box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--tb), 0 var(--px) 0 0 var(--tb), calc(-1 * var(--px)) 0 0 0 var(--tb), var(--px) 0 0 0 var(--tb), inset 0 calc(-1 * var(--px)) 0 #b8862a; }
+.fs-tab:active { transform: translateY(2px); }
+
+/* what a tab opens: a paper-edged sheet that unrolls in steps */
+.fs-panel { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: 12px 16px; background: rgba(239, 228, 207, 0.05); scrollbar-color: rgba(239, 228, 207, 0.35) transparent;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 #2e2b3a, 0 var(--px) 0 0 #2e2b3a, calc(-1 * var(--px)) 0 0 0 #2e2b3a, var(--px) 0 0 0 #2e2b3a; }
+.fs-panel.fs-pop { animation: fs-unroll 0.28s steps(4); }
+@keyframes fs-unroll { from { opacity: 0; transform: translateY(-8px); } }
+.fs-panel p { margin: 0 0 8px; font-size: 15px; line-height: 1.45; color: #ddd7cb; }
+.fs-row { display: grid; grid-template-columns: 74px 1fr; gap: 12px; align-items: start; padding: 6px 0; }
+.fs-row + .fs-row { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 1' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%23efe4cf' fill-opacity='.18'/%3E%3C/svg%3E") 0 0 / 4px 2px repeat-x; }
+.fs-row b { font-size: 15px; letter-spacing: 0.06em; color: #fff; }
+.fs-row p { margin: 2px 0 0; font-size: 14px; color: #bdb7ab; }
+.fs-row i { font-style: normal; color: var(--gold); }
+.fs-key { justify-self: start; padding: 3px 7px 2px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #1a1206; background: var(--gold-hi); box-shadow: 0 -2px 0 0 var(--gold-hi), 0 2px 0 0 var(--gold-hi), -2px 0 0 0 var(--gold-hi), 2px 0 0 0 var(--gold-hi), inset 0 -2px 0 #c9a04a; }
+.fs-blurb { color: #ddd7cb; }
+.fs-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 22px; margin: 10px 0 12px; }
+.fs-bar { display: flex; align-items: center; gap: 10px; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; }
+.fs-bar span { width: 92px; color: var(--muted); }
+.fs-bar div { display: flex; gap: 4px; }
+.fs-bar i { width: 14px; height: 14px; background: #2a2734; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.35); }
+.fs-bar i.on { background: var(--gold); box-shadow: inset -2px -2px 0 #b8862a, inset 2px 2px 0 var(--gold-hi); }
+.fs-nums { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 14px; letter-spacing: 0.08em; color: var(--muted); }
+.fs-nums .pi { width: 16px; height: 16px; margin-right: 6px; }
+.fs-epithet { margin-bottom: 8px; font-family: var(--display); font-size: 17px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6); }
+.fs-quote { margin-top: 4px; font-size: 15px; letter-spacing: 0.04em; color: #fff4e4; }
+
+/* the call to arms */
+.fs-go { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding-top: 6px; }
+.fs-play { display: inline-flex; align-items: center; gap: 10px; padding: 11px 22px 10px; font: 600 18px var(--ui); letter-spacing: 0.14em; text-transform: uppercase; color: #fff; background: var(--red); border: none; cursor: pointer;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--red), 0 var(--px) 0 0 var(--red), calc(-1 * var(--px)) 0 0 0 var(--red), var(--px) 0 0 0 var(--red), inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.3), calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px) rgba(40, 6, 14, 0.45);
+  transition: background 0.12s steps(2); }
+.fs-play .pi { width: 22px; height: 22px; }
+.fs-play:hover { background: var(--red-hi); box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--red-hi), 0 var(--px) 0 0 var(--red-hi), calc(-1 * var(--px)) 0 0 0 var(--red-hi), var(--px) 0 0 0 var(--red-hi), inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.3), calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px) rgba(40, 6, 14, 0.45); }
+.fs-play:active { transform: translateY(2px); }
+.fs-note { font-size: 12px; letter-spacing: 0.08em; color: var(--dim); }
+
+/* the roster: a row of portrait tiles, the chosen one framed gold with a cursor bobbing over it */
+.fs-roster { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 14px; padding: 18px 6px 4px; }
+.fs-tile { --tb: #2e2b3a; position: relative; display: flex; flex-direction: column; align-items: stretch; padding: 0; color: var(--muted); background: color-mix(in srgb, var(--c2) 70%, #0e0d14); border: none; cursor: pointer;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--tb), 0 var(--px) 0 0 var(--tb), calc(-1 * var(--px)) 0 0 0 var(--tb), var(--px) 0 0 0 var(--tb);
+  transition: transform 0.1s steps(2); }
+.fs-tile img { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; filter: saturate(0.55) brightness(0.8); transition: filter 0.12s steps(2); }
+.fs-tile span { padding: 4px 2px 3px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; background: #0e0d14; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fs-tile:hover { --tb: #6a6480; transform: translateY(-3px); }
+.fs-tile:hover img { filter: none; }
+.fs-tile.sel { --tb: var(--gold); transform: translateY(-4px); color: #1a1206; }
+.fs-tile.sel img { filter: none; }
+.fs-tile.sel span { color: #1a1206; background: var(--gold); }
+.fs-tile.sel::before { content: ''; position: absolute; left: 50%; top: -20px; width: 16px; height: 8px; margin-left: -8px; background: var(--gold); clip-path: polygon(0 0, 100% 0, 100% 50%, 75% 50%, 75% 100%, 25% 100%, 25% 50%, 0 50%); animation: fs-bob 0.8s steps(2) infinite; }
+@keyframes fs-bob { 50% { transform: translateY(3px); } }
+@media (max-width: 900px) {
+  .fs-stage { grid-template-columns: minmax(170px, 230px) 1fr; gap: 20px; }
+  .fs-name { font-size: 40px; }
+  .fs-roster { gap: 10px; }
+}
+/* phones held sideways: everything tighter, so the roster still fits under the fighter */
+@media (max-height: 500px) {
+  .fs-box { --px: 3px; }
+  .fs-box .modal-head { padding: 8px 14px 6px; }
+  .fs-box .modal-head h2 { font-size: 18px; }
+  .fs-box .mk, .fs-box .mh-ico { min-width: 26px; width: 26px; height: 26px; font-size: 12px; }
+  .fs-box .modal-body { padding: 8px 14px 12px; }
+  .fs { gap: 10px; }
+  .fs-stage { grid-template-columns: 170px 1fr; gap: 16px; height: auto; }
+  .fs-preview { min-height: 180px; }
+  .fs-hero { gap: 10px; }
+  .fs-id { gap: 14px; }
+  .fs-kanji { min-width: 46px; height: 46px; font-size: 21px; }
+  .fs-name { font-size: 30px; }
+  .fs-role { margin-top: 4px; font-size: 12px; }
+  .fs-tabs { gap: 10px; }
+  .fs-tab { padding: 5px 10px 4px; font-size: 13px; }
+  .fs-panel { max-height: 140px; }
+  .fs-play { padding: 7px 14px 6px; font-size: 15px; }
+  .fs-note { display: none; }
+  .fs-roster { grid-template-columns: repeat(8, minmax(0, 64px)); justify-content: center; gap: 9px; padding-top: 14px; }
+  .fs-tile span { font-size: 9px; }
+}
+/* a narrow window: the fighter above, the roster in two rows */
+@media (max-width: 600px) {
+  .fs-stage { grid-template-columns: 1fr; height: auto; }
+  .fs-preview { min-height: 220px; }
+  .fs-panel { max-height: 280px; }
+  .fs-name { font-size: 32px; }
+  .fs-kanji { min-width: 56px; height: 56px; font-size: 26px; }
+  .fs-roster { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 28px; }
+  .fs-row { grid-template-columns: 62px 1fr; gap: 8px; }
+  .fs-bars { grid-template-columns: 1fr; }
+  .fs-box .modal-head h2 { gap: 10px; font-size: 16px; letter-spacing: 0.04em; }
+  .fs-box .mh-ico { display: none; }
+}
 
 .ladder table { width: 100%; border-collapse: collapse; font-size: 16px; margin: 8px 0; }
 .ladder th { font-weight: 700; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line-hi); }
@@ -461,8 +566,7 @@ h4.ih .pi { width: 20px; height: 20px; }
 .settings input[type='range'] { width: 190px; }
 
 @media (max-width: 900px) {
-  .char-select, .cd-top, .help-cols, .moves { grid-template-columns: 1fr; }
-  .char-grid { grid-template-columns: repeat(4, 1fr); }
+  .help-cols { grid-template-columns: 1fr; }
 }
 
 /* during a match the side menu only offers Forfeit */
@@ -646,6 +750,35 @@ h4.ih .pi { width: 20px; height: 20px; }
 .sel-badge.theirs { box-shadow: 0 0 0 3px var(--red-hi), 3px 3px 0 3px rgba(0, 0, 0, 0.45); }
 .sel-badge img { display: block; width: 100%; height: 100%; }
 .sel-badge b { position: absolute; left: 0; right: 0; bottom: -1px; font-size: 10px; text-align: center; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; background: rgba(0, 0, 0, 0.55); }
+/* the pixel HUD over it, like the fighter select's: stepped frames one pixel out on every side,
+   picks framed green (you), red (them) or gold (both), and motion in steps() */
+.select-screen { --px: 4px; }
+.select-screen .sel-band { padding-top: 14px; background: #0e0d14;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 #efe4cf, 0 var(--px) 0 0 #efe4cf, calc(-1 * var(--px)) 0 0 0 #efe4cf, var(--px) 0 0 0 #efe4cf, inset 0 0 0 var(--px) #1c1a26, calc(var(--px) * 3) calc(var(--px) * 3) 0 var(--px) rgba(0, 0, 0, 0.5); }
+.select-screen .sel-title { font-family: var(--display); font-weight: 700; font-size: 26px; letter-spacing: 0.08em; text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6); }
+.select-screen .sel-title .jp { padding: 2px 8px; font-size: 15px; color: #fff; background: var(--red); text-shadow: none; transform: rotate(-4deg); box-shadow: 0 -3px 0 0 var(--red), 0 3px 0 0 var(--red), -3px 0 0 0 var(--red), 3px 0 0 0 var(--red); }
+.select-screen .sel-count { margin-top: 4px; font-family: var(--display); font-weight: 700; text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6); }
+.select-screen .sel-maps { gap: 16px; margin-top: 12px; }
+.select-screen .sel-chars { gap: 16px; width: min(880px, 100%); }
+.select-screen .sel-tile, .select-screen .sel-card { --tb: #2e2b3a;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--tb), 0 var(--px) 0 0 var(--tb), calc(-1 * var(--px)) 0 0 0 var(--tb), var(--px) 0 0 0 var(--tb), calc(var(--px) * 2) calc(var(--px) * 2) 0 calc(var(--px) / 2) rgba(0, 0, 0, 0.45) !important;
+  transition: transform 0.1s steps(2); }
+.select-screen .sel-tile:hover, .select-screen .sel-card:hover { --tb: #6a6480; transform: translateY(-3px); }
+.select-screen .sel-tile:active, .select-screen .sel-card:active { transform: translateY(1px); }
+.select-screen .sel-tile.mine, .select-screen .sel-card.mine { --tb: #3ad16a; }
+.select-screen .sel-tile.theirs, .select-screen .sel-card.theirs { --tb: var(--red-hi); }
+.select-screen .sel-tile.mine.theirs, .select-screen .sel-card.mine.theirs { --tb: var(--gold); }
+.select-screen .sel-label { font-family: var(--ui); font-weight: 600; letter-spacing: 0.08em; text-shadow: 2px 2px 0 #000; }
+.select-screen .sel-art { image-rendering: pixelated; }
+.select-screen .sel-badge { box-shadow: 0 -3px 0 0 #3ad16a, 0 3px 0 0 #3ad16a, -3px 0 0 0 #3ad16a, 3px 0 0 0 #3ad16a, 4px 4px 0 2px rgba(0, 0, 0, 0.45) !important; }
+.select-screen .sel-badge.theirs { box-shadow: 0 -3px 0 0 var(--red-hi), 0 3px 0 0 var(--red-hi), -3px 0 0 0 var(--red-hi), 3px 0 0 0 var(--red-hi), 4px 4px 0 2px rgba(0, 0, 0, 0.45) !important; }
+@media (max-height: 520px) {
+  .select-screen { --px: 3px; }
+  .select-screen .sel-title { font-size: 18px; }
+  .select-screen .sel-title .jp { font-size: 12px; }
+  .select-screen .sel-maps { gap: 10px; }
+  .select-screen .sel-chars { gap: 10px; }
+}
 @media (max-height: 520px) {
   .select-screen { padding-top: calc(10px + var(--hud-top)); }
   .sel-band { padding: 4px 6% 10px; width: min(760px, 100%); }

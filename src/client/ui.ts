@@ -8,6 +8,7 @@ import { LobbyBar } from './lobbybar';
 import { ICON, IconName, icon, pixelSVG, recolor, slashRows } from './pixelicons';
 import { TRACKS } from './audio/music';
 import { settings } from './settings';
+import { LORE } from './lore';
 
 const h = (html: string): HTMLElement => {
   const t = document.createElement('template');
@@ -762,10 +763,10 @@ export class UI {
     this.handlers.onModalChange(false);
   }
 
-  private frame(title: string, body: string, wide = false, kanji = '', ico?: IconName): void {
+  private frame(title: string, body: string, wide = false, kanji = '', ico?: IconName, cls = ''): void {
     this.preview?.dispose();
     this.preview = null;
-    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''}"><div class="modal-head"><h2>${ico ? icon(ico, 'mh-ico') : ''}${kanji ? `<span class="mk">${kanji}</span>` : ''}${title}</h2><button class="btn small close" aria-label="Close">${icon('close')}<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
+    this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''} ${cls}"><div class="modal-head"><h2>${ico ? icon(ico, 'mh-ico') : ''}${kanji ? `<span class="mk">${kanji}</span>` : ''}${title}</h2><button class="btn small close" aria-label="Close">${icon('close')}<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
     this.modal.classList.remove('hidden');
     this.modal.querySelector('.close')!.addEventListener('click', () => this.closeModal());
   }
@@ -788,57 +789,118 @@ export class UI {
     } else this.renderHelp();
   }
 
+  /**
+   * The fighter select: the roster along the bottom and, above it, the chosen fighter large (their
+   * model turning through their moves), their name, kanji and role, and nothing more until you
+   * open one of the tabs: their moves, their numbers, or their story.
+   */
   private renderChars(selected: CharacterId): void {
-    const cards = CHARACTER_IDS.map((id) => {
+    const tiles = CHARACTER_IDS.map((id) => {
       const c = CHARACTERS[id];
-      return `<button class="char-card ${id === selected ? 'sel' : ''}" data-id="${id}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}">
-        <span class="cc-port"><img src="${this.handlers.portrait(id)}" alt="" draggable="false"></span><span class="cc-text"><span class="cc-jp" aria-hidden="true">${c.jp}</span><span class="cc-name">${c.name}</span><span class="cc-weapon">${c.weapon}</span></span></button>`;
+      return `<button class="fs-tile" data-id="${id}" style="--c2:${c.palette.accent}" aria-label="${esc(c.name)}"><img src="${this.handlers.portrait(id)}" alt="" draggable="false"><span>${esc(c.name)}</span></button>`;
     }).join('');
-    this.frame('Choose your fighter', `<div class="char-select"><div class="char-grid">${cards}</div><div class="char-detail"></div></div>`, true, '武者', 'fighters');
-    const detail = this.modal.querySelector<HTMLElement>('.char-detail')!;
-    const show = (id: CharacterId) => {
-      const c = CHARACTERS[id];
-      const bar = (ico: IconName, label: string, v: number) => `<div class="rating">${icon(ico)}<span>${label}</span><div>${'<i class="on"></i>'.repeat(v)}${'<i></i>'.repeat(5 - v)}</div></div>`;
-      const atkRow = (name: string, dmg: number, extra = '') => `<li><b>${esc(name)}</b> <span class="muted">${dmg} dmg${extra}</span></li>`;
-      detail.innerHTML = `
-        <div class="cd-top">
-          <div class="cd-preview"></div>
-          <div class="cd-info">
-            <h3><span class="cd-jp">${c.jp}</span>${c.name} <span class="muted">· ${c.weapon}</span></h3>
-            <div class="role">${c.role}</div>
-            <p>${esc(c.description)}</p>
-            <div class="cd-stats"><span>${icon('heart')}HP ${c.stats.hp}</span><span>${icon('shield')}Posture ${c.stats.posture}</span><span>${icon('dash')}Speed ${c.stats.speed}</span></div>
-            ${bar('fist', 'Power', c.ratings.power)}${bar('bolt', 'Speed', c.ratings.speed)}${bar('target', 'Reach', c.ratings.reach)}${bar('shield', 'Defense', c.ratings.defense)}${bar('skull', 'Difficulty', c.ratings.difficulty)}
+    this.frame(
+      'Choose your fighter',
+      `<div class="fs">
+        <div class="fs-stage">
+          <div class="fs-preview"></div>
+          <div class="fs-hero">
+            <div class="fs-id"><span class="fs-kanji"></span><div><div class="fs-name"></div><div class="fs-role"></div></div></div>
+            <div class="fs-tabs" role="tablist">
+              <button class="fs-tab" role="tab" data-tab="moves" aria-selected="false">${icon('sword')}Moves</button>
+              <button class="fs-tab" role="tab" data-tab="stats" aria-selected="false">${icon('gauge')}Stats</button>
+              <button class="fs-tab" role="tab" data-tab="story" aria-selected="false">${icon('eye')}Story</button>
+            </div>
+            <div class="fs-panel hidden" role="tabpanel"></div>
+            <div class="fs-go"><button class="fs-play" id="pick-char"></button><span class="fs-note">Switch fighters in the lobby safe zone</span></div>
           </div>
         </div>
-        <div class="moves">
-          <div>${iconHead('sword', 'Light chain [LMB ×3]')}<ul>${c.lights.map((l) => atkRow(l.name, l.damage * (l.hits ?? 1))).join('')}</ul>
-            ${iconHead('hammer', 'Heavy chain [F ×3]')}<ul>${[c.heavy, c.extra.h1, c.extra.h2].map((h, i) => atkRow(h.name, h.damage * (h.hits ?? 1), i === 0 && h.feintable ? ' · feint with RMB' : '')).join('')}</ul></div>
-          <div>${iconHead('dash', 'Dash [dodge forward, then LMB / F]')}<ul>${atkRow(c.extra.dl.name, c.extra.dl.damage * (c.extra.dl.hits ?? 1))}${atkRow(c.extra.dh.name, c.extra.dh.damage)}</ul>
-            ${iconHead('back', 'Backstep [walk away + LMB / F]')}<ul>${atkRow(c.extra.bl.name, c.extra.bl.damage)}${atkRow(c.extra.bh.name, c.extra.bh.damage)}</ul>
-            ${iconHead('jump', 'Air [jump, then LMB / F]')}<ul>${atkRow(c.extra.jl.name, c.extra.jl.damage)}${atkRow(c.extra.jh.name, c.extra.jh.damage)}</ul>
-            ${iconHead('peril', 'Perilous [E]')}<ul>${atkRow(c.special.name, c.special.damage, ` · ${c.special.cooldown / 1000}s`)}<li class="tip">${PERILOUS_TIP[c.special.perilous!]}</li></ul></div>
-          <div>${iconHead('bolt', `Ability [R] · ${c.ability.name}`)}<p>${esc(c.ability.description)} <span class="muted">(${c.ability.cooldown / 1000}s)</span></p>
-            ${iconHead('eye', `Passive · ${c.passive.name}`)}<p>${esc(c.passive.description)}</p></div>
-        </div>
-        <div class="cd-actions"><button class="btn big" id="pick-char">${jpLabel('選', `Play ${c.name}`, 'swords')}</button><span class="muted">Switch characters inside the lobby safe zone.</span></div>`;
-      detail.querySelector('#pick-char')!.addEventListener('click', () => {
-        this.handlers.onSelectChar(id);
-        this.closeModal();
-      });
-      const pv = detail.querySelector<HTMLElement>('.cd-preview')!;
+        <div class="fs-roster">${tiles}</div>
+      </div>`,
+      true,
+      '武者',
+      'fighters',
+      'fs-box',
+    );
+    const root = this.modal.querySelector<HTMLElement>('.fs')!;
+    const panel = root.querySelector<HTMLElement>('.fs-panel')!;
+    const tabs = [...root.querySelectorAll<HTMLElement>('.fs-tab')];
+    const roster = [...root.querySelectorAll<HTMLElement>('.fs-tile')];
+    let current = selected;
+    let tab: string | null = null;
+    const keys = this.touch ? { light: 'Light', heavy: 'Heavy', special: 'Special', ability: 'Ability' } : { light: 'LMB', heavy: 'F', special: 'E', ability: 'R' };
+    const row = (key: string, label: string, body: string) => `<div class="fs-row"><span class="fs-key">${key}</span><div><b>${label}</b><p>${body}</p></div></div>`;
+    const chain = (list: { name: string }[]) => list.map((a) => esc(a.name)).join(' <i>›</i> ');
+    const fill = () => {
+      const c = CHARACTERS[current];
+      if (tab === 'moves') {
+        panel.innerHTML =
+          row(keys.special, `Perilous · ${esc(c.special.name)}`, PERILOUS_TIP[c.special.perilous!]) +
+          row(keys.ability, esc(c.ability.name), esc(c.ability.description)) +
+          row('Passive', esc(c.passive.name), esc(c.passive.description)) +
+          row(keys.light, 'Light chain', chain(c.lights)) +
+          row(keys.heavy, 'Heavy chain', chain([c.heavy, c.extra.h1, c.extra.h2]));
+      } else if (tab === 'stats') {
+        const bar = (label: string, v: number) => `<div class="fs-bar"><span>${label}</span><div>${'<i class="on"></i>'.repeat(v)}${'<i></i>'.repeat(5 - v)}</div></div>`;
+        panel.innerHTML = `<p class="fs-blurb">${esc(c.description)}</p>
+          <div class="fs-bars">${bar('Power', c.ratings.power)}${bar('Speed', c.ratings.speed)}${bar('Reach', c.ratings.reach)}${bar('Defense', c.ratings.defense)}${bar('Difficulty', c.ratings.difficulty)}</div>
+          <div class="fs-nums"><span>${icon('heart')}HP <b>${c.stats.hp}</b></span><span>${icon('shield')}Posture <b>${c.stats.posture}</b></span><span>${icon('dash')}Speed <b>${c.stats.speed}</b></span></div>`;
+      } else if (tab === 'story') {
+        const l = LORE[current];
+        panel.innerHTML = `<div class="fs-epithet">${esc(l.epithet)}</div>${l.story.map((p) => `<p>${esc(p)}</p>`).join('')}<div class="fs-quote">“${esc(l.quote)}”</div>`;
+      }
+      panel.scrollTop = 0;
+    };
+    const setTab = (t: string | null) => {
+      tab = t;
+      for (const b of tabs) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+      panel.classList.toggle('hidden', !t);
+      root.classList.toggle('fs-open', !!t);
+      if (t) {
+        fill();
+        // replay the panel's opening
+        panel.classList.remove('fs-pop');
+        void panel.offsetWidth;
+        panel.classList.add('fs-pop');
+      }
+    };
+    const show = (id: CharacterId) => {
+      current = id;
+      const c = CHARACTERS[id];
+      root.style.setProperty('--c1', c.palette.primary);
+      root.style.setProperty('--c2', c.palette.accent);
+      for (const b of roster) b.classList.toggle('sel', b.dataset.id === id);
+      root.querySelector('.fs-kanji')!.textContent = c.jp;
+      root.querySelector('.fs-name')!.textContent = c.name;
+      root.querySelector('.fs-role')!.textContent = `${c.role} · ${c.weapon}`;
+      root.querySelector('#pick-char')!.innerHTML = `${icon('swords')}Play ${esc(c.name)}`;
+      const hero = root.querySelector<HTMLElement>('.fs-id')!;
+      hero.classList.remove('fs-in');
+      void hero.offsetWidth;
+      hero.classList.add('fs-in');
+      if (tab) fill();
+      const pv = root.querySelector<HTMLElement>('.fs-preview')!;
       if (!this.preview) this.preview = this.handlers.createPreview(pv);
-      else pv.appendChild(this.preview.el);
+      else if (this.preview.el.parentElement !== pv) pv.appendChild(this.preview.el);
       this.preview.setChar(id);
     };
-    this.modal.querySelectorAll<HTMLElement>('.char-card').forEach((b) =>
-      b.addEventListener('click', () => {
-        this.modal.querySelectorAll('.char-card').forEach((x) => x.classList.remove('sel'));
-        b.classList.add('sel');
-        show(b.dataset.id as CharacterId);
-      }),
-    );
+    for (const b of tabs) b.addEventListener('click', () => setTab(tab === b.dataset.tab ? null : b.dataset.tab!));
+    for (const b of roster) b.addEventListener('click', () => show(b.dataset.id as CharacterId));
+    root.querySelector('#pick-char')!.addEventListener('click', () => {
+      this.handlers.onSelectChar(current);
+      this.closeModal();
+    });
+    // the arrow keys walk the roster
+    root.addEventListener('keydown', (e) => {
+      const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!step || (e.target as HTMLElement).closest('.fs-panel')) return;
+      e.preventDefault();
+      const i = (CHARACTER_IDS.indexOf(current) + step + CHARACTER_IDS.length) % CHARACTER_IDS.length;
+      show(CHARACTER_IDS[i]);
+      roster[i].focus();
+    });
     show(selected);
+    if (!this.touch) roster[CHARACTER_IDS.indexOf(selected)]?.focus({ preventScroll: true });
   }
 
   showLeaderboard(entries: LeaderboardEntry[], you: number | null, total: number, me: ProfileView | null): void {
