@@ -314,27 +314,39 @@ const execGlaive = seq(
   0.04,
 );
 
-// Entrance: planted upright beside the kneeling body where the bolt struck, wrenched out, twirled
-// once in both hands across the front, then raised and its butt spike slammed into the floor
-const UPRIGHT: V3 = [0.04, 1, 0.08];
-const IN_PLANT: V3 = [-0.42, 0.28, 0.22];
-const IN_LIFT: V3 = [-0.36, 0.6, 0.3];
-const IN_RAISE: V3 = [-0.3, 0.62, 0.32];
-const IN_SLAM: V3 = [-0.3, 0.16, 0.32];
-const IN_STAND: V3 = [-0.32, 0.04, 0.3];
-// the twirl's plane leans back, so the blade passes low in front and high behind the head
-const TWIRL_UP: V3 = [0, 0.7, -0.72];
+// Entrance: landed in a crouch where the bolt struck, the glaive trailing back in the right hand;
+// ripped up over the shoulder into a flat spin overhead that spirals down into a windmill at his
+// right side; caught in both hands and drawn back as the lightning gathers in the blade; and driven
+// out at them in a long lunging thrust
+const IN_CROUCH_R: V3 = [-0.5, 0.3, -0.05];
+const IN_TRAIL: V3 = [-0.35, 0.1, -0.93];
+const IN_UP: V3 = [0.0, 0.5, 0.86];
+// the overhead spin's plane, tilted up at the front, and where it spirals down to at his side
+const IN_SPIN_U: V3 = [0, 0.35, 0.94];
+const IN_SPIN_V: V3 = [-1, 0.05, 0];
+const IN_SPIN_TOP: V3 = [-0.1, 1.12, 0.1];
+const IN_SPIN_SIDE: V3 = [-0.32, 0.6, 0.18];
+const IN_MILL: V3 = [-0.42, 0.45, 0.16];
+const IN_COIL_R: V3 = [-0.3, 0.36, -0.28];
+const IN_AIM: V3 = [0.06, 0.1, 1];
+const IN_THRUST_R: V3 = [-0.2, 0.4, 0.55];
 const entranceSpear = seq(
   [
-    [0.0, 0.34, line(IN_PLANT, [-0.42, 0.27, 0.22], UPRIGHT, UPRIGHT, [1, 0, 0], NaN, NaN, { body: true })],
-    [0.34, 0.42, line(IN_PLANT, IN_LIFT, UPRIGHT, [0.1, 1, 0.1], [1, 0, 0], NaN, NaN, { body: true })],
-    [0.42, 0.47, line(IN_LIFT, [-0.1, 0.62, 0.42], [0.1, 1, 0.1], TWIRL_UP, [1, 0, 0], -0.3, -0.6, { body: true })],
-    [0.47, 0.65, arc([-0.1, 0.5, 0.3], 0.3, circle(TWIRL_UP, [-1, 0, 0], 1, 0, 12), -0.6, { body: true })],
-    [0.65, 0.71, line([-0.1, 0.62, 0.42], IN_RAISE, TWIRL_UP, UPRIGHT, [1, 0, 0], -0.6, -0.45, { body: true })],
-    [0.71, 0.76, line(IN_RAISE, IN_SLAM, UPRIGHT, UPRIGHT, [1, 0, 0], -0.45, -0.45, { body: true })],
-    [0.76, 0.82, line(IN_SLAM, IN_STAND, UPRIGHT, UPRIGHT, [1, 0, 0], -0.45, NaN, { body: true })],
-    [0.82, 0.9, line(IN_STAND, [-0.32, 0.04, 0.3], UPRIGHT, UPRIGHT, [1, 0, 0], NaN, NaN, { body: true })],
-    [0.9, 1.0, line([-0.32, 0.04, 0.3], G_R, UPRIGHT, G_DIR, UPE, NaN, SP, { body: true })],
+    // crouched, trailing back
+    [-0.1, 0.1, line(IN_CROUCH_R, IN_CROUCH_R, IN_TRAIL, IN_TRAIL, UPE, NaN, NaN, { body: true })],
+    // ripped up over the shoulder, the arm swinging it from behind round to the front
+    [0.1, 0.22, arc([-0.3, 0.55, 0.0], 0.32, [IN_TRAIL, [-0.3, 0.75, -0.6], [-0.15, 0.97, 0.15], IN_UP], NaN, { body: true, pivot1: [-0.18, 0.8, 0.1] })],
+    // spun flat overhead in the right hand, twice round, spiralling down to his right side...
+    [0.22, 0.56, arc(IN_SPIN_TOP, -0.15, circle(IN_SPIN_U, IN_SPIN_V, 2, 0, 16), NaN, { body: true, pivot1: IN_SPIN_SIDE })],
+    // ...and on round upright there, a windmill: down past his front, under, and up behind
+    [0.56, 0.66, arc(IN_SPIN_SIDE, -0.15, circle([-0.1, 0.3, 0.95], [0, -1, 0.1], 1, 0, 8), NaN, { body: true, pivot1: IN_MILL })],
+    // caught in both hands and drawn back, aimed at them
+    [0.66, 0.72, line([-0.36, 0.42, 0.2], IN_COIL_R, IN_AIM, IN_AIM, UPE, NaN, SP, { body: true })],
+    // the thrust, the left hand sliding back down the shaft as it goes out
+    [0.72, 0.77, line(IN_COIL_R, IN_THRUST_R, IN_AIM, IN_AIM, UPE, SP, -0.1, { body: true })],
+    [0.77, 0.9, line(IN_THRUST_R, [-0.21, 0.4, 0.52], IN_AIM, IN_AIM, UPE, -0.1, -0.1, { body: true })],
+    // and back to the guard
+    [0.9, 1.0, line([-0.21, 0.4, 0.52], G_R, IN_AIM, G_DIR, UPE, -0.1, SP, { body: true })],
   ],
   0.025,
 );
@@ -781,46 +793,59 @@ export const spear: Style = {
     fx: [fx(0.05, 'dust', 'feet', 1.0), fx(0.98, 'dust', 'feet', 0.9)],
     trail: { life: 0.2, glow: 0.4 },
   }),
-  // Entrance: revealed kneeling where the lightning struck, head bowed and the glaive planted beside
-  // him; he wrenches it free, twirls it once across his front, and slams the butt spike down
+  // Entrance, Storm of the North (see entranceSpear): the bolt, the rise, the spin, the gathering
+  // and the thrust, one motion
   entrance: mv({
     keys: [
-      K(0.0, b({ front: 'R', twist: -0.35, hipTwist: 0, crouch: -0.5, lean: 0.34, step: 0.34, back: 0.36, width: 0.22, headPitch: 0.45 })),
-      K(0.3, b({ front: 'R', twist: -0.35, hipTwist: 0, crouch: -0.51, lean: 0.36, step: 0.34, back: 0.36, width: 0.22, headPitch: 0.5 })),
-      K(0.37, b({ front: 'R', twist: -0.3, hipTwist: 0, crouch: -0.3, lean: 0.14, step: 0.3, back: 0.3, width: 0.18, headPitch: 0.1 })),
-      K(0.44, b({ front: 'R', twist: -0.2, hipTwist: 0, crouch: -0.14, lean: 0.0, step: 0.26, back: 0.26, width: 0.16, headPitch: -0.04 })),
-      K(0.56, b({ front: 'R', twist: -0.05, hipTwist: 0, crouch: -0.16, lean: 0.02, step: 0.26, back: 0.26, width: 0.16 })),
-      K(0.65, b({ front: 'R', twist: -0.25, hipTwist: 0, crouch: -0.14, lean: 0.0, step: 0.26, back: 0.26, width: 0.16 })),
-      K(0.71, b({ front: 'R', twist: -0.3, hipTwist: 0, crouch: -0.06, lean: -0.08, step: 0.24, back: 0.24, width: 0.16, headPitch: -0.06 })),
-      K(0.76, b({ front: 'R', twist: -0.3, hipTwist: 0, crouch: -0.22, lean: 0.12, step: 0.28, back: 0.28, width: 0.2, headPitch: 0.04 })),
-      K(0.82, b({ front: 'R', twist: -0.3, hipTwist: 0, crouch: -0.03, lean: -0.06, step: 0.22, back: 0.22, width: 0.16, headPitch: -0.12 })),
-      K(0.9, b({ twist: -0.4, hipTwist: -0.2, crouch: -0.06, lean: -0.02, step: 0.24, back: 0.24, width: 0.16, headPitch: -0.12 })),
+      // landed hard: right knee down, left hand on the floor, head bowed
+      K(0.0, b({ front: 'R', twist: -0.3, hipTwist: 0, crouch: -0.56, lean: 0.4, step: 0.36, back: 0.36, width: 0.24, headPitch: 0.45 })),
+      K(0.1, b({ front: 'R', twist: -0.35, hipTwist: 0, crouch: -0.54, lean: 0.36, step: 0.36, back: 0.36, width: 0.24, headPitch: 0.3 })),
+      // up off the floor with the glaive, onto the toes
+      K(0.18, b({ front: 'R', twist: -0.1, hipTwist: 0, crouch: 0.0, lean: -0.12, step: 0.22, back: 0.22, width: 0.16, headPitch: -0.12 }), { hop: 0.12 }),
+      K(0.24, b({ twist: 0.05, hipTwist: 0.05, crouch: -0.06, lean: -0.06, step: 0.24, back: 0.24, width: 0.16, headPitch: -0.1 }), { hop: 0 }),
+      // turning under the spin, a step round with each turn
+      K(0.33, b({ twist: 0.3, hipTwist: 0.15, crouch: -0.1, lean: -0.04, step: 0.26, back: 0.22, width: 0.17, headPitch: -0.12 })),
+      K(0.42, b({ twist: -0.25, hipTwist: -0.12, crouch: -0.08, lean: -0.02, step: 0.24, back: 0.26, width: 0.17, headPitch: -0.08 })),
+      K(0.5, b({ twist: 0.2, hipTwist: 0.1, crouch: -0.12, lean: 0.0, step: 0.26, back: 0.24, width: 0.17, headPitch: -0.05 })),
+      // the windmill at his right side, turned into it
+      K(0.6, b({ twist: -0.55, hipTwist: -0.3, crouch: -0.14, lean: 0.06, step: 0.28, back: 0.28, width: 0.17, headPitch: 0.0 })),
+      // the coil: the weight back over the rear leg, the hips and shoulders turned away, eyes on them
+      K(0.7, b({ twist: -0.95, hipTwist: -0.6, crouch: -0.3, lean: -0.16, side: 0.06, step: 0.26, back: 0.5, width: 0.18, headPitch: 0.1 })),
+      // the lunge: the front foot strides out, the hips snap round, the trunk drives in behind it
+      K(0.75, b({ twist: -0.35, hipTwist: 0.02, crouch: -0.4, lean: 0.42, step: 0.8, back: 0.55, width: 0.18, headPitch: 0.05 })),
+      K(0.88, b({ twist: -0.32, hipTwist: 0.02, crouch: -0.42, lean: 0.4, step: 0.8, back: 0.55, width: 0.18, headPitch: 0.05 })),
       K(1.0, body),
     ],
     main: entranceSpear,
-    // the left hand braced on the knee, then on the shaft for the twirl and slam, then a fist at the hip
+    // the left hand on the floor, thrown out wide for balance through the spin, then onto the shaft
     free: track([
-      [0.0, [0.22, -0.02, 0.36]],
-      [0.34, [0.22, -0.02, 0.36]],
-      [0.42, [0.28, 0.2, 0.2]],
-      [0.8, [0.26, 0.2, 0.2]],
-      [0.86, [0.28, 0.02, 0.04]],
-      [0.95, [0.28, 0.02, 0.04]],
+      [0.0, [0.34, -0.2, 0.42]],
+      [0.1, [0.34, -0.18, 0.4]],
+      [0.2, [0.55, 0.45, 0.2]],
+      [0.5, [0.6, 0.5, 0.1]],
+      [0.62, [0.5, 0.45, 0.25]],
+      [0.7, [-0.05, 0.4, 0.15]],
     ]),
     lead: 0,
-    ghosts: [0.47, 0.65],
+    ghosts: [0.72, 0.8],
     fx: [
-      fx(0.02, 'bolt', 'root', 1.4),
-      fx(0.02, 'shockwave', 'root', 0.8, BOLT),
-      fx(0.04, 'dust', 'feet', 1.4),
-      fx(0.2, 'sparkle', 'tip', 0.6, BOLT),
-      fx(0.38, 'dust', 'feet', 0.8),
-      fx(0.5, 'sparkle', 'tip', 0.8, BOLT),
-      fx(0.56, 'bolt', 'tip', 0.5),
-      fx(0.62, 'sparkle', 'tip', 0.8, BOLT),
-      fx(0.76, 'shockwave', 'feet', 1.2, BOLT),
-      fx(0.76, 'bolt', 'root', 1.0),
-      fx(0.77, 'embers', 'root', 0.8, BOLT),
+      fx(0.0, 'bolt', 'root', 1.6),
+      fx(0.01, 'shockwave', 'root', 1.0, BOLT),
+      fx(0.01, 'dust', 'feet', 1.4),
+      fx(0.02, 'shake', 'root', 0.8),
+      fx(0.06, 'sparkle', 'tip', 0.8, BOLT),
+      fx(0.14, 'dust', 'feet', 0.9),
+      fx(0.3, 'whirl', 'main', 0.9, BOLT),
+      fx(0.44, 'whirl', 'main', 0.9, BOLT),
+      fx(0.5, 'bolt', 'tip', 0.5),
+      fx(0.6, 'sparkle', 'tip', 0.9, BOLT),
+      fx(0.67, 'bolt', 'tip', 0.9),
+      fx(0.68, 'embers', 'root', 0.8, BOLT),
+      fx(0.74, 'stomp', 'feet', 1.0),
+      fx(0.76, 'flashline', 'tip', 1.5, BOLT),
+      fx(0.76, 'bolt', 'tip', 1.2),
+      fx(0.77, 'shockwave', 'front', 1.2, BOLT),
+      fx(0.9, 'embers', 'tip', 0.7, BOLT),
     ],
   }),
 };

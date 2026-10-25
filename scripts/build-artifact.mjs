@@ -39,7 +39,7 @@ const fonts = html.match(/<link href="https:\/\/fonts\.googleapis\.com[^>]+>/)[0
 
 // the page skeleton (doctype, head, body) is added by the host at publish time
 const page = `<title>Deflect</title>
-<meta name="description" content="A 3D cel-shaded 1v1 samurai dueling game with deflect-and-posture combat.">
+<meta name="description" content="A 3D cel-shaded 1v1 dueling game with deflect-and-posture combat.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 ${fonts}

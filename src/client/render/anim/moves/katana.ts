@@ -362,17 +362,38 @@ const entDrawEnd = gripAt([-0.55, 0.42, 0.38], 0.08, ENT_HELD);
 const entFlickPivot: V3 = gripAt(entDrawEnd, -0.16, ENT_HELD);
 const entChiburi = arc(entFlickPivot, 0.16, [ENT_HELD, [-0.55, 0.8, -0.2], [-0.3, 0.9, 0.3], ENT_FLICKED]);
 const entFlicked = gripAt(entFlickPivot, 0.16, ENT_FLICKED);
-const entFlick = 0.875;
+const entFlick = 0.78;
+// the draw out to the right; raised one-handed over the right shoulder, the left hand closing on
+// the hilt at the top; the kesa cut down through them to low at the left; the blade brought
+// back flat across them in one hand to where the draw ended; the chiburi from there
+const ENT_JODAN: V3 = [-0.2, 0.9, -0.4];
+const ENT_LOW_L: V3 = [0.75, -0.55, 0.35];
+const entRaise = one([-0.3, 0.42, 0.25], 0.22, [ENT_HELD, [-0.75, 0.55, 0.3], [-0.5, 0.85, -0.05], ENT_JODAN], [-0.2, 0.5, 0.12]);
+const entRaised = gripAt([-0.2, 0.5, 0.12], 0.22, ENT_JODAN);
+const entKesa = two([-0.18, 0.5, 0.14], 0.24, [ENT_JODAN, [-0.25, 0.85, 0.45], [0.05, 0.3, 0.95], [0.4, -0.15, 0.9], ENT_LOW_L], [0.02, 0.22, 0.28]);
+const entKesaEnd = gripAt([0.02, 0.22, 0.28], 0.24, ENT_LOW_L);
+const entBackPivot1: V3 = (() => {
+  const d = N(ENT_HELD);
+  return [entDrawEnd[0] - d.x * 0.3, entDrawEnd[1] - d.y * 0.3, entDrawEnd[2] - d.z * 0.3];
+})();
+const entBack = one([0.05, 0.3, 0.12], 0.3, [ENT_LOW_L, [0.6, -0.15, 0.78], [0.0, 0.0, 1], [-0.55, 0.06, 0.83], ENT_HELD], entBackPivot1);
 const entrance = seq([
-  [-1, 0.4, line(IAI_GRIP, IAI_GRIP, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
-  [0.4, 0.45, line(IAI_GRIP, ENT_KOI, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
-  [0.45, 0.735, line(ENT_KOI, ENT_KOI, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
-  [0.735, 0.75, line(ENT_KOI, ENT_OUT, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
-  [0.75, 0.795, entDraw],
-  [0.795, 0.835, line(entDrawEnd, entDrawEnd, ENT_HELD, ENT_HELD, [0, 0.7, -0.7])],
-  [0.835, entFlick, entChiburi],
-  [entFlick, 0.96, line(entFlicked, GUARD_GRIP, ENT_FLICKED, GUARD_DIR, GUARD_EDGE)],
-  [0.96, 2, line(GUARD_GRIP, GUARD_GRIP, GUARD_DIR, GUARD_DIR, GUARD_EDGE)],
+  // carried in, the right hand resting on the hilt
+  [-1, 0.33, line(IAI_GRIP, IAI_GRIP, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
+  // the thumb frees the guard, and the draw
+  [0.33, 0.355, line(IAI_GRIP, ENT_KOI, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
+  [0.355, 0.365, line(ENT_KOI, ENT_OUT, KATANA_SHEATH, KATANA_SHEATH, [0, 1, 0])],
+  [0.365, 0.41, entDraw],
+  [0.41, 0.47, entRaise],
+  [0.47, 0.475, line(entRaised, entRaised, ENT_JODAN, ENT_JODAN, [0, 0.4, 1], G2, G2)],
+  [0.475, 0.53, entKesa],
+  [0.53, 0.565, line(entKesaEnd, entKesaEnd, ENT_LOW_L, ENT_LOW_L, [-0.5, 0.2, 0.8], G2, NaN)],
+  [0.565, 0.62, entBack],
+  // zanshin, held out where the cuts ended
+  [0.62, 0.74, line(entDrawEnd, entDrawEnd, ENT_HELD, ENT_HELD, [0, 0.7, -0.7])],
+  [0.74, entFlick, entChiburi],
+  [entFlick, 0.92, line(entFlicked, GUARD_GRIP, ENT_FLICKED, GUARD_DIR, GUARD_EDGE)],
+  [0.92, 2, line(GUARD_GRIP, GUARD_GRIP, GUARD_DIR, GUARD_DIR, GUARD_EDGE)],
 ], 0.012);
 
 // Execution, the last iai. The s axis is seconds here (the execution plays it linearly: the blow at
@@ -769,43 +790,69 @@ export const katana: Style = {
     ],
     trail: { life: 0.34, glow: 1, color: '#ffffff' },
   }),
-  // Ring entrance: still under the hat with a hand on the hilt; the thumb frees the guard and the
-  // eyes come up; then one flat draw at the opponent, zanshin, the chiburi, and the low guard
+  // Ring entrance, The Nameless Blade (see `entrance`): two slow steps in under the hat, the hand on
+  // the hilt; the iai draw, a kesa cut from overhead and a flat cut back across, one flowing kata;
+  // zanshin, the chiburi, and the eyes come up under the brim as he settles into the low guard
   entrance: mv({
     keys: [
       K(0, B({ ...body, twist: 0.18, crouch: -0.04, lean: 0.1, step: 0.1, back: 0.1, width: 0.1, headPitch: 0.45 })),
-      K(0.1, B({ ...body, twist: 0.18, crouch: -0.05, lean: 0.12, step: 0.1, back: 0.1, width: 0.1, headPitch: 0.45 })),
-      K(0.19, B({ ...body, twist: 0.22, crouch: -0.13, lean: 0.16, step: 0.28, back: 0.24, width: 0.12, headPitch: 0.42 })),
-      K(0.4, B({ ...body, twist: 0.22, crouch: -0.14, lean: 0.17, step: 0.28, back: 0.24, width: 0.12, headPitch: 0.42 })),
-      K(0.47, B({ ...body, twist: 0.24, crouch: -0.15, lean: 0.17, step: 0.28, back: 0.24, width: 0.12, headPitch: 0.36 })),
-      K(0.62, B({ ...body, twist: 0.24, crouch: -0.15, lean: 0.12, step: 0.28, back: 0.24, width: 0.12, headPitch: -0.04 })),
-      K(0.73, B({ ...body, twist: 0.28, crouch: -0.19, lean: 0.16, step: 0.28, back: 0.26, width: 0.12, headPitch: -0.04 })),
-      K(0.795, B({ ...body, twist: -0.5, crouch: -0.26, lean: 0.3, step: 0.5, back: 0.34, width: 0.12, headPitch: 0.02 })),
-      K(0.835, B({ ...body, twist: -0.56, crouch: -0.27, lean: 0.28, step: 0.5, back: 0.34, width: 0.12, headPitch: 0.02 })),
+      // a step with the right foot, the weight rolling over it
+      K(0.05, B({ ...body, twist: 0.18, crouch: -0.06, lean: 0.1, step: 0.1, back: 0.1, width: 0.1, side: -0.05, headPitch: 0.45 })),
+      K(0.1, B({ ...body, twist: 0.16, crouch: -0.2, lean: 0.12, step: 0.18, back: 0.1, width: 0.1, side: -0.05, headPitch: 0.45, lift: 0.18 })),
+      K(0.15, B({ ...body, twist: 0.18, crouch: -0.07, lean: 0.12, step: 0.2, back: 0.14, width: 0.11, side: 0.04, headPitch: 0.44 })),
+      // and again
+      K(0.2, B({ ...body, twist: 0.18, crouch: -0.07, lean: 0.12, step: 0.2, back: 0.14, width: 0.11, side: -0.05, headPitch: 0.44 })),
+      K(0.25, B({ ...body, twist: 0.2, crouch: -0.21, lean: 0.14, step: 0.26, back: 0.18, width: 0.11, side: -0.05, headPitch: 0.44, lift: 0.18 })),
+      K(0.3, B({ ...body, twist: 0.22, crouch: -0.12, lean: 0.15, step: 0.28, back: 0.24, width: 0.12, side: 0.0, headPitch: 0.42 })),
+      // sunk into iai, wound to the left over the scabbard
+      K(0.355, B({ ...body, twist: 0.3, crouch: -0.24, lean: 0.2, step: 0.3, back: 0.26, width: 0.12, headPitch: 0.3 })),
+      // the draw: the hips snap round, the front knee takes the weight
+      K(0.41, B({ ...body, twist: -0.5, crouch: -0.28, lean: 0.3, step: 0.5, back: 0.34, width: 0.12, headPitch: 0.05 })),
+      // rising tall under the raised blade
+      K(0.47, B({ ...body, twist: -0.3, crouch: -0.08, lean: -0.08, step: 0.4, back: 0.3, width: 0.12, headPitch: -0.05 })),
+      // the kesa: the hips go first, the chest pitches over the front knee
+      K(0.53, B({ ...body, twist: 0.35, crouch: -0.32, lean: 0.38, step: 0.52, back: 0.34, width: 0.13, headPitch: 0.1 })),
+      K(0.565, B({ ...body, twist: 0.38, crouch: -0.33, lean: 0.38, step: 0.52, back: 0.34, width: 0.13, headPitch: 0.1 })),
+      // and back across
+      K(0.62, B({ ...body, twist: -0.55, crouch: -0.26, lean: 0.24, step: 0.5, back: 0.34, width: 0.13, headPitch: 0.05 })),
+      // zanshin
+      K(0.74, B({ ...body, twist: -0.56, crouch: -0.27, lean: 0.26, step: 0.5, back: 0.34, width: 0.13, headPitch: 0.05 })),
       K(entFlick, B({ ...body, twist: -0.4, crouch: -0.22, lean: 0.2, step: 0.44, back: 0.32, headPitch: 0.05 })),
-      K(0.96, body),
+      // the eyes come up under the brim
+      K(0.9, B({ ...body, headPitch: -0.12 })),
+      K(1.0, body),
     ],
     main: entrance,
     free: track([
       [0.0, ENT_SAYA],
-      [0.735, ENT_SAYA],
-      [0.79, [0.24, 0.1, -0.02]],
+      [0.355, ENT_SAYA],
+      [0.4, [0.24, 0.1, -0.02]],
+      // onto the hilt for the kesa, let go for the cut back
+      [0.47, [-0.05, 0.62, 0.05]],
+      [0.53, [0.18, 0.2, 0.3]],
+      [0.6, [0.28, 0.12, 0.0]],
+      [0.74, [0.24, 0.1, -0.02]],
       [0.86, [0.22, 0.12, 0.02]],
       [0.96, SAYA],
     ]),
     start: 0,
     rest: 1,
     lead: 0,
-    ghosts: [0.735, 0.8],
+    ghosts: [0.365, 0.62],
     fx: [
       fx(0.02, 'dust', 'feet', 0.6),
       fx(0.05, 'petals', 'root', 0.9),
-      fx(0.19, 'dust', 'feet', 0.7),
-      fx(0.45, 'sparkle', 'main', 0.5, '#ffffff'),
-      fx(0.75, 'dust', 'feet', 1),
-      fx(hitAt(entrance, 3, 4), 'flashline', 'tip', 1.6, '#ffffff'),
-      fx(hitAt(entrance, 3, 4) + 0.006, 'petals', 'tip', 1.3),
-      fx(entFlick, 'sparkle', 'tip', 0.5, '#ffffff'),
+      fx(0.12, 'dust', 'feet', 0.6),
+      fx(0.27, 'dust', 'feet', 0.6),
+      fx(0.34, 'sparkle', 'main', 0.5, '#ffffff'),
+      fx(0.36, 'dust', 'feet', 1),
+      fx(0.365 + hitAt(entDraw, 3) * 0.045, 'flashline', 'tip', 1.6, '#ffffff'),
+      fx(0.365 + hitAt(entDraw, 3) * 0.045 + 0.006, 'petals', 'tip', 1.3),
+      fx(0.475 + hitAt(entKesa, 2) * 0.055, 'flashline', 'tip', 1.4, '#ffffff'),
+      fx(0.475 + hitAt(entKesa, 2) * 0.055, 'dust', 'feet', 0.8),
+      fx(0.565 + hitAt(entBack, 2) * 0.055, 'flashline', 'tip', 1.2, '#ffffff'),
+      fx(0.565 + hitAt(entBack, 2) * 0.055 + 0.006, 'petals', 'tip', 1.0),
+      fx(entFlick, 'sparkle', 'tip', 0.6, '#ffffff'),
     ],
     trail: { life: 0.28, glow: 1 },
   }),

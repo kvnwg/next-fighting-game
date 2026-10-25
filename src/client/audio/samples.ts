@@ -28,7 +28,7 @@ function bytes(b64: string): ArrayBuffer {
 export function loadSamples(ctx: BaseAudioContext): Promise<void> {
   let p = pending.get(ctx);
   if (!p) {
-    const table: Record<SampleName, AudioBuffer[]> = {};
+    const table: Record<SampleName, AudioBuffer[]> = decoded.get(ctx) ?? {};
     decoded.set(ctx, table);
     p = SAMPLES.then((samples) =>
       Promise.all(
@@ -41,6 +41,25 @@ export function loadSamples(ctx: BaseAudioContext): Promise<void> {
     pending.set(ctx, p);
   }
   return p;
+}
+
+/**
+ * Decode one sample ahead of the rest, for a sound wanted the moment audio starts (the title's first
+ * touch); resolves true once it can play.
+ */
+export function primeSample(ctx: BaseAudioContext, name: SampleName): Promise<boolean> {
+  if (!decoded.has(ctx)) decoded.set(ctx, {});
+  const table = decoded.get(ctx)!;
+  if (table[name]?.length) return Promise.resolve(true);
+  return SAMPLES.then(async (samples) => {
+    const src = samples[name];
+    if (!src) return false;
+    if (!table[name]?.length) {
+      const bufs = await Promise.all(src.map((b) => ctx.decodeAudioData(bytes(b)).catch(() => null)));
+      if (!table[name]?.length) table[name] = bufs.filter((b): b is AudioBuffer => !!b);
+    }
+    return table[name].length > 0;
+  });
 }
 
 /** One take of the named sample (`take`, or one at random), if there is one and it has decoded for this context. */

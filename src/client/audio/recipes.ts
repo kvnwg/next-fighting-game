@@ -649,6 +649,9 @@ const SAMPLE_GAIN: Record<string, number> = {
   // the Knight striking his shield in his entrance: the clang and the ring as a pair, 3 dB over the
   // block clang they replace there
   paladin_shield_clang: 0.7, paladin_shield_ring: 0.7,
+  // the title screen's first touch: a taiko drum hit 8 dB over its wind gust; and the match intro's
+  // song, the fue, at the music's level (its momentary peaks with the songs' at the default music volume)
+  title_taiko: 0.8, intro_fue: 0.44,
   // the Wraith's: his entrance's breathing (level with the Monk's breath) and void whoosh (level with
   // the old dark whoosh it replaces), the fiery whoosh 3 dB under his scythe swings, the conjuring
   // through his Reaping Arc level with the perilous warning, the shriek level with his body falling

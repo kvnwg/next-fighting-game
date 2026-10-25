@@ -1,4 +1,4 @@
-# DEFLECT — a samurai dueling arena
+# DEFLECT — a dueling arena
 
 A browser-based 1v1 sword-fighting game with deflect-and-posture combat. You walk around a shared lobby with other players, spar or brawl outside the safe zone, and click into **ranked** duels (best of 3 rounds) on one of six arenas. Instead of picking weapons, you pick a **character**, and each character's weapon, quirks and moves are part of who they are.
 

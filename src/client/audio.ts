@@ -7,7 +7,7 @@
 import { CHARACTERS, CharacterId, getAttack } from '../shared/characters';
 import type { CombatEvent } from '../shared/protocol';
 import { LEGACY_LEVEL, Sfx, legacy } from './audio/legacy';
-import { loadSamples } from './audio/samples';
+import { loadSamples, primeSample } from './audio/samples';
 import { LEVEL, WET } from './audio/levels';
 import { Mixer, Voice } from './audio/mixer';
 import { Bed, Music } from './audio/music';
@@ -70,6 +70,8 @@ const RECORDED: Partial<Record<Sfx, { layers: string[]; offset?: number }>> = {
   wind: { layers: ['title_wind'] },
   // the lobby's ring duel: the Warden's entrance gong (a barrel slam over a big kick)
   gong: { layers: ['juggernaut_slam', 'juggernaut_thud'] },
+  // the title screen's: the first touch, and the seal stamped as the name is taken
+  taiko: { layers: ['title_taiko'] },
 };
 
 export interface Placed {
@@ -129,6 +131,8 @@ class AudioEngine {
       if (!Ctx) return;
       this.ctx = new Ctx();
       this.mix = new Mixer(this.ctx);
+      // the title's first-touch drum decodes ahead of everything else
+      void primeSample(this.ctx, 'title_taiko');
       void loadSamples(this.ctx);
       this.mix.setRoom(this.roomId);
       this.tunes = new Music(this.ctx);
@@ -153,6 +157,29 @@ class AudioEngine {
     // the fight's first song loads while the fighters are picked
     if (bed === 'select') this.tunes.cue('combat');
   }
+
+  /**
+   * The match intro's song: the fue running up its scale, with the strong wind gusting under the
+   * establishing shot and again as your own entrance begins (`at`: seconds into the intro, when
+   * joining part way). At the music's volume; stopped early with introSongStop().
+   */
+  introSong(at = 0, windAgain = 6.1): void {
+    this.introStop();
+    const level = settings.music;
+    if (level <= 0.01) return;
+    const song = this.emit((o) => void R.playLayers(o, ['intro_fue'], 1, undefined, at), { level, vol: 1, wet: 0.15, priority: 2 });
+    const wind = at < 2 ? this.emit((o) => void R.playLayers(o, ['title_wind'], 1, undefined, at), { level: LEVEL.legacy * 0.9, vol: 1, wet: 0.2, priority: 1 }) : null;
+    const again = at < windAgain ? this.emit((o) => void R.playLayers(o, ['title_wind'], 1), { level: LEVEL.legacy * 0.55, vol: 1, wet: 0.2, priority: 1, delay: windAgain - at }) : null;
+    this.intro = [song, wind, again].filter((v): v is Voice => !!v);
+  }
+
+  /** The intro song fading out (`fade` s), e.g. as the fight starts. */
+  introStop(fade = 0.6): void {
+    for (const v of this.intro) v.stop(fade);
+    this.intro = [];
+  }
+
+  private intro: Voice[] = [];
 
   /** Under an execution. */
   musicDuck(on: boolean): void {
@@ -238,6 +265,19 @@ class AudioEngine {
       v.input.disconnect();
     }, life * 1000);
     return v;
+  }
+
+  /**
+   * A recorded named sound wanted right as audio starts (the title's first touch): played the moment
+   * its recording has decoded, or (after `wait` s) whatever is ready, so it is never the stand-in.
+   */
+  playSoon(name: Sfx, volume = 1, wait = 0.4): void {
+    const ctx = this.ctx;
+    const rec = RECORDED[name];
+    if (!ctx || !rec) return this.play(name, volume);
+    const ready = Promise.all(rec.layers.map((l) => primeSample(ctx, l)));
+    const late = new Promise((res) => setTimeout(res, wait * 1000));
+    void Promise.race([ready, late]).then(() => this.play(name, volume));
   }
 
   /** A named sound (menus, the countdown, entrances, the title screen); `take` picks which of its recordings. */

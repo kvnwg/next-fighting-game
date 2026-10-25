@@ -290,6 +290,7 @@ class App {
       this.ui.setCharsLocked(false);
       this.match = null;
       audio.music(null, 1);
+      audio.introStop();
       this.cam.stopShots();
       this.endEntrances();
       this.select.hide();
@@ -351,6 +352,7 @@ class App {
     });
     n.on('result', (m) => {
       this.ui.showResult(m, this.profile);
+      audio.introStop();
       audio.play(m.won ? 'victory' : 'defeat');
       audio.music(null, 3);
       platform.gameplayStop();
@@ -412,6 +414,7 @@ class App {
   }
 
   private enterInstance(m: Extract<ServerMsg, { t: 'enter' }>): void {
+    audio.introStop();
     this.cam.stopShots();
     this.endEntrances();
     this.select.hide();
@@ -590,8 +593,13 @@ class App {
     const changed = !prev || prev.phase !== m.phase || prev.round !== m.round;
     if (!changed) return;
     if (this.local) this.local.frozen = m.phase === 'intro' || m.phase === 'countdown';
-    // the fight's music starts as they walk into the ring and runs to the result
-    if (m.phase === 'intro' || m.phase === 'countdown' || m.phase === 'fight') audio.music('combat');
+    // the intro has its own song (see startEntrances); the fight's music comes in on "Fight!" and
+    // runs to the result
+    if (m.phase === 'intro') audio.music(null, 1.5);
+    else if (m.phase === 'fight') {
+      audio.introStop(1.2);
+      audio.music('combat');
+    }
     const oppId = m.players[m.you === 0 ? 1 : 0].id;
     switch (m.phase) {
       case 'intro': {
@@ -645,8 +653,10 @@ class App {
     };
     const subject = (f: ClientFighter) => ({ pos: f.pos, yaw: f.yaw, scale: f.model.scale, char: f.roster.char });
     const end = this.cam.restPose(me.pos, op.pos);
-    this.cam.playShots(introSequence(subject(me), subject(op), end), Math.max(0, this.net.serverNow() - start) / 1000);
+    const into = Math.max(0, this.net.serverNow() - start) / 1000;
+    this.cam.playShots(introSequence(subject(me), subject(op), end), into);
     this.ui.setCinematic(true);
+    audio.introSong(into, (at.me - 200) / 1000);
   }
 
   private endEntrances(): void {
@@ -661,6 +671,8 @@ class App {
     const intro = this.intro;
     if (!intro) return;
     if (now > intro.start + MATCH.introTime + 500) return this.endEntrances();
+    // the camera keeps to the intro's clock, so a slow frame never leaves it behind the entrances
+    this.cam.syncShots((now - intro.start) / 1000);
     for (const t of intro.turns) {
       const s = (now - t.at) / ENTRANCE_MS;
       if (s < 0 || s > 1) continue;
@@ -1097,10 +1109,25 @@ class App {
       case 'ronin': {
         // the cut leaves a ribbon of smoke along the blade's path, drifting and spreading as it hangs
         if (swing) {
-          for (let i = 0; i < Math.round(110 * dt + Math.random()); i++) {
-            const p = along(rnd(0.25, 1));
+          for (let i = 0; i < Math.round(170 * dt + Math.random()); i++) {
+            const p = along(rnd(0.2, 1));
             const c = ['#f4f4f6', '#dcdde2', '#c4c6cd', '#a9acb5'][Math.floor(Math.random() * 4)];
-            fx.emit(p.x, p.y, p.z, rnd(-0.15, 0.15), rnd(0.05, 0.3), rnd(-0.15, 0.15), c, { life: rnd(0.9, 1.4), size: 0.06 * k, gravity: -0.12, drag: 1.6, grow: 3.4 });
+            fx.emit(p.x, p.y, p.z, rnd(-0.15, 0.15), rnd(0.05, 0.3), rnd(-0.15, 0.15), c, { life: rnd(1.0, 1.6), size: 0.065 * k, gravity: -0.12, drag: 1.6, grow: 3.6 });
+          }
+        }
+        // his special and his iai tear through the air in a thick black smoke shot with embers,
+        // left hanging along the blade's path and the line he lunged down
+        const tearing = v.state === 'attack' && (v.key === 'sp' || v.key === 'ia') ? v.attack : null;
+        if (tearing && v.elapsed > v.windup * 0.45 && v.elapsed < v.windup + tearing.active + 260) {
+          for (let i = 0; i < Math.round(420 * dt + Math.random()); i++) {
+            const p = Math.random() < 0.7 ? along(rnd(0.05, 1)) : this.tmp.set(f.pos.x + rnd(-0.3, 0.3) * k, f.pos.y + rnd(0.3, 1.6) * k, f.pos.z + rnd(-0.3, 0.3) * k);
+            const c = ['#141012', '#1f1718', '#2b1d1e', '#3a2322', '#4a1616'][Math.floor(Math.random() * 5)];
+            fx.emit(p.x, p.y, p.z, rnd(-0.25, 0.25), rnd(0.0, 0.25), rnd(-0.25, 0.25), c, { life: rnd(1.6, 2.6), size: 0.09 * k, gravity: -0.06, drag: 1.4, grow: 4.5 });
+          }
+          for (let i = 0; i < Math.round(110 * dt + Math.random()); i++) {
+            const p = along(rnd(0.2, 1));
+            const c = ['#ff3a1a', '#ff6a2a', '#ffb04a'][Math.floor(Math.random() * 3)];
+            fx.emit(p.x, p.y, p.z, rnd(-1.2, 1.2), rnd(0.2, 1.4), rnd(-1.2, 1.2), c, { life: rnd(0.6, 1.2), size: 0.03, gravity: -0.4, drag: 1.4, stretch: 0.05 });
           }
         }
         break;

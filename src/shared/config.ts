@@ -1,7 +1,7 @@
 /** Global tuning shared by the client and the server. Times are milliseconds, distances meters. */
 
 export const GAME_TITLE = 'DEFLECT';
-export const GAME_SUBTITLE = 'a samurai dueling arena';
+export const GAME_SUBTITLE = 'a dueling arena';
 
 // ---- Networking ---------------------------------------------------------------
 export const SERVER_TICK_HZ = 60;
@@ -165,7 +165,7 @@ export const MATCH = {
   maxRounds: 5,
   /** a wide shot, both ring entrances (see client/entrances.ts) and the swing behind you */
   // the establishing shot, two entrances each holding under its name card, and the swing round
-  introTime: 12000,
+  introTime: 12500,
   countdownTime: 3000,
   // health doubled for longer, posture-driven fights: rounds have the time for it
   roundTime: 120_000,

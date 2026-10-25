@@ -178,14 +178,22 @@ export class TitleScreen {
     this.bootT = Math.max(this.bootT, this.bootDur);
     this.set('press');
     this.later(1050, () => {
-      // the hanko stamps down after the letters
-      audio.play('taiko', 0.7);
+      // the hanko stamps down after the letters (on the drum, unless the first touch just struck it)
+      if (performance.now() - this.struckAt > 1500) audio.play('taiko', 0.7);
       this.o.scene()?.kick(0.7);
     });
   }
 
+  /** when the first touch of the screen struck the taiko (-Infinity: not yet) */
+  private struckAt = -Infinity;
+
   private advance(): void {
     audio.unlock();
+    // the very first touch of the screen lands with a taiko drum
+    if (this.struckAt === -Infinity) {
+      this.struckAt = performance.now();
+      audio.playSoon('taiko', 1);
+    }
     if (this.state === 'boot') {
       // skip the slow reveal, straight to the logo
       this.clearTimers();
@@ -194,7 +202,8 @@ export class TitleScreen {
       return;
     }
     if (this.state !== 'press') return;
-    audio.play('whoosh', 0.9);
+    // the drum carries the first touch; any later one gets the whoosh
+    if (performance.now() - this.struckAt > 100) audio.play('whoosh', 0.9);
     audio.play('wind', 0.8);
     this.later(120, () => audio.play('chime', 0.45));
     this.pixelPulse(10, 0.55);

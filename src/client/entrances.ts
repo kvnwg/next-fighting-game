@@ -49,21 +49,23 @@ export const ENTRANCE_HOLD = 1100;
 export const ENTRANCES: Record<CharacterId, Entrance> = {
   ronin: {
     title: 'The Nameless Blade',
-    trails: [[0.7, 0.82]],
+    trails: [[0.36, 0.64]],
     line: 'Your name won’t be remembered. Neither will mine.',
     shots: [
-      // ground level beside the sandals, a slow dolly
+      // ground level beside the sandals as he walks in, a slow dolly
       { from: [1.3, 1.7, 0.28], to: [0.8, 1.3, 0.32], look: [[0, 0.2, 0.35], [0.1, 0.1, 0.45]], fov: [40, 38] },
-      // over the shoulder onto the guard, tilting up to the hat brim
-      { from: [0.9, -0.75, 1.05], to: [1.05, -0.6, 1.25], look: [[0.15, 0.2, 0.95], [0, 0, 1.6]], fov: [30, 28] },
-      // front medium, pushing in
-      { from: [3.2, 0.3, 1.5], to: [2.4, 0.2, 1.5], look: [[0, 0, 1.35], [0, 0, 1.4]], fov: [40, 36] },
+      // wide at his side for the kata, drifting round to the front
+      { from: [0.6, 3.4, 1.3], via: [2.2, 3.0, 1.3], to: [2.6, 2.0, 1.3], look: [[0.6, 0, 1.0], [0.4, 0, 1.1]], fov: [44, 42] },
+      // front medium, pushing in to the eyes under the brim
+      { from: [3.2, 0.3, 1.5], to: [2.2, 0.2, 1.55], look: [[0, 0, 1.35], [0, 0, 1.5]], fov: [40, 34] },
     ],
     sfx: [
       { s: 0, sound: 'wind', vol: 0.8 },
-      { s: 0.36, sound: 'taiko' },
-      { s: 0.5, sound: 'tink' },
-      { s: 0.72, sound: 'draw' },
+      { s: 0.34, sound: 'tink' },
+      { s: 0.37, sound: 'draw' },
+      { s: 0.38, sound: 'taiko' },
+      { s: 0.48, sound: 'whoosh' },
+      { s: 0.57, sound: 'whoosh', vol: 0.8 },
     ],
   },
   juggernaut: {

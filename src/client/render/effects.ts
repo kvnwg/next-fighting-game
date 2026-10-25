@@ -51,7 +51,7 @@ const _c = new THREE.Vector3();
 const DUST = ['#c8b49a', '#a8957c', '#ddd0bc'];
 const DEBRIS = ['#6b5a48', '#4a3d31', '#8a7660'];
 
-const MAX_PARTICLES = 900;
+const MAX_PARTICLES = 2400;
 const MAX_SPLATS = 72;
 const BLOOD = ['#a80c1a', '#7a0812', '#c41824', '#560610'];
 
@@ -162,8 +162,16 @@ export class Effects {
     this.weather = kind ? new WeatherSystem(kind, this.group) : null;
   }
 
+  /** where the search for a free particle picks up (a ring, so a busy pool isn't rescanned from the start) */
+  private nextFree = 0;
   private spawn(): Particle | null {
-    for (const p of this.particles) if (!p.alive) return p;
+    const n = this.particles.length;
+    for (let i = 0; i < n; i++) {
+      const p = this.particles[(this.nextFree + i) % n];
+      if (p.alive) continue;
+      this.nextFree = (this.nextFree + i + 1) % n;
+      return p;
+    }
     return null;
   }
 
