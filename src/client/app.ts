@@ -4,7 +4,7 @@ import { AttackDef, AttackKey, AttackShape, CHARACTERS, CharacterId, executeSpac
 import { COMBAT, MATCH, PLAYER_RADIUS } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, hazardAt, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
-import { zoneAim } from '../shared/combat';
+import { thrownOut, zoneAim } from '../shared/combat';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RingView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
 import { audio } from './audio';
@@ -48,6 +48,30 @@ const EXEC_WHOOSH_LEAD = 160;
 const EXEC_SOUND_LEAD = EXEC_LEAD * 1000;
 /** the colour an area attack's ground flashes as it lands: a fissure's embers, lightning, soulfire */
 const AREA_HIT: Record<AttackShape['kind'], string> = { line: '#ff8a3a', zone: '#ffe27a', ring: '#3cff8a' };
+/** the Lancer's golden lightning */
+const BOLT = '#ffe27a';
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+
+/** A thrown spear in the air (see App.spearFlight). */
+interface SpearFlight {
+  /** the copy of the spear that flies */
+  mesh: THREE.Object3D;
+  serial: number;
+  /** where it left the hand, its line (a unit vector), and how far down it the grip goes */
+  from: THREE.Vector3;
+  dir: THREE.Vector3;
+  reach: number;
+  /** grip to tip (m) */
+  len: number;
+  /** 0..1 through the flight: out to the end of the line by 0.5, then back */
+  u: number;
+  /** the flight's length (ms) */
+  ms: number;
+  turned: boolean;
+  spin: number;
+  spark: number;
+  lastTip: THREE.Vector3 | null;
+}
 
 export function startApp(root: HTMLElement, offline = false): void {
   new App(root, offline);
@@ -73,6 +97,8 @@ class App {
   private marks = new Map<string, { tg: Telegraph; serial: number; aim: { x: number; z: number } | null }>();
   /** marks whose blow has landed or was stopped, fading out */
   private fadingMarks: Telegraph[] = [];
+  /** thrown spears in the air, by thrower id */
+  private spears = new Map<string, SpearFlight>();
   private local: LocalController | null = null;
   private myId = '';
   private profile: ProfileView | null = null;
@@ -103,6 +129,7 @@ class App {
   private tmp = new THREE.Vector3();
   private tmp2 = new THREE.Vector3();
   private tmp3 = new THREE.Vector3();
+  private tmpQ = new THREE.Quaternion();
   /** the title screen: the Ronin on the cliff (3D) and the menus over it, until the game starts */
   private titleScene: TitleScene | null = null;
   private titleScreen: TitleScreen | null = null;
@@ -716,6 +743,7 @@ class App {
     if (b === 'escape') {
       if (!pressed) return;
       if (this.ui.chatOpen) this.ui.closeChat();
+      else if (this.ui.closeLegend()) return;
       else if (this.ui.modalOpen) this.ui.closeModal();
       else if (this.ui.closePlayPanel()) return;
       else this.input.exitLock();
@@ -1333,9 +1361,11 @@ class App {
       m = undefined;
     }
     if (!atk || !shape || f.lastAreaSerial === v.serial) return;
+    // a thrown spear's line stays marked until the spear is back in his hand
+    const lands = v.windup + (atk.thrown ? atk.active : 0);
     if (!m) {
-      if (v.elapsed >= v.windup) return;
-      const tg = new Telegraph(shape, atk.range, '#ff2a2a', AREA_HIT[shape.kind]);
+      if (v.elapsed >= lands) return;
+      const tg = atk.thrown ? new Telegraph(shape, atk.range, '#ff2a2a', BOLT, false) : new Telegraph(shape, atk.range, '#ff2a2a', AREA_HIT[shape.kind]);
       this.effects.group.add(tg.mesh);
       m = { tg, serial: v.serial, aim: null };
       this.marks.set(f.id, m);
@@ -1346,12 +1376,141 @@ class App {
       m.tg.place(m.aim.x, m.aim.z, 0);
     } else m.tg.place(f.pos.x, f.pos.z, f.yaw);
     m.tg.progress = v.elapsed / v.windup;
-    if (v.elapsed < v.windup) return;
+    if (v.elapsed < lands) return;
     f.lastAreaSerial = v.serial;
     m.tg.strike();
     this.fadingMarks.push(m.tg);
     this.marks.delete(f.id);
-    this.areaStrike(f, atk, shape, m.tg.mesh.position.clone(), f.yaw);
+    if (!atk.thrown) this.areaStrike(f, atk, shape, m.tg.mesh.position.clone(), f.yaw);
+  }
+
+  /**
+   * The Lancer's thrown spear (an attack with `thrown`): the spear leaves his hand as the windup
+   * ends and a copy of it flies the length of the line and back to the hand (thrownOut, the pace
+   * the server judges the hits by), while the one in his hand is hidden. Out, it streaks lightning
+   * and lights the line behind it; at the far end the sky answers with a bolt; coming back it's
+   * pulled home on a lightning tether, and lands in his palm with a crack. If the throw is cut
+   * short it still flies back. Runs before the fighter's model updates, so the hand is empty the
+   * same frame.
+   */
+  private spearFlight(f: ClientFighter, dt: number, now: number): void {
+    const v = f.view(now);
+    const atk = v.state === 'attack' ? v.attack : null;
+    const flying = !!atk?.thrown && v.elapsed >= v.windup && v.elapsed < v.windup + atk.active;
+    let s = this.spears.get(f.id);
+    if (flying && atk && (!s || s.serial !== v.serial)) {
+      if (s) this.landSpear(f, s, false);
+      s = this.throwSpear(f, atk, v.serial);
+    }
+    if (!s) return;
+    if (flying && atk && s.serial === v.serial) s.u = (v.elapsed - v.windup) / atk.active;
+    else {
+      // home, or the throw cut short: straight back the way it would have come
+      if (s.u < 0.5) s.u = 1 - s.u;
+      s.u += (dt * 1000) / (s.ms * 0.4);
+    }
+    if (s.u >= 1) {
+      this.landSpear(f, s, true);
+      return;
+    }
+    f.model.thrown = true;
+    const fx = this.effects;
+    const hand = f.model.weaponXf('main', this.tmp, this.tmpQ, this.tmp2) ? this.tmp : f.pos;
+    const far = this.tmp3.copy(s.from).addScaledVector(s.dir, s.reach);
+    const back = s.u > 0.5;
+    const grip = (back ? hand : s.from).clone().lerp(far, thrownOut(s.u));
+    const dir = back ? far.clone().sub(hand).normalize() : s.dir;
+    if (dir.lengthSq() < 0.5) dir.copy(s.dir);
+    s.spin += dt * 26;
+    s.mesh.position.copy(grip);
+    s.mesh.quaternion.setFromUnitVectors(Z_AXIS, dir).multiply(this.tmpQ.setFromAxisAngle(Z_AXIS, s.spin));
+    const tip = grip.clone().addScaledVector(dir, s.len);
+    const butt = grip.clone().addScaledVector(dir, -s.len * 0.35);
+    // the shaft blazing with lightning, the streak it leaves, and sparks spitting off it
+    fx.beam(butt, tip, BOLT, 0.2, 0.05);
+    fx.beam(butt, tip, '#ffffff', 0.07, 0.04);
+    if (s.lastTip) {
+      fx.beam(back ? tip : s.lastTip, back ? s.lastTip : tip, BOLT, 0.09, 0.14);
+      fx.beam(back ? tip : s.lastTip, back ? s.lastTip : tip, '#ffffff', 0.03, 0.1);
+    }
+    s.lastTip = tip.clone();
+    s.spark += dt;
+    if (s.spark > 0.035) {
+      s.spark = 0;
+      for (let i = 0; i < 3; i++) {
+        const p = butt.clone().lerp(tip, Math.random());
+        fx.emit(p.x, p.y, p.z, (Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3, i ? BOLT : '#ffffff', { life: 0.3, size: 0.05, gravity: 4, drag: 2, stretch: 0.05 });
+      }
+      fx.arc(tip, tip.clone().add(this.tmp2.set((Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 1.4)), BOLT, 3, 0.12, 0.07, 0.022);
+      // coming back it's pulled home along a tether of lightning
+      if (back) {
+        fx.arc(hand.clone(), butt, '#fff3b0', 9, 0.3, 0.07, 0.03);
+        audio.zap(0.7, { vol: this.volumeAt(butt.x, butt.z), pos: butt });
+      }
+    }
+    // the far end: the sky answers, and the whole line it flew lights up behind it
+    if (back && !s.turned) {
+      s.turned = true;
+      const ground = new THREE.Vector3(tip.x, Math.max(0, f.pos.y) + 0.05, tip.z);
+      fx.bolt(tip, BOLT, 1.3);
+      fx.bolt(tip, '#cfe8ff', 0.7);
+      fx.shockwave(ground, 0.9, BOLT);
+      fx.flash(tip, '#fff6d0', 3.2, 0.22);
+      fx.beam(s.from, tip, '#fff3b0', 0.05, 0.7);
+      fx.beam(s.from, tip, BOLT, 0.16, 0.45);
+      const me = this.local?.cf;
+      const k = me ? Math.max(0, 1 - Math.min(dist2D(me.pos.x, me.pos.z, tip.x, tip.z), dist2D(me.pos.x, me.pos.z, f.pos.x, f.pos.z)) / 14) : 0;
+      this.renderer.flash = Math.max(this.renderer.flash, 0.3 + 0.35 * k);
+      this.renderer.flashColor.set('#fff8e0');
+      if (k > 0.05) this.cam.shake(0.3 * k, 0.4);
+      audio.cue('bolt', f.roster.char, 1.8, { vol: this.volumeAt(tip.x, tip.z), pos: tip, hero: true });
+    }
+  }
+
+  /** Thunderreach leaves the hand: the copy that flies, set off along his line. */
+  private throwSpear(f: ClientFighter, atk: AttackDef, serial: number): SpearFlight {
+    const m = f.model;
+    const mesh = m.weapon.main.clone(true);
+    mesh.traverse((o) => (o.visible = true));
+    const from = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    m.weaponXf('main', from, this.tmpQ, scale);
+    mesh.scale.copy(scale);
+    this.scene.add(mesh);
+    const len = from.distanceTo(f.weaponTip(this.tmp));
+    // out along his facing, from the hand down to chest height, the tip reaching the line's end
+    const fw = forward(f.yaw);
+    const reachXZ = Math.max(1, atk.range - len);
+    const far = new THREE.Vector3(f.pos.x + fw.x * reachXZ, Math.max(0, f.pos.y) + 1.15 * m.scale, f.pos.z + fw.z * reachXZ);
+    const dir = far.clone().sub(from);
+    const reach = dir.length();
+    dir.divideScalar(reach);
+    const s: SpearFlight = { mesh, serial, from, dir, reach, len, u: 0, ms: atk.active, turned: false, spin: 0, spark: 0, lastTip: null };
+    this.spears.set(f.id, s);
+    // the release: a flash off the hand and a crack of lightning
+    const fx = this.effects;
+    fx.flash(from, '#fff6d0', 2.2, 0.16);
+    fx.spray(from, dir, [BOLT, '#ffffff'], 18, 9, 0.35, { life: 0.3, size: 0.05, gravity: 2, stretch: 0.06 });
+    audio.zap(1.6, { vol: this.volumeAt(from.x, from.z), pos: from });
+    this.shakeNear(f, 0.12, 0.2);
+    return s;
+  }
+
+  /** The spear back in his hand (`caught`), or put away (a new throw, or he's gone). */
+  private landSpear(f: ClientFighter, s: SpearFlight, caught: boolean): void {
+    s.mesh.removeFromParent();
+    this.spears.delete(f.id);
+    f.model.thrown = false;
+    if (!caught) return;
+    const fx = this.effects;
+    const hand = f.model.weaponXf('main', this.tmp, this.tmpQ, this.tmp2) ? this.tmp.clone() : f.pos.clone();
+    fx.flash(hand, '#fff6d0', 1.8, 0.16);
+    fx.sparkle(hand, BOLT, 1.3);
+    fx.spray(hand, s.dir.clone().negate(), [BOLT, '#ffffff'], 16, 6, 0.6, { life: 0.35, size: 0.05, gravity: 5, stretch: 0.05 });
+    for (let i = 0; i < 3; i++) fx.arc(hand, new THREE.Vector3(hand.x + (Math.random() - 0.5) * 1.6, Math.max(0, f.pos.y) + 0.05, hand.z + (Math.random() - 0.5) * 1.6), BOLT, 5, 0.18, 0.1, 0.025);
+    audio.zap(1.8, { vol: this.volumeAt(hand.x, hand.z), pos: hand });
+    audio.cue('shockwave', f.roster.char, 0.7, { vol: this.volumeAt(hand.x, hand.z), pos: hand });
+    this.shakeNear(f, 0.14, 0.18);
   }
 
   /** The blow of an area attack landing across the ground it marked. */
@@ -1589,9 +1748,15 @@ class App {
       else if (this.local && f === this.local.cf) f.lookAt = lockOn?.pos ?? null;
       else f.lookAt = lockOn === f && this.local ? this.local.cf.pos : null;
     }
+    for (const [id, s] of this.spears) {
+      if (this.fighters.has(id)) continue;
+      s.mesh.removeFromParent();
+      this.spears.delete(id);
+    }
     for (const f of this.fighters.values()) {
       f.interpolate(now);
       const buff = (f.flags & 1) === 1 || (!!f.sim && f.sim.buffActive(now));
+      this.spearFlight(f, dt, now);
       f.updateVisual(dt, now, buff);
       this.stateCues(f, now);
       this.areaFx(f, now);

@@ -318,8 +318,8 @@ class AudioEngine {
       clang: ['block', 1.2],
       stomp: ['entrance_stomp', 1],
       thump: ['paladin_deflect', 0.9],
-      zap: ['lancer_spark', 1.6],
-      thunder: ['lancer_bolt', 2.2],
+      zap: ['lancer_spark', 2.6],
+      thunder: [['lancer_bolt', 'bolt_crackle'], 3.4],
       chime: [shine, 1.6],
       bell: [shine, 1.6],
       tink: [shine, 1.2],
@@ -349,7 +349,15 @@ class AudioEngine {
     const [rec, gain, offset] = m;
     if (!rec) return;
     const layers = typeof rec === 'string' ? [rec] : rec;
-    this.emit((o) => void (R.playLayers(o, layers, gain, undefined, offset ?? 0) || legacy(o, name)), { level: LEVEL.legacy, vol: volume, wet: 0.25, gap: 0.02, priority: 1 });
+    // the Lancer's thunder rolls on after the crack
+    const roll = name === 'thunder' && char === 'lancer';
+    this.emit(
+      (o) => {
+        if (!R.playLayers(o, layers, gain, undefined, offset ?? 0)) legacy(o, name);
+        if (roll) R.thunderRoll(o, volume);
+      },
+      { level: LEVEL.legacy * (roll ? 1.4 : 1), vol: volume, wet: 0.25, gap: 0.02, priority: 1, hero: roll },
+    );
   }
 
   // ---------------------------------------------------------------- fighters
@@ -524,7 +532,7 @@ class AudioEngine {
 
   /** A stray arc of the Lancer's lightning snapping off him (`k`: how big). */
   zap(k: number, o: Placed): void {
-    this.emit((out) => R.zap(out, k), { level: LEVEL.cue, vol: o.vol, pos: o.pos, wet: WET.swing, key: 'zap', gap: 0.15, priority: 0 });
+    this.emit((out) => R.zap(out, k), { level: LEVEL.cue * 1.35, vol: o.vol, pos: o.pos, wet: WET.swing, key: 'zap', gap: 0.15, priority: 0 });
   }
 
   // ---------------------------------------------------------------- feedback (yours alone)
@@ -606,7 +614,11 @@ class AudioEngine {
   cue(kind: string, char: CharacterId, scale: number, o: Placed & { hero?: boolean }): void {
     if (!R.CUES.has(kind)) return;
     const p: Profile = profile(char);
-    this.emit((out) => void R.cue(out, p, kind, scale), { level: LEVEL.cue, vol: o.vol, pos: o.pos, wet: WET.big, hero: o.hero, key: `cue:${kind}:${char}`, gap: 0.08 });
+    // the Lancer's lightning: well over the mix, never ducked, and the world holds its breath under
+    // the thunder when it's near
+    const storm = char === 'lancer' && kind === 'bolt';
+    this.emit((out) => void R.cue(out, p, kind, scale), { level: LEVEL.cue * (storm ? 1.6 : 1), vol: o.vol, pos: o.pos, wet: WET.big, hero: o.hero || storm, key: `cue:${kind}:${char}`, gap: 0.08 });
+    if (storm && o.vol > 0.45) this.mix?.duck(0.5, 0.006, 0.3, 0.9);
   }
 }
 

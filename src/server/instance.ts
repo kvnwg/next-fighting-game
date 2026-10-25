@@ -4,7 +4,7 @@
  */
 import { AttackDef, AttackKey, executeSpacing } from '../shared/characters';
 import { COMBAT, INTEREST, MAX_LAG_COMP_MS, PLAYER_RADIUS, SNAPSHOT_HZ, FALL_DEATH_Y, SPRINT_MULT } from '../shared/config';
-import { HitResult, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pruneDefenseLog, pushDefense, zoneAim } from '../shared/combat';
+import { HitResult, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pruneDefenseLog, pushDefense, thrownSpan, zoneAim } from '../shared/combat';
 import { FORCED_STATES, INPUT_ACTIONS, InputAction, InputOptions } from '../shared/fighter';
 import { MapDef, hazardAt, inSafeZone, onFloor } from '../shared/maps';
 import { clamp, forward, turnToward, yawTo } from '../shared/math';
@@ -428,11 +428,13 @@ export abstract class Instance {
       const segLen = atk.active / hits;
       const seg = Math.min(hits - 1, Math.floor((Math.min(now, end - 1) - start) / segLen));
       if (seg < 0) continue;
+      // a thrown weapon only reaches as far as it has flown
+      const span = atk.thrown ? thrownSpan(atk, (Math.min(now, end - 1) - start) / atk.active) : undefined;
       for (const d of this.fighters.values()) {
         if (d === a || !d.isAlive() || !this.canDamage(a, d)) continue;
         const done = a.hitRecord.get(d.id) ?? 0;
         if (done > seg) continue;
-        const dist = inAttackCone(a, d, atk, PLAYER_RADIUS);
+        const dist = inAttackCone(a, d, atk, PLAYER_RADIUS, span);
         if (dist === null) continue;
         a.hitRecord.set(d.id, seg + 1);
         const tHit = Math.max(start + seg * segLen, this.lastTick);

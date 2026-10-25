@@ -113,7 +113,7 @@ export const ENTRANCES: Record<CharacterId, Entrance> = {
     ],
   },
   lancer: {
-    title: 'Storm of the North',
+    title: 'The Stormwarden',
     trails: [[0.46, 0.66]],
     line: 'Stand, or be struck.',
     shots: [

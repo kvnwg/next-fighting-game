@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NO_DEFENSE, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pushDefense } from '../src/shared/combat';
+import { NO_DEFENSE, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pushDefense, thrownSpan } from '../src/shared/combat';
 import { CHARACTERS } from '../src/shared/characters';
 import { COMBAT, GRAVITY } from '../src/shared/config';
 import { DefenseEvent, Fighter } from '../src/shared/fighter';
@@ -325,17 +325,27 @@ describe('special shapes', () => {
     expect(decideOutcome(A, D, atk, 1000, NO_DEFENSE)).not.toBe('counter');
   });
 
-  it("the Lancer's Thunderstrike lands where it was aimed, wherever he stands", () => {
+  it("the Lancer's thrown spear reaches only as far as it has flown, out and back", () => {
     const { A, D } = duel('lancer', 'ronin');
     const atk = special('lancer');
-    A.aim = { x: 0, z: 9 };
-    D.z = 9;
-    expect(inAttackCone(A, D, atk, 0.45)).not.toBeNull();
-    D.x = 2.6;
-    expect(inAttackCone(A, D, atk, 0.45)).toBeNull();
-    A.aim = null;
-    D.x = 0;
-    expect(inAttackCone(A, D, atk, 0.45)).toBeNull();
+    expect(atk.thrown).toBe(true);
+    D.z = 10;
+    // just thrown, nowhere near them yet; then at the end of its line, past them
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.05))).toBeNull();
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.45))).not.toBeNull();
+    // on the way back: not back to them yet, then past them
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.55))).toBeNull();
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.8))).not.toBeNull();
+    // and only along its line
+    D.x = 1.5;
+    expect(inAttackCone(A, D, atk, 0.45, thrownSpan(atk, 0.45))).toBeNull();
+  });
+
+  it('the thrown spear holds its line while it is out', () => {
+    const A = new Fighter('a', 'lancer');
+    A.input('special', 1000);
+    expect(A.turnRate(1000 + A.atkWindup / 2)).toBeGreaterThan(0);
+    expect(A.turnRate(1000 + A.atkWindup + A.attack!.active / 2)).toBe(0);
   });
 
   it("the Lancer's Vault Strike carries him 5m through the air, untouchable, and hits all round on landing", () => {

@@ -291,6 +291,8 @@ export class Fighter {
         return 9;
       case 'attack': {
         const p = this.attackPhase(now);
+        // a thrown weapon holds its line until it's back in the hand
+        if (p === 'active' && this.attack?.thrown) return 0;
         return p === 'windup' ? 7 : p === 'active' ? 1.5 : 3;
       }
       default:

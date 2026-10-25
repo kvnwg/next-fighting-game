@@ -472,6 +472,76 @@ h4.ih .pi { width: 20px; height: 20px; }
 .fs-nums .pi { width: 16px; height: 16px; margin-right: 6px; }
 .fs-epithet { margin-bottom: 8px; font-family: var(--display); font-size: 17px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6); }
 .fs-quote { margin-top: 4px; font-size: 15px; letter-spacing: 0.04em; color: #fff4e4; }
+.fs-lg-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 8px; font-family: var(--display); font-weight: 700; font-size: 22px; line-height: 1.1; letter-spacing: 0.05em; text-transform: uppercase; color: #fff7ea; text-shadow: 3px 3px 0 color-mix(in srgb, var(--c2) 45%, #000); }
+.fs-lg-title span { font-family: var(--ui); font-weight: 500; font-size: 12px; letter-spacing: 0.18em; color: var(--muted); text-shadow: none; }
+.fs-panel p.fs-teaser { margin-bottom: 12px; color: #ece5d8; }
+.fs-lg-go { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 20px; padding: 4px 0 6px; }
+.fs-lg-go .fs-quote { margin: 0; }
+.fs-read { display: inline-flex; align-items: center; gap: 9px; padding: 7px 14px 6px; font: 600 15px var(--ui); letter-spacing: 0.14em; text-transform: uppercase; color: #1a1206; background: var(--gold); border: none; cursor: pointer;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--gold), 0 var(--px) 0 0 var(--gold), calc(-1 * var(--px)) 0 0 0 var(--gold), var(--px) 0 0 0 var(--gold), inset 0 calc(-1 * var(--px)) 0 #b8862a, calc(var(--px) * 2) calc(var(--px) * 2) 0 0 rgba(0, 0, 0, 0.45); }
+.fs-read .pi { width: 20px; height: 20px; }
+.fs-read span { padding-left: 9px; font-size: 12px; letter-spacing: 0.1em; color: #5a3e10; border-left: 2px solid rgba(26, 18, 6, 0.3); }
+.fs-read:hover { background: var(--gold-hi); }
+.fs-read:active { transform: translateY(2px); }
+.fs-read:focus-visible { outline: 2px dashed var(--gold-hi); outline-offset: 7px; }
+
+/* a legend, unrolled over the whole fighter select like a scroll: a bar with the title, the five
+   numerals to jump between parts and the way back; a bar filling as you read; and the page */
+.lg { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: #12101a; animation: lg-in 0.32s steps(6) both;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--frame), 0 var(--px) 0 0 var(--frame), calc(-1 * var(--px)) 0 0 0 var(--frame), var(--px) 0 0 0 var(--frame); }
+.lg.lg-out { animation: lg-out 0.22s steps(4) both; }
+@keyframes lg-in { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes lg-out { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 100% 0); } }
+.lg-bar { flex: none; display: flex; align-items: center; gap: 16px; padding: 12px 18px 10px; background: #1a1724; }
+.lg-kanji { flex: none; display: grid; place-items: center; min-width: 50px; height: 50px; padding: 0 6px; font-family: var(--jp); font-size: 20px; color: #fff; background: var(--red); transform: rotate(-4deg);
+  box-shadow: 0 -3px 0 0 var(--red), 0 3px 0 0 var(--red), -3px 0 0 0 var(--red), 3px 0 0 0 var(--red), inset 0 0 0 2px #ffb4a8, 4px 4px 0 2px rgba(40, 6, 14, 0.5); }
+.lg-heads { flex: 1; min-width: 0; }
+.lg-title { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1.05; letter-spacing: 0.05em; text-transform: uppercase; color: #fff7ea; text-shadow: 3px 3px 0 color-mix(in srgb, var(--c2) 45%, #000); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg-sub { margin-top: 3px; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+.lg-nav { flex: none; display: flex; gap: 8px; }
+.lg-nav button { min-width: 36px; height: 32px; padding: 0 6px; font: 700 14px var(--display); color: #cfc8ba; background: #24202f; border: none; cursor: pointer;
+  box-shadow: 0 -3px 0 0 #3a3648, 0 3px 0 0 #3a3648, -3px 0 0 0 #3a3648, 3px 0 0 0 #3a3648; transition: background 0.12s steps(2), color 0.12s steps(2); }
+.lg-nav button:hover { color: #fff; background: #302b3e; }
+.lg-nav button.on { color: #1a1206; background: var(--gold); box-shadow: 0 -3px 0 0 var(--gold), 0 3px 0 0 var(--gold), -3px 0 0 0 var(--gold), 3px 0 0 0 var(--gold), inset 0 -3px 0 #b8862a; }
+.lg-close { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 5px; font: 600 14px var(--ui); letter-spacing: 0.12em; text-transform: uppercase; color: #e8e2d6; background: #24202f; border: none; cursor: pointer;
+  box-shadow: 0 -3px 0 0 #6a6480, 0 3px 0 0 #6a6480, -3px 0 0 0 #6a6480, 3px 0 0 0 #6a6480; }
+.lg-close .pi { width: 16px; height: 16px; }
+.lg-close .key { color: var(--dim); font-size: 11px; }
+.lg-close:hover { background: #302b3e; }
+.lg-progress { flex: none; height: 6px; background: #0b0a10; }
+.lg-progress i { display: block; width: 0; height: 100%; background: repeating-linear-gradient(90deg, var(--gold) 0 8px, #b8862a 8px 10px); transition: width 0.1s steps(3); }
+.lg-page { flex: 1; min-height: 0; overflow-y: auto; outline: none; scrollbar-color: rgba(239, 228, 207, 0.35) transparent;
+  background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--c2) 9%, transparent), transparent 60%), #12101a; }
+.lg-text { max-width: 640px; margin: 0 auto; padding: 26px 24px 60px; }
+.lg-epithet { margin-bottom: 6px; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); text-align: center; }
+.lg-sec { padding-top: 22px; }
+.lg-h { display: flex; align-items: center; gap: 14px; margin: 0 0 16px; font-family: var(--display); font-style: normal; font-weight: 700; font-size: 19px; line-height: 1.2; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6); }
+.lg-h::after { content: ''; flex: 1; height: 4px; min-width: 24px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 1' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%23f2c14e' fill-opacity='.5'/%3E%3C/svg%3E") 0 50% / 8px 4px repeat-x; }
+.lg-n { flex: none; display: grid; place-items: center; min-width: 40px; height: 34px; padding: 0 6px; font-size: 16px; color: #fff; background: var(--red); text-shadow: none; transform: rotate(-3deg);
+  box-shadow: 0 -3px 0 0 var(--red), 0 3px 0 0 var(--red), -3px 0 0 0 var(--red), 3px 0 0 0 var(--red), 3px 3px 0 2px rgba(40, 6, 14, 0.5); }
+.lg-text p { margin: 0 0 14px; font-size: 17px; line-height: 1.62; letter-spacing: 0.01em; color: #e6dfd2; }
+/* each part opens on a big gold initial */
+.lg-sec > h3 + p::first-letter { float: left; margin: 4px 8px 0 0; font-family: var(--display); font-weight: 700; font-size: 46px; line-height: 0.9; color: var(--gold); text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6); }
+.lg-end { display: flex; flex-direction: column; align-items: center; gap: 18px; margin-top: 36px; padding-top: 26px; text-align: center;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 1' shape-rendering='crispEdges'%3E%3Crect width='1' height='1' fill='%23efe4cf' fill-opacity='.3'/%3E%3C/svg%3E") 50% 0 / 8px 4px repeat-x; }
+.lg-quote { font-family: var(--display); font-size: 20px; letter-spacing: 0.06em; color: #fff4e4; text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6); }
+.lg-fin { display: grid; place-items: center; min-width: 44px; height: 44px; padding: 0 6px; font-family: var(--jp); font-size: 17px; color: #fff; background: var(--red); transform: rotate(-4deg);
+  box-shadow: 0 -3px 0 0 var(--red), 0 3px 0 0 var(--red), -3px 0 0 0 var(--red), 3px 0 0 0 var(--red), inset 0 0 0 2px #ffb4a8; }
+@media (max-height: 500px), (max-width: 600px) {
+  .lg-bar { gap: 10px; padding: 8px 12px 7px; }
+  .lg-kanji { display: none; }
+  .lg-title { font-size: 17px; }
+  .lg-sub { font-size: 10px; }
+  .lg-nav { gap: 6px; }
+  .lg-nav button { min-width: 28px; height: 26px; font-size: 12px; }
+  .lg-close .key { display: none; }
+  .lg-text { padding: 14px 16px 40px; }
+  .lg-text p { font-size: 15px; line-height: 1.55; }
+  .lg-h { font-size: 15px; }
+}
+@media (max-width: 600px) {
+  .lg-nav { display: none; }
+}
 
 /* the call to arms */
 .fs-go { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding-top: 6px; }
@@ -520,6 +590,9 @@ h4.ih .pi { width: 20px; height: 20px; }
   .fs-tabs { gap: 10px; }
   .fs-tab { padding: 5px 10px 4px; font-size: 13px; }
   .fs-panel { max-height: 140px; }
+  /* the legend's way in has to show without scrolling: the teaser waits for the legend itself */
+  .fs-panel p.fs-teaser { display: none; }
+  .fs-lg-title { font-size: 18px; }
   .fs-play { padding: 7px 14px 6px; font-size: 15px; }
   .fs-note { display: none; }
   .fs-roster { grid-template-columns: repeat(8, minmax(0, 64px)); justify-content: center; gap: 9px; padding-top: 14px; }

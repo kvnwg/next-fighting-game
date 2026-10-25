@@ -85,7 +85,7 @@ export function pushDefense(log: DefenseEvent[], e: DefenseEvent): void {
  * straight ahead, a ring round it, or a zone round where it aimed)? Returns the distance between
  * them if so.
  */
-export function inAttackCone(attacker: Fighter, target: Fighter, atk: AttackDef, radius: number): number | null {
+export function inAttackCone(attacker: Fighter, target: Fighter, atk: AttackDef, radius: number, span?: [number, number]): number | null {
   const dx = target.x - attacker.x;
   const dz = target.z - attacker.z;
   const d = Math.hypot(dx, dz);
@@ -101,7 +101,8 @@ export function inAttackCone(attacker: Fighter, target: Fighter, atk: AttackDef,
     const f = forward(attacker.yaw);
     const along = dx * f.x + dz * f.z;
     const across = Math.abs(dx * f.z - dz * f.x);
-    return along >= -radius && along - radius <= atk.range && across <= shape.width + radius ? Math.max(0, along) : null;
+    const [near, far] = span ?? [0, atk.range];
+    return along + radius >= near && along - radius <= far && across <= shape.width + radius ? Math.max(0, along) : null;
   }
   if (d - radius > atk.range) return null;
   if (d < 0.3) return d;
@@ -110,6 +111,30 @@ export function inAttackCone(attacker: Fighter, target: Fighter, atk: AttackDef,
   const slack = Math.atan2(radius, d);
   if (ang > atk.arc * DEG + slack) return null;
   return d;
+}
+
+/**
+ * How far out along its line a thrown weapon is, as a fraction of the range, `u` (0..1) of the way
+ * through the active frames: out fast and slowing to the end of the line by halfway, then pulled
+ * back to the hand faster and faster.
+ */
+export function thrownOut(u: number): number {
+  if (u <= 0.5) {
+    const k = Math.max(0, u) / 0.5;
+    return 1 - (1 - k) * (1 - k);
+  }
+  const k = Math.min(1, (u - 0.5) / 0.5);
+  return 1 - k * k;
+}
+
+/**
+ * The stretch of its line a thrown weapon has swept so far in this hit (see AttackDef.thrown): on
+ * the way out, from the hand to where it has got; on the way back, from where it has got to the
+ * end of the line.
+ */
+export function thrownSpan(atk: AttackDef, u: number): [number, number] {
+  const d = atk.range * thrownOut(u);
+  return u <= 0.5 ? [0, d] : [d, atk.range];
 }
 
 /**

@@ -1,6 +1,7 @@
 /**
  * The warning painted on the ground under a perilous area attack's windup: the strip a fissure
- * will split, the band a ring of fire will sweep, or the circle lightning will strike. A dim
+ * will split or a thrown spear will fly down and back, the band a ring of fire will sweep, or the
+ * circle lightning will strike. A dim
  * blocky field with a hard bright rim; a fill grows across it as the blow comes and reaches the
  * far edge the moment it lands. Then the ground flashes in the attack's own colour and, for a
  * fissure, a glowing crack lingers.
@@ -23,6 +24,7 @@ uniform float uProgress;
 uniform float uTime;
 uniform float uFade;
 uniform float uStrike;
+uniform float uCrack;
 uniform vec3 uColor;
 uniform vec3 uHit;
 varying vec2 vP;
@@ -64,7 +66,7 @@ void main() {
     float k = clamp(uStrike / 0.4, 0.0, 1.0);
     a = (1.0 - k) * (1.0 - k) * (0.6 + rim * 0.4);
     col = mix(vec3(1.0), uHit, 0.35 + k * 0.6) * 1.6;
-    if (uKind < 0.5) {
+    if (uCrack > 0.5) {
       // a crack zigzagging down the middle of the strip, glowing like embers as it cools
       float seg = floor(q.y * 1.6);
       float f = fract(q.y * 1.6);
@@ -90,7 +92,8 @@ export class Telegraph {
   /** how long the after-image lasts once struck (a fissure's crack lingers) */
   private readonly after: number;
 
-  constructor(shape: AttackShape, range: number, color = '#ff2a2a', hit = '#ffd27a') {
+  /** `crack`: a strip splits open as it lands and the crack lingers (a fissure, not a thrown spear) */
+  constructor(shape: AttackShape, range: number, color = '#ff2a2a', hit = '#ffd27a', crack = shape.kind === 'line') {
     let geo: THREE.PlaneGeometry;
     let dim: [number, number];
     if (shape.kind === 'line') {
@@ -101,7 +104,7 @@ export class Telegraph {
       geo = new THREE.PlaneGeometry(r * 2 + 0.5, r * 2 + 0.5).rotateX(-Math.PI / 2);
       dim = shape.kind === 'ring' ? [shape.inner, range] : [shape.radius, 0];
     }
-    this.after = shape.kind === 'line' ? 1.6 : 0.45;
+    this.after = crack ? 1.6 : 0.45;
     this.mat = new THREE.ShaderMaterial({
       uniforms: {
         uKind: { value: KIND[shape.kind] },
@@ -110,6 +113,7 @@ export class Telegraph {
         uTime: { value: 0 },
         uFade: { value: 0 },
         uStrike: { value: -1 },
+        uCrack: { value: crack ? 1 : 0 },
         uColor: { value: new THREE.Color(color) },
         uHit: { value: new THREE.Color(hit) },
       },

@@ -741,6 +741,20 @@ export const ICON = {
     '.hhhhhhhhhh.',
     '...hhhhhh...',
   ],
+  /** a scroll on its rollers: a legend */
+  scroll: [
+    '.wwwwwwwwww.',
+    'wwwwwwwwwwww',
+    '.pppppppppp.',
+    '.pkkkkkkkpp.',
+    '.pppppppppp.',
+    '.pkkkkkpppp.',
+    '.pppppppppp.',
+    '.pkkkkkkkpp.',
+    '.pppppppppp.',
+    'wwwwwwwwwwww',
+    '.wwwwwwwwww.',
+  ],
   /** a broken blade: defeat */
   broken: [
     '..........hh',

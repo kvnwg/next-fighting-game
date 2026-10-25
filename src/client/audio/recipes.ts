@@ -143,7 +143,7 @@ function swingBase(o0: Out, p: Profile, s: SwingOpts = {}): void {
   if (sw.snap) noise(o, { type: 'highpass', f: 2200, dur: 0.035, gain: sw.snap * 0.4, a: 0.001, delay: len * pk });
   if (p.chain) rattle(o, { count: heavy ? 16 : 10, spread: len, fLo: 2600, fHi: 6500, decay: 0.035, fade: 1, whirl: sw.whirl }, { gain: 0.32, type: 'highpass', f: 1800 });
   // the charged spear spits as it moves
-  if (p.lightning) crackle(o, len * 0.9, 30, { gain: heavy ? 0.32 : 0.24, type: 'highpass', f: 2500 });
+  if (p.lightning) crackle(o, len * 0.9, 30, { gain: heavy ? 0.5 : 0.36, type: 'highpass', f: 2500 });
   followThrough(at(o, s.follow ?? len * 0.8), p, heavy);
 }
 
@@ -185,8 +185,8 @@ export interface HitOpts {
 function tell(o: Out, a: Profile, h: number): void {
   if (a.chain) rattle(o, { count: 9, spread: 0.12, fLo: 2400, fHi: 6500, decay: 0.04, fade: 2 }, { gain: 0.35 * h, type: 'highpass', f: 1800, delay: 0.005 });
   if (a.lightning) {
-    crackle(o, 0.14, 50, { gain: 0.3 * h, type: 'highpass', f: 2200 });
-    noise(o, { type: 'highpass', f: 3000, dur: 0.02, gain: 0.25 * h, a: 0.0005 });
+    crackle(o, 0.18, 50, { gain: 0.48 * h, type: 'highpass', f: 2200 });
+    noise(o, { type: 'highpass', f: 3000, dur: 0.02, gain: 0.4 * h, a: 0.0005 });
   }
 }
 
@@ -551,7 +551,7 @@ const SAMPLE_SETS: Record<string, SampleSet> = {
   ronin: { swing: ['ronin_swing'], hit: ['ronin_hit'] },
   duelist: { swing: ['duelist_swing'], hitGain: 0.6 },
   // the glaive's whoosh or the katana's, lightning crackling behind it; the cut arcs, a heavy strikes
-  lancer: { swing: ['lancer_swing', 'ronin_swing'], swingLayer: 'lancer_zap', hitGain: 0.6, hitLayer: 'lancer_spark', heavyHitLayer: 'lancer_bolt', layerGain: 2.4 },
+  lancer: { swing: ['lancer_swing', 'ronin_swing'], swingLayer: 'lancer_zap', hitGain: 0.6, hitLayer: 'lancer_spark', heavyHitLayer: 'lancer_bolt', layerGain: 3.3 },
   // the katana's swooshes (weightier) with a holy glow on heavies; every cut lands with a radiant impact
   // heavies stack the glow, a dark or a fiery whoosh and the holy shimmer; hits ring out pure
   paladin: { swing: ['ronin_swing'], swingGain: 1.5, heavySwingLayer: 'paladin_glow', heavyExtra: ['paladin_darkwhoosh', 'paladin_firewhoosh'], heavyShimmer: 'paladin_shimmer', hitGain: 0.75, hitLayer: 'paladin_impact', heavyHitLayer: 'paladin_shimmer' },
@@ -786,11 +786,25 @@ export function postureBreak(o: Out, d: Profile | null): void {
   osc(filtered(o, 'lowpass', 500), { type: 'sawtooth', f: 60, f1: 28, dur: 0.7, gain: 0.25, delay: 0.02 });
 }
 
+/**
+ * Thunder rolling away after one of the Lancer's bolts: a hard crack, then a low rumble that
+ * swells and grumbles off for a couple of seconds, with a sub-bass drop under it.
+ */
+export function thunderRoll(o: Out, k: number): void {
+  const s = Math.min(1.4, k);
+  noise(o, { type: 'highpass', f: 1200, f1: 500, dur: 0.1, gain: 0.8 * s, a: 0.001 });
+  noise(o, { color: 'brown', type: 'lowpass', f: 900, f1: 70, dur: 2.2 * s, gain: 1.1 * s, delay: 0.04, shape: SHAPES.swing(0.12, 1.6) });
+  // the grumble: a second, slower roll under the first
+  noise(o, { color: 'brown', type: 'lowpass', f: 300, f1: 50, dur: 2.6 * s, gain: 0.8 * s, delay: 0.35, shape: SHAPES.swing(0.3, 2) });
+  osc(o, { f: 55, f1: 26, dur: 1.4 * s, gain: 0.55 * s, delay: 0.03 });
+  crackle(o, 0.6 * s, 35, { gain: 0.45, type: 'highpass', f: 1800, delay: 0.05 });
+}
+
 /** A stray arc of the Lancer's charge snapping down to the ground: a spark and a short crackle. */
 export function zap(o: Out, k: number): void {
   const spark = sampleFor(o.ctx, 'lancer_spark');
-  if (spark) playSample(o, spark, sampleGain('lancer_spark') * 2.6 * k, jit(1, 0.1));
-  crackle(o, 0.1 + 0.12 * k, 45, { gain: 0.32 * k, type: 'highpass', f: 2200 });
+  if (spark) playSample(o, spark, sampleGain('lancer_spark') * 3.8 * k, jit(1, 0.1));
+  crackle(o, 0.1 + 0.14 * k, 45, { gain: 0.5 * k, type: 'highpass', f: 2200 });
 }
 
 /**
@@ -1230,10 +1244,13 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
       // a recorded lightning strike, if there is one, with the user's electric step and crackle over it
       const bolt = sampleFor(o.ctx, 'lancer_bolt');
       if (bolt) {
-        // the Lancer's own lightning is a good deal louder than anyone else's
-        const loud = p.id === 'lancer' ? 1.9 : 1;
+        // the Lancer's own lightning is far louder than anyone else's, with the thunder rolling on
+        // after the crack
+        const lancer = p.id === 'lancer';
+        const loud = lancer ? 2.9 : 1;
         playSample(o, bolt, BOLT_CUE_GAIN * Math.min(1.5, scale) * loud, jit(1, 0.03));
         playLayers(o, ['bolt_summon', 'bolt_crackle'], Math.min(1.5, scale) * loud);
+        if (lancer) thunderRoll(o, k);
         return true;
       }
     }

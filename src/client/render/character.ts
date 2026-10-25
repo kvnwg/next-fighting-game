@@ -184,6 +184,8 @@ export class CharacterModel {
   /** whether each weapon is mid-swing this frame (drives the trails) */
   swingMain = false;
   swingOff = false;
+  /** the main weapon is out of the hand (a thrown spear, drawn by the app): hidden, and no trail */
+  thrown = false;
   /** trail anchors in weapon space */
   readonly trailMain: { base: THREE.Vector3; tip: THREE.Vector3 };
   readonly trailOff: { base: THREE.Vector3; tip: THREE.Vector3 } | null;
@@ -677,8 +679,9 @@ export class CharacterModel {
     this.frame = f;
     const p = f.pose;
     const b = p.body;
-    this.swingMain = f.swingMain;
+    this.swingMain = f.swingMain && !this.thrown;
     this.swingOff = f.swingOff;
+    this.weapon.main.visible = !this.thrown;
     // lightning crackles along the spear through heavy swings and the special
     const charged = (a.state === 'attack' && (isHeavyKey(a.key) || a.key === 'sp')) || a.state === 'execute';
     this.charged.forEach((m, i) => (m.visible = charged && Math.sin(performance.now() / 21 + i * 2.1) > -0.35));
@@ -942,8 +945,9 @@ export class CharacterModel {
       toneMapped: false,
     });
     const group = new THREE.Group();
-    this.root.traverse((o) => {
-      if (!(o instanceof THREE.Mesh) || !o.visible) return;
+    // (not a weapon that's out of the hand)
+    this.root.traverseVisible((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
       const m = new THREE.Mesh(o.geometry, mat);
       m.matrixAutoUpdate = false;
       m.matrix.copy(o.matrixWorld);

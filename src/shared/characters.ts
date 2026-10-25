@@ -115,6 +115,13 @@ export interface AttackDef {
    * landing as the windup ends; the hit comes on landing.
    */
   vault?: boolean;
+  /**
+   * Thrown (a line attack): the weapon leaves the hand as the windup ends, flies out to the end of
+   * the line over the first half of the active frames and comes back to the hand over the second.
+   * Each hit lands only where the weapon has got to (see thrownSpan); the thrower can't turn while
+   * it's out.
+   */
+  thrown?: boolean;
 }
 
 export type AbilityDef =
@@ -343,7 +350,7 @@ const lancer: BaseDef = {
   weapon: 'Golden Spear',
   weaponKind: 'spear',
   role: 'Zoner',
-  description: 'A horned knight with a lightning spear. Controls space with the longest reach in the game; tip hits hurt more, he calls lightning down on you from afar, and vaults clean over you to strike your back.',
+  description: 'A horned knight with a lightning spear. Controls space with the longest reach in the game; tip hits hurt more, he hurls the spear the length of the field and it flies back to his hand, and he vaults clean over you to strike your back.',
   stats: { hp: 200, posture: 200, speed: 2.5, postureRegen: 1 },
   ratings: { power: 3, speed: 3, reach: 5, defense: 2, difficulty: 3 },
   lights: [
@@ -353,9 +360,10 @@ const lancer: BaseDef = {
     { name: 'Flat Sweep', anim: 'slashR', windup: 380, active: 110, recovery: 460, damage: 12, posture: 14, blockPosture: 18, range: 4.1, arc: 44 },
   ],
   heavy: { name: 'Lunging Cut', anim: 'thrust', windup: 640, active: 110, recovery: 520, damage: 18, posture: 24, blockPosture: 30, range: 4.7, arc: 15, lunge: 1.4, feintable: true },
-  // the spear raised to the sky calls the lightning down on where you stood when he raised it,
-  // marked on the ground: be out of the circle when it lands, however far away he is
-  special: { name: 'Thunderstrike', anim: 'overhead', windup: 950, active: 120, recovery: 600, damage: 20, posture: 28, blockPosture: 28, range: 12, arc: 180, shape: { kind: 'zone', radius: 1.9 }, perilous: 'area', cooldown: 8000 },
+  // Thunderreach raised to the sky until the lightning pours down it, then thrown the length of the
+  // field along the line marked on the ground; it flies back to his hand, through anyone still on
+  // the line: get off it before it goes, and stay off it until it's home
+  special: { name: 'Light the Way', anim: 'thrust', windup: 900, active: 720, recovery: 420, damage: 13, posture: 18, blockPosture: 18, range: 13, arc: 6, hits: 2, shape: { kind: 'line', width: 0.75 }, thrown: true, perilous: 'area', cooldown: 8000 },
   // planted and vaulted over you, untouchable in the air, and driven down behind him as he lands,
   // lightning bursting all round: it takes you in the back unless you turn to meet it
   ability: {

@@ -8,7 +8,7 @@ import { LobbyBar } from './lobbybar';
 import { ICON, IconName, icon, pixelSVG, recolor, slashRows } from './pixelicons';
 import { TRACKS } from './audio/music';
 import { settings } from './settings';
-import { LORE } from './lore';
+import { LORE, readingMinutes } from './lore';
 
 const h = (html: string): HTMLElement => {
   const t = document.createElement('template');
@@ -131,6 +131,8 @@ export class UI {
   private preview: Preview | null = null;
   private challengeFrom: string | null = null;
   modalOpen: string | null = null;
+  /** a fighter's legend open over the fighter select (see openLegend) */
+  private legend: HTMLElement | null = null;
   /** in a match you fight with who you brought: the fighter picker stays shut */
   private charsLocked = false;
   profile: ProfileView | null = null;
@@ -763,6 +765,7 @@ export class UI {
   closeModal(): void {
     if (!this.modalOpen) return;
     this.modalOpen = null;
+    this.legend = null;
     this.modal.classList.add('hidden');
     this.preview?.dispose();
     this.preview = null;
@@ -773,9 +776,91 @@ export class UI {
   private frame(title: string, body: string, wide = false, kanji = '', ico?: IconName, cls = ''): void {
     this.preview?.dispose();
     this.preview = null;
+    this.legend = null;
     this.modal.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''} ${cls}"><div class="modal-head"><h2>${ico ? icon(ico, 'mh-ico') : ''}${kanji ? `<span class="mk">${kanji}</span>` : ''}${title}</h2><button class="btn small close" aria-label="Close">${icon('close')}<span class="key"> Esc</span></button></div><div class="modal-body">${body}</div></div>`;
     this.modal.classList.remove('hidden');
     this.modal.querySelector('.close')!.addEventListener('click', () => this.closeModal());
+  }
+
+  /**
+   * A fighter's legend, opened over the fighter select like a scroll unrolled across it: the
+   * title, the five parts with their numerals stamped beside them (and a row of those numerals up
+   * top to jump between parts, lit as you read through each), a bar filling as you go, and the
+   * line they're known by at the end. Esc or Back rolls it up again.
+   */
+  private openLegend(id: CharacterId): void {
+    this.closeLegend();
+    const box = this.modal.querySelector<HTMLElement>('.fs-box');
+    if (!box) return;
+    const l = LORE[id];
+    const c = CHARACTERS[id];
+    const part = (h: string) => {
+      const m = /^([IVX]+)\.\s*(.*)$/.exec(h);
+      return m ? { n: m[1], name: m[2] } : { n: '', name: h };
+    };
+    const el = document.createElement('div');
+    el.className = 'lg';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', `${l.title}: ${l.subtitle}`);
+    el.style.setProperty('--c2', c.palette.accent);
+    el.innerHTML = `
+      <div class="lg-bar">
+        <span class="lg-kanji">${esc(c.jp)}</span>
+        <div class="lg-heads"><div class="lg-title">${esc(l.title)}</div><div class="lg-sub">${esc(l.subtitle)}</div></div>
+        <nav class="lg-nav">${l.sections.map((s, i) => `<button data-i="${i}" title="${esc(part(s.heading).name)}">${esc(part(s.heading).n || String(i + 1))}</button>`).join('')}</nav>
+        <button class="lg-close">${icon('back')}Back<span class="key"> Esc</span></button>
+      </div>
+      <div class="lg-progress"><i></i></div>
+      <div class="lg-page" tabindex="0">
+        <article class="lg-text">
+          <div class="lg-epithet">${esc(c.name)} · ${esc(l.epithet)}</div>
+          ${l.sections
+            .map((s) => {
+              const p = part(s.heading);
+              return `<section class="lg-sec"><h3 class="lg-h">${p.n ? `<span class="lg-n">${esc(p.n)}</span>` : ''}<span>${esc(p.name)}</span></h3>${s.paragraphs.map((t) => `<p>${esc(t)}</p>`).join('')}</section>`;
+            })
+            .join('')}
+          <div class="lg-end"><span class="lg-quote">“${esc(l.quote)}”</span><span class="lg-fin">${esc(c.jp)}</span></div>
+        </article>
+      </div>`;
+    box.appendChild(el);
+    this.legend = el;
+    const page = el.querySelector<HTMLElement>('.lg-page')!;
+    const secs = [...el.querySelectorAll<HTMLElement>('.lg-sec')];
+    const nav = [...el.querySelectorAll<HTMLElement>('.lg-nav button')];
+    const bar = el.querySelector<HTMLElement>('.lg-progress i')!;
+    const track = () => {
+      const max = page.scrollHeight - page.clientHeight;
+      bar.style.width = `${max > 0 ? Math.min(100, (page.scrollTop / max) * 100) : 100}%`;
+      // the part being read: the last one whose heading has passed the top third of the page
+      const line = page.scrollTop + page.clientHeight * 0.33;
+      let at = 0;
+      secs.forEach((s, i) => {
+        if (s.offsetTop - page.offsetTop <= line) at = i;
+      });
+      if (page.scrollTop >= max - 2) at = secs.length - 1;
+      nav.forEach((b, i) => b.classList.toggle('on', i === at));
+    };
+    page.addEventListener('scroll', track, { passive: true });
+    nav.forEach((b, i) =>
+      b.addEventListener('click', () => {
+        page.scrollTop = secs[i].offsetTop - page.offsetTop - 4;
+        page.focus({ preventScroll: true });
+      }),
+    );
+    el.querySelector('.lg-close')!.addEventListener('click', () => this.closeLegend());
+    track();
+    page.focus({ preventScroll: true });
+  }
+
+  /** Roll the legend up if it's open; true if it was. */
+  closeLegend(): boolean {
+    const el = this.legend;
+    if (!el) return false;
+    this.legend = null;
+    el.classList.add('lg-out');
+    window.setTimeout(() => el.remove(), 220);
+    return true;
   }
 
   /** Lock the fighter picker for the length of a match (and shut it if it's open). */
@@ -854,7 +939,11 @@ export class UI {
           <div class="fs-nums"><span>${icon('heart')}HP <b>${c.stats.hp}</b></span><span>${icon('shield')}Posture <b>${c.stats.posture}</b></span><span>${icon('dash')}Speed <b>${c.stats.speed}</b></span></div>`;
       } else if (tab === 'story') {
         const l = LORE[current];
-        panel.innerHTML = `<div class="fs-epithet">${esc(l.epithet)}</div>${l.story.map((p) => `<p>${esc(p)}</p>`).join('')}<div class="fs-quote">“${esc(l.quote)}”</div>`;
+        panel.innerHTML = `<div class="fs-epithet">${esc(l.epithet)}</div>
+          <div class="fs-lg-title">${esc(l.title)}<span>${esc(l.subtitle)}</span></div>
+          <p class="fs-teaser">${esc(l.teaser)}</p>
+          <div class="fs-lg-go"><button class="fs-read">${icon('scroll')}Read the legend<span>${readingMinutes(l)} min</span></button><div class="fs-quote">“${esc(l.quote)}”</div></div>`;
+        panel.querySelector('.fs-read')!.addEventListener('click', () => this.openLegend(current));
       }
       panel.scrollTop = 0;
     };
@@ -901,7 +990,7 @@ export class UI {
     // the arrow keys walk the roster
     root.addEventListener('keydown', (e) => {
       const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-      if (!step || (e.target as HTMLElement).closest('.fs-panel')) return;
+      if (!step || this.legend || (e.target as HTMLElement).closest('.fs-panel')) return;
       e.preventDefault();
       const i = (CHARACTER_IDS.indexOf(current) + step + CHARACTER_IDS.length) % CHARACTER_IDS.length;
       show(CHARACTER_IDS[i]);

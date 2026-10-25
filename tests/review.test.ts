@@ -113,24 +113,23 @@ describe('new specials on the server', () => {
   const hitsBy = (inbox: ServerMsg[], id: string) =>
     inbox.filter((m) => m.t === 'fx').flatMap((m) => (m as Extract<ServerMsg, { t: 'fx' }>).e).filter((e) => e.a === id && e.k !== 'feint');
 
-  it('Thunderstrike is aimed at the foe as it starts, and misses them if they leave the mark', () => {
+  it('Light the Way hits on the way out and again on the way back, unless they get off its line', () => {
     for (const leave of [false, true]) {
       const { arena, fa, fb, inboxA, now, step } = setup('lancer', 'ronin');
       fa.owner = null;
       fa.x = 0;
       fa.z = 0;
       fa.yaw = 0;
-      fb.x = 0.5;
-      fb.z = 8;
+      fb.x = 0.3;
+      fb.z = 9;
       fb.yaw = Math.PI;
       fa.specialReadyAt = 0;
       arena.applyInput(fa, 'special', now());
-      expect(fa.aim).toEqual({ x: 0.5, z: 8 });
       step(300);
       if (leave) fb.x = 3.5;
-      step(fa.atkWindup + 400);
-      const out = hitsBy(inboxA, fa.id).map((e) => e.k);
-      expect(out.includes('hit')).toBe(!leave);
+      step(fa.atkWindup + fa.attack!.active + 300);
+      const out = hitsBy(inboxA, fa.id).filter((e) => e.k === 'hit');
+      expect(out.length).toBe(leave ? 0 : 2);
     }
   });
 

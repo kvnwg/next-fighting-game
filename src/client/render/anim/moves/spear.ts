@@ -9,10 +9,10 @@
  * over the left shoulder, the glaive raised overhead and driven down and round into a low thrust,
  * the overhead twirl that drops into two full turns at the ankles, a long side-on lunge out of the
  * dash, a charge that rips the blade up from the floor, a backhand sweep and a wheel over the top
- * while giving ground, a cut from overhead and a plunge into the floor from the air, lightning
- * called down from the sky with the glaive raised to it (Thunderstrike), and a vault clean over
- * them that drives the glaive into the ground behind him (Vault Strike). Lightning crackles along
- * the glaive through every heavy.
+ * while giving ground, a cut from overhead and a plunge into the floor from the air, the spear
+ * raised to the sky until the lightning comes down it and thrown the length of the field to fly
+ * back to his hand (Light the Way), and a vault clean over them that drives the glaive into the
+ * ground behind him (Vault Strike). Lightning crackles along the glaive through every heavy.
  */
 import { B, K, N, P, Style, X, arc, circle, fx, line, mv, seq, track } from '../author';
 import type { BodyPose, Motion, V3 } from '../author';
@@ -163,17 +163,35 @@ const splitterFree = track([
   [0.2, [-0.2, 0.3, 0.5]],
 ]);
 
-// Thunderstrike: the glaive raised straight up to the sky in one hand while the other points at
-// them, held there as the lightning gathers on the blade, then swung down to point at them as the
-// bolt falls where they stood
-const THUNDER_HIT = 0.45;
-const thunder = glaive([
-  [-1.6, G_R, G_DIR, SP],
-  [-1.0, [-0.24, 0.95, 0.12], [0.05, 1, 0.04], NaN],
-  [0.15, [-0.24, 0.98, 0.12], [0.05, 1, 0.08], NaN],
-  [THUNDER_HIT, [-0.2, 0.56, 0.42], [0.05, -0.22, 1], NaN],
-  [1.4, [-0.2, 0.52, 0.42], [0.05, -0.24, 1], NaN],
-  [1.8, G_R, G_DIR, SP],
+// Light the Way: Thunderreach raised straight up to the sky in one hand while the lightning pours
+// down it; brought down over the top onto the line and drawn back like a javelin, the fist high
+// behind the ear; thrown. Then the empty hand (the spear is drawn in flight, see app.ts
+// spearFlight) follows through low across the body, comes up and reaches out open toward them,
+// and the spear lands back in it, pointing at them as it left, the shock driving the arm back.
+// Baked to time (linear): s 0.45 is the release, 1.0 the spear at the end of its line, and the
+// catch comes at about s 1.49 (two thirds of the way from 1.0 to the end, 1.7).
+const THROW_AT = 0.45;
+const THROW_TURN = 1.0;
+const THROW_DIR: V3 = [0.06, 0.06, 1];
+const throwGlaive = glaive([
+  [-1.7, G_R, G_DIR, SP],
+  // up to the sky
+  [-1.03, [-0.24, 0.98, 0.12], [0.05, 1, 0.06], NaN],
+  [-0.46, [-0.24, 1.0, 0.1], [0.05, 1, 0.08], NaN],
+  // over the top and drawn back along the line: the fist high behind the ear
+  [0.02, [-0.32, 0.86, -0.5], [0.08, 0.16, 0.98], NaN],
+  [0.2, [-0.33, 0.86, -0.36], [0.07, 0.12, 0.99], NaN],
+  // thrown: the arm whips through to full stretch
+  [THROW_AT, [-0.18, 0.74, 0.5], THROW_DIR, NaN],
+  // the empty hand follows through low across the body...
+  [0.72, [0.06, 0.3, 0.42], THROW_DIR, NaN],
+  // ...comes up and reaches out open for it
+  [THROW_TURN, [-0.12, 0.5, 0.58], THROW_DIR, NaN],
+  [1.47, [-0.16, 0.56, 0.62], THROW_DIR, NaN],
+  // caught: the shaft slaps into the palm and drives the arm back
+  [1.6, [-0.22, 0.44, 0.36], THROW_DIR, NaN],
+  [1.7, [-0.23, 0.4, 0.34], THROW_DIR, NaN],
+  [2.1, G_R, G_DIR, SP],
 ]);
 
 // Vault Strike: the blade end planted ahead and the body swung up over it in a forward somersault
@@ -497,45 +515,64 @@ export const spear: Style = {
       ],
       trail: { life: 0.26, glow: 0.8 },
     }),
-    // Thunderstrike: the glaive raised straight up to the sky one-handed while the free arm points at
-    // them, lightning gathering on the blade, then swung down to point at them as the bolt falls on
-    // the ground marked where they stood (be off it)
+    // Light the Way (see throwGlaive): drawn up tall and looking up as the spear goes to the sky and
+    // the lightning comes down it; then the weight goes back over the rear leg, the body turns away
+    // and arches with the fist high behind the ear and the free arm aimed at them; the front foot
+    // strides, the hips snap round, the trunk pitches over the front knee and the arm comes last;
+    // bowed over the follow-through, then up and reaching out for it, rocked back by the catch
     sp: mv({
       keys: [
-        K(-1.6, body),
-        // drawn up tall, square to them, the glaive going up
-        K(-1.0, b({ twist: -0.25, hipTwist: -0.2, crouch: -0.1, lean: -0.16, step: 0.26, back: 0.3, headPitch: -0.3 })),
-        K(0.15, b({ twist: -0.25, hipTwist: -0.2, crouch: -0.08, lean: -0.2, step: 0.26, back: 0.3, headPitch: -0.38 })),
-        // the point brought down onto them as the bolt falls
-        K(THUNDER_HIT, b({ twist: -0.5, hipTwist: -0.3, crouch: -0.3, lean: 0.28, step: 0.38, back: 0.32, headPitch: 0.0 })),
-        K(1.4, b({ twist: -0.5, hipTwist: -0.3, crouch: -0.3, lean: 0.26, step: 0.38, back: 0.32 })),
-        K(1.8, body),
+        K(-1.7, body),
+        K(-1.03, b({ twist: -0.25, hipTwist: -0.2, crouch: -0.08, lean: -0.18, step: 0.26, back: 0.3, headPitch: -0.34 })),
+        K(-0.46, b({ twist: -0.3, hipTwist: -0.22, crouch: -0.06, lean: -0.22, step: 0.26, back: 0.3, headPitch: -0.4 })),
+        K(0.02, b({ twist: -1.1, hipTwist: -0.75, crouch: -0.28, lean: -0.3, side: 0.1, step: 0.22, back: 0.56, headPitch: 0.18 })),
+        K(0.2, b({ twist: -1.0, hipTwist: -0.45, crouch: -0.3, lean: -0.12, step: 0.55, back: 0.56, headPitch: 0.15 })),
+        K(THROW_AT, b({ twist: -0.1, hipTwist: 0.12, crouch: -0.38, lean: 0.52, step: 0.86, back: 0.56, width: 0.18, headPitch: 0.06 })),
+        K(0.72, b({ twist: 0.15, hipTwist: 0.15, crouch: -0.42, lean: 0.6, step: 0.86, back: 0.56, width: 0.18, headPitch: 0.1 })),
+        K(THROW_TURN, b({ twist: -0.35, hipTwist: -0.05, crouch: -0.28, lean: 0.2, step: 0.66, back: 0.48, headPitch: 0.0 })),
+        K(1.47, b({ twist: -0.45, hipTwist: -0.12, crouch: -0.26, lean: 0.14, step: 0.6, back: 0.46, headPitch: 0.0 })),
+        K(1.6, b({ twist: -0.62, hipTwist: -0.3, crouch: -0.34, lean: -0.08, step: 0.5, back: 0.5, headPitch: 0.05 })),
+        K(1.7, b({ twist: -0.6, hipTwist: -0.32, crouch: -0.32, lean: -0.02, step: 0.46, back: 0.48 })),
+        K(2.1, body),
       ],
-      main: thunder,
-      // the free arm aimed at them while the glaive is raised
+      main: throwGlaive,
+      // the free arm out for balance as the spear goes up, aimed at them through the load, flung
+      // back against the throw, out wide for the catch, and onto the shaft again
       free: track([
-        [-1.6, [0.3, 0.2, 0.2]],
-        [-1.0, [0.12, 0.56, 0.62]],
-        [0.15, [0.12, 0.58, 0.64]],
-        [THUNDER_HIT, [0.4, 0.4, 0.2]],
-        [1.8, [0.3, 0.2, 0.2]],
+        [-1.7, [0.3, 0.2, 0.2]],
+        [-1.03, [0.5, 0.42, 0.25]],
+        [-0.46, [0.52, 0.45, 0.25]],
+        [0.02, [0.18, 0.56, 0.62]],
+        [0.2, [0.2, 0.54, 0.6]],
+        [THROW_AT, [0.42, 0.24, -0.34]],
+        [0.72, [0.4, 0.2, -0.3]],
+        [THROW_TURN, [0.5, 0.36, 0.1]],
+        [1.6, [0.48, 0.34, 0.06]],
+        [1.85, [0.1, 0.4, 0.4]],
       ]),
-      impacts: [THUNDER_HIT],
-      start: -1.6,
-      chamber: -1.0,
-      flow: 1.0,
-      blendIn: 0.3,
-      end: 1.4,
-      rest: 1.8,
-      settle: 0.6,
+      impacts: [THROW_AT, THROW_TURN],
+      start: -1.7,
+      chamber: 0.02,
+      linear: true,
+      blendIn: 0.25,
+      end: 1.7,
+      rest: 2.1,
+      settle: 0.7,
       fx: [
-        fx(-0.95, 'sparkle', 'tip', 1.2, BOLT),
-        fx(-0.6, 'bolt', 'tip', 0.45, BOLT),
-        fx(-0.25, 'sparkle', 'tip', 1.4, BOLT),
-        fx(0.05, 'bolt', 'tip', 0.55, BOLT),
-        fx(THUNDER_HIT, 'flashline', 'tip', 1.2, BOLT),
+        fx(-1.4, 'sparkle', 'tip', 1.0, BOLT),
+        // the lightning comes down the raised spear: the tower lit up
+        fx(-1.0, 'bolt', 'tip', 1.3),
+        fx(-0.98, 'sparkle', 'tip', 1.5, BOLT),
+        fx(-0.8, 'embers', 'root', 1.0, BOLT),
+        fx(-0.72, 'bolt', 'tip', 0.7),
+        fx(-0.55, 'sparkle', 'main', 1.3, BOLT),
+        fx(-0.3, 'whirl', 'main', 0.9, BOLT),
+        fx(0.3, 'stomp', 'feet', 1.1),
+        fx(THROW_AT, 'flashline', 'tip', 1.6, BOLT),
+        fx(THROW_AT, 'shockwave', 'front', 1.0, BOLT),
+        fx(THROW_AT + 0.02, 'dust', 'feet', 1.0),
       ],
-      trail: { life: 0.26, glow: 0.9 },
+      trail: { life: 0.26, glow: 0.95 },
     }),
     // Vault Strike: the blade planted ahead and the body swung up and over it in a forward
     // somersault, clean over them, untouchable; landed in a crouch with the glaive driven back under
@@ -793,7 +830,7 @@ export const spear: Style = {
     fx: [fx(0.05, 'dust', 'feet', 1.0), fx(0.98, 'dust', 'feet', 0.9)],
     trail: { life: 0.2, glow: 0.4 },
   }),
-  // Entrance, Storm of the North (see entranceSpear): the bolt, the rise, the spin, the gathering
+  // Entrance, The Stormwarden (see entranceSpear): the bolt, the rise, the spin, the gathering
   // and the thrust, one motion
   entrance: mv({
     keys: [
