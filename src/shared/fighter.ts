@@ -118,6 +118,11 @@ export class Fighter {
   buffUntil = 0;
   riposteUntil = 0;
   invulnUntil = 0;
+  /**
+   * Where the current attack is aimed, for a zone attack (AttackShape 'zone'): set by the server as
+   * the attack starts, to the nearest foe in front within its range (see Instance.aimPoint).
+   */
+  aim: { x: number; z: number } | null = null;
 
   // kinematics (authoritative on the owning client for players, on the server for bots)
   x = 0;
@@ -311,11 +316,17 @@ export class Fighter {
   /** Forward lunge speed (m/s) from the current attack, if any; negative for attacks that give ground. */
   lungeSpeed(now: number): number {
     if (this.state !== 'attack' || !this.attack?.lunge) return 0;
-    const start = this.atkWindup * 0.55;
-    const end = this.atkWindup + this.attack.active;
+    // a vault carries them through the air from early in the windup and lands as it ends
+    const start = this.atkWindup * (this.attack.vault ? 0.15 : 0.55);
+    const end = this.atkWindup + (this.attack.vault ? 0 : this.attack.active);
     const e = now - this.stateStart;
     if (e < start || e > end) return 0;
     return this.attack.lunge / ((end - start) / 1000);
+  }
+
+  /** In the air on a vault's lunge, passing over anyone in the way (no bodies to collide with). */
+  vaulting(now: number): boolean {
+    return this.state === 'attack' && !!this.attack?.vault && now - this.stateStart < this.atkWindup;
   }
 
   /** Dodge velocity (world space, m/s). Ease-out profile that integrates to dodgeDist. */
@@ -375,6 +386,9 @@ export class Fighter {
     this.attack = atk;
     this.attackKey = key;
     this.atkWindup = Math.round(atk.windup * scale);
+    this.aim = null;
+    // a vault is untouchable in the air
+    if (atk.vault) this.invulnUntil = Math.max(this.invulnUntil, now + this.atkWindup * 0.9);
     this.comboIndex = this.isLightKey(key) ? Number(key.slice(1)) : -1;
     this.attackSerial++;
     this.emit({ type: 'attack', t: now, key });

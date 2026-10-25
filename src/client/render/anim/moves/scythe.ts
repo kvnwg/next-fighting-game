@@ -103,15 +103,18 @@ const rites = seq([
 ]);
 const ritesHit = hitAt(rites, 3, 1);
 
-// Reaping Arc: wheeled at the right side, faster and lower, then swept flat round along the ground
-const reaping = seq(
+// Requiem: lifted high over the head and whirled there once on a short chain, then driven straight
+// down into the ground at his feet, the blade buried and the haft stood up out of it
+const REQUIEM_HIT = 0.45;
+const requiem = seq(
   [
-    [-1.6, -0.2, whirl([-0.46, 0.26, 0.08], [0, 1, 0.1], [0, 0.1, 1], 1.75, 90, 0.12, [-0.5, 0.12, 0.06])],
-    [-0.2, 1.07, cast([[-0.15, 0.2, -1], [-0.95, 0.12, -0.2], [-0.75, 0.1, 0.66], [-0.02, 0.12, 1], [0.6, 0.1, 0.8], [0.9, 0.12, 0.4]], 0.3, [-0.2, 0.2, 0.12])],
+    [-1.6, -0.75, line([-0.32, 0.22, 0.12], [-0.12, 0.95, 0.05], [0, -0.2, 1], [0, 1, 0.12], [0, 0, 1])],
+    [-0.75, 0.0, whirl([-0.12, 0.95, 0.05], [0, 0.25, 1], [-1, 0.25, 0], -1, 0, 0.1)],
+    [0.0, REQUIEM_HIT, line([-0.12, 0.95, 0.05], [-0.1, 0.06, 0.42], [0, 1, 0.12], [0.02, -1, 0.15], [0, 0, 1])],
+    [REQUIEM_HIT, 1.5, line([-0.1, 0.06, 0.42], [-0.1, 0.08, 0.42], [0.02, -1, 0.15], [0.02, -1, 0.15], [0, 0, 1])],
   ],
   0.1,
 );
-const reapingHit = hitAt(reaping, 3, 1);
 
 /** The sickle keyed along s (the entrance): straight moves between keyed grips [s, pos, dir, edge], held outside them. */
 type Grip = [number, V3, V3, V3];
@@ -460,37 +463,44 @@ export const scythe: Style = {
       fx: [fx(ritesHit, 'shockwave', 'tip', 1.0), fx(ritesHit, 'soulfire', 'tip', 1.0), fx(ritesHit, 'wisps', 'tip', 1.2), fx(ritesHit, 'stomp', 'feet', 0.7)],
       trail: { life: 0.24, glow: 0.6 },
     }),
-    // Reaping Arc: the sickle wheeled at the right side, faster and lower as the Wraith sinks into a
-    // wide crouch, then swept round flat along the ground at their ankles in green fire
+    // Requiem: the sickle raised high and whirled once over the head as the Wraith stands tall, then
+    // driven down into the ground at his feet as he sinks to one knee over it: a ring of soulfire
+    // bursts up out of the ground round him (hug him inside it, or be beyond it)
     sp: mv({
       keys: [
-        K(-1.6, B({ ...body, twist: -0.4, lean: 0.1, crouch: -0.09 })),
-        K(-0.5, B({ ...body, twist: -1.15, hipTwist: -0.5, crouch: -0.16, lean: 0.12, step: 0.14, back: 0.28, width: 0.28, side: 0.12 })),
-        K(reapingHit + 0.1, B({ ...body, twist: 0.0, hipTwist: 0.0, crouch: -0.17, lean: 0.36, step: 0.26, back: 0.2, width: 0.3 })),
-        K(1.05, B({ ...body, twist: 1.0, hipTwist: 0.45, crouch: -0.2, lean: 0.36, step: 0.26, back: 0.2, width: 0.3 })),
+        K(-1.6, B({ ...body, twist: -0.3, lean: 0.08, crouch: -0.07 })),
+        K(-0.75, B({ ...body, twist: -0.05, hipTwist: 0, lean: -0.22, crouch: 0.02, step: 0.16, back: 0.16, headPitch: -0.32 })),
+        K(0.0, B({ ...body, twist: 0.0, hipTwist: 0, lean: -0.26, crouch: 0.03, step: 0.16, back: 0.16, headPitch: -0.36 })),
+        K(REQUIEM_HIT, B({ ...body, twist: 0.0, hipTwist: 0, lean: 0.46, crouch: -0.44, step: 0.3, back: 0.34, width: 0.18, headPitch: 0.1 })),
+        K(1.2, B({ ...body, twist: 0.0, hipTwist: 0, lean: 0.42, crouch: -0.44, step: 0.3, back: 0.34, width: 0.18, headPitch: 0.15 })),
+        K(1.5, B({ ...body })),
       ],
-      main: reaping,
+      main: requiem,
+      // the free hand spread out over the ground as he sinks
       free: track([
         [-1.6, [0.3, 0.2, 0.25]],
-        [-0.5, [0.38, 0.3, 0.3]],
-        [reapingHit, [0.45, 0.25, 0.1]],
-        [1.0, [0.35, 0.2, 0.15]],
+        [-0.75, [0.45, 0.62, 0.2]],
+        [REQUIEM_HIT, [0.42, 0.05, 0.42]],
+        [1.5, [0.3, 0.2, 0.25]],
       ]),
-      impacts: [reapingHit],
+      impacts: [REQUIEM_HIT],
       start: -1.6,
-      chamber: -1.5,
-      flow: 1.25,
+      chamber: -0.75,
+      flow: 1.2,
       blendIn: 0.3,
+      end: 1.2,
+      rest: 1.5,
+      settle: 0.6,
       fx: [
-        fx(-1.2, 'whirl', 'root', 0.7, BLOOD),
-        fx(-0.6, 'whirl', 'root', 1.0, BLOOD),
-        fx(hitAt(reaping, 2, 1), 'soulfire', 'tip', 0.8),
-        fx(reapingHit, 'soulfire', 'tip', 1.2),
-        fx(reapingHit, 'wisps', 'tip', 0.8),
-        fx(hitAt(reaping, 4, 1), 'soulfire', 'tip', 0.8),
-        fx(0.95, 'soulfire', 'tip', 0.6),
+        fx(-1.2, 'wisps', 'tip', 0.8),
+        fx(-0.5, 'whirl', 'root', 0.9, SOUL),
+        fx(-0.1, 'soulfire', 'tip', 0.7),
+        fx(REQUIEM_HIT, 'soulfire', 'tip', 1.6),
+        fx(REQUIEM_HIT, 'shockwave', 'tip', 1.3, SOUL),
+        fx(REQUIEM_HIT + 0.01, 'wisps', 'tip', 1.4),
+        fx(REQUIEM_HIT + 0.02, 'stomp', 'feet', 0.7),
       ],
-      trail: { life: 0.24, glow: 0.7 },
+      trail: { life: 0.26, glow: 0.75 },
     }),
     // Soul Hook: the sickle swung up over the shoulder and thrown overhand straight at them; a chain
     // of souls reaches out after it, and the Wraith hauls it back in hand over hand

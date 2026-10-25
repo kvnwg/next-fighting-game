@@ -58,6 +58,8 @@ export interface FighterSnap {
   n: number;
   /** when the special is charged (server ms); drives the special meter */
   sr?: number;
+  /** where the current zone attack is aimed (x, z): the ground it marks */
+  am?: [number, number];
 }
 
 export interface CombatEvent {
@@ -219,6 +221,7 @@ export function fighterSnap(f: Fighter, flags: number): FighterSnap {
   if (f.state === 'attack' && f.attackKey) {
     s.a = f.attackKey;
     s.aw = f.atkWindup;
+    if (f.aim) s.am = [round2(f.aim.x), round2(f.aim.z)];
   }
   return s;
 }

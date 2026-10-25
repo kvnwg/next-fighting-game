@@ -41,6 +41,7 @@ const PERILOUS_TIP: Record<Perilous, string> = {
   thrust: 'Perilous THRUST — deflect it, or dodge into it for a Mikiri Counter',
   sweep: 'Perilous SWEEP — jump over it',
   grab: 'Perilous GRAB — dodge or jump away',
+  area: 'Perilous AREA — get off the marked ground, or dodge through it as it lands',
 };
 
 export interface UIHandlers {

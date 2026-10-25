@@ -109,6 +109,51 @@ function setup(a: CharacterId, b: CharacterId) {
   return { game, arena, pa, pb, fa: arena.slots[0] as ServerFighter, fb: arena.slots[1] as ServerFighter, inboxA, step, now: () => t };
 }
 
+describe('new specials on the server', () => {
+  const hitsBy = (inbox: ServerMsg[], id: string) =>
+    inbox.filter((m) => m.t === 'fx').flatMap((m) => (m as Extract<ServerMsg, { t: 'fx' }>).e).filter((e) => e.a === id && e.k !== 'feint');
+
+  it('Thunderstrike is aimed at the foe as it starts, and misses them if they leave the mark', () => {
+    for (const leave of [false, true]) {
+      const { arena, fa, fb, inboxA, now, step } = setup('lancer', 'ronin');
+      fa.owner = null;
+      fa.x = 0;
+      fa.z = 0;
+      fa.yaw = 0;
+      fb.x = 0.5;
+      fb.z = 8;
+      fb.yaw = Math.PI;
+      fa.specialReadyAt = 0;
+      arena.applyInput(fa, 'special', now());
+      expect(fa.aim).toEqual({ x: 0.5, z: 8 });
+      step(300);
+      if (leave) fb.x = 3.5;
+      step(fa.atkWindup + 400);
+      const out = hitsBy(inboxA, fa.id).map((e) => e.k);
+      expect(out.includes('hit')).toBe(!leave);
+    }
+  });
+
+  it('Vault Strike carries the Lancer over the foe and takes them in the back, past their guard', () => {
+    const { arena, pb, fa, fb, inboxA, now, step } = setup('lancer', 'ronin');
+    fa.owner = null;
+    fa.x = 0;
+    fa.z = 0;
+    fa.yaw = 0;
+    fb.x = 0;
+    fb.z = 2.6;
+    fb.yaw = Math.PI;
+    // guarding toward where he started
+    arena.handleAction(pb, { t: 'act', a: 'blockDown', vt: now(), r: Math.PI });
+    step(300);
+    arena.applyInput(fa, 'ability', now());
+    step(fa.atkWindup + fa.attack!.active + 200);
+    expect(fa.z).toBeGreaterThan(fb.z + 0.5);
+    expect(fb.blockHeld).toBe(true);
+    expect(hitsBy(inboxA, fa.id)[0]?.k).toBe('hit');
+  });
+});
+
 describe('server authority', () => {
   it('ignores impossible heights (hovering out of reach)', () => {
     const { arena, pa, fa } = setup('ronin', 'ronin');

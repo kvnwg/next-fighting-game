@@ -89,6 +89,8 @@ export class Effects {
   private splatMesh: THREE.InstancedMesh;
   private splats: { x: number; z: number; r: number; rot: number; stretch: number; delay: number; life: number; max: number; color: THREE.Color }[] = [];
   private splatNext = 0;
+  /** bursts waiting to go off (a fissure splitting outwards) */
+  private timers: { t: number; run: () => void }[] = [];
 
   constructor(readonly scene: THREE.Scene) {
     const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -565,7 +567,19 @@ export class Effects {
     this.burst(_a.copy(pos).setY(pos.y + 1), { count: 24, color: ['#ff6a2a', '#ffb030', '#ff2a1a'], speed: 5, up: 1, life: 0.5, size: 0.07, gravity: -2, drag: 2 });
   }
 
+  /** Run `run` after `delay` seconds, to stagger a sequence of bursts. */
+  after(delay: number, run: () => void): void {
+    this.timers.push({ t: delay, run });
+  }
+
   update(dt: number, camera: THREE.Camera): void {
+    for (let i = this.timers.length - 1; i >= 0; i--) {
+      const tm = this.timers[i];
+      tm.t -= dt;
+      if (tm.t > 0) continue;
+      this.timers.splice(i, 1);
+      tm.run();
+    }
     let n = 0;
     for (const p of this.particles) {
       if (!p.alive) continue;

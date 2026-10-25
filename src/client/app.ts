@@ -1,9 +1,10 @@
 /** The client application: wires networking, input, simulation, rendering and UI together. */
 import * as THREE from 'three';
-import { AttackKey, CHARACTERS, CharacterId, executeSpacing, getAttack, isHeavyKey } from '../shared/characters';
+import { AttackDef, AttackKey, AttackShape, CHARACTERS, CharacterId, executeSpacing, getAttack, isHeavyKey } from '../shared/characters';
 import { COMBAT, MATCH, PLAYER_RADIUS } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, hazardAt, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
+import { zoneAim } from '../shared/combat';
 import { CombatEvent, PROTOCOL_VERSION, ProfileView, RingView, RosterEntry, ServerMsg } from '../shared/protocol';
 import { rankOf } from '../shared/ranks';
 import { audio } from './audio';
@@ -25,6 +26,7 @@ import { portraitURL } from './render/portrait';
 import { SelectScreen } from './select';
 import { MapView } from './render/world';
 import { RingWalls } from './render/rings';
+import { Telegraph } from './render/telegraph';
 import { TITLE_MAP } from './render/maps/title';
 import { TitleScene } from './title/scene';
 import { TitleScreen } from './title/screen';
@@ -44,6 +46,8 @@ const IMPACT_MS = 70;
 const EXEC_WHOOSH_LEAD = 160;
 /** and the finishing blow's recorded lead-ins (audio's EXEC_LEAD) */
 const EXEC_SOUND_LEAD = EXEC_LEAD * 1000;
+/** the colour an area attack's ground flashes as it lands: a fissure's embers, lightning, soulfire */
+const AREA_HIT: Record<AttackShape['kind'], string> = { line: '#ff8a3a', zone: '#ffe27a', ring: '#3cff8a' };
 
 export function startApp(root: HTMLElement, offline = false): void {
   new App(root, offline);
@@ -64,6 +68,10 @@ class App {
   private mapView: MapView | null = null;
   private map: MapDef = LOBBY_MAP;
   private fighters = new Map<string, ClientFighter>();
+  /** the ground marked under each fighter's perilous area attack while it winds up, by fighter id */
+  private marks = new Map<string, { tg: Telegraph; serial: number; aim: { x: number; z: number } | null }>();
+  /** marks whose blow has landed or was stopped, fading out */
+  private fadingMarks: Telegraph[] = [];
   private local: LocalController | null = null;
   private myId = '';
   private profile: ProfileView | null = null;
@@ -1223,6 +1231,116 @@ class App {
     f.fxQueue.length = 0;
   }
 
+  /**
+   * A perilous area attack's ground, marked from the first frame of its windup so you can get off
+   * it: the strip ahead a fissure will split, the band around the Wraith his ring of fire will
+   * sweep, the circle lightning will strike where you stood. The fill reaches the edge as the blow
+   * lands, and the attack's own effect goes off across the whole of it.
+   */
+  private areaFx(f: ClientFighter, now: number): void {
+    const v = f.view(now);
+    const atk = v.state === 'attack' && v.attack?.perilous ? v.attack : null;
+    const shape = atk?.shape;
+    let m = this.marks.get(f.id);
+    if (m && (!shape || m.serial !== v.serial)) {
+      // stopped before it landed
+      m.tg.cancel();
+      this.fadingMarks.push(m.tg);
+      this.marks.delete(f.id);
+      m = undefined;
+    }
+    if (!atk || !shape || f.lastAreaSerial === v.serial) return;
+    if (!m) {
+      if (v.elapsed >= v.windup) return;
+      const tg = new Telegraph(shape, atk.range, '#ff2a2a', AREA_HIT[shape.kind]);
+      this.effects.group.add(tg.mesh);
+      m = { tg, serial: v.serial, aim: null };
+      this.marks.set(f.id, m);
+    }
+    if (shape.kind === 'zone') {
+      // where the server says it's aimed; until that arrives (your own), the same choice made here
+      m.aim = f.am ?? m.aim ?? zoneAim({ x: f.pos.x, z: f.pos.z, yaw: f.yaw }, [...this.fighters.values()].filter((o) => o !== f && o.s !== 'dead').map((o) => o.pos), atk.range);
+      m.tg.place(m.aim.x, m.aim.z, 0);
+    } else m.tg.place(f.pos.x, f.pos.z, f.yaw);
+    m.tg.progress = v.elapsed / v.windup;
+    if (v.elapsed < v.windup) return;
+    f.lastAreaSerial = v.serial;
+    m.tg.strike();
+    this.fadingMarks.push(m.tg);
+    this.marks.delete(f.id);
+    this.areaStrike(f, atk, shape, m.tg.mesh.position.clone(), f.yaw);
+  }
+
+  /** The blow of an area attack landing across the ground it marked. */
+  private areaStrike(f: ClientFighter, atk: AttackDef, shape: AttackShape, at: THREE.Vector3, yaw: number): void {
+    const fx = this.effects;
+    const me = this.local?.cf;
+    const near = (p: THREE.Vector3): number => (me ? Math.max(0, 1 - dist2D(me.pos.x, me.pos.z, p.x, p.z) / 14) : 0);
+    at.y = 0.05;
+    switch (shape.kind) {
+      case 'line': {
+        // the ground splits from the hammer out to the end of the strip, earth thrown up along it
+        const fw = forward(yaw);
+        const dir = new THREE.Vector3(fw.x, 0, fw.z);
+        for (let s = 0.8; s <= atk.range; s += 0.7) {
+          const p = new THREE.Vector3(at.x + fw.x * s, 0.05, at.z + fw.z * s);
+          fx.after(s * 0.02, () => {
+            fx.quake(p, dir, 0.8);
+            if (Math.random() < 0.5) fx.debris(p, 0.7);
+          });
+        }
+        const end = new THREE.Vector3(at.x + fw.x * atk.range, 0.05, at.z + fw.z * atk.range);
+        fx.after(atk.range * 0.02, () => fx.shockwave(end, 0.7, AREA_HIT.line));
+        const mid = at.clone().addScaledVector(dir, atk.range / 2);
+        audio.cue('quake', f.roster.char, 1.8, { vol: this.volumeAt(mid.x, mid.z), pos: mid });
+        const k = Math.max(near(at), near(mid), near(end));
+        if (k > 0.05) this.cam.shake(0.2 * k, 0.4);
+        break;
+      }
+      case 'zone': {
+        // lightning out of a clear sky onto the mark
+        fx.bolt(at, AREA_HIT.zone, 1.7);
+        fx.bolt(at, '#cfe8ff', 0.9);
+        fx.shockwave(at, 0.7, AREA_HIT.zone);
+        const k = near(at);
+        this.renderer.flash = Math.max(this.renderer.flash, 0.25 + 0.4 * k);
+        this.renderer.flashColor.set('#fff8e0');
+        if (k > 0.05) this.cam.shake(0.32 * k, 0.35);
+        audio.cue('bolt', f.roster.char, 2, { vol: this.volumeAt(at.x, at.z), pos: at });
+        break;
+      }
+      case 'ring': {
+        // soulfire bursts up all through the band and a green wave rolls out across it
+        for (let i = 0; i < 30; i++) {
+          const a = (i / 30) * Math.PI * 2 + Math.random() * 0.2;
+          const r = shape.inner + Math.random() * (atk.range - shape.inner);
+          fx.soulfire(new THREE.Vector3(at.x + Math.cos(a) * r, 0.05, at.z + Math.sin(a) * r), 0.7);
+        }
+        fx.ring(at, AREA_HIT.ring, atk.range, 0.55, undefined, true);
+        fx.ring(at, '#b8ffd0', shape.inner, 0.35, undefined, true);
+        const k = near(at);
+        if (k > 0.05) this.cam.shake(0.18 * k, 0.25);
+        break;
+      }
+    }
+  }
+
+  private updateMarks(dt: number): void {
+    for (const [id, m] of this.marks) {
+      if (this.fighters.has(id)) m.tg.update(dt);
+      else {
+        m.tg.cancel();
+        this.fadingMarks.push(m.tg);
+        this.marks.delete(id);
+      }
+    }
+    for (let i = this.fadingMarks.length - 1; i >= 0; i--) {
+      if (this.fadingMarks[i].update(dt)) continue;
+      this.fadingMarks[i].dispose();
+      this.fadingMarks.splice(i, 1);
+    }
+  }
+
   /** Shake the camera for an impact, fading with distance from the local player. */
   private shakeNear(f: ClientFighter, amount: number, time: number): void {
     const me = this.local?.cf;
@@ -1393,6 +1511,7 @@ class App {
       const buff = (f.flags & 1) === 1 || (!!f.sim && f.sim.buffActive(now));
       f.updateVisual(dt, now, buff);
       this.stateCues(f, now);
+      this.areaFx(f, now);
       this.moveFx(f);
       this.auraFx(f, dt);
       this.signatureFx(f, dt);
@@ -1422,6 +1541,7 @@ class App {
     this.titleScreen?.update(dt);
     this.ringWalls?.update(dt);
     this.effects.update(dt, this.renderer.camera);
+    this.updateMarks(dt);
     this.updateHud(dt, now);
     this.renderer.render();
     if (this.snapWant) {

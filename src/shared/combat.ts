@@ -80,19 +80,57 @@ export function pushDefense(log: DefenseEvent[], e: DefenseEvent): void {
   log.splice(i, 0, e);
 }
 
-/** Is `target` inside the attack cone of `attacker`? Returns the distance if so. */
+/**
+ * Is `target` inside the attack's reach: the cone in front of `attacker`, or its shape (a line
+ * straight ahead, a ring round it, or a zone round where it aimed)? Returns the distance between
+ * them if so.
+ */
 export function inAttackCone(attacker: Fighter, target: Fighter, atk: AttackDef, radius: number): number | null {
   const dx = target.x - attacker.x;
   const dz = target.z - attacker.z;
   const d = Math.hypot(dx, dz);
-  if (d - radius > atk.range) return null;
+  const shape = atk.shape;
+  if (shape?.kind === 'zone') {
+    const aim = attacker.aim;
+    if (!aim) return null;
+    return Math.hypot(target.x - aim.x, target.z - aim.z) - radius <= shape.radius ? d : null;
+  }
   if (Math.abs(target.y - attacker.y) > 2.2) return null;
+  if (shape?.kind === 'ring') return d + radius >= shape.inner && d - radius <= atk.range ? d : null;
+  if (shape?.kind === 'line') {
+    const f = forward(attacker.yaw);
+    const along = dx * f.x + dz * f.z;
+    const across = Math.abs(dx * f.z - dz * f.x);
+    return along >= -radius && along - radius <= atk.range && across <= shape.width + radius ? Math.max(0, along) : null;
+  }
+  if (d - radius > atk.range) return null;
   if (d < 0.3) return d;
   const ang = Math.abs(angleDiff(attacker.yaw, Math.atan2(dx, dz)));
   // a wider effective arc up close so point-blank hits don't whiff
   const slack = Math.atan2(radius, d);
   if (ang > atk.arc * DEG + slack) return null;
   return d;
+}
+
+/**
+ * Where a zone attack marks the ground: on the foe it's most plausibly meant for (near, and in
+ * front), or half its range straight ahead if nobody is in reach.
+ */
+export function zoneAim(from: { x: number; z: number; yaw: number }, foes: Iterable<{ x: number; z: number }>, range: number): Vec2 {
+  let best: { x: number; z: number } | null = null;
+  let bestScore = Infinity;
+  for (const o of foes) {
+    const d = Math.hypot(o.x - from.x, o.z - from.z);
+    if (d > range) continue;
+    const score = d + Math.abs(angleDiff(from.yaw, yawTo(from.x, from.z, o.x, o.z))) * 3;
+    if (score < bestScore) {
+      bestScore = score;
+      best = o;
+    }
+  }
+  if (best) return { x: best.x, z: best.z };
+  const fw = forward(from.yaw);
+  return { x: from.x + fw.x * range * 0.5, z: from.z + fw.z * range * 0.5 };
 }
 
 export function decideOutcome(attacker: Fighter, defender: Fighter, atk: AttackDef, t: number, def: DefenseInfo): Outcome {
@@ -115,14 +153,15 @@ export function decideOutcome(attacker: Fighter, defender: Fighter, atk: AttackD
     defender.stateStart <= t &&
     defender.char.ability.kind === 'counter' &&
     atk.perilous !== 'grab' &&
-    atk.perilous !== 'sweep'
+    atk.perilous !== 'sweep' &&
+    atk.perilous !== 'area'
   ) {
     return 'counter';
   }
 
   const guardArc = (COMBAT.guardArc + (defender.mods.guardArcBonus ?? 0)) * DEG;
   const facing = Math.abs(angleDiff(defender.yaw, toAttacker)) <= guardArc;
-  const canDeflect = !atk.unparryable && atk.perilous !== 'sweep' && atk.perilous !== 'grab';
+  const canDeflect = !atk.unparryable && atk.perilous !== 'sweep' && atk.perilous !== 'grab' && atk.perilous !== 'area';
   const canBlock = !atk.perilous;
 
   if (facing && def.parrying && canDeflect) return 'deflect';

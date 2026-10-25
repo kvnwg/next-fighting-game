@@ -9,8 +9,10 @@
  * over the left shoulder, the glaive raised overhead and driven down and round into a low thrust,
  * the overhead twirl that drops into two full turns at the ankles, a long side-on lunge out of the
  * dash, a charge that rips the blade up from the floor, a backhand sweep and a wheel over the top
- * while giving ground, a cut from overhead and a plunge into the floor from the air, and the Pole
- * Vault out of reach. Lightning crackles along the glaive through every heavy.
+ * while giving ground, a cut from overhead and a plunge into the floor from the air, lightning
+ * called down from the sky with the glaive raised to it (Thunderstrike), and a vault clean over
+ * them that drives the glaive into the ground behind him (Vault Strike). Lightning crackles along
+ * the glaive through every heavy.
  */
 import { B, K, N, P, Style, X, arc, circle, fx, line, mv, seq, track } from '../author';
 import type { BodyPose, Motion, V3 } from '../author';
@@ -161,15 +163,31 @@ const splitterFree = track([
   [0.2, [-0.2, 0.3, 0.5]],
 ]);
 
-// Whirlwind: twirled one-handed flat over the head, dropped to the ankles, and swept round low
-const whirl = seq(
-  [
-    [-1.6, -0.85, arc([-0.28, 0.88, 0.16], -0.15, circle([0, 0, 1], [-1, -0.28, 0], 1.25, 0, 14), NaN)],
-    [-0.85, -0.45, line([-0.28, 0.76, 0.22], [-0.28, 0.14, 0.26], [0, 0, 1], [-0.05, -0.28, 1], UPE, NaN, NaN, { body: true })],
-    [-0.45, 1.9, line([-0.28, 0.14, 0.26], [-0.28, 0.14, 0.26], [-0.05, -0.28, 1], [-0.05, -0.28, 1], UPE, NaN, NaN, { body: true })],
-  ],
-  0.08,
-);
+// Thunderstrike: the glaive raised straight up to the sky in one hand while the other points at
+// them, held there as the lightning gathers on the blade, then swung down to point at them as the
+// bolt falls where they stood
+const THUNDER_HIT = 0.45;
+const thunder = glaive([
+  [-1.6, G_R, G_DIR, SP],
+  [-1.0, [-0.24, 0.95, 0.12], [0.05, 1, 0.04], NaN],
+  [0.15, [-0.24, 0.98, 0.12], [0.05, 1, 0.08], NaN],
+  [THUNDER_HIT, [-0.2, 0.56, 0.42], [0.05, -0.22, 1], NaN],
+  [1.4, [-0.2, 0.52, 0.42], [0.05, -0.24, 1], NaN],
+  [1.8, G_R, G_DIR, SP],
+]);
+
+// Vault Strike: the blade end planted ahead and the body swung up over it in a forward somersault
+// with the shaft held tight to the chest, then landed in a crouch with the glaive driven down and
+// back under the arm into the ground behind him, where they stand
+const VAULT_HIT = 0.45;
+const vault = glaive([
+  [-1.0, [-0.15, 0.4, 0.3], [0.1, -0.85, 0.5], 0.4],
+  [-0.55, [-0.2, 0.55, 0.15], [0.1, 0.9, 0.3], 0.4],
+  [0.0, [-0.22, 0.5, 0.18], [0.1, 0.92, 0.22], 0.4],
+  [VAULT_HIT, [-0.3, 0.28, -0.08], [-0.1, -0.55, -0.83], 0.3],
+  [1.1, [-0.3, 0.26, -0.08], [-0.1, -0.58, -0.81], 0.3],
+  [1.45, G_R, G_DIR, SP],
+]);
 
 // Serpent Lunge: turned side-on and cocked like a javelin, the right fist by the ear and the blade
 // raised high out to the right while the left arm aims at them; then brought onto the line, the left
@@ -467,46 +485,77 @@ export const spear: Style = {
       ],
       trail: { life: 0.26, glow: 0.8 },
     }),
-    // Whirlwind: the glaive twirled flat over the head in one hand, then down into a crouch with it
-    // level at the ankles for two full turns; jump it
+    // Thunderstrike: the glaive raised straight up to the sky one-handed while the free arm points at
+    // them, lightning gathering on the blade, then swung down to point at them as the bolt falls on
+    // the ground marked where they stood (be off it)
     sp: mv({
       keys: [
-        K(-1.6, b({ crouch: -0.12, lean: -0.05, twist: 0.2, hipTwist: 0 }), { spin: 0 }),
-        K(-1.0, b({ crouch: -0.06, lean: -0.1, twist: -0.2, hipTwist: 0, headPitch: -0.12 }), { spin: 0 }),
-        // wound up the other way against the turns to come, then dropped into them
-        K(-0.82, b({ twist: 0.75, hipTwist: 0.4, crouch: -0.26, lean: 0.02, side: -0.1, headPitch: -0.05 }), { spin: 0.06 }),
-        K(-0.6, b({ front: 'R', twist: -0.2, hipTwist: 0, crouch: -0.44, lean: 0.32, step: 0.2, back: 0.24, width: 0.24 }), { spin: -0.1 }),
-        K(0.55, b({ front: 'R', twist: -0.1, hipTwist: 0, crouch: -0.42, lean: 0.32, step: 0.2, back: 0.24, width: 0.24 }), { spin: -1 }),
-        K(1.6, b({ front: 'R', twist: -0.1, hipTwist: 0, crouch: -0.42, lean: 0.3, step: 0.24, back: 0.26, width: 0.22 }), { spin: -2 }),
-        K(1.9, b({ crouch: -0.18, lean: 0.12 }), { spin: -2 }),
+        K(-1.6, body),
+        // drawn up tall, square to them, the glaive going up
+        K(-1.0, b({ twist: -0.25, hipTwist: -0.2, crouch: -0.1, lean: -0.16, step: 0.26, back: 0.3, headPitch: -0.3 })),
+        K(0.15, b({ twist: -0.25, hipTwist: -0.2, crouch: -0.08, lean: -0.2, step: 0.26, back: 0.3, headPitch: -0.38 })),
+        // the point brought down onto them as the bolt falls
+        K(THUNDER_HIT, b({ twist: -0.5, hipTwist: -0.3, crouch: -0.3, lean: 0.28, step: 0.38, back: 0.32, headPitch: 0.0 })),
+        K(1.4, b({ twist: -0.5, hipTwist: -0.3, crouch: -0.3, lean: 0.26, step: 0.38, back: 0.32 })),
+        K(1.8, body),
       ],
-      main: whirl,
-      // the free arm thrown up and out for balance through the twirl and the turns
+      main: thunder,
+      // the free arm aimed at them while the glaive is raised
       free: track([
         [-1.6, [0.3, 0.2, 0.2]],
-        [-1.2, [0.6, 0.62, 0.1]],
-        [-0.6, [0.66, 0.45, 0.12]],
-        [1.5, [0.66, 0.45, 0.12]],
-        [1.9, [0.34, 0.2, 0.2]],
+        [-1.0, [0.12, 0.56, 0.62]],
+        [0.15, [0.12, 0.58, 0.64]],
+        [THUNDER_HIT, [0.4, 0.4, 0.2]],
+        [1.8, [0.3, 0.2, 0.2]],
       ]),
-      impacts: [0.45],
+      impacts: [THUNDER_HIT],
       start: -1.6,
-      chamber: -1.5,
-      flow: 1.3,
+      chamber: -1.0,
+      flow: 1.0,
       blendIn: 0.3,
-      end: 1.6,
-      rest: 1.9,
+      end: 1.4,
+      rest: 1.8,
       settle: 0.6,
       fx: [
-        fx(-1.4, 'whirl', 'main', 0.8, '#bff8ff'),
-        fx(-0.5, 'stomp', 'feet', 0.7),
-        fx(-0.2, 'whirl', 'root', 1.0, '#bff8ff'),
-        fx(0.0, 'quake', 'tip', 0.8),
-        fx(0.45, 'quake', 'tip', 1.2),
-        fx(0.45, 'whirl', 'root', 1.3, '#2ce8f5'),
-        fx(1.0, 'quake', 'tip', 0.8),
+        fx(-0.95, 'sparkle', 'tip', 1.2, BOLT),
+        fx(-0.6, 'bolt', 'tip', 0.45, BOLT),
+        fx(-0.25, 'sparkle', 'tip', 1.4, BOLT),
+        fx(0.05, 'bolt', 'tip', 0.55, BOLT),
+        fx(THUNDER_HIT, 'flashline', 'tip', 1.2, BOLT),
       ],
-      trail: { life: 0.26, glow: 0.7 },
+      trail: { life: 0.26, glow: 0.9 },
+    }),
+    // Vault Strike: the blade planted ahead and the body swung up and over it in a forward
+    // somersault, clean over them, untouchable; landed in a crouch with the glaive driven back under
+    // the arm into the ground behind him, lightning bursting out all round
+    ab: mv({
+      keys: [
+        K(-1.0, b({ crouch: -0.32, lean: 0.3 }), { flip: 0, hop: 0 }),
+        K(-0.7, b({ crouch: -0.08, lean: 0.05 }), { flip: 0.05, hop: 0.45 }),
+        K(-0.25, b({ crouch: 0.0, lean: -0.1, headPitch: 0.2 }), { flip: 0.45, hop: 1.25 }),
+        K(0.15, b({ crouch: -0.12, lean: 0.1 }), { flip: 0.92, hop: 0.4 }),
+        K(VAULT_HIT, b({ front: 'R', twist: -1.0, hipTwist: -0.5, crouch: -0.48, lean: 0.36, step: 0.34, back: 0.36, width: 0.22, headPitch: -0.1 }), { flip: 1, hop: 0 }),
+        K(1.1, b({ front: 'R', twist: -1.0, hipTwist: -0.5, crouch: -0.46, lean: 0.34, step: 0.34, back: 0.36, width: 0.22 }), { flip: 1, hop: 0 }),
+        K(1.45, body, { flip: 1, hop: 0 }),
+      ],
+      main: vault,
+      impacts: [VAULT_HIT],
+      start: -1.0,
+      chamber: -0.7,
+      flow: 1.0,
+      blendIn: 0.25,
+      end: 1.1,
+      rest: 1.45,
+      settle: 0.6,
+      ghosts: [-0.7, 0.3],
+      fx: [
+        fx(-0.95, 'dust', 'feet', 1.0),
+        fx(-0.3, 'sparkle', 'tip', 1.0, BOLT),
+        fx(VAULT_HIT, 'shockwave', 'feet', 1.1, BOLT),
+        fx(VAULT_HIT, 'bolt', 'tip', 0.7, BOLT),
+        fx(VAULT_HIT + 0.01, 'dust', 'feet', 1.3),
+      ],
+      trail: { life: 0.24, glow: 0.85 },
     }),
     // Serpent Lunge: out of the dash the body turns side-on and the glaive is drawn back along its
     // line, then the front foot shoots out into the longest lunge and both arms drive it out level

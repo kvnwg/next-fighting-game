@@ -259,7 +259,7 @@ export class BotBrain {
       const at = Math.max(earliest, hitTime - rand(90, 160));
       if (at > hitTime + 10) return;
       if (atk.perilous === 'sweep') plan(at, 'jump');
-      else if (atk.perilous === 'grab') plan(at, 'dodge', -toward.x, -toward.z);
+      else if (atk.perilous === 'grab' || atk.perilous === 'area') plan(at, 'dodge', -toward.x, -toward.z);
       else if (Math.random() < 0.45) plan(Math.max(earliest, hitTime - rand(60, 140)), 'dodge', toward.x, toward.z);
       else this.planParry(hitTime, earliest, serial);
       return;

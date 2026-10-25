@@ -4,7 +4,7 @@
  */
 import { AttackDef, AttackKey, executeSpacing } from '../shared/characters';
 import { COMBAT, INTEREST, MAX_LAG_COMP_MS, PLAYER_RADIUS, SNAPSHOT_HZ, FALL_DEATH_Y, SPRINT_MULT } from '../shared/config';
-import { HitResult, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pruneDefenseLog, pushDefense } from '../shared/combat';
+import { HitResult, applyHit, decideOutcome, defenseAt, executeBlow, inAttackCone, pruneDefenseLog, pushDefense, zoneAim } from '../shared/combat';
 import { FORCED_STATES, INPUT_ACTIONS, InputAction, InputOptions } from '../shared/fighter';
 import { MapDef, hazardAt, inSafeZone, onFloor } from '../shared/maps';
 import { clamp, forward, turnToward, yawTo } from '../shared/math';
@@ -265,6 +265,8 @@ export abstract class Instance {
     if (a === 'jump' && f.owner) f.onGround = true;
     const before = { serial: f.attackSerial, state: f.state, start: f.stateStart };
     const ok = f.input(a, now, opts);
+    // a zone attack lands where its target stood as it began
+    if (f.attackSerial !== before.serial && f.attack?.shape?.kind === 'zone') f.aim = this.aimPoint(f, f.attack.range);
     this.grantMovement(f, before);
     this.processEvents(f);
     return ok;
@@ -316,6 +318,15 @@ export abstract class Instance {
     }
     void now;
     return best;
+  }
+
+  /**
+   * Where a zone attack starting now lands: on the nearest foe in front within `range` (the same
+   * choice as a shadow step's), or half its range straight ahead if there is none.
+   */
+  aimPoint(f: ServerFighter, range: number): { x: number; z: number } {
+    const foes = [...this.fighters.values()].filter((o) => o !== f && o.isAlive() && this.canDamage(f, o));
+    return zoneAim(f, foes, range);
   }
 
   /** Where a shadow step behind `target` would land, or null if there's no safe spot. */
@@ -374,7 +385,7 @@ export abstract class Instance {
     if (lunge !== 0) {
       const fw = forward(f.yaw);
       // stop lunging into someone (retreating attacks always back off)
-      const blocked = lunge > 0 && all.some((o) => o !== f && o.isAlive() && Math.hypot(o.x - f.x, o.z - f.z) < 1.1);
+      const blocked = lunge > 0 && !f.vaulting(now) && all.some((o) => o !== f && o.isAlive() && Math.hypot(o.x - f.x, o.z - f.z) < 1.1);
       if (!blocked) {
         vx += fw.x * lunge;
         vz += fw.z * lunge;
@@ -383,7 +394,8 @@ export abstract class Instance {
     const dv = f.dodgeVelocity(now);
     vx += dv.x;
     vz += dv.z;
-    const obstacles = all.filter((o) => o !== f && o.isAlive()).map((o) => ({ x: o.x, z: o.z }));
+    // a vault passes over everyone
+    const obstacles = f.vaulting(now) ? [] : all.filter((o) => o !== f && o.isAlive()).map((o) => ({ x: o.x, z: o.z }));
     if (f.dummy) {
       vx = 0;
       vz = 0;
