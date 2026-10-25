@@ -430,14 +430,14 @@ export const swordShield: Style = {
     }),
   },
   // Execution, Last Rites: a knight's salute to the fallen, the blade upright before the face; then
-  // its point laid under their chin to lift the head and make them look up; the sword raised to the
-  // sky, where the light strikes it; cocked back over the right shoulder, the body arched; and the
-  // wrath cut, high right to low left through the neck and collarbone, the knight dropping onto his
-  // rear knee to put his whole weight behind it, the shield flung back. The blood flicked off the
-  // blade, and he rises into the salute again.
-  // (s runs in seconds: the point under the chin at 1.05, the cut at 2.15)
+  // the sword dropped to his left hip and swung in a rising backhand cut across them, up past his
+  // right shoulder and on up to the sky, where the light strikes it; cocked back over the right
+  // shoulder, the body arched; and the wrath cut, high right to low left through the neck and
+  // collarbone, the knight dropping onto his rear knee to put his whole weight behind it, the shield
+  // flung back. The blood flicked off the blade, and he rises into the salute again.
+  // (s runs in seconds: the rising cut lands at 1.05, the wrath cut at 2.15)
   execute: (() => {
-    const T_CHIN = 1.05;
+    const T_RISE = 1.05;
     const T_CUT = 2.15;
     const FLAT: V3 = [1, 0, 0];
     const salute: ItemKey = [0, [-0.06, 0.52, 0.3], [0, 1, 0.06], FLAT];
@@ -455,6 +455,14 @@ export const swordShield: Style = {
     const cutA = arc(PIV_A, R, [CHAMBER, [-0.28, 0.85, -0.45], TOP], NaN, { pivot1: PIV_B });
     const cutB = arc(PIV_B, R, [TOP, [-0.1, 0.75, 0.65], [0.15, 0.25, 1], [0.6, -0.55, 0.6], [0.8, -0.6, -0.1]], NaN, { pivot1: PIV_C });
     const LEN_B = 0.34;
+    // the rising cut: from the left hip (the blade back and down past it), forward through them at
+    // chest height, and up past the right shoulder
+    const PIV_R: V3 = [0.0, 0.4, 0.12];
+    const RISE_END: V3 = [-0.55, 0.8, 0.15];
+    const rise = arc(PIV_R, R * 0.95, [[0.75, -0.35, -0.55], [0.8, -0.3, 0.5], [0.0, 0.05, 1], [-0.6, 0.45, 0.65], RISE_END], NaN, { pivot1: [-0.08, 0.5, 0.15] });
+    const LEN_R = 0.3;
+    const riseFrom = T_RISE - hitAt(rise, 2) * LEN_R;
+    const riseEnd = riseFrom + LEN_R;
     const cutBFrom = T_CUT - hitAt(cutB, 2) * LEN_B;
     const cutAFrom = cutBFrom - 0.14;
     const cutEnd = cutBFrom + LEN_B;
@@ -467,6 +475,10 @@ export const swordShield: Style = {
       return [piv[0] + u[0] * R, piv[1] + u[1] * R, piv[2] + u[2] * R];
     };
     const cockedAt = (t: number): ItemKey => [t, along(PIV_A, CHAMBER), CHAMBER, [0.3, 0.9, 0.2]];
+    const lowLeft: V3 = [0.75, -0.35, -0.55];
+    const atHip = (t: number): ItemKey => [t, [PIV_R[0] + lowLeft[0] * R * 0.95 * 0.95, PIV_R[1] + lowLeft[1] * R * 0.95 * 0.95, PIV_R[2] + lowLeft[2] * R * 0.95 * 0.95], lowLeft, [0, 1, 0]];
+    const upRight = n(RISE_END);
+    const risen: ItemKey = [riseEnd, [-0.08 + upRight[0] * R * 0.95, 0.5 + upRight[1] * R * 0.95, 0.15 + upRight[2] * R * 0.95], RISE_END, [0, -1, 0]];
     const after: ItemKey = [cutEnd, along(PIV_C, [0.8, -0.6, -0.1]), [0.8, -0.6, -0.1], [0, -1, 0]];
     const stand = B({ ...body, twist: -0.2, hipTwist: -0.05, side: 0, crouch: -0.04, lean: 0.02, step: 0.16, back: 0.14, width: 0.15, headPitch: 0.1 });
     const coil = B({ ...stand, twist: -0.95, hipTwist: -0.38, crouch: -0.12, lean: -0.32, step: 0.36, back: 0.2, width: 0.18, side: 0.12, headPitch: -0.05 });
@@ -476,11 +488,12 @@ export const swordShield: Style = {
         K(0.0, B({ ...stand, headPitch: 0.0 })),
         K(0.35, B({ ...stand, headPitch: 0.25 })),
         K(0.55, B({ ...stand, headPitch: 0.22 })),
-        // a step in as the point drops and draws back low (the flick's pull-back)...
-        K(0.88, B({ ...stand, twist: -0.48, hipTwist: -0.2, crouch: -0.16, lean: 0.06, step: 0.34, back: 0.24, width: 0.17, headPitch: 0.05 })),
-        // ...and lifted under the chin, the body following it in
-        K(T_CHIN, B({ ...stand, twist: -0.25, hipTwist: -0.12, crouch: -0.1, lean: 0.18, step: 0.34, back: 0.24, width: 0.17, headPitch: 0.0 })),
-        K(1.25, B({ ...stand, twist: -0.25, hipTwist: -0.12, crouch: -0.08, lean: 0.12, step: 0.34, back: 0.24, width: 0.17, headPitch: -0.05 })),
+        // wound up to the left as the sword drops to the hip, a step in...
+        K(0.8, B({ ...stand, twist: 0.45, hipTwist: 0.15, crouch: -0.16, lean: 0.08, step: 0.34, back: 0.22, width: 0.17, side: -0.05, headPitch: 0.1 })),
+        K(riseFrom, B({ ...stand, twist: 0.52, hipTwist: 0.18, crouch: -0.18, lean: 0.1, step: 0.36, back: 0.22, width: 0.17, side: -0.06, headPitch: 0.1 })),
+        // ...and unwound through the cut, rising onto it
+        K(T_RISE, B({ ...stand, twist: -0.3, hipTwist: -0.14, crouch: -0.12, lean: 0.14, step: 0.38, back: 0.26, width: 0.17, headPitch: 0.0 })),
+        K(1.22, B({ ...stand, twist: -0.55, hipTwist: -0.2, crouch: -0.04, lean: -0.04, step: 0.34, back: 0.24, width: 0.17, headPitch: -0.15 })),
         // raised to the sky, tall, chin up to the light
         K(T_SKY, B({ ...stand, twist: -0.1, hipTwist: -0.1, crouch: 0.02, lean: -0.14, step: 0.32, back: 0.24, width: 0.17, headPitch: -0.35 })),
         // the coil: the hips and shoulders turned right away, the weight back over the rear foot and
@@ -506,12 +519,15 @@ export const swordShield: Style = {
             [0.08, [-0.4, 0.2, 0.16], [0, 1, 0.3], FLAT],
             [0.5, salute[1], salute[2], salute[3]],
             [0.58, salute[1], salute[2], salute[3]],
-            // swept down to point at them, drawn back low
-            [0.88, [-0.26, 0.12, 0.28], [0.05, -0.45, 1], [0, 1, 0]],
-            // and flicked up under the chin
-            [T_CHIN, [-0.16, 0.24, 0.46], [0.03, 0.1, 1], [0, 1, 0], 'in'],
-            [1.25, [-0.16, 0.27, 0.45], [0.03, 0.14, 1], [0, 1, 0], 'out'],
-            // up to the sky
+            // dropped to the left hip, the blade back past it, and held a beat
+            atHip(0.8),
+            atHip(riseFrom),
+          ]),
+          // the rising cut
+          [riseFrom, riseEnd, rise],
+          ...keyed([
+            risen,
+            // and carried on up to the sky
             [T_SKY, [-0.16, 1.04, 0.14], [0, 1, 0.04], FLAT],
             // laid back past the shoulder to the end of its range, and held
             cockedAt(T_COCK),
@@ -538,7 +554,10 @@ export const swordShield: Style = {
             [-10, [0.3, 0.2, 0.14], [0.35, 0, 1], SHIELD_UP],
             [0.0, [0.3, 0.2, 0.14], [0.35, 0, 1], SHIELD_UP],
             [0.55, [0.3, 0.2, 0.14], [0.35, 0, 1], SHIELD_UP],
-            [1.0, [0.26, 0.36, 0.3], [0.2, 0.05, 1], SHIELD_UP],
+            // swung out wide as the sword drops across to the hip, then driven back through the cut
+            [0.8, [0.42, 0.3, -0.02], [0.75, 0.05, 0.6], SHIELD_UP],
+            [riseFrom, [0.44, 0.3, -0.04], [0.8, 0.05, 0.55], SHIELD_UP],
+            [1.1, [0.26, 0.36, 0.3], [0.2, 0.05, 1], SHIELD_UP],
             [T_SKY, [0.12, 0.5, 0.42], [-0.1, 0.15, 1], SHIELD_UP],
             [T_COCK, [0.0, 0.5, 0.5], [-0.25, 0.1, 1], SHIELD_UP],
             [cutAFrom, [-0.02, 0.5, 0.52], [-0.28, 0.1, 1], SHIELD_UP],
@@ -551,7 +570,7 @@ export const swordShield: Style = {
         ],
         0.015,
       ),
-      impacts: [T_CHIN, T_CUT],
+      impacts: [T_RISE, T_CUT],
       // the greatsword brought down from the top
       strike: 1.86,
       start: 0,
@@ -563,8 +582,9 @@ export const swordShield: Style = {
       fx: [
         fx(0.3, 'sparkle', 'tip', 0.9, '#ffffff'),
         fx(0.4, 'holy', 'main', 0.5),
-        fx(0.85, 'dust', 'feet', 0.6),
-        fx(T_CHIN, 'sparkle', 'tip', 0.9, '#ffe8a0'),
+        fx(0.8, 'dust', 'feet', 0.6),
+        fx(T_RISE, 'flashline', 'tip', 1.0, '#ffe8a0'),
+        fx(T_RISE, 'dust', 'feet', 0.7),
         fx(1.4, 'sparkle', 'tip', 1.2, '#ffffff'),
         fx(T_SKY, 'bolt', 'tip', 1.0),
         fx(T_SKY + 0.02, 'holy', 'tip', 1.3),

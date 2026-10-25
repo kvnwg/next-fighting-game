@@ -2,7 +2,8 @@
  * Ring entrances (see docs/ring-intros.md): before round one the camera films each fighter's
  * entrance in turn, the opponent first, then you, then swings round behind your shoulder. Each
  * entrance is ENTRANCE_MS long and has three beats that the camera cuts on: arrival (s 0–0.35),
- * signature (0.35–0.7) and challenge (0.7–1). The body's choreography is the weapon style's
+ * signature (0.35–0.7) and challenge (0.7–1), then the camera holds on them a moment
+ * (ENTRANCE_HOLD) under their name card. The body's choreography is the weapon style's
  * `entrance` move; this file holds the camera, the sound cues and the name card.
  */
 import * as THREE from 'three';
@@ -40,8 +41,10 @@ export interface Entrance {
 
 /** Where the three beats start, along the entrance. */
 export const BEATS = [0, 0.35, 0.7];
-/** The name card comes up a little into the last beat. */
-export const CARD_AT = 0.66;
+/** The name card comes up early in the last beat. */
+export const CARD_AT = 0.6;
+/** After each entrance the camera holds on the fighter a while longer, under their name card (ms). */
+export const ENTRANCE_HOLD = 1100;
 
 export const ENTRANCES: Record<CharacterId, Entrance> = {
   ronin: {
@@ -220,7 +223,7 @@ function place(f: ShotSubject, r: Rel): THREE.Vector3 {
 export function entranceShots(id: CharacterId, f: ShotSubject): Shot[] {
   const e = ENTRANCES[id];
   const chest = place(f, [0, 0, 1.2]);
-  return e.shots.map((s, i) => {
+  const shots: Shot[] = e.shots.map((s, i) => {
     const len = ((i < 2 ? BEATS[i + 1] : 1) - BEATS[i]) * ENTRANCE_MS;
     const pose = (at: Rel, look: Rel, fov: number): CamPose => ({ pos: place(f, at), look: place(f, look), fov, subject: chest });
     return {
@@ -230,6 +233,11 @@ export function entranceShots(id: CharacterId, f: ShotSubject): Shot[] {
       via: s.via ? place(f, s.via) : undefined,
     };
   });
+  // and the hold: easing on in a little closer while the name card is up
+  const last = shots[shots.length - 1].to;
+  const closer = last.pos.clone().lerp(last.look, 0.1);
+  shots.push({ duration: ENTRANCE_HOLD / 1000, from: { ...last }, to: { ...last, pos: closer, fov: last.fov - 2 } });
+  return shots;
 }
 
 /** How the intro is laid out in time (ms from its start). */
@@ -238,13 +246,13 @@ export const INTRO = {
   establish: 1400,
   /** the swing from your entrance to behind your shoulder: the rest of the intro */
   get swing(): number {
-    return Math.max(600, MATCH.introTime - this.establish - 2 * ENTRANCE_MS);
+    return Math.max(600, MATCH.introTime - this.establish - 2 * (ENTRANCE_MS + ENTRANCE_HOLD));
   },
 };
 
 /** When the opponent's and your entrances start, in ms from the start of the intro. */
 export function entranceStarts(): { op: number; me: number } {
-  return { op: INTRO.establish, me: INTRO.establish + ENTRANCE_MS };
+  return { op: INTRO.establish, me: INTRO.establish + ENTRANCE_MS + ENTRANCE_HOLD };
 }
 
 /**

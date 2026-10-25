@@ -10,7 +10,7 @@ import { rankOf } from '../shared/ranks';
 import { audio } from './audio';
 import { EXEC_LEAD } from './audio/recipes';
 import { CAMERA_BULK, CameraRig, executionShots } from './camera';
-import { CARD_AT, ENTRANCES, entranceStarts, introSequence } from './entrances';
+import { CARD_AT, ENTRANCES, ENTRANCE_HOLD, entranceStarts, introSequence } from './entrances';
 import { ENTRANCE_MS } from './render/anim/animator';
 import { buildBlockers, constrainCamera } from './cameraClip';
 import { ClientFighter } from './entities';
@@ -676,7 +676,8 @@ class App {
       const key = `${t.r.id}:card`;
       if (s >= CARD_AT && s < CARD_AT + 0.15 && !intro.fired.has(key)) {
         intro.fired.add(key);
-        this.ui.nameCard(t.r, t.mine, e.title, e.line, (1 - CARD_AT) * ENTRANCE_MS + 250);
+        // up through the rest of the entrance and the hold after it
+        this.ui.nameCard(t.r, t.mine, e.title, e.line, (1 - CARD_AT) * ENTRANCE_MS + ENTRANCE_HOLD + 200);
       }
     }
   }
