@@ -1,11 +1,12 @@
 /** The mix: each sound family's level, balanced from offline renders (peak/RMS per sound). */
 export const LEVEL = {
   swing: 0.55,
-  hit: 0.9,
-  block: 0.75,
-  deflect: 0.95,
-  guardBreak: 0.9,
-  posture: 0.7,
+  // blows landing (cuts, punches, hammers, blocks, parries) sit well over everything else
+  hit: 1.5,
+  block: 1.05,
+  deflect: 1.15,
+  guardBreak: 1.25,
+  posture: 0.9,
   windup: 0.5,
   finish: 1.0,
   step: 0.5,

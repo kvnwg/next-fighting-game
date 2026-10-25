@@ -63,6 +63,8 @@ export const COMBAT = {
   /** While staggered you may start guarding (and deflect) after this long. */
   staggerDefendAfter: 100,
   blockstunTime: 200,
+  /** A light, then guarding: a light thrown from guard within this long (ms) carries the chain on. */
+  chainThroughGuard: 900,
   /**
    * Recoil after being deflected scales with how heavy the deflected attack was:
    * base + posture * perPosture, clamped. Pokes give a small opening, heavies a big one.

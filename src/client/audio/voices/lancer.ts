@@ -75,7 +75,7 @@ const curve = (pts: readonly (readonly [number, number])[], dur: number, k = 1) 
 
 /** The charge in the glaive: it arcs on contact. */
 function spark(o: Out, h: number, len = 0.14): void {
-  crackle(o, len, 50, { gain: 0.3 * h, type: 'highpass', f: 2200 });
+  crackle(o, len, 50, { gain: 0.6 * h, type: 'highpass', f: 2200 });
   noise(o, { type: 'highpass', f: 3000, dur: 0.02, gain: 0.25 * h, a: 0.0005 });
 }
 
@@ -127,7 +127,7 @@ function swing(o0: Out, p: Profile, s: SwingOpts): void {
   if (heavy || wide || chance(0.2)) clang(o, heavy ? 0.035 : 0.022, 1, 0.55, 0.45, len * 0.25);
 
   // the charged glaive spits as it moves
-  if (heavy || chance(0.5)) crackle(o, len * 0.7, 30, { gain: 0.08, type: 'highpass', f: 2500, delay: len * 0.08 });
+  crackle(o, len * 0.7, 30, { gain: heavy ? 0.3 : 0.22, type: 'highpass', f: 2500, delay: len * 0.08 });
 
   // the plate settling as the swing carries through
   const ft = at(o, s.follow ?? len * 0.6);
@@ -210,7 +210,7 @@ function block(o: Out, a: Profile, _d: Profile, s: GuardOpts): void {
   // the weight of the blow, through the arms
   thump(o, 120 + 40 * (1 - st.mass), 55, 0.14 + 0.12 * st.mass, (0.3 + 0.5 * st.mass) * h);
   // a little spark off the charged glaive
-  crackle(o, 0.06, 50, { gain: 0.16, type: 'highpass', f: 3000 });
+  crackle(o, 0.06, 50, { gain: 0.35, type: 'highpass', f: 3000 });
   attackerTell(o, a, h);
   // the Lancer's own plate jolting
   rattle(o, { count: 4, spread: 0.08, fLo: 1800, fHi: 4200, decay: 0.04 }, { gain: 0.22, delay: 0.015, type: 'highpass', f: 1500 });

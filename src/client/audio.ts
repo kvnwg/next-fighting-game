@@ -265,7 +265,7 @@ class AudioEngine {
    * A ring-entrance cue. They were the old synthesised effects (chimes, bells, plucks); now each
    * plays one of the recordings where one fits, and the bell-like ones give way to the fighter's own
    * shimmer or are dropped. The Ronin's wind and taiko, the Warden's rumble and gong, the Wraith's
-   * breathing, scrape and whoosh, the Assassin's grind, the Monk's breath and the stomps have
+   * breathing, scrape and whoosh, the Assassin's grind, the Knight's shield clang, the Monk's breath and the stomps have
    * (layered) recordings of their own.
    */
   entrance(char: CharacterId, name: Sfx, volume = 1): void {
@@ -302,6 +302,7 @@ class AudioEngine {
       INTRO.whoosh = ['reaper_void', 1.2, 0.3];
     }
     else if (char === 'shade') INTRO.scrape = ['shade_scrape', 1];
+    else if (char === 'paladin') INTRO.clang = [['paladin_shield_clang', 'paladin_shield_ring'], 1];
     else if (char === 'monk') INTRO.breath = ['monk_breath', 1];
     const m = INTRO[name];
     if (!m) return this.play(name, volume);
@@ -477,6 +478,11 @@ class AudioEngine {
   executionLead(char: CharacterId, o: Placed): void {
     const p = profile(char);
     if (R.hasLead(p)) this.emit((out) => R.execLead(out, p), { level: LEVEL.finish, vol: o.vol, pos: o.pos, wet: WET.finish, hero: true, priority: 3 });
+  }
+
+  /** A stray arc of the Lancer's lightning snapping off him (`k`: how big). */
+  zap(k: number, o: Placed): void {
+    this.emit((out) => R.zap(out, k), { level: LEVEL.cue, vol: o.vol, pos: o.pos, wet: WET.swing, key: 'zap', gap: 0.15, priority: 0 });
   }
 
   /** One of an execution's flourish strikes landing on the victim. */

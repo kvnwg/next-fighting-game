@@ -143,7 +143,7 @@ function swingBase(o0: Out, p: Profile, s: SwingOpts = {}): void {
   if (sw.snap) noise(o, { type: 'highpass', f: 2200, dur: 0.035, gain: sw.snap * 0.4, a: 0.001, delay: len * pk });
   if (p.chain) rattle(o, { count: heavy ? 16 : 10, spread: len, fLo: 2600, fHi: 6500, decay: 0.035, fade: 1, whirl: sw.whirl }, { gain: 0.32, type: 'highpass', f: 1800 });
   // the charged spear spits as it moves
-  if (p.lightning && (heavy || chance(0.45))) crackle(o, len * 0.9, 30, { gain: 0.1, type: 'highpass', f: 2500 });
+  if (p.lightning) crackle(o, len * 0.9, 30, { gain: heavy ? 0.32 : 0.24, type: 'highpass', f: 2500 });
   followThrough(at(o, s.follow ?? len * 0.8), p, heavy);
 }
 
@@ -527,12 +527,14 @@ interface SampleSet {
   hitGain?: number;
   hitLayer?: string;
   heavyHitLayer?: string;
+  /** how far over its matched level every layer sits (the Lancer's lightning is meant to be heard) */
+  layerGain?: number;
 }
 const SAMPLE_SETS: Record<string, SampleSet> = {
   ronin: { swing: ['ronin_swing'], hit: ['ronin_hit'] },
   duelist: { swing: ['duelist_swing'], hitGain: 0.6 },
   // the glaive's whoosh or the katana's, lightning crackling behind it; the cut arcs, a heavy strikes
-  lancer: { swing: ['lancer_swing', 'ronin_swing'], swingLayer: 'lancer_zap', hitGain: 0.6, hitLayer: 'lancer_spark', heavyHitLayer: 'lancer_bolt' },
+  lancer: { swing: ['lancer_swing', 'ronin_swing'], swingLayer: 'lancer_zap', hitGain: 0.6, hitLayer: 'lancer_spark', heavyHitLayer: 'lancer_bolt', layerGain: 2.4 },
   // the katana's swooshes (weightier) with a holy glow on heavies; every cut lands with a radiant impact
   // heavies stack the glow, a dark or a fiery whoosh and the holy shimmer; hits ring out pure
   paladin: { swing: ['ronin_swing'], swingGain: 1.5, heavySwingLayer: 'paladin_glow', heavyExtra: ['paladin_darkwhoosh', 'paladin_firewhoosh'], heavyShimmer: 'paladin_shimmer', hitGain: 0.75, hitLayer: 'paladin_impact', heavyHitLayer: 'paladin_shimmer' },
@@ -579,7 +581,7 @@ function recordedSwing(o: Out, p: Profile, s: SwingOpts): boolean {
   const thrust = s.anim === 'thrust' || s.anim === 'charge';
   playSample(o, rec, sampleGain(take) * (set.swingGain ?? 1) * (s.heavy ? 1.15 : 1), jit(1, 0.04) * (s.heavy ? 0.86 : thrust ? 1.08 : 1));
   const layer = set.swingLayer && sampleFor(o.ctx, set.swingLayer);
-  if (layer) playSample(o, layer, sampleGain(set.swingLayer!) * (s.heavy ? 1.3 : 1), jit(1, 0.06), 0.02);
+  if (layer) playSample(o, layer, sampleGain(set.swingLayer!) * (s.heavy ? 1.3 : 1) * (set.layerGain ?? 1), jit(1, 0.06), 0.02);
   return true;
 }
 
@@ -601,9 +603,9 @@ function recordedHit(o: Out, a: Profile, s: HitOpts): boolean {
   // started a little into the clip, where it has swelled, so it lands with the blow
   playSample(o, rec, sampleGain(take) * h * (set.hitGain ?? 1), jit(1, 0.04) * (s.heavy ? 0.88 : 1), 0, 0.04);
   const layer = set.hitLayer && sampleFor(o.ctx, set.hitLayer);
-  if (layer) playSample(o, layer, sampleGain(set.hitLayer!) * h, jit(1, 0.05));
+  if (layer) playSample(o, layer, sampleGain(set.hitLayer!) * h * (set.layerGain ?? 1), jit(1, 0.05));
   const heavy = s.heavy && set.heavyHitLayer ? sampleFor(o.ctx, set.heavyHitLayer) : null;
-  if (heavy) playSample(o, heavy, sampleGain(set.heavyHitLayer!), jit(1, 0.04));
+  if (heavy) playSample(o, heavy, sampleGain(set.heavyHitLayer!) * (set.layerGain ?? 1), jit(1, 0.04));
   return true;
 }
 
@@ -644,6 +646,9 @@ const SAMPLE_GAIN: Record<string, number> = {
   reaper_finish_siren: 1.64, reaper_finish_depths: 1.64, reaper_finish_strings: 1.64, reaper_finish_perish: 1.64, reaper_finish_gore: 1.64,
   duelist_finish_dust: 1.23, duelist_finish_ball: 1.23, duelist_finish_wand: 1.23, monk_finish_punch: 0.94, monk_finish_punch2: 0.94, monk_finish_bones: 0.94, monk_finish_crowbar: 0.94, title_wind: 0.28,
   perilous_drum: 0.84, perilous_riser: 0.84,
+  // the Knight striking his shield in his entrance: the clang and the ring as a pair, 3 dB over the
+  // block clang they replace there
+  paladin_shield_clang: 0.7, paladin_shield_ring: 0.7,
   // the Wraith's: his entrance's breathing (level with the Monk's breath) and void whoosh (level with
   // the old dark whoosh it replaces), the fiery whoosh 3 dB under his scythe swings, the conjuring
   // through his Reaping Arc level with the perilous warning, the shriek level with his body falling
@@ -759,6 +764,13 @@ export function postureBreak(o: Out, d: Profile | null): void {
   if (!playLayers(o, ['exec_glass'], 0.87)) for (let i = 0; i < 6; i++) ring(o, MAT.shard, 0.06, { pitch: rand(1, 2.1), decay: rand(0.8, 1.6), delay: rand(0, 0.12), beat: false });
   thump(o, 90, 30, 0.9, 0.9);
   osc(filtered(o, 'lowpass', 500), { type: 'sawtooth', f: 60, f1: 28, dur: 0.7, gain: 0.25, delay: 0.02 });
+}
+
+/** A stray arc of the Lancer's charge snapping down to the ground: a spark and a short crackle. */
+export function zap(o: Out, k: number): void {
+  const spark = sampleFor(o.ctx, 'lancer_spark');
+  if (spark) playSample(o, spark, sampleGain('lancer_spark') * 2.6 * k, jit(1, 0.1));
+  crackle(o, 0.1 + 0.12 * k, 45, { gain: 0.32 * k, type: 'highpass', f: 2200 });
 }
 
 /**
@@ -1198,8 +1210,10 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
       // a recorded lightning strike, if there is one, with the user's electric step and crackle over it
       const bolt = sampleFor(o.ctx, 'lancer_bolt');
       if (bolt) {
-        playSample(o, bolt, BOLT_CUE_GAIN * Math.min(1.5, scale), jit(1, 0.03));
-        playLayers(o, ['bolt_summon', 'bolt_crackle'], Math.min(1.5, scale));
+        // the Lancer's own lightning is a good deal louder than anyone else's
+        const loud = p.id === 'lancer' ? 1.9 : 1;
+        playSample(o, bolt, BOLT_CUE_GAIN * Math.min(1.5, scale) * loud, jit(1, 0.03));
+        playLayers(o, ['bolt_summon', 'bolt_crackle'], Math.min(1.5, scale) * loud);
         return true;
       }
     }

@@ -1030,13 +1030,13 @@ class App {
   }
 
   /** Per-fighter signature particles: the Lancer's lightning, the Ronin's smoke trail, the Knight's holy light. */
-  private sigState = new Map<string, { arc: number; step: string | null; dodge: number }>();
+  private sigState = new Map<string, { arc: number; body: number; ground: number; step: string | null; dodge: number }>();
 
   private signatureFx(f: ClientFighter, dt: number): void {
     if (dt <= 0 || !f.model.root.visible) return;
     if (f.pos.distanceToSquared(this.renderer.camera.position) > 40 * 40) return;
     let st = this.sigState.get(f.id);
-    if (!st) this.sigState.set(f.id, (st = { arc: 0, step: null, dodge: -1 }));
+    if (!st) this.sigState.set(f.id, (st = { arc: 0, body: 0, ground: 1, step: null, dodge: -1 }));
     const fx = this.effects;
     const k = f.model.scale;
     const swing = f.model.swingMain;
@@ -1056,18 +1056,40 @@ class App {
     }
     switch (f.roster.char) {
       case 'lancer': {
-        // sparks crawling up the spear, and arcs jumping along it now and then (all the time as it swings)
-        const sparks = Math.round((swing ? 70 : 16) * dt + Math.random());
+        // sparks crawling up the spear, and arcs jumping along it (all the time as it swings)
+        const sparks = Math.round((swing ? 90 : 28) * dt + Math.random());
         for (let i = 0; i < sparks; i++) {
           const p = along(rnd(0.15, 1));
           fx.emit(p.x, p.y, p.z, rnd(-1, 1), rnd(-0.5, 1.5), rnd(-1, 1), Math.random() < 0.5 ? '#bfe6ff' : '#ffffff', { life: 0.16, size: 0.028, gravity: 0, drag: 6, stretch: 0.04 });
         }
         st.arc -= dt;
         if (st.arc <= 0) {
-          st.arc = swing ? 0.04 : rnd(0.25, 0.8);
+          st.arc = swing ? 0.03 : rnd(0.1, 0.35);
           const a = along(rnd(0.1, 0.5));
           const b = along(rnd(0.6, 1)).add(new THREE.Vector3(rnd(-0.3, 0.3), rnd(-0.2, 0.35), rnd(-0.3, 0.3)).multiplyScalar(k));
           fx.arc(a, b, '#8fd0ff', 5, 0.12 * k, swing ? 0.07 : 0.09);
+        }
+        // the charge he carries radiates off him: short arcs leaping out of his body
+        st.body -= dt;
+        if (st.body <= 0) {
+          st.body = rnd(0.08, 0.25);
+          const a = new THREE.Vector3(f.pos.x + rnd(-0.22, 0.22) * k, f.pos.y + rnd(0.35, 1.75) * k, f.pos.z + rnd(-0.22, 0.22) * k);
+          const out = new THREE.Vector3(a.x - f.pos.x, rnd(-0.3, 0.7), a.z - f.pos.z).normalize().multiplyScalar(rnd(0.35, 0.8) * k);
+          fx.arc(a, out.add(a), Math.random() < 0.5 ? '#8fd0ff' : '#bfe6ff', 4, 0.09 * k, 0.07, 0.018);
+        }
+        // and every so often one snaps down to the ground beside him with a crack
+        st.ground -= dt;
+        if (st.ground <= 0) {
+          st.ground = swing ? rnd(0.3, 0.7) : rnd(0.8, 1.9);
+          const a = Math.random() < 0.5 ? along(rnd(0.4, 1)) : new THREE.Vector3(f.pos.x, f.pos.y + rnd(0.8, 1.6) * k, f.pos.z);
+          const ang = rnd(0, Math.PI * 2);
+          const r = rnd(0.7, 1.6) * k;
+          const g = new THREE.Vector3(f.pos.x + Math.cos(ang) * r, f.pos.y + 0.04, f.pos.z + Math.sin(ang) * r);
+          fx.arc(a, g, '#bfe6ff', 7, 0.16 * k, 0.11, 0.035);
+          fx.arc(a, g, '#8fd0ff', 6, 0.22 * k, 0.07, 0.02);
+          fx.sparkle(g, '#bfe6ff', 0.8);
+          fx.ring(g, '#8fd0ff', 0.7, 0.25, undefined, true);
+          audio.zap(swing ? 1 : 0.75, { vol: this.volumeAt(g.x, g.z), pos: g });
         }
         break;
       }
