@@ -51,6 +51,8 @@ export interface UIHandlers {
   onPractice(diff: BotDifficulty): void;
   onCancelQueue(): void;
   onSelectChar(id: CharacterId): void;
+  /** a fighter brought up on the roster (not yet chosen) */
+  onRosterPick(id: CharacterId): void;
   onLeaderboard(): void;
   onChat(text: string): void;
   onChallengeReply(from: string, accept: boolean): void;
@@ -866,6 +868,7 @@ export class UI {
     };
     const show = (id: CharacterId) => {
       current = id;
+      this.handlers.onRosterPick(id);
       const c = CHARACTERS[id];
       root.style.setProperty('--c1', c.palette.primary);
       root.style.setProperty('--c2', c.palette.accent);

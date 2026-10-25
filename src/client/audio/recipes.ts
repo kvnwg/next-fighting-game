@@ -1308,5 +1308,89 @@ export function cue(o: Out, p: Profile, kind: string, scale: number): boolean {
   return false;
 }
 
+// ---------------------------------------------------------------- feedback
+
+/** Your own blow landing: a tight punch under the hit's own sound (a deeper drop under a heavy). */
+export function hitConfirm(o: Out, heavy: boolean): void {
+  thump(o, heavy ? 100 : 130, heavy ? 40 : 55, heavy ? 0.22 : 0.13, heavy ? 1.0 : 0.7);
+  noise(o, { type: 'bandpass', f: 1700, q: 1.1, dur: 0.03, gain: heavy ? 0.45 : 0.32, a: 0.0005 });
+  if (heavy) osc(filtered(o, 'lowpass', 300), { type: 'sawtooth', f: 70, f1: 32, dur: 0.35, gain: 0.18, delay: 0.01 });
+}
+
+/** Taking a blow yourself: a dull whump, as if heard through the bone. */
+export function hitTaken(o: Out, heavy: boolean): void {
+  thump(o, 75, 36, heavy ? 0.3 : 0.18, heavy ? 0.85 : 0.55, 0.004);
+  noise(o, { color: 'brown', type: 'lowpass', f: 380, dur: heavy ? 0.24 : 0.16, gain: heavy ? 0.5 : 0.32 });
+}
+
+/** The blow that kills: a deep cinematic hit (the Warden's finisher's bass) under everything. */
+export function killBlow(o: Out): void {
+  if (!playLayers(o, ['juggernaut_finish_bass'], 0.55)) thump(o, 70, 28, 1.2, 1.0);
+  thump(o, 110, 40, 0.4, 0.7);
+}
+
+/** One beat of your heart when you're nearly dead (`k`: louder as it gets worse). */
+export function lowHealth(o: Out, k: number): void {
+  heartbeat(o, 0.6 * k);
+}
+
+/** A round won (two taiko strikes and a blade's ring) or lost (one low strike under a dark whoosh). */
+export function roundEnd(o: Out, won: boolean): void {
+  const taiko = sampleFor(o.ctx, 'title_taiko');
+  if (!taiko) return void thump(o, won ? 90 : 60, 40, 0.6, 1);
+  const g = sampleGain('title_taiko');
+  if (won) {
+    playSample(o, taiko, g, 1);
+    playSample(o, taiko, g * 0.85, 1.12, 0.22);
+    const shing = sampleFor(o.ctx, 'blade_shing');
+    if (shing) playSample(o, shing, sampleGain('blade_shing') * 0.7, 1, 0.45);
+  } else {
+    playSample(o, taiko, g, 0.78);
+    const w = sampleFor(o.ctx, 'heavy_whoosh');
+    if (w) playSample(o, w, sampleGain('heavy_whoosh') * 0.6, 0.75, 0.05);
+  }
+}
+
+/** Your special charged again (a blade's ring), or your ability (a drawn blade's hiss). */
+export function ready(o: Out, kind: 'special' | 'ability'): void {
+  if (!playLayers(o, [kind === 'special' ? 'blade_shing' : 'blade_draw'], kind === 'special' ? 0.45 : 0.35)) noise(o, { type: 'highpass', f: 4000, dur: 0.3, gain: 0.2 });
+}
+
+/** Locking on to someone (a firm, low click) or letting go (a lighter one). */
+export function lockOn(o: Out, on: boolean): void {
+  const c = sampleFor(o.ctx, 'ui_click');
+  if (c) playSample(o, c, sampleGain('ui_click') * (on ? 1.3 : 0.8), on ? 0.78 : 1.15);
+  thump(o, on ? 160 : 200, on ? 90 : 120, 0.06, on ? 0.3 : 0.15);
+}
+
+/** An entrance's name card slamming in: a heavy whoosh into a taiko strike. */
+export function cardSlam(o: Out): void {
+  playLayers(o, ['heavy_whoosh'], 0.7);
+  const taiko = sampleFor(o.ctx, 'title_taiko');
+  if (taiko) playSample(o, taiko, sampleGain('title_taiko') * 0.75, 0.9, 0.12);
+}
+
+/** A soft tick as the pointer finds a button. */
+export function hover(o: Out): void {
+  const c = sampleFor(o.ctx, 'ui_click');
+  if (c) playSample(o, c, sampleGain('ui_click') * 0.35, rand(1.35, 1.5));
+  else noise(o, { type: 'bandpass', f: 3000, q: 2, dur: 0.012, gain: 0.08 });
+}
+
+/** Each fighter's signature, played as they're picked on the roster. */
+const SIGNATURE: Record<string, string[]> = {
+  ronin: ['ronin_unsheathe'],
+  juggernaut: ['juggernaut_slam', 'juggernaut_thud'],
+  lancer: ['lancer_bolt', 'bolt_crackle'],
+  reaper: ['reaper_void'],
+  monk: ['monk_punch'],
+  duelist: ['duelist_swing'],
+  shade: ['shade_swing'],
+  paladin: ['paladin_shield_clang', 'paladin_shield_ring'],
+};
+export function fighterPick(o: Out, id: string): void {
+  playLayers(o, SIGNATURE[id] ?? ['blade_shing'], 0.6);
+}
+
 /** The shared recipes behind each voice hook, for a voice that layers on top of them. */
 export const BASE = { swing: swingBase, hit: hitBase, block: blockBase, deflect: deflectBase };

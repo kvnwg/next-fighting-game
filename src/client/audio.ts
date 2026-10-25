@@ -525,6 +525,58 @@ class AudioEngine {
     this.emit((out) => R.zap(out, k), { level: LEVEL.cue, vol: o.vol, pos: o.pos, wet: WET.swing, key: 'zap', gap: 0.15, priority: 0 });
   }
 
+  // ---------------------------------------------------------------- feedback (yours alone)
+
+  /** Your blow landing: a tight punch under its sound (a deeper one under a heavy). */
+  hitConfirm(heavy: boolean): void {
+    this.emit((o) => R.hitConfirm(o, heavy), { level: LEVEL.hit * 0.6, vol: 1, wet: 0.05, key: 'confirm', gap: 0.04, priority: 2 });
+  }
+
+  /** A blow landing on you: a dull whump through the bone. */
+  hitTaken(heavy: boolean): void {
+    this.emit((o) => R.hitTaken(o, heavy), { level: LEVEL.hit * 0.55, vol: 1, wet: 0.03, key: 'taken', gap: 0.05, priority: 2 });
+  }
+
+  /** The blow that kills, when you dealt it or took it. */
+  killBlow(o: Placed): void {
+    this.emit((out) => R.killBlow(out), { level: LEVEL.finish * 0.8, vol: o.vol, pos: o.pos, wet: WET.big, hero: true, priority: 3 });
+  }
+
+  /** A heartbeat while you're nearly dead (`k` 0..1: louder and the closer to death). */
+  lowHealth(k: number): void {
+    this.emit((o) => R.lowHealth(o, k), { level: 0.9, vol: 1, wet: 0.02, key: 'heart', gap: 0.35, priority: 1 });
+  }
+
+  /** A round won or lost. */
+  roundEnd(won: boolean): void {
+    this.emit((o) => R.roundEnd(o, won), { level: LEVEL.ui, vol: 1, wet: 0.3, priority: 2 });
+  }
+
+  /** Your special or ability charged again. */
+  ready(kind: 'special' | 'ability'): void {
+    this.emit((o) => R.ready(o, kind), { level: LEVEL.ui * 0.8, vol: 1, wet: 0.2, key: `ready:${kind}`, gap: 1, priority: 1 });
+  }
+
+  /** Locking on to someone, or letting go. */
+  lockOn(on: boolean): void {
+    this.emit((o) => R.lockOn(o, on), { level: LEVEL.ui, vol: 1, wet: 0, key: 'lock', gap: 0.08, priority: 1 });
+  }
+
+  /** An entrance's name card slamming in. */
+  cardSlam(): void {
+    this.emit((o) => R.cardSlam(o), { level: LEVEL.legacy, vol: 1, wet: 0.25, hero: true, priority: 2 });
+  }
+
+  /** The pointer finding a button. */
+  hover(): void {
+    this.emit((o) => R.hover(o), { level: LEVEL.ui, vol: 1, wet: 0, key: 'hover', gap: 0.05, priority: 0 });
+  }
+
+  /** A fighter picked on the roster: their signature sound. */
+  fighterPick(id: CharacterId): void {
+    this.emit((o) => R.fighterPick(o, id), { level: LEVEL.ui, vol: 1, wet: 0.15, key: 'pick', gap: 0.08, priority: 1 });
+  }
+
   /** One of an execution's flourish strikes landing on the victim. */
   executionBlow(a: CharacterId, d: CharacterId, o: Placed): void {
     this.emit((out) => R.execBlow(out, profile(a), profile(d)), { level: LEVEL.hit, vol: o.vol, pos: o.pos, wet: WET.hit, hero: true, priority: 2 });

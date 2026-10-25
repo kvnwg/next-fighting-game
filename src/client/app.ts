@@ -68,6 +68,8 @@ class App {
   private mapView: MapView | null = null;
   private map: MapDef = LOBBY_MAP;
   private fighters = new Map<string, ClientFighter>();
+  /** the button the pointer is over (for the hover tick) */
+  private hoverEl: HTMLElement | null = null;
   /** the ground marked under each fighter's perilous area attack while it winds up, by fighter id */
   private marks = new Map<string, { tg: Telegraph; serial: number; aim: { x: number; z: number } | null }>();
   /** marks whose blow has landed or was stopped, fading out */
@@ -132,7 +134,11 @@ class App {
       onRanked: () => this.net.send({ t: 'queue', mode: 'ranked' }),
       onPractice: (diff) => this.net.send({ t: 'queue', mode: 'practice', diff }),
       onCancelQueue: () => this.net.send({ t: 'unqueue' }),
-      onSelectChar: (id) => this.selectChar(id),
+      onSelectChar: (id) => {
+        this.selectChar(id);
+        audio.play('taiko', 0.8);
+      },
+      onRosterPick: (id) => audio.fighterPick(id),
       onLeaderboard: () => this.net.send({ t: 'leaderboard' }),
       onChat: (text) => this.net.send({ t: 'chat', text }),
       onChallengeReply: (from, accept) => this.net.send({ t: 'challengeReply', from, accept }),
@@ -162,9 +168,18 @@ class App {
       createPreview: (el) => createPreview(el),
       portrait: (id) => portraitURL(this.renderer.renderer, id),
     }, offline, touch);
+    // a soft tick as a real pointer finds a button
+    root.addEventListener('pointerover', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const b = (e.target as HTMLElement).closest<HTMLElement>('button, [role="tab"], .fs-tile, .sel-tile, .sel-card');
+      if (b === this.hoverEl) return;
+      this.hoverEl = b;
+      if (b && !(b as HTMLButtonElement).disabled) audio.hover();
+    });
     this.select = new SelectScreen(root, (id) => portraitURL(this.renderer.renderer, id), (v) => {
       this.net.send({ t: 'vote', ...v });
       audio.play('click', 0.5);
+      if (v.char) audio.fighterPick(v.char);
       if (v.char) {
         settings.char = v.char;
         saveSettings();
@@ -626,6 +641,7 @@ class App {
         break;
       case 'roundEnd': {
         const w = m.roundWinner;
+        if (w !== -1) audio.roundEnd(w === m.you);
         this.ui.banner(w === -1 ? 'Draw' : w === m.you ? 'Round won' : 'Round lost', `${m.scores[m.you]} - ${m.scores[m.you === 0 ? 1 : 0]}`, 2500, w === -1 ? 'draw' : w === m.you ? 'win' : 'lose', w === -1 ? '引分' : w === m.you ? '勝' : '敗');
         break;
       }
@@ -690,6 +706,7 @@ class App {
         intro.fired.add(key);
         // up through the rest of the entrance and the hold after it
         this.ui.nameCard(t.r, t.mine, e.title, e.line, (1 - CARD_AT) * ENTRANCE_MS + ENTRANCE_HOLD + 200);
+        audio.cardSlam();
       }
     }
   }
@@ -763,9 +780,11 @@ class App {
   private toggleLock(): void {
     if (this.lock) {
       this.lock = null;
+      audio.lockOn(false);
       return;
     }
     this.lock = this.bestLockTarget();
+    if (this.lock) audio.lockOn(true);
   }
 
   private bestLockTarget(): ClientFighter | null {
@@ -997,6 +1016,11 @@ class App {
     }
     // the sound of it all: who hit whom, with what, on what (audio.ts / audio/recipes.ts)
     audio.combat(e, { a: a?.roster.char, d: d?.roster.char, vol, pos, heavy, mine, streak: e.k === 'deflect' ? this.deflectStreak : 1 });
+    // and what only you feel: your blow landing, a blow landing on you, the one that kills
+    const landed = e.k === 'hit' || e.k === 'armor' || e.k === 'deathblow' || e.k === 'guardBreak';
+    if (meA && landed) audio.hitConfirm(heavy || e.k !== 'hit');
+    if (meD && (e.k === 'hit' || e.k === 'deathblow')) audio.hitTaken(heavy);
+    if (mine && e.k !== 'execute' && e.tags?.includes('kill')) audio.killBlow({ vol, pos });
   }
 
   /** Effects a move's choreography asks for: dust on a stomp, a shockwave under a slam, petals off an iai cut. */
@@ -1619,6 +1643,27 @@ class App {
     return this.renderer.project(this.tmp.set(x, y, z), out) ? out : null;
   }
 
+  /** whether your special and ability were last seen charged (so each comes back with a sound) */
+  private readySeen = { special: true, ability: true };
+  /** when your heart next beats, while you're nearly dead */
+  private heartAt = 0;
+
+  /** Your special and ability coming back, and your heartbeat when you're nearly dead. */
+  private feedbackCues(sim: LocalController['sim'], now: number): void {
+    const fighting = sim.isAlive() && (!this.match || this.match.phase === 'fight');
+    const special = fighting && now >= sim.specialReadyAt;
+    const ability = fighting && now >= sim.abilityReadyAt;
+    if (special && !this.readySeen.special) audio.ready('special');
+    if (ability && !this.readySeen.ability) audio.ready('ability');
+    // outside a fight they count as seen, so nothing chimes the moment it starts
+    this.readySeen = { special: special || !fighting, ability: ability || !fighting };
+    const left = sim.hp / sim.maxHp;
+    if (fighting && left > 0 && left <= 0.25 && now >= this.heartAt) {
+      audio.lowHealth(left <= 0.1 ? 1 : 0.7);
+      this.heartAt = now + (left <= 0.1 ? 650 : 900);
+    }
+  }
+
   private updateHud(dt: number, now: number): void {
     this.ui.updateFloaters(dt, (x, y, z) => this.project(x, y, z));
     const local = this.local;
@@ -1638,6 +1683,7 @@ class App {
       });
     }
     this.ui.setPostureMain(sim.posture / sim.char.stats.posture, sim.state === 'broken');
+    this.feedbackCues(sim, now);
     this.ui.setZone(this.kind === 'lobby' && inSafeZone(this.map, me.pos.x, me.pos.z));
     this.ui.setClickHint(!this.input.locked && !this.ui.modalOpen && !this.ui.chatOpen, this.input.locked, this.input.lockFailed);
     this.ui.setQueue(!!this.queue, this.queue?.since ?? 0, this.queue?.count ?? 0, now);
@@ -1807,6 +1853,10 @@ function createPreview(container: HTMLElement): Preview {
       }
       model = new CharacterModel(id);
       scene.add(model.root);
+      // framed close on the fighter, whatever their size, so they fill the tall frame
+      const k = model.scale;
+      r.camera.position.set(0, 1.25 * k, 3.1 * k);
+      r.camera.lookAt(0, 0.95 * k, 0);
       idx = 0;
       stateT = 0;
     },
