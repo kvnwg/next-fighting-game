@@ -10,6 +10,8 @@ const THREE_VERSION = JSON.parse(fs.readFileSync('node_modules/three/package.jso
 const outDir = path.resolve('dist/artifact');
 
 process.env.VITE_OFFLINE = '1';
+// the Claude build is for testing: every fighter and arena unlocked, coins to spare (not the CrazyGames build)
+process.env.VITE_UNLOCK_ALL = '1';
 await build({
   configFile: false,
   root: process.cwd(),

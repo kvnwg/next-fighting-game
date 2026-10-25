@@ -95,8 +95,11 @@ let game: Game | null = null;
 export function connectOffline(): ClientSocketLike {
   if (!game) {
     // ?arena=<id> pins every match to one map (handy for testing a specific arena)
-    const arena = new URLSearchParams(location.search).get('arena') ?? undefined;
-    game = new Game(new Store(localPersistence), undefined, { offline: true, roamers: 4, arena });
+    const params = new URLSearchParams(location.search);
+    const arena = params.get('arena') ?? undefined;
+    // the build published on Claude is for testing: everything unlocked (?unlockall does it in dev)
+    const unlockAll = import.meta.env.VITE_UNLOCK_ALL === '1' || (import.meta.env.DEV && params.has('unlockall'));
+    game = new Game(new Store(localPersistence), undefined, { offline: true, roamers: 4, arena, unlockAll });
     game.start();
     addEventListener('pagehide', () => game?.store.flush());
   }

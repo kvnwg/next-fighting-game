@@ -56,7 +56,12 @@ export interface GameOptions {
   selectTime?: number;
   /** How long the match intro (the ring entrances) runs (ms). */
   introTime?: number;
+  /** A test build: everyone owns every fighter and arena, with coins to spare. */
+  unlockAll?: boolean;
 }
+
+/** Coins a test build tops everyone up to. */
+const TEST_COINS = 99_999;
 
 export class Game {
   readonly players = new Map<string, Player>();
@@ -246,6 +251,11 @@ export class Game {
       profile = this.store.create(name);
     }
     profile.lastSeen = Date.now();
+    if (this.options.unlockAll) {
+      profile.chars = [...CHARACTER_IDS];
+      profile.maps = ARENA_MAPS.map((m) => m.id);
+      profile.coins = Math.max(profile.coins, TEST_COINS);
+    }
     this.store.markDirty();
     // you play a fighter you own (a locked one falls back to the Ronin)
     const char: CharacterId = isCharacterId(msg.char) && profile.chars.includes(msg.char) ? msg.char : 'ronin';
