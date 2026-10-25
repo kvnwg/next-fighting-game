@@ -1259,7 +1259,7 @@ export class Animator {
     for (let i = this.reactions.length - 1; i >= 0; i--) {
       const r = this.reactions[i];
       r.t += dt;
-      const life = r.kind === 'roar' ? 0.95 : r.hit?.heavy ? 0.6 : 0.35;
+      const life = r.kind === 'roar' ? 0.95 : r.hit?.heavy ? 0.6 : r.kind === 'deflect' ? 0.45 : 0.35;
       if (r.t > life) {
         this.reactions.splice(i, 1);
         continue;
@@ -1267,11 +1267,17 @@ export class Animator {
       const b = pose.body;
       switch (r.kind) {
         case 'deflect': {
-          // a crisp flick of the blade as it turns the strike aside
+          // a hard snap of the blade up and out as it turns the strike aside, the body bracing
+          // behind it and rocking back a touch, then driving forward again
           const k = kick(r.t / 0.05);
-          tilt(pose.main, -0.5 * k);
-          shiftHands(pose, UP, 0.05 * k);
-          b.twist += 0.12 * k;
+          const after = Math.max(0, r.t - 0.12);
+          tilt(pose.main, -0.95 * k);
+          shiftHands(pose, UP, 0.09 * k);
+          shiftHands(pose, BACK, 0.04 * k);
+          b.twist += 0.24 * k;
+          b.lean -= 0.1 * k - 0.06 * Math.min(1, after * 6) * k;
+          b.crouch -= 0.06 * k;
+          b.headPitch -= 0.08 * k;
           break;
         }
         case 'blocked': {

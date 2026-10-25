@@ -482,8 +482,11 @@ function blockBase(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
 /** The perfect deflect: the sound the game is named for. Bright, ringing, and long. */
 export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void {
   // one clang for everyone: a take of the recorded clash, or the synthesised one (clang.ts) until
-  // the recordings have decoded. Back-to-back deflects climb a little in pitch and level.
+  // the recordings have decoded. Back-to-back deflects climb a little in pitch and level. And
+  // every deflect rings out after it (deflectRing), so it is never mistaken for a block or a hit.
   void a;
+  const streak = Math.min(4, Math.max(1, s.streak ?? 1)) - 1;
+  deflectRing(o, !!s.heavy, streak);
   // the Knight's deflect is his own: a sword hit ringing off his shield, not the shared clang
   const shield = d.id === 'paladin' ? sampleFor(o.ctx, 'paladin_parry') : null;
   if (shield) {
@@ -502,8 +505,22 @@ export function deflect(o: Out, a: Profile, d: Profile, s: GuardOpts = {}): void
     deflectClang(o, s);
     return;
   }
-  const streak = Math.min(4, Math.max(1, s.streak ?? 1)) - 1;
   playSample(o, buf, DEFLECT_GAIN * (1 + 0.08 * streak) * (s.heavy ? 1.1 : 1), jit(1, 0.035) * (1 + 0.025 * streak));
+}
+
+/**
+ * What makes a deflect a deflect: the steel ringing out after the clash. The shield strike's ring
+ * (the user's) pitched up to a blade's, a sword's own partials singing on for a couple of seconds
+ * over it, a crackle of sparks and a low punch for the weight. A streak climbs in pitch.
+ */
+function deflectRing(o: Out, heavy: boolean, streak: number): void {
+  const up = 1 + 0.05 * streak;
+  const shieldRing = sampleFor(o.ctx, 'paladin_shield');
+  if (shieldRing) playSample(o, shieldRing, sampleGain('paladin_shield') * 2.4 * (heavy ? 1.15 : 1), jit(1.42, 0.02) * up, 0.004);
+  ring(o, MAT.katana, heavy ? 0.42 : 0.34, { pitch: 1.12 * up, decay: 1.7, delay: 0.006 });
+  crackle(o, 0.12, 55, { gain: 0.38, type: 'highpass', f: 3500 });
+  noise(o, { type: 'highpass', f: 6000, dur: 0.04, gain: 0.55, a: 0.0004 });
+  thump(o, 150, 62, 0.18, heavy ? 0.75 : 0.6);
 }
 
 /** The recorded deflect's level in the mix, matched to the synthesised one's loudness. */

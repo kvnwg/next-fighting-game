@@ -4,7 +4,8 @@ export const LEVEL = {
   // blows landing (cuts, punches, hammers, blocks, parries) sit well over everything else
   hit: 1.5,
   block: 1.05,
-  deflect: 1.15,
+  // the deflect rings out over everything (see recipes deflectRing)
+  deflect: 1.55,
   guardBreak: 1.25,
   posture: 0.9,
   windup: 0.5,
@@ -18,4 +19,4 @@ export const LEVEL = {
 };
 
 /** Reverb send per family: parries hang in the air, footsteps barely touch the room. */
-export const WET = { swing: 0.12, hit: 0.18, block: 0.18, deflect: 0.45, big: 0.4, step: 0.05, finish: 0.55 };
+export const WET = { swing: 0.12, hit: 0.18, block: 0.18, deflect: 0.55, big: 0.4, step: 0.05, finish: 0.55 };

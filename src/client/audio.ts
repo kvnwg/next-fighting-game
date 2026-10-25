@@ -380,7 +380,9 @@ class AudioEngine {
     const tags = e.tags ?? [];
     switch (e.k) {
       case 'deflect':
-        this.emit((out) => R.deflect(out, A, D, { heavy, anim, streak: o.streak }), { ...at, level: LEVEL.deflect, wet: WET.deflect, key: 'deflect', gap: 0.03, priority: 2 });
+        // yours rides over everything: the rest of the world dips for a beat so it rings out
+        this.emit((out) => R.deflect(out, A, D, { heavy, anim, streak: o.streak }), { ...at, level: LEVEL.deflect, wet: WET.deflect, key: 'deflect', gap: 0.03, priority: 3, hero: o.mine });
+        if (o.mine) this.mix?.duck(0.55, 0.004, 0.18, 0.7);
         break;
       case 'block':
         this.emit((out) => R.block(out, A, D, { heavy, anim }), { ...at, level: LEVEL.block, wet: WET.block, key: `blk:${e.d}`, gap: 0.04, priority: 2 });

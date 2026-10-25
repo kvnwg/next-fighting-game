@@ -856,24 +856,35 @@ class App {
     if (meA && this.local && (e.k === 'hit' || e.k === 'armor' || e.k === 'block' || e.k === 'guardBreak')) this.local.sim.contactSerial = this.local.sim.attackSerial;
     switch (e.k) {
       case 'deflect': {
-        // the clash, as Dueling Grounds does it: a gold streak and flash at the blades, a brief
-        // orange tint, embers falling. No freeze, no shake, no zoom, no text.
+        // the clash: unmistakable every time. A freeze on the blades, a burst of gold light rings
+        // facing you with a star at the contact, a gold streak and a shower of sparks, the
+        // attacker's weapon lit up as it's thrown back; for your own, a flash and a kick of the
+        // camera. A streak of them builds it all up.
         const nowMs = performance.now();
         const streak = (this.deflectStreak = nowMs - this.lastDeflectAt < 2500 ? this.deflectStreak + 1 : 1);
         this.lastDeflectAt = nowMs;
-        const big = (heavy ? 1.2 : 1) * (1 + 0.1 * Math.min(3, streak - 1));
+        const big = (heavy ? 1.2 : 1) * (1 + 0.12 * Math.min(3, streak - 1));
         const toCam = this.tmp3.subVectors(this.renderer.camera.position, pos).normalize();
-        this.effects.flash(pos, '#fff6d0', 0.9 * big, 0.1);
-        this.effects.flash(pos, '#ffb02a', 1.6 * big, 0.2);
-        this.effects.slash(pos, this.tmp2.set(0, 1, 0).cross(toCam).normalize(), '#ffd24a', 1.3 * big, 0.06);
-        this.effects.burst(pos, { count: Math.round(14 * big), color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 9, life: 0.25, size: 0.04, gravity: 6, drag: 3, stretch: 0.1 });
-        this.effects.burst(pos, { count: Math.round(16 * big), color: ['#ffd24a', '#ff9a2a', '#fff6c0'], speed: 3, up: 2, life: 0.45, size: 0.035, gravity: 9, drag: 0.8 });
+        const across = this.tmp2.set(0, 1, 0).cross(toCam).normalize();
+        this.effects.flash(pos, '#ffffff', 1.3 * big, 0.12);
+        this.effects.flash(pos, '#ffb02a', 2.4 * big, 0.24);
+        this.effects.ring(pos, '#ffd24a', 1.8 * big, 0.32, toCam, true);
+        this.effects.ring(pos, '#fff6d0', 1.0 * big, 0.22, toCam, true);
+        this.effects.hitFlare(pos, across, toCam, '#ffd24a', 1.4 * big);
+        this.effects.slash(pos, across, '#ffd24a', 1.8 * big, 0.08);
+        this.effects.burst(pos, { count: Math.round(30 * big), color: ['#fff6c0', '#ffd24a', '#ffffff'], speed: 12, life: 0.3, size: 0.045, gravity: 6, drag: 2.5, stretch: 0.12 });
+        this.effects.burst(pos, { count: Math.round(24 * big), color: ['#ffd24a', '#ff9a2a', '#fff6c0'], speed: 3.5, up: 2.4, life: 0.6, size: 0.04, gravity: 9, drag: 0.8 });
         d?.model.react('deflect');
         a?.model.react('blocked');
-        a?.model.flash('#ffc34a', 0.8);
+        a?.model.flash('#ffc34a', 1);
+        d?.model.flash('#fff2c0', 0.5);
+        // the blades bite and hold for a beat
+        a?.hitstop(90, 0.035);
+        d?.hitstop(70);
         if (mine) {
-          this.renderer.flash = 0.2;
-          this.renderer.flashColor.set('#ff9a2a');
+          this.renderer.flash = Math.max(this.renderer.flash, 0.32);
+          this.renderer.flashColor.set('#ffd88a');
+          this.cam.shake(0.12 * big, 0.14);
         }
         if (meD) this.local?.onDeflected();
         break;
