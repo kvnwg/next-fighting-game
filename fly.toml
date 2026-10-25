@@ -1,0 +1,55 @@
+# Fly.io config for the game server. See DEPLOY.md for the whole launch.
+#
+# Every lobby and match lives in this one process's memory, so it runs on exactly ONE machine,
+# with the profiles (ranked ratings) on a volume. Don't scale it past one machine.
+#
+#   fly launch --copy-config --no-deploy           (pick a name; it rewrites `app` below)
+#   fly volumes create deflect_data --size 1 --region <same as primary_region>
+#   fly deploy
+
+app = "deflect"
+# the region closest to most of your players (fly platform regions)
+primary_region = "iad"
+
+kill_signal = "SIGTERM"
+kill_timeout = "15s"
+
+[env]
+  PORT = "8080"
+  DATA_DIR = "/data"
+  # Fly's proxy sits in front: read the player's address from it (per-address limits)
+  TRUST_PROXY = "1"
+  # about 500 players on one dedicated core (load-tested); lower it on a smaller machine
+  MAX_PLAYERS = "500"
+  # only these pages may open the game's WebSocket; unset allows any
+  # ALLOWED_ORIGINS = "https://deflect.fly.dev,*.crazygames.com"
+
+[mounts]
+  source = "deflect_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # players are connected all day: never stop the machine, or every lobby and match goes with it
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    # every player is one long-lived WebSocket connection
+    type = "connections"
+    soft_limit = 500
+    hard_limit = 1000
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "15s"
+    timeout = "5s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  # a dedicated core holds ~500 players; shared-cpu-2x with MAX_PLAYERS = "80" is a cheaper start
+  size = "performance-1x"
+  memory = "2gb"

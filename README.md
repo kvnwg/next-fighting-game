@@ -22,6 +22,8 @@ npm run build        # typecheck + build the client into dist/client
 npm start            # one server on $PORT (default 3000) serving the client and the WebSocket
 ```
 
+**Putting it online:** [DEPLOY.md](DEPLOY.md) is the launch guide: the server on Fly.io (`fly.toml`) or any Docker host (`Dockerfile`), its settings, the online CrazyGames build, capacity and cost (about 500 players on one core), and a checklist.
+
 ### Single player (no server)
 
 The whole game server also runs inside the browser. Open <http://localhost:5173/?offline> in dev, or build a single self-contained page with `npm run build:artifact` (writes `dist/artifact/deflect.html`, which is what the claude.ai artifact is built from). Offline you get:
@@ -30,17 +32,18 @@ The whole game server also runs inside the browser. Open <http://localhost:5173/
 - the training dummies and practice matches
 - **Ranked vs AI**: opponents matched to your rating, with Elo saved in browser storage
 
-Multiplayer and the shared ladder need the server.
+Multiplayer and the shared ladder need the server. An online build that can't reach its server offers single player instead (`?offline`), and a way back.
 
 ### CrazyGames
 
-`npm run build:crazygames` builds the single-player game for [CrazyGames](https://developer.crazygames.com) into `dist/crazygames` (zipped to `dist/crazygames.zip`, ready to upload). It uses relative paths and loads the CrazyGames SDK v3 in the page head. `src/client/platform.ts` wraps the SDK, and every call does nothing off CrazyGames:
+`SERVER_URL=wss://your-server npm run build:crazygames` builds the online game for [CrazyGames](https://developer.crazygames.com) into `dist/crazygames` (zipped to `dist/crazygames.zip`, ready to upload), connecting to your server; without `SERVER_URL` it builds the single-player game. It uses relative paths and loads the CrazyGames SDK v3 in the page head. `src/client/platform.ts` wraps the SDK, and every call does nothing off CrazyGames:
 - loading and gameplay start/stop (menus, the title screen and results are breaks);
 - a midgame ad after a match, never during one, with the game muted while it plays;
 - `happytime` on a ranked promotion;
 - the platform's mute setting;
-- the signed-in player's name;
-- settings and progress saved with CrazyGames' data module.
+- the signed-in player's name, which they play under so friends know them;
+- settings and progress saved with CrazyGames' data module;
+- multiplayer: each lobby is a room (`updateRoom` / `leftRoom`), invites and CrazyGames' Join land a friend in your lobby, instant multiplayer goes straight in, and the platform's chat setting is respected (see [DEPLOY.md](DEPLOY.md#3-launch-on-crazygames)).
 
 Touch controls switch on by themselves on phones and tablets.
 
@@ -48,7 +51,9 @@ Other scripts: `npm test` (combat rules, server integration and bot-vs-bot match
 
 `tests/sim.ts` can simulate complete matches between server-side bots on a fake clock. It's handy for balance passes: run every matchup and compare win rates and how often each outcome (deflect, deathblow and so on) happens. The current numbers are a first pass tuned that way.
 
-Ranked profiles are stored in `data/profiles.json` (`DATA_DIR` overrides the folder). Identity is a random token kept in the browser's localStorage. There are no accounts or passwords yet.
+Ranked profiles are stored in SQLite, `data/deflect.db` (`DATA_DIR` overrides the folder; an old `data/profiles.json` is imported on first start), and only the profiles that change are written. Identity is a random token kept in the browser's localStorage. There are no accounts or passwords yet.
+
+Chat and names are moderated on the server with CrazyGames' word list (`src/server/blocklist.txt`, whole words only).
 
 ## Controls
 
@@ -115,6 +120,8 @@ The server is authoritative for combat. Each client predicts its own actions wit
 
 In a lobby, each player is sent what's near them (`INTEREST` in `src/shared/config.ts`): fighters within 40m on every snapshot (20 a second), everyone farther away on every fourth, and combat effects and state changes only from within 60m. Clients draw far-off fighters a little further behind so they still glide. A full lobby of 24 spread over the grounds costs each player about 30 KB/s; packed into one spot it's about 60 KB/s, what it was before (everyone is near everyone).
 
+The server pings every connection every 10s and drops one that misses four in a row (a phone that lost signal), so nobody lingers as a statue. A restart (a deploy) closes every connection with a "restarting" goodbye: matches in progress end without a result, and clients wait for the server and rejoin on their own. Connections are capped in total (`MAX_PLAYERS`) and per address, and invites carry a lobby's id (`?lobby=` on your own site).
+
 ## Characters
 
 | | Weapon | Role | Passive | Perilous (E) | Ability (R) |
@@ -169,18 +176,21 @@ src/shared/      code used by both client and server
   ranks.ts         tiers, divisions, Elo
   protocol.ts      WebSocket message types
 src/server/      Node WebSocket server
-  game.ts          connections, queue/matchmaking, challenges, results
+  app.ts           HTTP + WebSocket: the built client, /healthz, connection limits, heartbeat, restarts
+  game.ts          connections, lobbies and invites, queue/matchmaking, challenges, results
   instance.ts      authoritative simulation + lag-compensated hit resolution
   lobby.ts         safe zone, respawns, dummies     arena.ts   best-of-3 match flow
-  bot.ts           AI opponents                     store.ts   profile persistence
+  bot.ts           AI opponents                     store.ts   profiles (sqliteStore.ts on the server)
+  censor.ts        chat and name moderation (blocklist.txt)
 src/client/      three.js client
   render/          HDR renderer + post pipeline, character rig + animation, weapons, effects
     gfx/             voxel mesher, trees, props, sky + clouds, water, grass, GPU particles, shared shaders
     maps/            one recipe per map (lighting mood + build) on a shared kit
   app.ts           main loop + networking glue      local.ts   local player prediction
+  endpoint.ts      where the server is (VITE_SERVER_URL)  platform.ts  the CrazyGames SDK
   ui.ts            HUD, menus, character select, ladder, results
   title/           the title screen: the Ronin on the cliff, the camera shots, the way into the game
-tests/           vitest: combat rules + server integration
+tests/           vitest: combat rules, server integration, what a public server has to survive
 scripts/         headless-browser screenshot helpers used during development
 ```
 
@@ -251,9 +261,11 @@ All combat timings live in `COMBAT` and `MATCH` in `src/shared/config.ts` (defle
 
 ## Known limitations / next steps
 
-- No real accounts: identity is a browser token. Hook up auth before running a public ranked ladder.
+- No real accounts: identity is a browser token (CrazyGames' cloud data there). Verifying CrazyGames' signed user token on the server would make ranked profiles real accounts.
+- Disconnecting forfeits a ranked match; there's no rejoining a match in progress.
 - Movement is client-reported. The server caps speed by state (no walking away while staggered or broken), limits height to real jumps, and measures latency itself. That stops the obvious cheats, but it isn't a fully server-simulated movement model.
-- One server process holds every lobby and match. Scaling past one machine would need lobbies spread over several processes and a shared store such as SQLite or Postgres.
+- One server process holds every lobby and match (about 500 players on one core). Scaling past one machine would need lobbies spread over several processes and a shared database such as Postgres.
+- Snapshots are JSON, about 55 KB/s per player in a crowded lobby; a compact binary encoding would cut the bandwidth bill several times over.
 - No gamepad support yet (keyboard + mouse, or touch).
 
 ## Voxel characters
