@@ -171,11 +171,16 @@ export class Arena extends Instance {
     }
   }
 
-  /** A player left or gave up. */
-  forfeit(p: Player): void {
+  /**
+   * A player left (`chose` false) or gave up. Giving up is refused while they're finishing their
+   * opponent off: the round is theirs, it only counts when the execution ends.
+   */
+  forfeit(p: Player, chose = false): void {
     if (this.finished) return;
     const slot = this.humans[0] === p ? 0 : this.humans[1] === p ? 1 : -1;
     if (slot < 0) return;
+    const [me, foe] = slot === 0 ? this.slots : [this.slots[1], this.slots[0]];
+    if (chose && (me.state === 'execute' || foe.state === 'executed' || foe.state === 'dead')) return;
     this.finish(slot === 0 ? 1 : 0, 'forfeit', this.game.now());
   }
 

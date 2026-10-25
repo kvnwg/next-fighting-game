@@ -374,6 +374,11 @@ export class UI {
     if (!inLobby) this.els.queue.classList.add('hidden');
   }
 
+  /** Whether giving up is on the table (not once the match is decided, nor while you finish them). */
+  setForfeitable(on: boolean): void {
+    this.els.btnForfeit.classList.toggle('gone', !on);
+  }
+
   setQueue(searching: boolean, since: number, count: number, serverNow: number): void {
     this.els.queue.classList.toggle('hidden', !searching);
     (this.els.btnRanked as HTMLButtonElement).disabled = searching;

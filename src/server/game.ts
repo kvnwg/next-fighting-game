@@ -307,7 +307,7 @@ export class Game {
         break;
       }
       case 'forfeit':
-        if (p.instance instanceof Arena) p.instance.forfeit(p);
+        if (p.instance instanceof Arena) p.instance.forfeit(p, true);
         break;
       case 'leaderboard':
         p.send({ t: 'leaderboard', entries: this.store.leaderboard(25), you: this.store.position(p.profile), total: this.store.placedCount() });

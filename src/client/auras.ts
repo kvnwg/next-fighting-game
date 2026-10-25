@@ -16,6 +16,8 @@ export interface Aura {
   size: number;
   grow: number;
   life: number;
+  /** how see-through a puff starts (thinning out from there), so it never hides the fight */
+  alpha: number;
 }
 
 export const AURAS: Partial<Record<CharacterId, Aura>> = {
@@ -28,5 +30,6 @@ export const AURAS: Partial<Record<CharacterId, Aura>> = {
     size: 0.06,
     grow: 3.6,
     life: 1.7,
+    alpha: 0.3,
   },
 };

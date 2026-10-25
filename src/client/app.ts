@@ -1051,7 +1051,7 @@ class App {
     const k = f.model.scale;
     const fx = this.effects;
     const color = () => aura.colors[Math.floor(Math.random() * aura.colors.length)];
-    const opts = { life: aura.life, size: aura.size * k, gravity: -aura.rise * 0.35, drag: 1.1, grow: aura.grow };
+    const opts = { life: aura.life, size: aura.size * k, gravity: -aura.rise * 0.35, drag: 1.1, grow: aura.grow, alpha: aura.alpha };
     // off the blade, anywhere along it: rising and streaming back against the way he moves,
     // and boiling off much harder as it cuts
     const base = this.tmp2;
@@ -1145,7 +1145,7 @@ class App {
           for (let i = 0; i < Math.round(170 * dt + Math.random()); i++) {
             const p = along(rnd(0.2, 1));
             const c = ['#f4f4f6', '#dcdde2', '#c4c6cd', '#a9acb5'][Math.floor(Math.random() * 4)];
-            fx.emit(p.x, p.y, p.z, rnd(-0.15, 0.15), rnd(0.05, 0.3), rnd(-0.15, 0.15), c, { life: rnd(1.0, 1.6), size: 0.065 * k, gravity: -0.12, drag: 1.6, grow: 3.6 });
+            fx.emit(p.x, p.y, p.z, rnd(-0.15, 0.15), rnd(0.05, 0.3), rnd(-0.15, 0.15), c, { life: rnd(1.0, 1.6), size: 0.065 * k, gravity: -0.12, drag: 1.6, grow: 3.6, alpha: 0.35 });
           }
         }
         // his special and his iai tear through the air in a thick black smoke shot with embers,
@@ -1155,7 +1155,7 @@ class App {
           for (let i = 0; i < Math.round(420 * dt + Math.random()); i++) {
             const p = Math.random() < 0.7 ? along(rnd(0.05, 1)) : this.tmp.set(f.pos.x + rnd(-0.3, 0.3) * k, f.pos.y + rnd(0.3, 1.6) * k, f.pos.z + rnd(-0.3, 0.3) * k);
             const c = ['#141012', '#1f1718', '#2b1d1e', '#3a2322', '#4a1616'][Math.floor(Math.random() * 5)];
-            fx.emit(p.x, p.y, p.z, rnd(-0.25, 0.25), rnd(0.0, 0.25), rnd(-0.25, 0.25), c, { life: rnd(1.6, 2.6), size: 0.075 * k, gravity: -0.06, drag: 1.4, grow: 3.8 });
+            fx.emit(p.x, p.y, p.z, rnd(-0.25, 0.25), rnd(0.0, 0.25), rnd(-0.25, 0.25), c, { life: rnd(1.6, 2.6), size: 0.075 * k, gravity: -0.06, drag: 1.4, grow: 3.8, alpha: 0.5 });
           }
           for (let i = 0; i < Math.round(110 * dt + Math.random()); i++) {
             const p = along(rnd(0.2, 1));
@@ -1693,6 +1693,10 @@ class App {
     }
     this.ui.setPostureMain(sim.posture / sim.char.stats.posture, sim.state === 'broken');
     this.feedbackCues(sim, now);
+    // no giving up a match that's over, or while you're finishing them off
+    const m0 = this.match;
+    const rival = m0 ? this.fighters.get(m0.players[m0.you === 0 ? 1 : 0].id) : undefined;
+    this.ui.setForfeitable(!!m0 && m0.phase !== 'matchEnd' && sim.state !== 'execute' && rival?.s !== 'executed' && rival?.s !== 'dead');
     this.ui.setZone(this.kind === 'lobby' && inSafeZone(this.map, me.pos.x, me.pos.z));
     this.ui.setClickHint(!this.input.locked && !this.ui.modalOpen && !this.ui.chatOpen, this.input.locked, this.input.lockFailed);
     this.ui.setQueue(!!this.queue, this.queue?.since ?? 0, this.queue?.count ?? 0, now);

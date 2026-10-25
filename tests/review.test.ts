@@ -210,3 +210,27 @@ describe('server authority', () => {
     expect(outcomes.length).toBe(1);
   });
 });
+
+describe('forfeiting', () => {
+  it('is refused while you are finishing your opponent, and still counts otherwise', () => {
+    const { arena, pa, pb, fa, fb, now } = setup('ronin', 'ronin');
+    // A is executing B: the round is A's, so A giving up now changes nothing
+    fa.force('execute', now(), 3000);
+    fb.force('executed', now(), 3000);
+    arena.forfeit(pa, true);
+    expect(arena.finished).toBe(false);
+    // B giving up mid-execution does end it, in A's favour
+    arena.forfeit(pb, true);
+    expect(arena.finished).toBe(true);
+    expect(arena.winner).toBe(0);
+  });
+
+  it('leaving still forfeits, even mid-execution', () => {
+    const { arena, pa, fa, fb, now } = setup('ronin', 'ronin');
+    fa.force('execute', now(), 3000);
+    fb.force('executed', now(), 3000);
+    arena.forfeit(pa);
+    expect(arena.finished).toBe(true);
+    expect(arena.winner).toBe(1);
+  });
+});
