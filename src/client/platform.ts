@@ -125,6 +125,36 @@ class Platform {
     });
   }
 
+  /**
+   * A rewarded ad, the kind a player chooses to watch for a reward. Resolves 'rewarded' only if it
+   * played to the end; 'skipped' if it failed, was unfilled or was closed early; 'unavailable' off
+   * CrazyGames (the caller shows its own stand-in then). `onStart` fires when it really starts.
+   */
+  requestRewardedAd(onStart: () => void): Promise<'rewarded' | 'skipped' | 'unavailable'> {
+    const sdk = this.sdk;
+    if (!sdk) return Promise.resolve('unavailable');
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = (r: 'rewarded' | 'skipped') => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(safety);
+        resolve(r);
+      };
+      const safety = setTimeout(() => done('skipped'), 90_000);
+      try {
+        sdk.ad.requestAd('rewarded', {
+          adStarted: onStart,
+          adFinished: () => done('rewarded'),
+          adError: () => done('skipped'),
+        });
+      } catch (err) {
+        console.warn('[platform] rewarded requestAd failed:', err);
+        done('skipped');
+      }
+    });
+  }
+
   /** The CrazyGames account name, when the player is signed in. */
   async username(): Promise<string | null> {
     if (!this.sdk?.user?.isUserAccountAvailable) return null;

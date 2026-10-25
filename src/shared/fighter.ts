@@ -83,6 +83,8 @@ export class Fighter {
   attack: AttackDef | null = null;
   attackKey: AttackKey | null = null;
   atkWindup = 0;
+  /** every windup stretched by this much (the tutorial's sensei swings slowly enough to read) */
+  windupScale = 1;
   comboIndex = -1;
   /** the light chain left off at this hit to guard; a light from guard before `chainUntil` throws the next one */
   chainFrom = -1;
@@ -388,10 +390,10 @@ export class Fighter {
   startAttack(key: AttackKey, now: number): void {
     const atk = getAttack(this.char, key);
     if (!atk) return;
-    let scale = 1;
+    let scale = this.windupScale;
     const rip = this.mods.riposteWindupMult;
     if (rip && this.riposteUntil > now) {
-      scale = rip;
+      scale *= rip;
       this.riposteUntil = 0;
     }
     this.setState('attack', now);

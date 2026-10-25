@@ -9,6 +9,8 @@ import { ICON, IconName, icon, pixelSVG, recolor, slashRows } from './pixelicons
 import { TRACKS } from './audio/music';
 import { settings } from './settings';
 import { LORE, readingMinutes } from './lore';
+import { FREE_PICK_GAMES, MAP_PRICE, AD_REWARD, charPrice, freePickReady, gamesToFreePick, isPremium, reachedGold } from '../shared/progress';
+import { THUMBS } from './select';
 
 const h = (html: string): HTMLElement => {
   const t = document.createElement('template');
@@ -64,7 +66,18 @@ export interface UIHandlers {
   createPreview(container: HTMLElement): Preview;
   /** data URL of a character's portrait (rendered in-engine) */
   portrait(id: CharacterId): string;
+  /** buy a fighter or an arena with coins, or (free) take the free fighter */
+  onUnlock(kind: 'char' | 'map', id: string, free?: boolean): void;
+  /** watch an ad for coins (the shop's reward, or to double the last match's); true if earned */
+  onWatchAd(kind: 'double' | 'bonus'): Promise<boolean>;
+  /** play the tutorial (again) */
+  onTutorial(): void;
 }
+
+export type ModalKind = 'chars' | 'ladder' | 'help' | 'shop';
+
+/** Coins as written: 1,250. */
+const coinText = (n: number): string => Math.max(0, Math.floor(n)).toLocaleString('en-US');
 
 export interface CardData {
   name: string;
@@ -133,6 +146,8 @@ export class UI {
   modalOpen: string | null = null;
   /** a fighter's legend open over the fighter select (see openLegend) */
   private legend: HTMLElement | null = null;
+  /** repaints the open fighter select's locks and buttons (what you own changed) */
+  private charsRefresh: (() => void) | null = null;
   /** in a match you fight with who you brought: the fighter picker stays shut */
   private charsLocked = false;
   profile: ProfileView | null = null;
@@ -196,6 +211,7 @@ export class UI {
           </div>
           <div class="esc-hint hidden">Esc to free the cursor</div>
         </div>
+        <button class="purse" title="Coins · open the shop">${icon('coin', 'purse-ico')}<b class="purse-n">0</b><span class="purse-plus">+</span></button>
         <div class="feed"></div>
         <div class="center">
           <div class="banner hidden"></div>
@@ -238,6 +254,7 @@ export class UI {
       onRanked: () => this.handlers.onRanked(),
       onCancelQueue: () => this.handlers.onCancelQueue(),
       onFighters: () => this.toggleModal('chars'),
+      onShop: () => this.toggleModal('shop'),
       onLadder: () => this.toggleModal('ladder'),
       onHelp: () => this.toggleModal('help'),
       onSettings: () => {
@@ -287,6 +304,8 @@ export class UI {
       btnRanked: '#btn-ranked',
       btnPractice: '#btn-practice',
       btnForfeit: '#btn-forfeit',
+      purse: '.purse',
+      purseN: '.purse-n',
     })) {
       this.els[k] = q(sel);
     }
@@ -297,6 +316,7 @@ export class UI {
     q('#btn-chars').addEventListener('click', () => this.toggleModal('chars'));
     q('#btn-ladder').addEventListener('click', () => this.toggleModal('ladder'));
     q('#btn-help').addEventListener('click', () => this.toggleModal('help'));
+    q('.purse').addEventListener('click', () => this.toggleModal('shop'));
     q('.prompt').addEventListener('click', () => this.handlers.onPrompt());
     // touch: the menu is a dropdown under the menu button; picking anything closes it
     this.els.menuButtons.addEventListener('click', (e) => {
@@ -350,6 +370,22 @@ export class UI {
 
   setProfile(p: ProfileView): void {
     this.profile = p;
+    this.setText(this.els.purseN, coinText(p.coins));
+    this.lobbyBar.setFreePick(Math.min(p.games, FREE_PICK_GAMES), FREE_PICK_GAMES, freePickReady(p), p.freePicked);
+    // what's owned or affordable may have changed under an open menu
+    if (this.modalOpen === 'chars') this.charsRefresh?.();
+    else if (this.modalOpen === 'shop') this.renderShop();
+  }
+
+  /** Coins just came in: the purse jumps and the amount floats up off it. */
+  coinsGained(n: number): void {
+    const purse = this.els.purse;
+    purse.classList.remove('bump');
+    void purse.offsetWidth;
+    purse.classList.add('bump');
+    const pop = h(`<div class="coin-pop">${icon('coin')}+${coinText(n)}</div>`);
+    purse.appendChild(pop);
+    setTimeout(() => pop.remove(), 1400);
   }
 
   /** Small, dim connection line: players online, round-trip time, fps. */
@@ -541,9 +577,11 @@ export class UI {
   }
 
   setMatch(m: Extract<ServerMsg, { t: 'match' }> | null, serverNow: number): void {
-    this.els.timer.classList.toggle('hidden', !m);
-    this.els.round.classList.toggle('hidden', !m);
-    if (!m) return;
+    // a lesson has no rounds and no clock
+    const shown = !!m && m.mode !== 'tutorial';
+    this.els.timer.classList.toggle('hidden', !shown);
+    this.els.round.classList.toggle('hidden', !shown);
+    if (!m || !shown) return;
     let secs = 0;
     if (m.phase === 'fight') secs = Math.max(0, Math.ceil((m.endsAt - serverNow) / 1000));
     this.setText(this.els.round, `Round ${m.round}`);
@@ -757,7 +795,7 @@ export class UI {
 
   // ------------------------------------------------------------------ modals
 
-  toggleModal(kind: 'chars' | 'ladder' | 'help'): void {
+  toggleModal(kind: ModalKind): void {
     if (this.modalOpen === kind) this.closeModal();
     else this.openModal(kind);
   }
@@ -766,6 +804,7 @@ export class UI {
     if (!this.modalOpen) return;
     this.modalOpen = null;
     this.legend = null;
+    this.charsRefresh = null;
     this.modal.classList.add('hidden');
     this.preview?.dispose();
     this.preview = null;
@@ -870,11 +909,12 @@ export class UI {
     if (on && this.modalOpen === 'chars') this.closeModal();
   }
 
-  openModal(kind: 'chars' | 'ladder' | 'help', currentChar: CharacterId = settings.char): void {
+  openModal(kind: ModalKind, currentChar: CharacterId = settings.char): void {
     if (kind === 'chars' && this.charsLocked) return;
     this.modalOpen = kind;
     this.handlers.onModalChange(true);
     if (kind === 'chars') this.renderChars(currentChar);
+    else if (kind === 'shop') this.renderShop();
     else if (kind === 'ladder') {
       this.frame('Ranked Ladder', `<div class="ladder">Loading…</div>`, false, '番付', 'ladder');
       this.handlers.onLeaderboard();
@@ -884,12 +924,14 @@ export class UI {
   /**
    * The fighter select: the roster along the bottom and, above it, the chosen fighter large (their
    * model turning through their moves), their name, kanji and role, and nothing more until you
-   * open one of the tabs: their moves, their numbers, or their story.
+   * open one of the tabs: their moves, their numbers, or their story. Fighters you don't own wear a
+   * padlock; the button under the chosen one plays them, unlocks them with coins (the Lancer and the
+   * Warden once you've reached Gold), or takes the free fighter once it's yours to take.
    */
   private renderChars(selected: CharacterId): void {
     const tiles = CHARACTER_IDS.map((id) => {
       const c = CHARACTERS[id];
-      return `<button class="fs-tile" data-id="${id}" style="--c2:${c.palette.accent}" aria-label="${esc(c.name)}"><img src="${this.handlers.portrait(id)}" alt="" draggable="false"><span>${esc(c.name)}</span></button>`;
+      return `<button class="fs-tile" data-id="${id}" style="--c2:${c.palette.accent}" aria-label="${esc(c.name)}"><img src="${this.handlers.portrait(id)}" alt="" draggable="false"><span>${esc(c.name)}</span><i class="fs-lock">${icon('lock')}</i></button>`;
     }).join('');
     this.frame(
       'Choose your fighter',
@@ -904,7 +946,7 @@ export class UI {
               <button class="fs-tab" role="tab" data-tab="story" aria-selected="false">${icon('eye')}Story</button>
             </div>
             <div class="fs-panel hidden" role="tabpanel"></div>
-            <div class="fs-go"><button class="fs-play" id="pick-char"></button><span class="fs-note">Switch fighters in the lobby safe zone</span></div>
+            <div class="fs-go"><button class="fs-play" id="pick-char"></button><button class="fs-free hidden" id="free-char">${icon('star')}Take free</button><span class="fs-note"></span></div>
           </div>
         </div>
         <div class="fs-roster">${tiles}</div>
@@ -970,7 +1012,7 @@ export class UI {
       root.querySelector('.fs-kanji')!.textContent = c.jp;
       root.querySelector('.fs-name')!.textContent = c.name;
       root.querySelector('.fs-role')!.textContent = `${c.role} · ${c.weapon}`;
-      root.querySelector('#pick-char')!.innerHTML = `${icon('swords')}Play ${esc(c.name)}`;
+      paintLocks();
       const hero = root.querySelector<HTMLElement>('.fs-id')!;
       hero.classList.remove('fs-in');
       void hero.offsetWidth;
@@ -981,12 +1023,50 @@ export class UI {
       else if (this.preview.el.parentElement !== pv) pv.appendChild(this.preview.el);
       this.preview.setChar(id);
     };
+    const play = root.querySelector<HTMLButtonElement>('#pick-char')!;
+    const free = root.querySelector<HTMLButtonElement>('#free-char')!;
+    const note = root.querySelector<HTMLElement>('.fs-note')!;
+    const owns = (id: CharacterId) => !this.profile || this.profile.chars.includes(id);
+    // padlocks on the roster, and what the button under the chosen fighter does
+    const paintLocks = () => {
+      const p = this.profile;
+      for (const b of roster) b.classList.toggle('locked', !owns(b.dataset.id as CharacterId));
+      const c = CHARACTERS[current];
+      free.classList.add('hidden');
+      play.classList.remove('buy');
+      if (!p || owns(current)) {
+        play.disabled = false;
+        play.innerHTML = `${icon('swords')}Play ${esc(c.name)}`;
+        const left = p ? gamesToFreePick(p) : 0;
+        note.innerHTML = p && freePickReady(p) ? `${icon('star')}A free fighter is waiting: pick a locked one` : p && left > 0 ? `${left} more match${left === 1 ? '' : 'es'} to a free fighter` : 'Switch fighters in the lobby safe zone';
+        return;
+      }
+      const price = charPrice(current);
+      const gold = reachedGold(p);
+      if (isPremium(current) && !gold) {
+        play.disabled = true;
+        play.innerHTML = `${icon('lock')}Reach Gold to unlock`;
+        note.textContent = `Then ${coinText(price)} coins. Climb the ranked ladder to Gold first.`;
+        return;
+      }
+      if (freePickReady(p)) free.classList.remove('hidden');
+      play.classList.add('buy');
+      play.disabled = p.coins < price;
+      play.innerHTML = `${icon('coin')}Unlock · ${coinText(price)}`;
+      note.textContent = p.coins >= price ? `You have ${coinText(p.coins)} coins` : `${coinText(price - p.coins)} more coins needed · watch an ad in the shop`;
+    };
+    this.charsRefresh = paintLocks;
     for (const b of tabs) b.addEventListener('click', () => setTab(tab === b.dataset.tab ? null : b.dataset.tab!));
     for (const b of roster) b.addEventListener('click', () => show(b.dataset.id as CharacterId));
-    root.querySelector('#pick-char')!.addEventListener('click', () => {
+    play.addEventListener('click', () => {
+      if (!owns(current)) {
+        this.handlers.onUnlock('char', current);
+        return;
+      }
       this.handlers.onSelectChar(current);
       this.closeModal();
     });
+    free.addEventListener('click', () => this.handlers.onUnlock('char', current, true));
     // the arrow keys walk the roster
     root.addEventListener('keydown', (e) => {
       const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
@@ -998,6 +1078,54 @@ export class UI {
     });
     show(selected);
     if (!this.touch) roster[CHARACTER_IDS.indexOf(selected)]?.focus({ preventScroll: true });
+  }
+
+  /**
+   * The shop: your coins, an ad to watch for more (as often as you like), the free fighter's
+   * progress, the arenas to unlock and a way to the fighters.
+   */
+  private renderShop(): void {
+    const p = this.profile;
+    const coins = p?.coins ?? 0;
+    const left = p ? gamesToFreePick(p) : FREE_PICK_GAMES;
+    const pips = Array.from({ length: FREE_PICK_GAMES }, (_, i) => `<i class="${p && (p.freePicked || i < p.games) ? 'on' : ''}"></i>`).join('');
+    const freeLine = !p ? '' : p.freePicked ? 'Free fighter taken' : freePickReady(p) ? 'Ready! Pick any fighter free' : `${left} more match${left === 1 ? '' : 'es'} to a free fighter`;
+    const mapCard = (id: string) => {
+      const m = MAPS[id];
+      const owned = !p || p.maps.includes(id);
+      const action = owned
+        ? `<span class="sh-owned">${icon('check')}Owned</span>`
+        : `<button class="sh-buy" data-map="${id}"${coins < MAP_PRICE ? ' disabled' : ''}>${icon('coin')}${coinText(MAP_PRICE)}</button>`;
+      return `<div class="sh-map${owned ? ' owned' : ''}"><img src="${THUMBS[id] ?? ''}" alt="" draggable="false"><span class="sh-jp">${esc(m?.jp ?? '')}</span><span class="sh-name">${esc(m?.name ?? id)}</span>${owned ? '' : `<i class="sh-lock">${icon('lock')}</i>`}${action}</div>`;
+    };
+    this.frame(
+      'Shop',
+      `<div class="shop">
+        <div class="sh-top">
+          <div class="sh-purse">${icon('coin')}<b>${coinText(coins)}</b><span>coins</span></div>
+          <button class="sh-ad">${icon('watch')}<span><b>Watch an ad</b><i>+${AD_REWARD} coins · as often as you like</i></span></button>
+          <div class="sh-free${p && freePickReady(p) ? ' ready' : ''}"><span class="sh-pips">${pips}</span><span>${esc(freeLine)}</span></div>
+        </div>
+        ${iconHead('mountain', 'Arenas')}
+        <p class="muted">Anyone you fight can pick any arena either of you owns.</p>
+        <div class="sh-maps">${ARENA_MAPS.map((m) => mapCard(m.id)).join('')}</div>
+        ${iconHead('fighters', 'Fighters')}
+        <button class="sh-fighters">${icon('fighters')}Unlock fighters<span>${coinText(charPrice('ronin'))} coins each · Lancer and Warden ${coinText(charPrice('lancer'))} at Gold</span></button>
+        <p class="muted">Every finished match pays coins (watch an ad afterwards to double them).</p>
+      </div>`,
+      true,
+      '店',
+      'coin',
+      'shop-box',
+    );
+    const box = this.modal.querySelector<HTMLElement>('.shop')!;
+    const ad = box.querySelector<HTMLButtonElement>('.sh-ad')!;
+    ad.addEventListener('click', () => {
+      ad.disabled = true;
+      void this.handlers.onWatchAd('bonus').finally(() => (ad.disabled = false));
+    });
+    for (const b of box.querySelectorAll<HTMLElement>('[data-map]')) b.addEventListener('click', () => this.handlers.onUnlock('map', b.dataset.map!));
+    box.querySelector('.sh-fighters')!.addEventListener('click', () => this.openModal('chars'));
   }
 
   showLeaderboard(entries: LeaderboardEntry[], you: number | null, total: number, me: ProfileView | null): void {
@@ -1070,6 +1198,7 @@ export class UI {
             </table>
           </div>
           <div>
+            <button class="help-tutorial">${icon('dummy')}Play the tutorial<span>The sensei shows you posture and deflects</span></button>
             ${iconHead('shield', 'Posture & deflects')}
             <p>Every fighter has <b>health</b> and <b>posture</b>. Blocking a hit costs posture. <b>Deflecting</b> (pressing guard just before the hit lands) costs almost nothing and instead hammers the attacker's posture, staggering them for a free counter.</p>
             <p>When posture fills up you are <b>posture broken</b>: helpless for a moment, and the next hit is a <b>Deathblow</b> for ${40} damage. Posture recovers slowly, and only once you stop: not while you attack, dodge or reel, and not until a while after the last posture damage (faster while guarding, slower when hurt). After a break, the guard comes back whole.</p>
@@ -1122,6 +1251,10 @@ export class UI {
     bind('#set-inv', (el) => (settings.invertY = el.checked));
     bind('#set-shake', (el) => (settings.reduceShake = el.checked));
     bind('#set-fps', (el) => (settings.showFps = el.checked));
+    this.modal.querySelector('.help-tutorial')!.addEventListener('click', () => {
+      this.closeModal();
+      this.handlers.onTutorial();
+    });
   }
 
   // ------------------------------------------------------------------ match screens
@@ -1171,7 +1304,11 @@ export class UI {
 
   private revealTimer = 0;
 
-  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null): void {
+  /**
+   * The result card. With coins earned it says how many, and offers an ad to double them (the
+   * card waits while it plays). `closed` hears whether an ad was watched from it.
+   */
+  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null, closed?: (watchedAd: boolean) => void): void {
     let ratingHtml = '';
     if (r.before && r.after && r.delta !== undefined) {
       const before = rankOf(r.before.mmr, r.before.placements);
@@ -1188,16 +1325,36 @@ export class UI {
       </div>`;
     }
     const reason = r.reason === 'forfeit' ? (r.won ? 'Opponent forfeited' : 'You forfeited') : r.reason === 'timeout' ? 'Time' : '';
+    const coinsHtml = r.coins
+      ? `<div class="res-coins">${icon('coin')}+${coinText(r.coins)} coins</div>${r.double ? `<button class="res-double">${icon('watch')}Watch an ad · +${coinText(r.double)} more</button>` : ''}`
+      : '';
     const el = h(`<div class="result ${r.won ? 'win' : 'lose'}">
       <div class="res-jp">${r.won ? '勝利' : '敗北'}</div>
       <div class="res-icon">${icon(r.won ? 'crown' : 'skull')}</div>
       <div class="res-title">${r.won ? 'VICTORY' : 'DEFEAT'}</div>
       <div class="res-score">${r.scores.join(' - ')}${reason ? ` · ${reason}` : ''}</div>
       ${ratingHtml}
+      ${coinsHtml}
       <div class="muted">Returning to the lobby…</div></div>`);
     void me;
     this.hud.appendChild(el);
-    setTimeout(() => el.classList.add('out'), 6300);
-    setTimeout(() => el.remove(), 7000);
+    let watched = false;
+    let timers: number[] = [];
+    const close = (after: number) => {
+      timers.forEach((t) => clearTimeout(t));
+      timers = [window.setTimeout(() => el.classList.add('out'), after), window.setTimeout(() => (el.remove(), closed?.(watched)), after + 700)];
+    };
+    const dbl = el.querySelector<HTMLButtonElement>('.res-double');
+    dbl?.addEventListener('click', () => {
+      dbl.disabled = true;
+      timers.forEach((t) => clearTimeout(t));
+      void this.handlers.onWatchAd('double').then((ok) => {
+        watched = true;
+        dbl.innerHTML = ok ? `${icon('check')}Doubled!` : 'No reward this time';
+        close(2200);
+      });
+    });
+    // a card with an offer on it stays up a little longer
+    close(dbl ? 9300 : 6300);
   }
 }

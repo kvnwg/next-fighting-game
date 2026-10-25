@@ -582,6 +582,16 @@ class AudioEngine {
     this.emit((o) => R.hover(o), { level: LEVEL.ui, vol: 1, wet: 0, key: 'hover', gap: 0.05, priority: 0 });
   }
 
+  /** Coins coming in (`n`: how many). */
+  coins(n: number): void {
+    this.emit((o) => R.coins(o, n), { level: LEVEL.ui, vol: 1, wet: 0.15, key: 'coins', gap: 0.3, priority: 1 });
+  }
+
+  /** A fighter or arena unlocked. */
+  unlocked(): void {
+    this.emit((o) => R.unlock(o), { level: LEVEL.ui, vol: 1, wet: 0.3, key: 'unlock', gap: 0.3, priority: 2 });
+  }
+
   /** A fighter picked on the roster: their signature sound. */
   fighterPick(id: CharacterId): void {
     this.emit((o) => R.fighterPick(o, id), { level: LEVEL.ui, vol: 1, wet: 0.15, key: 'pick', gap: 0.08, priority: 1 });

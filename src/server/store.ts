@@ -1,4 +1,5 @@
 /** Player profiles + ranked ratings. Persistence is pluggable (a JSON file on the server, localStorage offline). */
+import { withProgress } from '../shared/progress';
 import { LeaderboardEntry, ProfileView } from '../shared/protocol';
 import { PLACEMENT_MATCHES, START_MMR } from '../shared/ranks';
 
@@ -19,6 +20,12 @@ export function profileView(p: Profile): ProfileView {
     placements: p.placements,
     streak: p.streak,
     kills: p.kills,
+    coins: p.coins,
+    chars: [...p.chars],
+    maps: [...p.maps],
+    games: p.games,
+    freePicked: p.freePicked,
+    tutorial: p.tutorial,
   };
 }
 
@@ -49,7 +56,8 @@ export class Store {
   constructor(private readonly persist: StorePersistence | null) {
     if (persist) {
       try {
-        for (const p of persist.load()) this.index(p);
+        // profiles saved before coins and unlocks existed start with the starter set
+        for (const p of persist.load()) this.index(withProgress(p));
       } catch (err) {
         console.error('[store] could not load profiles:', err);
       }
@@ -76,7 +84,7 @@ export class Store {
 
   create(name: string): Profile {
     const now = Date.now();
-    const p: Profile = {
+    const base = {
       id: randomId(),
       token: randomToken(),
       name,
@@ -90,6 +98,7 @@ export class Store {
       createdAt: now,
       lastSeen: now,
     };
+    const p: Profile = withProgress(base);
     this.index(p);
     this.markDirty();
     return p;

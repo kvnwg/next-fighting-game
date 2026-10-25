@@ -49,6 +49,11 @@ export function botProfileForRating(mmr: number): BotProfile {
   return out;
 }
 
+/** What drives a server-run fighter each tick: an AI, or the tutorial's sensei. */
+export interface Brain {
+  think(now: number, inst: Instance): void;
+}
+
 /**
  * duel: fight one opponent (arenas). sparring: stationary dummy that swings at nearby players.
  * passive: does nothing. roam: wanders the lobby and picks fights outside the safe zone.
@@ -57,7 +62,7 @@ export type BotMode = 'duel' | 'sparring' | 'passive' | 'roam';
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
-export class BotBrain {
+export class BotBrain implements Brain {
   private queue: Scheduled[] = [];
   private seenSerial = -1;
   private seenTargetId = '';

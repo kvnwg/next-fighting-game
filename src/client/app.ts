@@ -33,6 +33,8 @@ import { TitleScreen } from './title/screen';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
 import { Sideways } from './rotate';
+import { watchAd } from './adbreak';
+import { TutorialOverlay } from './tutorial';
 import { TouchControls, isTouchDevice } from './touch';
 import { CardData, Preview, UI, esc } from './ui';
 
@@ -135,6 +137,11 @@ class App {
   private titleScreen: TitleScreen | null = null;
   /** which lobby we're in and how full it is */
   private lobbyInfo: { n: number; count: number; cap: number } | null = null;
+  /** the tutorial is still to come for this player (it starts once the lobby is up) */
+  private tutorialDue = false;
+  /** the tutorial's lessons drawn over the fight, while it runs */
+  private tutorial: TutorialOverlay | null = null;
+  private tutorialStep: string | null = null;
   /** the lobby's dueling rings, and the walls of light around the sealed ones */
   private rings: RingView[] = [];
   private ringWalls: RingWalls | null = null;
@@ -193,6 +200,15 @@ class App {
       onPrompt: () => this.sendChallenge(),
       createPreview: (el) => createPreview(el),
       portrait: (id) => portraitURL(this.renderer.renderer, id),
+      onUnlock: (kind, id, free) => this.net.send({ t: 'unlock', kind, id, ...(free ? { free: true } : {}) }),
+      onWatchAd: async (kind) => {
+        this.input.exitLock();
+        const ok = await watchAd();
+        // the server pays out (it checks the offer is still good)
+        if (ok) this.net.send({ t: 'ad', kind });
+        return ok;
+      },
+      onTutorial: () => this.net.send({ t: 'tutorial', a: 'start' }),
     }, offline, touch);
     // a soft tick as a real pointer finds a button
     root.addEventListener('pointerover', (e) => {
@@ -211,7 +227,7 @@ class App {
         saveSettings();
         this.ui.setLobbyChar(v.char);
       }
-    });
+    }, () => this.profile);
     if (touch) {
       this.touch = new TouchControls(this.ui.hud, this.input, {
         onMenu: () => this.ui.setTouchMenu(),
@@ -350,7 +366,14 @@ class App {
     n.on('welcome', (m) => {
       this.myId = m.id;
       settings.token = m.token;
+      // you play a fighter you own: a locked one (or a fresh profile) means the Ronin
+      if (!m.profile.chars.includes(settings.char)) {
+        settings.char = 'ronin';
+        this.ui.setLobbyChar('ronin');
+      }
       saveSettings();
+      // a first visit starts with the tutorial, once the lobby is up
+      this.tutorialDue = !m.profile.tutorial;
       this.profile = m.profile;
       this.online = m.online;
       this.ui.setProfile(m.profile);
@@ -391,17 +414,36 @@ class App {
       this.ui.toast(m.reason, 'warn');
     });
     n.on('result', (m) => {
-      this.ui.showResult(m, this.profile);
+      // coins on the card, and an offer to double them: free the cursor to take it
+      if (m.coins) this.input.exitLock();
+      // the usual break for an ad comes once the card is gone, unless one was just watched from it
+      this.ui.showResult(m, this.profile, (watched) => {
+        if (!watched) void platform.requestMidgameAd(() => audio.setMuted('ad', true)).then(() => audio.setMuted('ad', false));
+      });
       audio.introStop();
       audio.play(m.won ? 'victory' : 'defeat');
       audio.music(null, 3);
       platform.gameplayStop();
       // a ranked promotion is the rare moment CrazyGames' celebration is for
       if (m.before && m.after && rankOf(m.after.mmr, m.after.placements).label !== rankOf(m.before.mmr, m.before.placements).label && (m.delta ?? 0) > 0) platform.happytime();
-      // after a match is the natural break for an ad: never mid-fight
-      setTimeout(() => {
-        void platform.requestMidgameAd(() => audio.setMuted('ad', true)).then(() => audio.setMuted('ad', false));
-      }, 1200);
+    });
+    n.on('tutorial', (m) => {
+      if (!this.tutorial) this.tutorial = new TutorialOverlay(this.ui.hud, this.ui.touch, () => this.net.send({ t: 'tutorial', a: 'skip' }));
+      const was = this.tutorialStep;
+      this.tutorialStep = m.step;
+      this.tutorial.show(m.step, m.n, m.need, m.note);
+      if (m.step !== was) audio.cardSlam();
+      else if (m.note === 'good') audio.ready('special');
+    });
+    n.on('coins', (m) => {
+      this.ui.coinsGained(m.gained);
+      audio.coins(m.gained);
+      if (m.why === 'tutorial') this.ui.toast(`Lesson learned: +${m.gained} coins`, 'good');
+    });
+    n.on('unlocked', (m) => {
+      audio.unlocked();
+      const name = m.kind === 'char' ? (CHARACTERS[m.id as CharacterId]?.name ?? m.id) : (MAPS[m.id]?.name ?? m.id);
+      this.ui.toast(m.kind === 'char' ? `${name} unlocked${m.free ? ' (your free pick)' : ''}!` : `${name} unlocked: pick it before a match`, 'good');
     });
     n.on('profile', (m) => {
       this.profile = m.profile;
@@ -480,6 +522,13 @@ class App {
     this.ui.setLobbyMode(m.kind === 'lobby');
     this.ui.setDeath(null);
     if (m.kind === 'lobby') {
+      this.tutorial?.destroy();
+      this.tutorial = null;
+      this.tutorialStep = null;
+      if (this.tutorialDue) {
+        this.tutorialDue = false;
+        this.net.send({ t: 'tutorial', a: 'start' });
+      }
       this.match = null;
       audio.music('lobby');
       this.ui.setMatch(null, 0);
@@ -660,8 +709,10 @@ class App {
         // a slow device can still be mid-intro: the fight always starts on the follow camera
         this.cam.stopShots();
         this.endEntrances();
-        this.ui.banner('Fight', '', 900, 'fight', '始め');
-        audio.play('fight');
+        if (m.mode !== 'tutorial') {
+          this.ui.banner('Fight', '', 900, 'fight', '始め');
+          audio.play('fight');
+        }
         this.lock = this.fighters.get(oppId) ?? null;
         break;
       case 'roundEnd': {
@@ -760,9 +811,9 @@ class App {
       }
       return;
     }
-    if (pressed && (b === 'chars' || b === 'leaderboard' || b === 'help')) {
+    if (pressed && (b === 'chars' || b === 'shop' || b === 'leaderboard' || b === 'help')) {
       if (this.ui.chatOpen) return;
-      this.ui.toggleModal(b === 'chars' ? 'chars' : b === 'leaderboard' ? 'ladder' : 'help');
+      this.ui.toggleModal(b === 'leaderboard' ? 'ladder' : b);
       return;
     }
     if (pressed && (b === 'ranked' || b === 'practice')) {
@@ -1861,7 +1912,13 @@ class App {
     // no giving up a match that's over, or while you're finishing them off
     const m0 = this.match;
     const rival = m0 ? this.fighters.get(m0.players[m0.you === 0 ? 1 : 0].id) : undefined;
-    this.ui.setForfeitable(!!m0 && m0.phase !== 'matchEnd' && sim.state !== 'execute' && rival?.s !== 'executed' && rival?.s !== 'dead');
+    this.ui.setForfeitable(!!m0 && m0.mode !== 'tutorial' && m0.phase !== 'matchEnd' && sim.state !== 'execute' && rival?.s !== 'executed' && rival?.s !== 'dead');
+    // the tutorial's arrow and timing ring follow the sensei
+    if (this.tutorial && rival) {
+      const v = rival.view(now);
+      const blow = v.state === 'attack' && v.attack ? { left: v.windup - v.elapsed, windup: v.windup } : null;
+      this.tutorial.update({ foe: this.project(rival.pos.x, rival.pos.y + 1.2 * rival.model.scale, rival.pos.z), blow });
+    }
     this.ui.setZone(this.kind === 'lobby' && inSafeZone(this.map, me.pos.x, me.pos.z));
     this.ui.setClickHint(!this.input.locked && !this.ui.modalOpen && !this.ui.chatOpen, this.input.locked, this.input.lockFailed);
     this.ui.setQueue(!!this.queue, this.queue?.since ?? 0, this.queue?.count ?? 0, now);

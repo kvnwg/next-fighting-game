@@ -741,6 +741,47 @@ export const ICON = {
     '.hhhhhhhhhh.',
     '...hhhhhh...',
   ],
+  /** a gold mon coin with its square hole: coins */
+  coin: [
+    '...gggggg...',
+    '..gggggggg..',
+    '.gggggggggg.',
+    'gggggggggggg',
+    'gggggggggggg',
+    'ggggg..ggggg',
+    'ggggg..ggggg',
+    'gggggggggggg',
+    'gggggggggggg',
+    '.gggggggggg.',
+    '..gggggggg..',
+    '...gggggg...',
+  ],
+  /** a padlock: locked */
+  lock: [
+    '...ssssss...',
+    '..ss....ss..',
+    '..s......s..',
+    '..s......s..',
+    '.gggggggggg.',
+    '.gggggggggg.',
+    '.ggggkkgggg.',
+    '.ggggkkgggg.',
+    '.gggggkgggg.',
+    '.gggggggggg.',
+    '.gggggggggg.',
+  ],
+  /** a play triangle in a frame: watch an ad */
+  watch: [
+    'dddddddddddd',
+    'd..........d',
+    'd...hh.....d',
+    'd...hhhh...d',
+    'd...hhhhhh.d',
+    'd...hhhh...d',
+    'd...hh.....d',
+    'd..........d',
+    'dddddddddddd',
+  ],
   /** a scroll on its rollers: a legend */
   scroll: [
     '.wwwwwwwwww.',

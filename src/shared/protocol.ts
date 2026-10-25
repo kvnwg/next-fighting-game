@@ -3,15 +3,17 @@ import { AttackKey, CharacterId } from './characters';
 import { Outcome } from './combat';
 import { Fighter, FighterState, InputAction } from './fighter';
 import { round2 } from './math';
+import type { Progress } from './progress';
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export type QueueMode = 'ranked' | 'practice';
-export type MatchMode = 'ranked' | 'practice' | 'casual';
+export type MatchMode = 'ranked' | 'practice' | 'casual' | 'tutorial';
 export type BotDifficulty = 'easy' | 'normal' | 'hard';
 export type MatchPhase = 'intro' | 'countdown' | 'fight' | 'roundEnd' | 'matchEnd';
 
-export interface ProfileView {
+/** A player's record, rating and what they own (see progress.ts). */
+export interface ProfileView extends Progress {
   id: string;
   name: string;
   mmr: number;
@@ -102,7 +104,23 @@ export type ClientMsg =
   | { t: 'leaderboard' }
   | { t: 'fell' }
   /** a pick on the map and fighter select before a match ('random' leaves the arena to chance) */
-  | { t: 'vote'; map?: string; char?: CharacterId };
+  | { t: 'vote'; map?: string; char?: CharacterId }
+  /** buy a fighter or an arena with coins, or (free) take the free fighter */
+  | { t: 'unlock'; kind: 'char' | 'map'; id: string; free?: boolean }
+  /** an ad was watched to the end: double the last match's coins, or the shop's ad reward */
+  | { t: 'ad'; kind: 'double' | 'bonus' }
+  /** start the tutorial, or skip (or leave) it */
+  | { t: 'tutorial'; a: 'start' | 'skip' };
+
+/**
+ * The tutorial's steps, in order: strike into the sensei's guard; block until your own guard
+ * breaks (and pay for it); deflect his blows until his guard breaks; finish him with a deathblow;
+ * dodge his perilous attack; done.
+ */
+export type TutorialStep = 'strike' | 'block' | 'deflect' | 'execute' | 'perilous' | 'done';
+export const TUTORIAL_STEPS: readonly TutorialStep[] = ['strike', 'block', 'deflect', 'execute', 'perilous', 'done'];
+/** feedback on the last try: a deflect pressed too early (held into a block) or too late (hit) */
+export type TutorialNote = 'early' | 'late' | 'good' | 'broken' | 'again';
 
 /** One side of the map and fighter select. */
 export interface SelectSide {
@@ -185,6 +203,9 @@ export type ServerMsg =
       before?: { mmr: number; placements: number };
       after?: { mmr: number; placements: number };
       delta?: number;
+      /** coins earned, and how many more an ad would add (until the offer runs out) */
+      coins?: number;
+      double?: number;
     }
   | { t: 'profile'; profile: ProfileView }
   | { t: 'leaderboard'; entries: LeaderboardEntry[]; you: number | null; total: number }
@@ -199,7 +220,13 @@ export type ServerMsg =
   | { t: 'rings'; r: RingView[] }
   | ({ t: 'select' } & SelectView)
   /** the select closed without a match (the other side left) */
-  | { t: 'selectCancel'; reason: string };
+  | { t: 'selectCancel'; reason: string }
+  /** coins just came in */
+  | { t: 'coins'; gained: number; why: 'match' | 'double' | 'ad' | 'tutorial' }
+  /** a fighter or arena is yours now */
+  | { t: 'unlocked'; kind: 'char' | 'map'; id: string; free: boolean }
+  /** where the tutorial is: the step, how far through it (n of need), and a note on the last try */
+  | { t: 'tutorial'; step: TutorialStep; n: number; need: number; note?: TutorialNote };
 
 export function fighterSnap(f: Fighter, flags: number): FighterSnap {
   const s: FighterSnap = {

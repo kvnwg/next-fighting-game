@@ -1,8 +1,9 @@
 /**
  * The lobby's bottom bar, laid out like the reference: your fighter's portrait beside a big PLAY
- * button, and a row of pixel-art icons under it (Fighters, Ladder, Help, Settings). PLAY opens
+ * button, and a row of pixel-art icons under it (Fighters, Shop, Ladder, Help, Settings). PLAY opens
  * the mode panel: Casual practice against a bot of your chosen difficulty, or a Ranked duel; while
  * the panel is open PLAY turns into CLOSE, and while you're queued it shows the search and cancels it.
+ * The Fighters icon carries the free fighter's progress: a pip per match towards it, then FREE.
  */
 import type { BotDifficulty } from '../shared/protocol';
 import { CHARACTERS, type CharacterId } from '../shared/characters';
@@ -15,6 +16,7 @@ export interface LobbyBarHandlers {
   onRanked(): void;
   onCancelQueue(): void;
   onFighters(): void;
+  onShop(): void;
   onLadder(): void;
   onHelp(): void;
   onSettings(): void;
@@ -24,6 +26,7 @@ export interface LobbyBarHandlers {
 // pixel-art icons in the shared style (see pixelicons.ts)
 const ICONS = {
   fighters: icon('fighters'),
+  shop: icon('coin'),
   ladder: icon('ladder'),
   help: icon('help'),
   settings: icon('settings'),
@@ -46,7 +49,7 @@ export class LobbyBar {
     offline: boolean,
   ) {
     const tile = (id: string, svg: string, label: string, key: string) =>
-      `<button class="lb-icon" id="lb-${id}" title="${esc(label)} [${key}]">${svg}<span>${esc(label)}</span></button>`;
+      `<button class="lb-icon" id="lb-${id}" title="${esc(label)}${key ? ` [${key}]` : ''}">${svg}<span>${esc(label)}</span><b class="lb-badge hidden"></b></button>`;
     const wrap = document.createElement('div');
     wrap.innerHTML = `
       <div class="lobby-bar">
@@ -56,6 +59,7 @@ export class LobbyBar {
         </div>
         <div class="lb-icons">
           ${tile('fighters', ICONS.fighters, 'Fighters', 'C')}
+          ${tile('shop', ICONS.shop, 'Shop', 'B')}
           ${tile('ladder', ICONS.ladder, 'Ladder', 'L')}
           ${tile('help', ICONS.help, 'Help', 'H')}
           ${tile('settings', ICONS.settings, 'Settings', 'H')}
@@ -92,6 +96,7 @@ export class LobbyBar {
     });
     const on = (sel: string, f: () => void) => this.el.querySelector(sel)!.addEventListener('click', f);
     on('#lb-fighters', () => this.h.onFighters());
+    on('#lb-shop', () => this.h.onShop());
     on('#lb-ladder', () => this.h.onLadder());
     on('#lb-help', () => this.h.onHelp());
     on('#lb-settings', () => this.h.onSettings());
@@ -134,6 +139,19 @@ export class LobbyBar {
   setVisible(on: boolean): void {
     this.el.classList.toggle('hidden', !on);
     if (!on) this.setPanel(false);
+  }
+
+  /**
+   * The free fighter's progress on the Fighters icon: a pip for each match towards it (`done` of
+   * `need`), FREE once it's waiting to be picked, nothing once it's been taken.
+   */
+  setFreePick(done: number, need: number, ready: boolean, used: boolean): void {
+    const badge = this.el.querySelector<HTMLElement>('#lb-fighters .lb-badge')!;
+    badge.classList.toggle('hidden', used);
+    badge.classList.toggle('ready', ready);
+    const html = ready ? 'FREE' : Array.from({ length: need }, (_, i) => `<i class="${i < done ? 'on' : ''}"></i>`).join('');
+    if (badge.innerHTML !== html) badge.innerHTML = html;
+    badge.title = ready ? 'A free fighter is waiting: pick one' : `${need - done} more match${need - done === 1 ? '' : 'es'} to a free fighter`;
   }
 
   setChar(id: CharacterId): void {

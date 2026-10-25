@@ -1259,3 +1259,176 @@ html.sideways #app { inset: auto; top: 0; left: 0; width: var(--sh); height: var
 .rg-phone { width: 54px; height: 92px; border: 4px solid #fff; border-radius: 10px; position: relative; animation: rg-turn 2.4s ease-in-out infinite; }
 .rg-phone span { position: absolute; left: 50%; bottom: 6px; width: 10px; height: 4px; margin-left: -5px; border-radius: 2px; background: #fff; }
 @keyframes rg-turn { 0%, 25% { transform: rotate(0deg); } 55%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
+
+/* ---- coins: the purse in the lobby's top-right corner (it opens the shop), and the jump and
+   the floating "+60" as coins come in */
+.purse { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); top: calc(16px + var(--hud-top)); z-index: 6; display: none; align-items: center; gap: 8px; padding: 6px 12px 5px 8px; font: 700 20px var(--display); letter-spacing: 0.04em; color: var(--gold-hi); background: #16131e; border: none; cursor: pointer; text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
+  box-shadow: 0 -3px 0 0 #3a3448, 0 3px 0 0 #3a3448, -3px 0 0 0 #3a3448, 3px 0 0 0 #3a3448, 4px 4px 0 2px rgba(0, 0, 0, 0.4); }
+.hud.lobby .purse { display: flex; }
+.purse .purse-ico { width: 26px; height: 26px; }
+.purse-plus { display: grid; place-items: center; width: 22px; height: 22px; margin-left: 2px; font: 700 18px var(--ui); color: #1a1206; background: var(--gold); text-shadow: none; box-shadow: inset 0 -3px 0 #b8862a; }
+.purse:hover { background: #221d2c; }
+.purse:active { transform: translateY(2px); }
+.purse.bump { animation: purse-bump 0.45s steps(4); }
+@keyframes purse-bump { 30% { transform: scale(1.18); } }
+.coin-pop { position: absolute; right: 8px; top: 100%; display: flex; align-items: center; gap: 4px; font: 700 20px var(--display); color: var(--gold-hi); text-shadow: 2px 2px 0 #000; pointer-events: none; animation: coin-pop 1.4s steps(10) forwards; }
+.coin-pop .pi { width: 18px; height: 18px; }
+@keyframes coin-pop { from { opacity: 0; transform: translateY(18px); } 15% { opacity: 1; transform: translateY(0); } 70% { opacity: 1; } to { opacity: 0; transform: translateY(-26px); } }
+
+/* the free fighter's progress on the lobby bar's Fighters icon: a pip per match, then FREE */
+.lb-badge { position: absolute; top: -6px; right: 0; display: flex; gap: 3px; padding: 3px 4px; background: #16131e; box-shadow: 0 -2px 0 0 #3a3448, 0 2px 0 0 #3a3448, -2px 0 0 0 #3a3448, 2px 0 0 0 #3a3448; }
+.lb-badge i { width: 8px; height: 8px; background: #3a3448; }
+.lb-badge i.on { background: var(--gold); box-shadow: inset -2px -2px 0 #b8862a; }
+.lb-badge.ready { padding: 2px 6px; font: 700 12px var(--display); letter-spacing: 0.08em; color: #1a1206; background: var(--gold); box-shadow: 0 -2px 0 0 var(--gold-hi), 0 2px 0 0 #b8862a, -2px 0 0 0 var(--gold), 2px 0 0 0 var(--gold); animation: fs-bob 0.8s steps(2) infinite; }
+
+/* locked fighters on the fighter select: dimmed, with a padlock; the button buys them */
+.fs-lock { position: absolute; top: 6px; right: 6px; display: none; }
+.fs-lock .pi { width: 22px; height: 22px; filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.7)); }
+.fs-tile.locked .fs-lock { display: block; }
+.fs-tile.locked img { filter: saturate(0.15) brightness(0.55); }
+.fs-tile.locked.sel img { filter: saturate(0.35) brightness(0.75); }
+.fs-play.buy { color: #1a1206; background: var(--gold); box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--gold), 0 var(--px) 0 0 var(--gold), calc(-1 * var(--px)) 0 0 0 var(--gold), var(--px) 0 0 0 var(--gold), inset 0 calc(-1 * var(--px)) 0 #b8862a, calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px) rgba(0, 0, 0, 0.45); }
+.fs-play.buy:hover { background: var(--gold-hi); }
+.fs-play:disabled { cursor: default; opacity: 0.6; transform: none; }
+.fs-free { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px 8px; font: 600 16px var(--ui); letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: #3f7f3a; border: none; cursor: pointer; animation: fs-bob 0.8s steps(2) infinite;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 #6fd462, 0 var(--px) 0 0 #2a5a26, calc(-1 * var(--px)) 0 0 0 #3f7f3a, var(--px) 0 0 0 #3f7f3a; }
+.fs-free .pi { width: 18px; height: 18px; }
+.fs-note .pi { width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; }
+
+/* the shop */
+.shop-box { width: min(980px, 96vw); }
+.shop { display: flex; flex-direction: column; gap: 10px; }
+.sh-top { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 22px; }
+.sh-purse { display: flex; align-items: center; gap: 10px; font: 700 34px var(--display); color: var(--gold-hi); text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6); }
+.sh-purse .pi { width: 38px; height: 38px; }
+.sh-purse span { font: 500 14px var(--ui); letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); text-shadow: none; }
+.sh-ad { display: flex; align-items: center; gap: 12px; padding: 10px 18px 9px; text-align: left; color: #fff; background: var(--red); border: none; cursor: pointer;
+  box-shadow: 0 -4px 0 0 var(--red), 0 4px 0 0 var(--red), -4px 0 0 0 var(--red), 4px 0 0 0 var(--red), inset 0 -4px 0 rgba(0, 0, 0, 0.3), 8px 8px 0 4px rgba(40, 6, 14, 0.45); }
+.sh-ad .pi { width: 30px; height: 24px; }
+.sh-ad b { display: block; font: 700 18px var(--ui); letter-spacing: 0.12em; text-transform: uppercase; }
+.sh-ad i { font-style: normal; font-size: 13px; letter-spacing: 0.06em; color: #ffd6d0; }
+.sh-ad:hover { background: var(--red-hi); }
+.sh-ad:disabled { opacity: 0.6; cursor: default; }
+.sh-free { display: flex; align-items: center; gap: 10px; font-size: 14px; letter-spacing: 0.06em; color: var(--muted); }
+.sh-free.ready { color: var(--gold-hi); }
+.sh-pips { display: flex; gap: 4px; }
+.sh-pips i { width: 12px; height: 12px; background: #2a2734; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.35); }
+.sh-pips i.on { background: var(--gold); box-shadow: inset -2px -2px 0 #b8862a; }
+.sh-maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.sh-map { position: relative; display: flex; flex-direction: column; background: #121018; box-shadow: 0 -3px 0 0 #2e2b3a, 0 3px 0 0 #2e2b3a, -3px 0 0 0 #2e2b3a, 3px 0 0 0 #2e2b3a; }
+.sh-map img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; image-rendering: pixelated; }
+.sh-map:not(.owned) img { filter: saturate(0.25) brightness(0.6); }
+.sh-jp { position: absolute; left: 8px; top: 6px; font-family: var(--jp); font-size: 16px; color: rgba(255, 255, 255, 0.75); text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7); }
+.sh-lock { position: absolute; right: 8px; top: 8px; }
+.sh-lock .pi { width: 22px; height: 22px; filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.7)); }
+.sh-name { padding: 6px 10px 2px; font: 700 15px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: #fff7ea; }
+.sh-owned { display: flex; align-items: center; gap: 6px; padding: 4px 10px 8px; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); }
+.sh-owned .pi { width: 14px; height: 14px; }
+.sh-buy { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 4px 10px 10px; padding: 6px 10px 5px; font: 700 15px var(--display); color: #1a1206; background: var(--gold); border: none; cursor: pointer; box-shadow: inset 0 -3px 0 #b8862a; }
+.sh-buy .pi { width: 16px; height: 16px; }
+.sh-buy:hover { background: var(--gold-hi); }
+.sh-buy:disabled { opacity: 0.45; cursor: default; }
+.sh-fighters { display: flex; align-items: center; gap: 12px; align-self: flex-start; padding: 9px 16px 8px; font: 600 16px var(--ui); letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: #24202f; border: none; cursor: pointer; box-shadow: 0 -3px 0 0 #6a6480, 0 3px 0 0 #6a6480, -3px 0 0 0 #6a6480, 3px 0 0 0 #6a6480; }
+.sh-fighters .pi { width: 22px; height: 22px; }
+.sh-fighters span { font-size: 12px; letter-spacing: 0.06em; text-transform: none; color: var(--muted); }
+.sh-fighters:hover { background: #302b3e; }
+
+/* coins on the result card, and the ad that doubles them */
+.res-coins { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 2px 0 10px; font: 700 26px var(--display); color: var(--gold-hi); text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6); }
+.res-coins .pi { width: 28px; height: 28px; }
+.res-double { display: inline-flex; align-items: center; gap: 10px; margin: 0 auto 12px; padding: 9px 16px 8px; font: 700 16px var(--ui); letter-spacing: 0.1em; text-transform: uppercase; color: #1a1206; background: var(--gold); border: none; cursor: pointer; pointer-events: auto;
+  box-shadow: 0 -3px 0 0 var(--gold), 0 3px 0 0 var(--gold), -3px 0 0 0 var(--gold), 3px 0 0 0 var(--gold), inset 0 -3px 0 #b8862a, 6px 6px 0 2px rgba(0, 0, 0, 0.45); animation: fs-bob 0.8s steps(2) infinite; }
+.res-double .pi { width: 24px; height: 20px; }
+.res-double:hover { background: var(--gold-hi); }
+.res-double:disabled { animation: none; opacity: 0.8; cursor: default; }
+
+/* locked arenas and fighters on the pre-match select; an arena open only through your opponent */
+.sel-lock { position: absolute; z-index: 3; right: 8px; top: 8px; }
+.sel-lock .pi { width: 24px; height: 24px; filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.7)); }
+.sel-tile.locked, .sel-card.locked { cursor: default; }
+.sel-tile.locked .sel-art, .sel-card.locked .sel-art { filter: saturate(0.1) brightness(0.45); }
+.sel-tile.locked:hover, .sel-card.locked:hover { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12), 0 6px 18px rgba(0, 0, 0, 0.45); }
+.sel-tag { position: absolute; z-index: 3; right: 6px; top: 6px; padding: 2px 6px; font: 600 11px var(--ui); letter-spacing: 0.1em; text-transform: uppercase; color: #1a1206; background: var(--gold); }
+
+/* the ad break that stands in where there's no ad network */
+.adbreak { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(6, 5, 10, 0.94); animation: fade-in 0.25s steps(3) both; }
+.adbreak.out { animation: lg-out 0.25s steps(3) both; }
+.ab-box { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 46px; background: #16131e; box-shadow: 0 -4px 0 0 #efe4cf, 0 4px 0 0 #efe4cf, -4px 0 0 0 #efe4cf, 4px 0 0 0 #efe4cf; }
+.ab-jp { font-family: var(--jp); font-size: 22px; color: var(--red); letter-spacing: 0.3em; }
+.ab-title { font: 700 40px var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: #fff7ea; text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6); }
+.ab-bar { width: min(360px, 70vw); height: 14px; background: #0b0a10; box-shadow: 0 -2px 0 0 #3a3448, 0 2px 0 0 #3a3448, -2px 0 0 0 #3a3448, 2px 0 0 0 #3a3448; }
+.ab-bar i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, var(--gold) 0 10px, #b8862a 10px 12px); }
+.ab-count { font: 600 16px var(--ui); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-hi); }
+.ab-note { font-size: 12px; letter-spacing: 0.06em; color: var(--dim); }
+
+/* Help's way into the tutorial */
+.help-tutorial { display: flex; align-items: center; gap: 12px; width: 100%; margin: 4px 0 12px; padding: 10px 14px; text-align: left; font: 700 17px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: #1a1206; background: var(--gold); border: none; cursor: pointer; box-shadow: inset 0 -3px 0 #b8862a; }
+.help-tutorial .pi { width: 26px; height: 26px; }
+.help-tutorial span { margin-left: auto; font: 500 12px var(--ui); letter-spacing: 0.04em; text-transform: none; color: #5a3e10; }
+.help-tutorial:hover { background: var(--gold-hi); }
+@media (max-height: 500px) {
+  .purse { top: calc(8px + var(--hud-top)); padding: 4px 8px 3px 6px; font-size: 16px; }
+  .purse .purse-ico { width: 20px; height: 20px; }
+  .sh-purse { font-size: 26px; }
+  .sh-maps { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+}
+
+/* ---- the tutorial over the fight: the lesson's verb and key at the top with its pips, the verb
+   stamped big as each lesson starts, a bouncing arrow on the bar that matters, the timing ring
+   closing on the sensei's blow, and flashes for too early / too late / good */
+.tut { position: absolute; inset: 0; z-index: 7; pointer-events: none; font-family: var(--ui); }
+.tut-head { position: absolute; left: 50%; top: calc(18px + var(--hud-top)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 22px 12px; background: rgba(14, 12, 20, 0.86);
+  box-shadow: 0 -3px 0 0 #3a3448, 0 3px 0 0 #3a3448, -3px 0 0 0 #3a3448, 3px 0 0 0 #3a3448, 6px 6px 0 2px rgba(0, 0, 0, 0.35); }
+.tut-head.in { animation: tut-in 0.3s steps(4) both; }
+@keyframes tut-in { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translateX(-50%); } }
+@keyframes fade-in { from { opacity: 0; } }
+.tut-pips { display: flex; gap: 6px; }
+.tut-pips i { width: 26px; height: 6px; background: #2e2b3a; }
+.tut-pips i.done { background: var(--gold); }
+.tut-pips i.on { background: #fff7ea; animation: fs-bob 0.8s steps(2) infinite; }
+.tut-word { display: flex; align-items: baseline; gap: 10px; }
+.tut-word b { font: 700 34px var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: #fff7ea; text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6); }
+.tut-jp { font-family: var(--jp); font-size: 26px; color: var(--red); }
+.tut-key { display: flex; align-items: center; gap: 10px; font-size: 15px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.tut-key kbd { padding: 4px 10px 3px; font: 700 16px var(--display); color: #1a1206; background: var(--gold-hi); box-shadow: 0 -2px 0 0 var(--gold-hi), 0 2px 0 0 #c9a04a, -2px 0 0 0 var(--gold-hi), 2px 0 0 0 var(--gold-hi), inset 0 -3px 0 #c9a04a; }
+.tut-count { display: flex; gap: 6px; }
+.tut-count i { width: 14px; height: 14px; background: #2a2734; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.35); }
+.tut-count i.on { background: var(--green); box-shadow: inset -2px -2px 0 #2a7a3a, inset 2px 2px 0 #c8f4a0; animation: purse-bump 0.35s steps(3); }
+.tut-stamp { position: absolute; left: 50%; top: 40%; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); }
+.tut-stamp .tut-jp { font-size: 64px; line-height: 1; }
+.tut-stamp b { font: 700 72px var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: #fff7ea; text-shadow: 5px 5px 0 rgba(0, 0, 0, 0.65); }
+.tut-stamp.go { animation: tut-stamp 1.5s steps(12) forwards; }
+@keyframes tut-stamp { from { opacity: 0; transform: translate(-50%, -50%) scale(1.6); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -64%) scale(0.9); } }
+.tut-note { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); font: 700 30px var(--display); letter-spacing: 0.08em; text-transform: uppercase; text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.75); }
+.tut-note[data-tone='good'] { color: var(--green); }
+.tut-note[data-tone='warn'] { color: var(--gold-hi); }
+.tut-note[data-tone='bad'] { color: var(--red-hi); font-size: 40px; }
+.tut-note.go { animation: tut-note 0.9s steps(8) forwards; }
+@keyframes tut-note { from { opacity: 0; transform: translate(-50%, 12px) scale(1.3); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1); } 70% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -10px); } }
+.tut-skip { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 6px; padding: 6px 12px 5px; font: 600 13px var(--ui); letter-spacing: 0.12em; text-transform: uppercase; color: #cfc8ba; background: rgba(14, 12, 20, 0.86); border: none; cursor: pointer; pointer-events: auto; box-shadow: 0 -2px 0 0 #3a3448, 0 2px 0 0 #3a3448, -2px 0 0 0 #3a3448, 2px 0 0 0 #3a3448; }
+.tut-skip .pi { width: 12px; height: 12px; }
+.tut-skip:hover { color: #fff; }
+/* the arrow lives inside the bar it points at, so it follows it wherever it floats */
+.tut-arrow { position: absolute; left: 50%; bottom: calc(100% + 6px); display: flex; flex-direction: column; align-items: center; gap: 2px; transform: translateX(-50%); pointer-events: none; animation: tut-bob 0.6s steps(2) infinite; z-index: 3; }
+.tut-arrow b { padding: 2px 8px 1px; font: 700 14px var(--display); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; color: #1a1206; background: var(--gold-hi); }
+.tut-arrow-ico { width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 14px solid var(--gold-hi); filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6)); }
+@keyframes tut-bob { 50% { transform: translate(-50%, -6px); } }
+/* the timing ring: the outer diamond closes on the inner as his blow lands */
+.tut-ring { position: absolute; left: 0; top: 0; z-index: 5; width: 0; height: 0; pointer-events: none; --k: 3; }
+.tut-ring i { position: absolute; left: -34px; top: -34px; width: 68px; height: 68px; transform: rotate(45deg); }
+.tut-ring-in { border: 4px solid rgba(255, 247, 234, 0.85); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5); }
+.tut-ring-out { border: 6px solid var(--gold-hi); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5); transform: rotate(45deg) scale(var(--k)); }
+.tut-ring.peril .tut-ring-out { border-color: var(--red-hi); }
+.tut-ring b { position: absolute; left: 50%; top: 46px; transform: translateX(-50%); font: 700 24px var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold-hi); text-shadow: 3px 3px 0 #000; opacity: 0; }
+.tut-ring.now .tut-ring-in { border-color: var(--gold-hi); background: rgba(242, 193, 78, 0.25); }
+.tut-ring.now b { opacity: 1; }
+.tut-ring.peril.now b { color: var(--red-hi); }
+@media (max-height: 500px) {
+  .tut-head { top: calc(6px + var(--hud-top)); padding: 6px 14px 8px; gap: 4px; }
+  .tut-word b { font-size: 24px; }
+  .tut-jp { font-size: 20px; }
+  .tut-stamp b { font-size: 48px; }
+  .tut-stamp .tut-jp { font-size: 42px; }
+}
+/* touch: the bottom-right corner is the attack buttons; skip sits under the opponent's card */
+.touch .tut-skip { top: calc(118px + var(--hud-top)); bottom: auto; }

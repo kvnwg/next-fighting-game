@@ -1411,6 +1411,27 @@ export function hover(o: Out): void {
   else noise(o, { type: 'bandpass', f: 3000, q: 2, dur: 0.012, gain: 0.08 });
 }
 
+/**
+ * Coins coming in: a run of small bright clinks, more of them the more coins, like a handful of mon
+ * dropped onto a table.
+ */
+export function coins(o: Out, n: number): void {
+  const count = Math.max(3, Math.min(9, Math.round(n / 15)));
+  for (let i = 0; i < count; i++) {
+    const delay = i * 0.055 + rand(0, 0.02);
+    ring(o, MAT.bell, 0.05, { pitch: rand(2.6, 3.4), decay: rand(0.25, 0.4), delay, beat: false });
+    noise(o, { type: 'highpass', f: 6000, dur: 0.02, gain: 0.08, delay, a: 0.0005 });
+  }
+}
+
+/** Something unlocked: the blade drawn over a taiko strike and a rising shimmer. */
+export function unlock(o: Out): void {
+  playLayers(o, ['blade_shing'], 0.55);
+  const taiko = sampleFor(o.ctx, 'title_taiko');
+  if (taiko) playSample(o, taiko, sampleGain('title_taiko') * 0.7, 1.05);
+  osc(o, { f: 880, f1: 1760, dur: 0.6, gain: 0.04, delay: 0.05, shape: SHAPES.swing(0.3, 1.5) });
+}
+
 /** Each fighter's signature, played as they're picked on the roster. */
 const SIGNATURE: Record<string, string[]> = {
   ronin: ['ronin_unsheathe'],
