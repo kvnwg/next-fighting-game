@@ -1146,7 +1146,7 @@ class App {
           for (let i = 0; i < Math.round(420 * dt + Math.random()); i++) {
             const p = Math.random() < 0.7 ? along(rnd(0.05, 1)) : this.tmp.set(f.pos.x + rnd(-0.3, 0.3) * k, f.pos.y + rnd(0.3, 1.6) * k, f.pos.z + rnd(-0.3, 0.3) * k);
             const c = ['#141012', '#1f1718', '#2b1d1e', '#3a2322', '#4a1616'][Math.floor(Math.random() * 5)];
-            fx.emit(p.x, p.y, p.z, rnd(-0.25, 0.25), rnd(0.0, 0.25), rnd(-0.25, 0.25), c, { life: rnd(1.6, 2.6), size: 0.09 * k, gravity: -0.06, drag: 1.4, grow: 4.5 });
+            fx.emit(p.x, p.y, p.z, rnd(-0.25, 0.25), rnd(0.0, 0.25), rnd(-0.25, 0.25), c, { life: rnd(1.6, 2.6), size: 0.075 * k, gravity: -0.06, drag: 1.4, grow: 3.8 });
           }
           for (let i = 0; i < Math.round(110 * dt + Math.random()); i++) {
             const p = along(rnd(0.2, 1));

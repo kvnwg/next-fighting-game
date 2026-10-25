@@ -1067,8 +1067,15 @@ export class UI {
 
   /** Letterbox the screen and hide the duel HUD while the intro camera runs. */
   setCinematic(on: boolean): void {
+    const was = this.hud.classList.contains('cinematic');
     this.hud.classList.toggle('cinematic', on);
+    // coming out of it, the HUD fades back in behind the retreating bars instead of popping on
+    clearTimeout(this.revealTimer);
+    this.hud.classList.toggle('reveal', was && !on);
+    if (was && !on) this.revealTimer = window.setTimeout(() => this.hud.classList.remove('reveal'), 900);
   }
+
+  private revealTimer = 0;
 
   showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null): void {
     let ratingHtml = '';
