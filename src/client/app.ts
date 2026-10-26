@@ -275,8 +275,9 @@ class App {
     // opened from a friend's invite: straight into their private lobby once in (or now, if already in)
     this.inviteRoom = platform.inviteRoom();
     platform.onInvite((room) => {
-      if (this.myId) this.net.send({ t: 'room', a: 'join', code: room });
-      else this.inviteRoom = room;
+      this.inviteRoom = room;
+      // in a match (or its select) the server can't move you: it waits till you're back in the lobby
+      if (this.myId && this.kind === 'lobby' && !this.select.open) this.joinInvite();
     });
     // a signed-in CrazyGames player gets their name filled in
     if (!settings.name) void platform.username().then((name) => name && this.titleScreen?.setName(name));
@@ -360,6 +361,13 @@ class App {
     this.net.send({ t: 'hello', v: PROTOCOL_VERSION, token: settings.token || undefined, name, char: settings.char });
   }
 
+  /** Into the private lobby a friend's invite is for, if one is waiting. */
+  private joinInvite(): void {
+    if (!this.inviteRoom) return;
+    this.net.send({ t: 'room', a: 'join', code: this.inviteRoom });
+    this.inviteRoom = null;
+  }
+
   private bindNet(): void {
     const n = this.net;
     n.onClose = (reason) => {
@@ -403,10 +411,7 @@ class App {
       // a first visit starts with the tutorial, once the lobby is up
       // (unless you came to play a friend: the tutorial waits for another visit, or the Help page)
       this.tutorialDue = !m.profile.tutorial && !this.inviteRoom;
-      if (this.inviteRoom) {
-        this.net.send({ t: 'room', a: 'join', code: this.inviteRoom });
-        this.inviteRoom = null;
-      }
+      this.joinInvite();
       this.profile = m.profile;
       this.online = m.online;
       this.ui.setProfile(m.profile);
@@ -445,6 +450,7 @@ class App {
       audio.music(this.kind === 'lobby' ? 'lobby' : null, 1);
       if (this.local && this.kind === 'lobby') this.local.frozen = false;
       this.ui.toast(m.reason, 'warn');
+      this.joinInvite();
     });
     n.on('result', (m) => {
       // the card says an ad plays next and what it pays; it plays as the card goes, and pays if it runs to the end
@@ -575,6 +581,8 @@ class App {
       this.match = null;
       audio.music('lobby');
       this.ui.setMatch(null, 0);
+      // a friend's invite that came in during the match
+      this.joinInvite();
       this.net.send({ t: 'leaderboard' });
     } else {
       this.queue = null;

@@ -39,8 +39,8 @@ interface PendingMatch {
   players: [Player, Player | null];
   diff?: BotDifficulty;
   botRating?: number;
-  /** the AI opponent's own picks, made at voteAt */
-  bot: { char: CharacterId; name: string; voteAt: number } | null;
+  /** the AI opponent's own picks, made at voteAt (and the rating it showed, if it was met in the lobby) */
+  bot: { char: CharacterId; name: string; voteAt: number; rating?: number } | null;
   endsAt: number;
   maps: string[];
   votes: SelectView['votes'];
@@ -64,6 +64,11 @@ export interface GameOptions {
   introTime?: number;
   /** A test build: everyone owns every fighter and arena, with coins to spare. */
   unlockAll?: boolean;
+  /**
+   * Drop a connection that has sent nothing for this long (ms; clients ping every second). A phone
+   * that lost its network can leave its socket open for minutes, its fighter standing there.
+   */
+  silentTimeout?: number;
   /** Runs the matches instead of the lobby (recording the trailer: see src/client/demo.ts). */
   director?: Director;
 }
@@ -91,11 +96,13 @@ export class Game {
   readonly arenas = new Set<Arena>();
   private queue: Player[] = [];
   /** challenges to the lobby's wanderers, waiting on their answer */
-  private answers: { p: Player; name: string; char: CharacterId; at: number; accept: boolean }[] = [];
+  private answers: { p: Player; name: string; char: CharacterId; rating?: number; at: number; accept: boolean }[] = [];
   /** pending challenges keyed by the challenged player's id (ring: fought in that lobby ring) */
   private challenges = new Map<string, { from: string; expires: number; ring: number }>();
   /** Matches waiting on the map and fighter select, by player. */
   private selecting = new Map<Player, PendingMatch>();
+  /** when an ad last paid out, by account: a fresh connection mustn't start the gap over */
+  private lastAdAt = new Map<string, number>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastMatchmake = 0;
   private lastQueueBroadcast = 0;
@@ -111,6 +118,13 @@ export class Game {
   ) {
     this.now = clock ?? (() => performance.now() - this.t0 + 1000);
     this.lobbies.push(new Lobby(this, options.roamers ?? 0, 1));
+  }
+
+  /** Who's online, as players see it: everyone connected, and the wanderers that pass as players. */
+  get online(): number {
+    let n = this.players.size;
+    for (const l of this.lobbies) n += l.wanderers;
+    return n;
   }
 
   /** The first lobby (the only one until it fills up). */
@@ -132,6 +146,7 @@ export class Game {
     while (this.lobbies.some((l) => !l.code && l.n === n)) n++;
     const l = new Lobby(this, this.options.roamers ?? 0, n);
     this.lobbies.push(l);
+    if (l.wanderers) this.broadcastAll({ t: 'online', n: this.online });
     return l;
   }
 
@@ -148,6 +163,7 @@ export class Game {
       if (l.players.size > 0 || homes.has(l)) continue;
       l.destroy();
       this.lobbies.splice(i, 1);
+      if (l.wanderers) this.broadcastAll({ t: 'online', n: this.online });
     }
   }
 
@@ -160,7 +176,14 @@ export class Game {
 
   start(): void {
     if (this.timer) return;
-    this.timer = setInterval(() => this.tick(), 1000 / SERVER_TICK_HZ);
+    this.timer = setInterval(() => {
+      // a throw out of a timer would take the whole server (everyone's match) down with it
+      try {
+        this.tick();
+      } catch (err) {
+        console.error('[game] tick failed', err);
+      }
+    }, 1000 / SERVER_TICK_HZ);
   }
 
   stop(): void {
@@ -185,7 +208,13 @@ export class Game {
     if (now - this.lastServerPing > 2000) {
       // latency is measured by the server, so a client can't claim extra lag compensation
       this.lastServerPing = now;
-      for (const p of this.players.values()) {
+      const silent = this.options.silentTimeout;
+      for (const p of [...this.players.values()]) {
+        if (silent && now - p.lastHeardAt > silent) {
+          p.ws.close(4003, 'connection timed out');
+          this.leave(p);
+          continue;
+        }
         p.lastPingS = Math.round(now);
         p.send({ t: 'sping', s: p.lastPingS });
       }
@@ -197,13 +226,26 @@ export class Game {
         pm.votes.map[1] = Math.random() < 0.5 && pm.votes.map[0] ? pm.votes.map[0] : pm.maps[Math.floor(Math.random() * pm.maps.length)];
         this.sendSelect(pm);
       }
-      if (now >= pm.endsAt) this.finishSelect(pm);
+      if (now >= pm.endsAt) {
+        try {
+          this.finishSelect(pm);
+        } catch (err) {
+          // the match couldn't start: nobody is left on the select, or out of every lobby
+          console.error('[game] match start failed', err);
+          for (const p of pm.players) {
+            if (!p || p.closed) continue;
+            if (!p.instance) this.enterLobby(p);
+            p.send({ t: 'selectCancel', reason: 'The match could not start.' });
+          }
+        }
+      }
     }
 
     if (now - this.lastMatchmake > 1000) {
       this.lastMatchmake = now;
       this.matchmake(now);
       for (const [target, c] of this.challenges) if (now > c.expires) this.challenges.delete(target);
+      for (const [id, at] of this.lastAdAt) if (now - at >= AD_MIN_GAP_MS) this.lastAdAt.delete(id);
       this.closeEmptyLobbies();
     }
   }
@@ -225,22 +267,28 @@ export class Game {
         return;
       }
       if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return;
-      if (!player) {
-        if (msg.t === 'hello') player = this.join(ws, msg);
-        return;
-      }
-      if (!this.rateLimit(player)) {
-        ws.close(4008, 'too many messages');
-        return;
-      }
+      // (a throw out of a socket's handler would take the whole server down)
       try {
+        if (!player) {
+          if (msg.t === 'hello') player = this.join(ws, msg);
+          return;
+        }
+        player.lastHeardAt = this.now();
+        if (!this.rateLimit(player)) {
+          ws.close(4008, 'too many messages');
+          return;
+        }
         this.handle(player, msg);
       } catch (err) {
         console.error('[game] message error', err);
       }
     });
     ws.on('close', () => {
-      if (player) this.leave(player);
+      try {
+        if (player) this.leave(player);
+      } catch (err) {
+        console.error('[game] leave failed', err);
+      }
     });
     ws.on('error', () => ws.close());
   }
@@ -257,7 +305,8 @@ export class Game {
   private join(ws: SocketLike, msg: Extract<ClientMsg, { t: 'hello' }>): Player | null {
     if (msg.v !== PROTOCOL_VERSION) {
       ws.send(JSON.stringify({ t: 'notice', text: 'Your client is out of date. Refresh the page.', kind: 'warn' }));
-      ws.close(4001, 'version');
+      // (the reason is what the player reads: the notice above is held back behind the title screen)
+      ws.close(4001, 'the game has been updated, reload the page');
       return null;
     }
     const name = sanitizeName(msg.name);
@@ -266,7 +315,7 @@ export class Game {
       const existing = this.players.get(profile.id);
       if (existing) {
         existing.send({ t: 'notice', text: 'You logged in from somewhere else.', kind: 'warn' });
-        existing.ws.close(4002, 'replaced');
+        existing.ws.close(4002, 'you logged in from somewhere else');
         this.leave(existing);
       }
       profile.name = name;
@@ -283,11 +332,13 @@ export class Game {
     // you play a fighter you own (a locked one falls back to the Ronin)
     const char: CharacterId = isCharacterId(msg.char) && profile.chars.includes(msg.char) ? msg.char : 'ronin';
     const p = new Player(ws, profile, char);
+    p.lastHeardAt = this.now();
     this.players.set(p.id, p);
-    p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.players.size, serverTime: this.now() });
+    p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.online, serverTime: this.now() });
     if (!this.options.director?.join(p)) this.enterLobby(p);
-    this.broadcastAll({ t: 'online', n: this.players.size });
-    this.broadcastAll({ t: 'chat', name: '', text: `${p.name} entered the grounds.`, sys: true });
+    this.broadcastAll({ t: 'online', n: this.online });
+    // (to the public grounds' chat: a private lobby's stays among its own people)
+    this.chatFrom(p, { t: 'chat', name: '', text: `${p.name} entered the grounds.`, sys: true });
     return p;
   }
 
@@ -296,12 +347,13 @@ export class Game {
     p.closed = true;
     this.cancelSelect(p, `${p.name} left.`);
     this.unqueue(p);
-    this.challenges.delete(p.id);
+    // challenges to them, and the ones they sent (which would otherwise still stand if they came back)
+    for (const [target, c] of this.challenges) if (target === p.id || c.from === p.id) this.challenges.delete(target);
     const inst = p.instance;
     if (inst instanceof Arena) inst.forfeit(p);
     inst?.removePlayer(p);
     this.players.delete(p.id);
-    this.broadcastAll({ t: 'online', n: this.players.size });
+    this.broadcastAll({ t: 'online', n: this.online });
   }
 
   // ------------------------------------------------------------------ messages
@@ -467,7 +519,7 @@ export class Game {
     return ARENA_MAPS[Math.floor(Math.random() * ARENA_MAPS.length)];
   }
 
-  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap(), botRating?: number, bot?: { char: CharacterId; name: string }): Arena {
+  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap(), botRating?: number, bot?: { char: CharacterId; name: string; rating?: number }): Arena {
     for (const p of [a, b]) {
       if (!p) continue;
       this.unqueue(p);
@@ -560,10 +612,10 @@ export class Game {
       });
       if (counted || earned[i] > 0) p.send({ t: 'profile', profile: profileView(p.profile) });
     }
-    const [pa, pb] = humans;
-    if (rated && pa && pb) {
-      const w = winner === 0 ? pa : pb;
-      const l = winner === 0 ? pb : pa;
+    // (a rated computer opponent's duels too: it passes as a player, so its results go out like anyone's)
+    if (rated) {
+      const w = arena.slots[winner];
+      const l = arena.slots[winner === 0 ? 1 : 0];
       this.broadcastAll({ t: 'chat', name: '', text: `${w.name} defeated ${l.name} in a ranked duel.`, sys: true });
     }
   }
@@ -604,6 +656,8 @@ export class Game {
   private moveTo(p: Player, l: Lobby): void {
     this.unqueue(p);
     this.challenges.delete(p.id);
+    // a wanderer back there can't answer a challenge any more
+    this.answers = this.answers.filter((a) => a.p !== p);
     p.instance?.removePlayer(p);
     this.home.set(p, l);
     l.addPlayer(p, l.spawnPoint());
@@ -655,7 +709,7 @@ export class Game {
    */
   private adReward(p: Player, kind: unknown): void {
     const now = this.now();
-    if (now - p.lastAdAt < AD_MIN_GAP_MS) return;
+    if (now - (this.lastAdAt.get(p.id) ?? -Infinity) < AD_MIN_GAP_MS) return;
     let gained = 0;
     if (kind === 'match') {
       if (now > p.matchAdUntil) return;
@@ -663,7 +717,7 @@ export class Game {
       p.matchAdUntil = 0;
     } else if (kind === 'bonus') gained = AD_REWARD;
     else return;
-    p.lastAdAt = now;
+    this.lastAdAt.set(p.id, now);
     p.profile.coins += gained;
     this.store.markDirty();
     p.send({ t: 'coins', gained, why: kind === 'match' ? 'matchAd' : 'ad' });
@@ -680,6 +734,8 @@ export class Game {
   /** The tutorial is over: learned (the first time pays), or skipped. Either way it won't come up again. */
   endTutorial(p: Player, learned: boolean): void {
     const prof = p.profile;
+    // already done (a replay from Help, or a skip sent again): nothing changes, nothing to save
+    if (prof.tutorial) return;
     if (learned && !prof.tutorial) {
       prof.coins += TUTORIAL_REWARD;
       p.send({ t: 'coins', gained: TUTORIAL_REWARD, why: 'tutorial' });
@@ -720,7 +776,7 @@ export class Game {
     if (!(lobby instanceof Lobby) || lobby.inDuel(p) || this.selecting.has(p)) return;
     const f = lobby.fighters.get(id);
     if (!f || f.owner || f.dummy || !f.isAlive() || this.answers.some((a) => a.p === p)) return;
-    this.answers.push({ p, name: f.name, char: f.char.id, at: this.now() + 1500 + Math.random() * 2500, accept: Math.random() < 0.8 });
+    this.answers.push({ p, name: f.name, char: f.char.id, rating: f.rating, at: this.now() + 1500 + Math.random() * 2500, accept: Math.random() < 0.8 });
     p.send({ t: 'notice', text: `Challenge sent to ${f.name}.`, kind: 'info' });
   }
 
@@ -734,16 +790,20 @@ export class Game {
         p.send({ t: 'notice', text: `${a.name} declined your challenge.`, kind: 'info' });
         continue;
       }
-      this.beginSelect('casual', p, null, 'normal', undefined, { name: a.name, char: a.char });
+      this.beginSelect('casual', p, null, 'normal', undefined, { name: a.name, char: a.char, rating: a.rating });
     }
   }
 
   private challengeReply(p: Player, from: unknown, accept: boolean): void {
     const c = this.challenges.get(p.id);
-    if (!c || c.from !== from || this.now() > c.expires) return;
+    const gone = () => {
+      if (accept) p.send({ t: 'notice', text: 'That challenge is no longer available.', kind: 'warn' });
+    };
+    // (it ran out, or the challenger left)
+    if (!c || c.from !== from || this.now() > c.expires) return gone();
     this.challenges.delete(p.id);
     const challenger = this.players.get(c.from);
-    if (!challenger) return;
+    if (!challenger) return gone();
     if (!accept) {
       challenger.send({ t: 'notice', text: `${p.name} declined your challenge.`, kind: 'info' });
       return;
@@ -770,7 +830,7 @@ export class Game {
 
   /** Open the map and fighter select for a match; it starts when the vote closes. */
   /** `as`: the computer-run opponent's name and fighter, when it's someone already met (a lobby wanderer). */
-  beginSelect(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, botRating?: number, as?: { name: string; char: CharacterId }): void {
+  beginSelect(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, botRating?: number, as?: { name: string; char: CharacterId; rating?: number }): void {
     for (const p of [a, b]) {
       if (!p) continue;
       this.unqueue(p);
@@ -783,7 +843,7 @@ export class Game {
       players: [a, b],
       diff,
       botRating,
-      bot: b ? null : { char: as?.char ?? CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)], name: as?.name ?? botName(), voteAt: now + 1200 + Math.random() * 2200 },
+      bot: b ? null : { char: as?.char ?? CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)], name: as?.name ?? botName(), rating: as?.rating, voteAt: now + 1200 + Math.random() * 2200 },
       endsAt: now + (this.options.selectTime ?? MATCH.selectTime),
       // an arena either of you owns can be fought in
       maps: fixed ? [fixed.id] : sharedMaps(ARENA_MAPS.map((m) => m.id), a.profile, b?.profile),
@@ -823,7 +883,7 @@ export class Game {
       const c = pm.votes.char[i];
       if (p && c) p.charId = c;
     }
-    const bot = pm.bot ? { char: pm.votes.char[1] ?? pm.bot.char, name: pm.bot.name } : undefined;
+    const bot = pm.bot ? { char: pm.votes.char[1] ?? pm.bot.char, name: pm.bot.name, rating: pm.bot.rating } : undefined;
     this.startMatch(pm.mode, a, b, pm.diff, map, pm.botRating, bot);
   }
 

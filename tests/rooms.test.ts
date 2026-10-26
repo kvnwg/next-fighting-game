@@ -75,6 +75,10 @@ describe('private lobbies', () => {
     a.send({ t: 'chat', text: 'ready?' });
     expect(b.last('chat')!.text).toBe('ready?');
     expect(c.inbox.slice(before).some((m) => m.t === 'chat' && m.text === 'ready?')).toBe(false);
+    // nor does the public grounds' chatter come in
+    const d = join('Newcomer');
+    expect(c.last('chat')!.text).toBe(`${d.p.name} entered the grounds.`);
+    expect(b.last('chat')!.text).toBe('ready?');
 
     // a casual challenge between them, and after the match they're back in the private lobby
     a.send({ t: 'challenge', target: b.p.id });
@@ -93,6 +97,17 @@ describe('private lobbies', () => {
     expect((a.p.instance as Lobby).code).toBeNull();
     step(1500);
     expect(game.lobbies.includes(room)).toBe(false);
+  });
+
+  it('a wanderer left behind in the public grounds no longer answers your challenge', () => {
+    const { game, join, step } = harness({ roamers: 2 });
+    const a = join('Host');
+    const wanderer = [...game.lobby.fighters.values()].find((f) => f.id.startsWith('roamer-'))!;
+    a.send({ t: 'challenge', target: wanderer.id });
+    a.send({ t: 'room', a: 'create' });
+    step(5000);
+    expect(a.last('select')).toBeUndefined();
+    expect((a.p.instance as Lobby).code).toBeTruthy();
   });
 
   it('closes when its people disconnect', () => {

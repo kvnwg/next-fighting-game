@@ -40,5 +40,13 @@ describe('player names', () => {
     const sel = inbox.find((m): m is Extract<ServerMsg, { t: 'select' }> => m.t === 'select')!;
     expect(sel.sides[1].name).toBe(target.name);
     expect(sel.sides[1].char).toBe(target.char.id);
+    // and in the match they're the same player: the same rank on their plate as in the lobby
+    for (let i = 0; i < 30; i++) {
+      t += 1000 / 60;
+      game.tick();
+    }
+    const enter = inbox.find((m): m is Extract<ServerMsg, { t: 'enter' }> => m.t === 'enter' && m.kind === 'arena')!;
+    const them = enter.roster.find((r) => r.name === target.name)!;
+    expect(them.mmr).toBe(target.rating);
   });
 });

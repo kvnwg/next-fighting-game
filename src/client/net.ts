@@ -35,6 +35,9 @@ export class Net {
     return new Promise((resolve, reject) => {
       const ws: SocketLike = typeof target === 'string' ? (new WebSocket(target) as unknown as SocketLike) : target();
       this.ws = ws;
+      // a reconnect may reach a new server (a deploy starts its clock over): sync afresh
+      this.synced = false;
+      this.samples = [];
       // a server that never answers (asleep, blocked) would otherwise hang here
       const timeout = setTimeout(() => {
         if (this.connected) return;

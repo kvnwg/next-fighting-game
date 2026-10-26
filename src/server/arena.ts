@@ -43,8 +43,8 @@ export class Arena extends Instance {
     diff: BotDifficulty = 'normal',
     /** When set (offline ranked), the AI opponent has this rating and plays at a matching skill. */
     readonly botRating?: number,
-    /** The bot's fighter and name, when the map and fighter select already settled them. */
-    bot?: { char: CharacterId; name: string },
+    /** The bot's fighter and name, when the map and fighter select already settled them (and the rating a lobby wanderer showed). */
+    bot?: { char: CharacterId; name: string; rating?: number },
   ) {
     super(game, map);
     const [s0, s1] = map.spawns;
@@ -58,7 +58,7 @@ export class Arena extends Instance {
       fb.z = s1.z;
       fb.yaw = s1.yaw;
       // a rating on its card like anyone's (the real one when the match is rated; the sensei has none)
-      fb.rating = botRating ?? (mode === 'tutorial' ? undefined : playerRating());
+      fb.rating = botRating ?? bot?.rating ?? (mode === 'tutorial' ? undefined : playerRating());
       fb.brain = new BotBrain(fb, 'duel', botRating !== undefined ? botProfileForRating(botRating) : BOT_PROFILES[diff]);
       this.addFighter(fb);
     }

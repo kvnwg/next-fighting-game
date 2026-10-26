@@ -133,7 +133,8 @@ export class SelectScreen {
     }
     for (const t of this.el.querySelectorAll<HTMLElement>('[data-char]')) {
       const id = t.dataset.char;
-      mark(t, (v.votes.char[me] ?? v.sides[me].char) === id, (v.votes.char[them] ?? (v.sides[them].bot ? null : v.sides[them].char)) === id);
+      // a computer-run opponent's fighter shows from the start, as a player's does (nothing may tell them apart)
+      mark(t, (v.votes.char[me] ?? v.sides[me].char) === id, (v.votes.char[them] ?? v.sides[them].char) === id);
     }
   }
 }

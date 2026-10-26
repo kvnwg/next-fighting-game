@@ -102,13 +102,13 @@ export class Player {
   lastPingS = 0;
   queue: { mode: QueueMode; since: number; diff?: BotDifficulty } | null = null;
   lastChatAt = 0;
+  /** when anything last came in from them (server ms) */
+  lastHeardAt = 0;
   msgWindowStart = 0;
   msgCount = 0;
   closed = false;
   /** the last match's ad pays if it's watched before this (server ms) */
   matchAdUntil = 0;
-  /** when an ad last paid out (server ms) */
-  lastAdAt = -Infinity;
 
   constructor(ws: SocketLike, profile: Profile, charId: CharacterId) {
     this.id = profile.id;
