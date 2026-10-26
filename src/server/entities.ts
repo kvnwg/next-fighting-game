@@ -107,8 +107,6 @@ export class Player {
   closed = false;
   /** the last match's ad pays if it's watched before this (server ms) */
   matchAdUntil = 0;
-  /** when an ad last paid out (server ms) */
-  lastAdAt = -Infinity;
 
   constructor(ws: SocketLike, profile: Profile, charId: CharacterId) {
     this.id = profile.id;

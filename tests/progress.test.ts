@@ -17,7 +17,7 @@ function world() {
       game.tick();
     }
   };
-  const join = (name: string, char = 'ronin') => {
+  const join = (name: string, char = 'ronin', token?: string) => {
     const inbox: ServerMsg[] = [];
     let onMsg: (d: unknown) => void = () => {};
     const ws = {
@@ -30,7 +30,7 @@ function world() {
     };
     game.handleConnection(ws as never);
     const send = (m: object) => onMsg(JSON.stringify(m));
-    send({ t: 'hello', v: PROTOCOL_VERSION, name, char });
+    send({ t: 'hello', v: PROTOCOL_VERSION, name, char, token });
     const player = [...game.players.values()].find((p) => p.name === name)!;
     const last = <T extends ServerMsg['t']>(k: T) => [...inbox].reverse().find((m) => m.t === k) as Extract<ServerMsg, { t: T }> | undefined;
     return { inbox, send, player, prof: player.profile, last };
@@ -106,6 +106,21 @@ describe('coins and unlocks', () => {
       c.send({ t: 'ad', kind: 'bonus' });
     }
     expect(c.prof.coins).toBe(AD_REWARD * 6);
+  });
+
+  it('reconnecting does not start the gap between paid ads over', () => {
+    const { join, step } = world();
+    let c = join('Rejoiner');
+    const token = c.prof.token;
+    for (let i = 0; i < 5; i++) {
+      c.send({ t: 'ad', kind: 'bonus' });
+      c = join('Rejoiner', 'ronin', token);
+      step(50);
+    }
+    expect(c.prof.coins).toBe(AD_REWARD);
+    step(AD_MIN_GAP_MS);
+    c.send({ t: 'ad', kind: 'bonus' });
+    expect(c.prof.coins).toBe(AD_REWARD * 2);
   });
 
   it('fighters and arenas cost coins; the Lancer and the Warden cost double and need Gold', () => {

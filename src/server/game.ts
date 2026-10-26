@@ -85,6 +85,8 @@ export class Game {
   private challenges = new Map<string, { from: string; expires: number; ring: number }>();
   /** Matches waiting on the map and fighter select, by player. */
   private selecting = new Map<Player, PendingMatch>();
+  /** when an ad last paid out, by account: a fresh connection mustn't start the gap over */
+  private lastAdAt = new Map<string, number>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastMatchmake = 0;
   private lastQueueBroadcast = 0;
@@ -192,6 +194,7 @@ export class Game {
       this.lastMatchmake = now;
       this.matchmake(now);
       for (const [target, c] of this.challenges) if (now > c.expires) this.challenges.delete(target);
+      for (const [id, at] of this.lastAdAt) if (now - at >= AD_MIN_GAP_MS) this.lastAdAt.delete(id);
       this.closeEmptyLobbies();
     }
   }
@@ -643,7 +646,7 @@ export class Game {
    */
   private adReward(p: Player, kind: unknown): void {
     const now = this.now();
-    if (now - p.lastAdAt < AD_MIN_GAP_MS) return;
+    if (now - (this.lastAdAt.get(p.id) ?? -Infinity) < AD_MIN_GAP_MS) return;
     let gained = 0;
     if (kind === 'match') {
       if (now > p.matchAdUntil) return;
@@ -651,7 +654,7 @@ export class Game {
       p.matchAdUntil = 0;
     } else if (kind === 'bonus') gained = AD_REWARD;
     else return;
-    p.lastAdAt = now;
+    this.lastAdAt.set(p.id, now);
     p.profile.coins += gained;
     this.store.markDirty();
     p.send({ t: 'coins', gained, why: kind === 'match' ? 'matchAd' : 'ad' });
