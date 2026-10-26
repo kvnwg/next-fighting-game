@@ -1,7 +1,8 @@
 /**
- * Watching an ad for a reward. On CrazyGames it's their rewarded ad; anywhere without an ad network
- * (this preview, local play) a stand-in ad break plays out instead, the same length as a short ad,
- * so the whole flow can be played. The game is muted while either runs.
+ * Ads that pay. Chosen in the shop it's CrazyGames' rewarded ad; the one that plays by itself after
+ * every match is their midgame ad (a rewarded ad must be the player's own choice there). Anywhere
+ * without an ad network (this preview, local play) a stand-in ad break plays out instead, the same
+ * length as a short ad, so the whole flow can be played. The game is muted while any of them runs.
  */
 import { AD_MIN_GAP_MS } from '../shared/progress';
 import { audio } from './audio';
@@ -21,6 +22,22 @@ export function watchAd(): Promise<boolean> {
       const r = await platform.requestRewardedAd(() => undefined);
       if (r === 'unavailable') return await standIn();
       return r === 'rewarded';
+    } finally {
+      audio.setMuted('ad', false);
+      running = null;
+    }
+  })();
+  return running;
+}
+
+/** The ad after a match, played without asking; true if it ran to the end (its coins are earned). */
+export function matchAd(): Promise<boolean> {
+  if (running) return running;
+  running = (async () => {
+    audio.setMuted('ad', true);
+    try {
+      if (!platform.hasAds) return await standIn();
+      return (await platform.requestMidgameAd(() => undefined)) === 'played';
     } finally {
       audio.setMuted('ad', false);
       running = null;

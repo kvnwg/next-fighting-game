@@ -2,7 +2,7 @@
 import { CHARACTER_IDS, CharacterId, isCharacterId } from '../shared/characters';
 import { MATCH, SERVER_TICK_HZ } from '../shared/config';
 import { ARENA_MAPS, MapDef } from '../shared/maps';
-import { AD_MIN_GAP_MS, AD_REWARD, DOUBLE_WINDOW_MS, FREE_PICK_GAMES, MATCH_REWARD, TUTORIAL_REWARD, UnlockRefusal, canUnlockChar, canUnlockMap, freePickReady, sharedMaps } from '../shared/progress';
+import { AD_MIN_GAP_MS, AD_REWARD, FREE_PICK_GAMES, MATCH_AD_REWARD, MATCH_AD_WINDOW_MS, MATCH_REWARD, TUTORIAL_REWARD, UnlockRefusal, canUnlockChar, canUnlockMap, freePickReady, sharedMaps } from '../shared/progress';
 import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, SelectView, ServerMsg } from '../shared/protocol';
 import { eloDelta } from '../shared/ranks';
 import { Arena, botName } from './arena';
@@ -505,7 +505,7 @@ export class Game {
       this.store.markDirty();
     }
     // coins for everyone who saw it through (giving up or leaving earns nothing and doesn't count
-    // towards the free fighter); an ad afterwards can double them
+    // towards the free fighter)
     const earned: [number, number] = [0, 0];
     const table = arena.mode === 'tutorial' ? null : MATCH_REWARD[arena.mode];
     for (const i of [0, 1] as const) {
@@ -515,7 +515,6 @@ export class Game {
       earned[i] = winner === i ? table.win : table.loss;
       prof.coins += earned[i];
       prof.games++;
-      p.doubleOffer = { coins: earned[i], until: this.now() + DOUBLE_WINDOW_MS };
       if (prof.games === FREE_PICK_GAMES && freePickReady(prof)) p.send({ t: 'notice', text: 'Your free fighter is ready! Open Fighters to pick one.', kind: 'good' });
       this.store.markDirty();
     }
@@ -523,6 +522,9 @@ export class Game {
       const p = humans[i];
       if (!p) continue;
       const counted = rated && opponentRating(i) !== null;
+      // an ad plays once the result card goes (not after the tutorial), paying when it's watched through
+      const ad = arena.mode !== 'tutorial';
+      if (ad) p.matchAdUntil = this.now() + MATCH_AD_WINDOW_MS;
       p.send({
         t: 'result',
         mode: arena.mode,
@@ -530,7 +532,8 @@ export class Game {
         reason,
         scores: arena.scores,
         ...(counted ? { before: before[i]!, after: { mmr: p.profile.mmr, placements: p.profile.placements }, delta: deltas[i] } : {}),
-        ...(earned[i] > 0 ? { coins: earned[i], double: earned[i] } : {}),
+        ...(earned[i] > 0 ? { coins: earned[i] } : {}),
+        ...(ad ? { ad: MATCH_AD_REWARD } : {}),
       });
       if (counted || earned[i] > 0) p.send({ t: 'profile', profile: profileView(p.profile) });
     }
@@ -567,24 +570,23 @@ export class Game {
   }
 
   /**
-   * An ad watched to the end: the last match's coins again, or the shop's ad reward. Ads can't be
-   * verified from here, so they pay at most once per AD_MIN_GAP_MS (no ad is shorter).
+   * An ad watched to the end: the one after a match (once, soon after it), or one from the shop.
+   * Ads can't be verified from here, so they pay at most once per AD_MIN_GAP_MS (no ad is shorter).
    */
   private adReward(p: Player, kind: unknown): void {
     const now = this.now();
     if (now - p.lastAdAt < AD_MIN_GAP_MS) return;
     let gained = 0;
-    if (kind === 'double') {
-      const offer = p.doubleOffer;
-      if (!offer || now > offer.until) return;
-      gained = offer.coins;
-      p.doubleOffer = null;
+    if (kind === 'match') {
+      if (now > p.matchAdUntil) return;
+      gained = MATCH_AD_REWARD;
+      p.matchAdUntil = 0;
     } else if (kind === 'bonus') gained = AD_REWARD;
     else return;
     p.lastAdAt = now;
     p.profile.coins += gained;
     this.store.markDirty();
-    p.send({ t: 'coins', gained, why: kind === 'double' ? 'double' : 'ad' });
+    p.send({ t: 'coins', gained, why: kind === 'match' ? 'matchAd' : 'ad' });
     p.send({ t: 'profile', profile: profileView(p.profile) });
   }
 

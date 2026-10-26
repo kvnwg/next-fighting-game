@@ -1333,14 +1333,11 @@ html.sideways #app { inset: auto; top: 0; left: 0; width: var(--sh); height: var
 .sh-fighters span { font-size: 12px; letter-spacing: 0.06em; text-transform: none; color: var(--muted); }
 .sh-fighters:hover { background: #302b3e; }
 
-/* coins on the result card, and the ad that doubles them */
+/* coins on the result card, and the ad that plays next */
 .res-coins { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 2px 0 10px; font: 700 26px var(--display); color: var(--gold-hi); text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6); }
 .res-coins .pi { width: 28px; height: 28px; }
-.res-double { display: inline-flex; align-items: center; gap: 10px; margin: 0 auto 12px; padding: 9px 16px 8px; font: 700 16px var(--ui); letter-spacing: 0.1em; text-transform: uppercase; color: #1a1206; background: var(--gold); border: none; cursor: pointer; pointer-events: auto;
-  box-shadow: 0 -3px 0 0 var(--gold), 0 3px 0 0 var(--gold), -3px 0 0 0 var(--gold), 3px 0 0 0 var(--gold), inset 0 -3px 0 #b8862a, 6px 6px 0 2px rgba(0, 0, 0, 0.45); animation: fs-bob 0.8s steps(2) infinite; }
-.res-double .pi { width: 24px; height: 20px; }
-.res-double:hover { background: var(--gold-hi); }
-.res-double:disabled { animation: none; opacity: 0.8; cursor: default; }
+.res-ad { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 auto 12px; max-width: 26em; font: 600 15px var(--ui); letter-spacing: 0.04em; color: var(--gold-hi); }
+.res-ad .pi { width: 22px; height: 18px; flex: none; }
 
 /* locked arenas and fighters on the pre-match select; an arena open only through your opponent */
 .sel-lock { position: absolute; z-index: 3; right: 8px; top: 8px; }

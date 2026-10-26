@@ -107,8 +107,8 @@ export type ClientMsg =
   | { t: 'vote'; map?: string; char?: CharacterId }
   /** buy a fighter or an arena with coins, or (free) take the free fighter */
   | { t: 'unlock'; kind: 'char' | 'map'; id: string; free?: boolean }
-  /** an ad was watched to the end: double the last match's coins, or the shop's ad reward */
-  | { t: 'ad'; kind: 'double' | 'bonus' }
+  /** an ad was watched to the end: the one after a match, or one from the shop */
+  | { t: 'ad'; kind: 'match' | 'bonus' }
   /** start the tutorial, or skip (or leave) it */
   | { t: 'tutorial'; a: 'start' | 'skip' };
 
@@ -204,9 +204,9 @@ export type ServerMsg =
       before?: { mmr: number; placements: number };
       after?: { mmr: number; placements: number };
       delta?: number;
-      /** coins earned, and how many more an ad would add (until the offer runs out) */
+      /** coins earned, and what the ad that plays next pays when it's watched to the end */
       coins?: number;
-      double?: number;
+      ad?: number;
     }
   | { t: 'profile'; profile: ProfileView }
   | { t: 'leaderboard'; entries: LeaderboardEntry[]; you: number | null; total: number }
@@ -223,7 +223,7 @@ export type ServerMsg =
   /** the select closed without a match (the other side left) */
   | { t: 'selectCancel'; reason: string }
   /** coins just came in */
-  | { t: 'coins'; gained: number; why: 'match' | 'double' | 'ad' | 'tutorial' }
+  | { t: 'coins'; gained: number; why: 'match' | 'matchAd' | 'ad' | 'tutorial' }
   /** a fighter or arena is yours now */
   | { t: 'unlocked'; kind: 'char' | 'map'; id: string; free: boolean }
   /** where the tutorial is: the step, how far through it (n of need), and a note on the last try */

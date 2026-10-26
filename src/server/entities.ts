@@ -105,8 +105,8 @@ export class Player {
   msgWindowStart = 0;
   msgCount = 0;
   closed = false;
-  /** the last match's coins, which an ad can double until `until` (server ms) */
-  doubleOffer: { coins: number; until: number } | null = null;
+  /** the last match's ad pays if it's watched before this (server ms) */
+  matchAdUntil = 0;
   /** when an ad last paid out (server ms) */
   lastAdAt = -Infinity;
 

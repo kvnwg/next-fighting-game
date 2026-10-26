@@ -91,6 +91,11 @@ class Platform {
     this.call((s) => s.game.happytime());
   }
 
+  /** There's an ad network to ask (CrazyGames): off it, the game shows a stand-in break instead. */
+  get hasAds(): boolean {
+    return !!this.sdk;
+  }
+
   /**
    * Request a midgame ad. Resolves when it finishes, fails, is unfilled or on cooldown: the game
    * always carries on. `onStart` fires only if an ad really plays (mute the game then).

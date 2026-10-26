@@ -9,7 +9,7 @@ import { ICON, IconName, icon, pixelSVG, recolor, slashRows } from './pixelicons
 import { TRACKS } from './audio/music';
 import { settings } from './settings';
 import { LORE, readingMinutes } from './lore';
-import { FREE_PICK_GAMES, MAP_PRICE, AD_REWARD, charPrice, freePickReady, gamesToFreePick, isPremium, reachedGold } from '../shared/progress';
+import { FREE_PICK_GAMES, MAP_PRICE, AD_REWARD, MATCH_AD_REWARD, charPrice, freePickReady, gamesToFreePick, isPremium, reachedGold } from '../shared/progress';
 import { THUMBS } from './select';
 
 const h = (html: string): HTMLElement => {
@@ -68,8 +68,8 @@ export interface UIHandlers {
   portrait(id: CharacterId): string;
   /** buy a fighter or an arena with coins, or (free) take the free fighter */
   onUnlock(kind: 'char' | 'map', id: string, free?: boolean): void;
-  /** watch an ad for coins (the shop's reward, or to double the last match's); true if earned */
-  onWatchAd(kind: 'double' | 'bonus'): Promise<boolean>;
+  /** watch an ad from the shop for coins; true if earned */
+  onWatchAd(kind: 'bonus'): Promise<boolean>;
   /** play the tutorial (again) */
   onTutorial(): void;
 }
@@ -1111,7 +1111,7 @@ export class UI {
         <div class="sh-maps">${ARENA_MAPS.map((m) => mapCard(m.id)).join('')}</div>
         ${iconHead('fighters', 'Fighters')}
         <button class="sh-fighters">${icon('fighters')}Unlock fighters<span>${coinText(charPrice('ronin'))} coins each · Lancer and Warden ${coinText(charPrice('lancer'))} at Gold</span></button>
-        <p class="muted">Every finished match pays coins (watch an ad afterwards to double them).</p>
+        <p class="muted">Every finished match pays coins, and the ad that plays after it pays ${coinText(MATCH_AD_REWARD)} more.</p>
       </div>`,
       true,
       '店',
@@ -1305,10 +1305,10 @@ export class UI {
   private revealTimer = 0;
 
   /**
-   * The result card. With coins earned it says how many, and offers an ad to double them (the
-   * card waits while it plays). `closed` hears whether an ad was watched from it.
+   * The result card: the coins earned, and that an ad plays next and what it pays when it's watched
+   * through. `closed` runs as the card goes (the ad plays then).
    */
-  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null, closed?: (watchedAd: boolean) => void): void {
+  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null, closed?: () => void): void {
     let ratingHtml = '';
     if (r.before && r.after && r.delta !== undefined) {
       const before = rankOf(r.before.mmr, r.before.placements);
@@ -1325,9 +1325,9 @@ export class UI {
       </div>`;
     }
     const reason = r.reason === 'forfeit' ? (r.won ? 'Opponent forfeited' : 'You forfeited') : r.reason === 'timeout' ? 'Time' : '';
-    const coinsHtml = r.coins
-      ? `<div class="res-coins">${icon('coin')}+${coinText(r.coins)} coins</div>${r.double ? `<button class="res-double">${icon('watch')}Watch an ad · +${coinText(r.double)} more</button>` : ''}`
-      : '';
+    const coinsHtml =
+      (r.coins ? `<div class="res-coins">${icon('coin')}+${coinText(r.coins)} coins</div>` : '') +
+      (r.ad ? `<div class="res-ad">${icon('watch')}An ad plays next. Watch it to the end for +${coinText(r.ad)} coins.</div>` : '');
     const el = h(`<div class="result ${r.won ? 'win' : 'lose'}">
       <div class="res-jp">${r.won ? '勝利' : '敗北'}</div>
       <div class="res-icon">${icon(r.won ? 'crown' : 'skull')}</div>
@@ -1338,23 +1338,7 @@ export class UI {
       <div class="muted">Returning to the lobby…</div></div>`);
     void me;
     this.hud.appendChild(el);
-    let watched = false;
-    let timers: number[] = [];
-    const close = (after: number) => {
-      timers.forEach((t) => clearTimeout(t));
-      timers = [window.setTimeout(() => el.classList.add('out'), after), window.setTimeout(() => (el.remove(), closed?.(watched)), after + 700)];
-    };
-    const dbl = el.querySelector<HTMLButtonElement>('.res-double');
-    dbl?.addEventListener('click', () => {
-      dbl.disabled = true;
-      timers.forEach((t) => clearTimeout(t));
-      void this.handlers.onWatchAd('double').then((ok) => {
-        watched = true;
-        dbl.innerHTML = ok ? `${icon('check')}Doubled!` : 'No reward this time';
-        close(2200);
-      });
-    });
-    // a card with an offer on it stays up a little longer
-    close(dbl ? 9300 : 6300);
+    window.setTimeout(() => el.classList.add('out'), 6300);
+    window.setTimeout(() => (el.remove(), closed?.()), 7000);
   }
 }

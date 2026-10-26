@@ -57,8 +57,8 @@ export class Arena extends Instance {
       fb.x = s1.x;
       fb.z = s1.z;
       fb.yaw = s1.yaw;
-      // a rating on its card like anyone's (the real one when the match is rated)
-      fb.rating = botRating ?? playerRating();
+      // a rating on its card like anyone's (the real one when the match is rated; the sensei has none)
+      fb.rating = botRating ?? (mode === 'tutorial' ? undefined : playerRating());
       fb.brain = new BotBrain(fb, 'duel', botRating !== undefined ? botProfileForRating(botRating) : BOT_PROFILES[diff]);
       this.addFighter(fb);
     }

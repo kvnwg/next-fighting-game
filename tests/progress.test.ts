@@ -4,7 +4,7 @@ import { MATCH } from '../src/shared/config';
 import { Game } from '../src/server/game';
 import { Store } from '../src/server/store';
 import { TUTORIAL_NEED } from '../src/server/tutorial';
-import { AD_MIN_GAP_MS, AD_REWARD, CHAR_PRICE, FREE_PICK_GAMES, MAP_PRICE, MATCH_REWARD, TUTORIAL_REWARD, canUnlockChar, withProgress } from '../src/shared/progress';
+import { AD_MIN_GAP_MS, AD_REWARD, CHAR_PRICE, MATCH_AD_REWARD, FREE_PICK_GAMES, MAP_PRICE, MATCH_REWARD, TUTORIAL_REWARD, canUnlockChar, withProgress } from '../src/shared/progress';
 import { CombatEvent, PROTOCOL_VERSION, ServerMsg } from '../src/shared/protocol';
 
 function world() {
@@ -70,25 +70,28 @@ describe('coins and unlocks', () => {
     expect(old.coins).toBe(0);
   });
 
-  it('a finished match pays, an ad doubles it once, and giving up pays nothing', () => {
+  it('a finished match pays, its ad pays once on top, and giving up pays nothing', () => {
     const { join, playMatch, step } = world();
     const c = join('Earner');
     playMatch(c, true);
     const win = MATCH_REWARD.practice.win;
     expect(c.prof.coins).toBe(win);
     expect(c.prof.games).toBe(1);
-    expect(c.last('result')).toMatchObject({ coins: win, double: win });
-    c.send({ t: 'ad', kind: 'double' });
-    expect(c.prof.coins).toBe(win * 2);
-    expect(c.last('coins')).toMatchObject({ gained: win, why: 'double' });
+    // the card says an ad plays next and what it pays; nothing doubles any more
+    expect(c.last('result')).toMatchObject({ coins: win, ad: MATCH_AD_REWARD });
+    expect(c.last('result')).not.toHaveProperty('double');
+    c.send({ t: 'ad', kind: 'match' });
+    expect(c.prof.coins).toBe(win + MATCH_AD_REWARD);
+    expect(c.last('coins')).toMatchObject({ gained: MATCH_AD_REWARD, why: 'matchAd' });
+    // once per match
     step(AD_MIN_GAP_MS + 100);
-    c.send({ t: 'ad', kind: 'double' });
-    expect(c.prof.coins).toBe(win * 2);
+    c.send({ t: 'ad', kind: 'match' });
+    expect(c.prof.coins).toBe(win + MATCH_AD_REWARD);
     // a loss still pays something; giving up pays nothing and doesn't count
     playMatch(c, false);
-    expect(c.prof.coins).toBe(win * 2 + MATCH_REWARD.practice.loss);
+    expect(c.prof.coins).toBe(win + MATCH_AD_REWARD + MATCH_REWARD.practice.loss);
     playMatch(c, false, true);
-    expect(c.prof.coins).toBe(win * 2 + MATCH_REWARD.practice.loss);
+    expect(c.prof.coins).toBe(win + MATCH_AD_REWARD + MATCH_REWARD.practice.loss);
     expect(c.prof.games).toBe(2);
   });
 

@@ -1,6 +1,6 @@
 /**
  * What you own and how you earn it. Everyone starts with the Ronin and the Sakura arena; coins come
- * from finishing matches (doubled by watching an ad afterwards) and from watching ads any time, and
+ * from finishing matches, from the ad that plays after each one, and from watching ads any time, and
  * buy the other fighters and arenas. The Lancer and the Warden cost twice as much and only open up
  * once you've reached Gold. After your first few matches you get one fighter free.
  *
@@ -35,8 +35,10 @@ export const AD_REWARD = 50;
 export const TUTORIAL_REWARD = 100;
 /** The server won't pay for ads closer together than this (no ad is shorter). */
 export const AD_MIN_GAP_MS = 5000;
-/** How long a match reward can be doubled by an ad after the match ends. */
-export const DOUBLE_WINDOW_MS = 3 * 60_000;
+/** Coins for the ad that plays after every match, watched to the end. */
+export const MATCH_AD_REWARD = 50;
+/** How long after a match its ad can still pay (it plays as the result card goes). */
+export const MATCH_AD_WINDOW_MS = 3 * 60_000;
 
 export interface Progress {
   coins: number;

@@ -33,7 +33,7 @@ import { TitleScreen } from './title/screen';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
 import { Sideways } from './rotate';
-import { watchAd } from './adbreak';
+import { matchAd, watchAd } from './adbreak';
 import { TutorialOverlay } from './tutorial';
 import { TouchControls, isTouchDevice } from './touch';
 import { CardData, Preview, UI, esc } from './ui';
@@ -414,11 +414,13 @@ class App {
       this.ui.toast(m.reason, 'warn');
     });
     n.on('result', (m) => {
-      // coins on the card, and an offer to double them: free the cursor to take it
-      if (m.coins) this.input.exitLock();
-      // the usual break for an ad comes once the card is gone, unless one was just watched from it
-      this.ui.showResult(m, this.profile, (watched) => {
-        if (!watched) void platform.requestMidgameAd(() => audio.setMuted('ad', true)).then(() => audio.setMuted('ad', false));
+      // the card says an ad plays next and what it pays; it plays as the card goes, and pays if it runs to the end
+      this.ui.showResult(m, this.profile, () => {
+        if (!m.ad) return;
+        this.input.exitLock();
+        void matchAd().then((ok) => {
+          if (ok) this.net.send({ t: 'ad', kind: 'match' });
+        });
       });
       audio.introStop();
       audio.play(m.won ? 'victory' : 'defeat');
@@ -441,6 +443,7 @@ class App {
       this.ui.coinsGained(m.gained);
       audio.coins(m.gained);
       if (m.why === 'tutorial') this.ui.toast(`Lesson learned: +${m.gained} coins`, 'good');
+      if (m.why === 'matchAd') this.ui.toast(`Thanks for watching: +${m.gained} coins`, 'good');
     });
     n.on('unlocked', (m) => {
       audio.unlocked();
