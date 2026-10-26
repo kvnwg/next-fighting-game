@@ -11,6 +11,7 @@ import { settings } from './settings';
 import { LORE, readingMinutes } from './lore';
 import { FREE_PICK_GAMES, MAP_PRICE, AD_REWARD, MATCH_AD_REWARD, charPrice, freePickReady, gamesToFreePick, isPremium, reachedGold } from '../shared/progress';
 import { THUMBS } from './select';
+import { matchAdExpected } from './adbreak';
 
 const h = (html: string): HTMLElement => {
   const t = document.createElement('template');
@@ -1327,7 +1328,7 @@ export class UI {
     const reason = r.reason === 'forfeit' ? (r.won ? 'Opponent forfeited' : 'You forfeited') : r.reason === 'timeout' ? 'Time' : '';
     const coinsHtml =
       (r.coins ? `<div class="res-coins">${icon('coin')}+${coinText(r.coins)} coins</div>` : '') +
-      (r.ad ? `<div class="res-ad">${icon('watch')}An ad plays next. Watch it to the end for +${coinText(r.ad)} coins.</div>` : '');
+      (r.ad && matchAdExpected() ? `<div class="res-ad">${icon('watch')}An ad plays next. Watch it to the end for +${coinText(r.ad)} coins.</div>` : '');
     const el = h(`<div class="result ${r.won ? 'win' : 'lose'}">
       <div class="res-jp">${r.won ? '勝利' : '敗北'}</div>
       <div class="res-icon">${icon(r.won ? 'crown' : 'skull')}</div>

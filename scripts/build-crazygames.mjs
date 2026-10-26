@@ -28,6 +28,14 @@ await build({
   ],
 });
 
+// CrazyGames runs ads, so songs whose licence is non-commercial don't ship at all (the game already
+// skips them there; see TRACKS in src/client/audio/music.ts)
+const tracks = fs.readFileSync('src/client/audio/music.ts', 'utf8');
+for (const [, file] of tracks.matchAll(/file: '([^']+)'[^}]*commercial: false/g)) {
+  fs.rmSync(path.join(outDir, 'music', file), { force: true });
+  console.log(`left out music/${file} (non-commercial licence)`);
+}
+
 const files = fs.readdirSync(outDir, { recursive: true }).filter((f) => fs.statSync(path.join(outDir, f)).isFile());
 const bytes = files.reduce((n, f) => n + fs.statSync(path.join(outDir, f)).size, 0);
 console.log(`wrote ${outDir} (${files.length} files, ${(bytes / 1024).toFixed(0)} KB)`);

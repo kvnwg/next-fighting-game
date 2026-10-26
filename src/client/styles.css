@@ -35,6 +35,9 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #08080b; color: var(--text); font-family: var(--ui); font-size: 16px; }
 /* pixel type stays crisp: no faked italics or bold smearing the grid, no smoothing where the browser lets us */
+/* no selection or magnifier when a finger or drag lingers (CrazyGames asks for it on body); fields stay editable */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea { -webkit-user-select: text; user-select: text; }
 body { font-synthesis: none; -webkit-font-smoothing: none; -moz-osx-font-smoothing: unset; font-smooth: never; text-rendering: optimizeSpeed; }
 #ui *, .ts *, .select-screen * { font-style: normal !important; }
 #app { position: fixed; inset: 0; }

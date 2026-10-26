@@ -11,7 +11,22 @@ import { platform } from './platform';
 /** how long the stand-in runs (no shorter than the server will pay for) */
 const STAND_IN_MS = AD_MIN_GAP_MS + 1000;
 
+/** CrazyGames plays at most one midgame ad every 3 minutes and ignores requests sooner */
+const MIDGAME_GAP_MS = 3 * 60_000;
+
 let running: Promise<boolean> | null = null;
+let lastPlayed = -Infinity;
+let lastFailed = false;
+
+/**
+ * Whether an ad will most likely play after this match, so the result card only promises one when
+ * it's coming: not inside CrazyGames' 3-minute gap, nor while ads aren't being served (the first
+ * weeks on CrazyGames, unfilled, an adblocker). The ad is still asked for either way.
+ */
+export function matchAdExpected(): boolean {
+  if (!platform.hasAds) return true;
+  return !lastFailed && performance.now() - lastPlayed > MIDGAME_GAP_MS;
+}
 
 /** Show an ad; true if it was watched to the end (the reward is earned). */
 export function watchAd(): Promise<boolean> {
@@ -37,7 +52,13 @@ export function matchAd(): Promise<boolean> {
     audio.setMuted('ad', true);
     try {
       if (!platform.hasAds) return await standIn();
-      return (await platform.requestMidgameAd(() => undefined)) === 'played';
+      const played = (await platform.requestMidgameAd(() => undefined)) === 'played';
+      const now = performance.now();
+      if (played) {
+        lastPlayed = now;
+        lastFailed = false;
+      } else if (now - lastPlayed > MIDGAME_GAP_MS) lastFailed = true; // inside the gap a refusal says nothing
+      return played;
     } finally {
       audio.setMuted('ad', false);
       running = null;
