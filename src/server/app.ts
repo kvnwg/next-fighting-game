@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { fileStore } from './fileStore';
+import { Censor, createCensor } from './censor';
 import { Game } from './game';
 import { Store } from './store';
 
@@ -33,6 +34,13 @@ export interface ServerOptions {
   introTime?: number;
   /** wandering computer-run fighters in each public lobby (none by default: tests) */
   roamers?: number;
+  /** Moderation for names and chat; the bundled word list unless given (null turns it off). */
+  censor?: Censor | null;
+}
+
+/** the word list CrazyGames gives multiplayer games, starring out names and chat */
+export function defaultCensor(): Censor {
+  return createCensor(fs.readFileSync(new URL('./blocklist.txt', import.meta.url), 'utf8'));
 }
 
 export interface RunningServer {
@@ -89,7 +97,8 @@ function staticHandler(dir: string | undefined): http.RequestListener {
 
 export function startServer(opts: ServerOptions): Promise<RunningServer> {
   const store = new Store(opts.dataFile ? fileStore(opts.dataFile) : null);
-  const game = new Game(store, undefined, { selectTime: opts.selectTime, introTime: opts.introTime, roamers: opts.roamers, silentTimeout: SILENT_TIMEOUT_MS });
+  const censor = opts.censor === undefined ? defaultCensor() : opts.censor ?? undefined;
+  const game = new Game(store, undefined, { selectTime: opts.selectTime, introTime: opts.introTime, roamers: opts.roamers, silentTimeout: SILENT_TIMEOUT_MS, censor });
   const server = http.createServer(staticHandler(opts.staticDir));
   const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 });
 

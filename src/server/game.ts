@@ -7,6 +7,7 @@ import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, SelectView, Serv
 import { eloDelta } from '../shared/ranks';
 import { normalizeRoomCode, randomRoomCode } from '../shared/rooms';
 import { Arena, botName } from './arena';
+import type { Censor } from './censor';
 import { Player, SocketLike } from './entities';
 import { Lobby } from './lobby';
 import { Store, profileView } from './store';
@@ -71,6 +72,8 @@ export interface GameOptions {
   silentTimeout?: number;
   /** Runs the matches instead of the lobby (recording the trailer: see src/client/demo.ts). */
   director?: Director;
+  /** Moderation for names and chat (the server's; single player has nobody to protect). */
+  censor?: Censor;
 }
 
 /** Puts players in matches of its choosing, instead of the lobby. */
@@ -309,7 +312,9 @@ export class Game {
       ws.close(4001, 'the game has been updated, reload the page');
       return null;
     }
-    const name = sanitizeName(msg.name);
+    let name = sanitizeName(msg.name);
+    const renamed = !!this.options.censor && !this.options.censor.allowed(name);
+    if (renamed) name = sanitizeName('');
     let profile = this.store.byTokenOrNull(msg.token);
     if (profile) {
       const existing = this.players.get(profile.id);
@@ -335,11 +340,17 @@ export class Game {
     p.lastHeardAt = this.now();
     this.players.set(p.id, p);
     p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.online, serverTime: this.now() });
+    if (renamed) p.send({ t: 'notice', text: `That name isn't allowed here, so you're ${name} for now.`, kind: 'warn' });
     if (!this.options.director?.join(p)) this.enterLobby(p);
     this.broadcastAll({ t: 'online', n: this.online });
     // (to the public grounds' chat: a private lobby's stays among its own people)
     this.chatFrom(p, { t: 'chat', name: '', text: `${p.name} entered the grounds.`, sys: true });
     return p;
+  }
+
+  /** a name as others see it: one from before the filter that it wouldn't let through is hidden */
+  private shownName(name: string): string {
+    return !this.options.censor || this.options.censor.allowed(name) ? name : '*'.repeat(name.length);
   }
 
   leave(p: Player): void {
@@ -397,7 +408,7 @@ export class Game {
         this.challengeReply(p, msg.from, !!msg.accept);
         break;
       case 'chat': {
-        const text = sanitizeChat(msg.text);
+        const text = this.options.censor?.clean(sanitizeChat(msg.text)) ?? sanitizeChat(msg.text);
         if (!text || now - p.lastChatAt < 600) return;
         p.lastChatAt = now;
         this.chatFrom(p, { t: 'chat', name: p.name, text });
@@ -407,7 +418,7 @@ export class Game {
         if (p.instance instanceof Arena) p.instance.forfeit(p, true);
         break;
       case 'leaderboard':
-        p.send({ t: 'leaderboard', entries: this.store.leaderboard(25), you: this.store.position(p.profile), total: this.store.placedCount() });
+        p.send({ t: 'leaderboard', entries: this.store.leaderboard(25).map((e) => ({ ...e, name: this.shownName(e.name) })), you: this.store.position(p.profile), total: this.store.placedCount() });
         break;
       case 'unlock':
         this.unlock(p, msg.kind, msg.id, !!msg.free);
