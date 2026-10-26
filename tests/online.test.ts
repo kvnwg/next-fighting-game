@@ -133,3 +133,18 @@ describe('server robustness', () => {
     vi.useRealTimers();
   });
 });
+
+describe('computer opponents pass as players', () => {
+  it('a ranked duel against the rated fallback opponent is announced like one between two players', () => {
+    const { step, join } = harness({ rankedFallback: 1000 });
+    const lone = join('Lonely');
+    const watcher = join('Watcher');
+    lone.send({ t: 'queue', mode: 'ranked' });
+    step(2500);
+    const them = lone.last('select')!.sides[1].name;
+    step(500);
+    expect(lone.p.instance?.kind).toBe('arena');
+    lone.send({ t: 'forfeit' });
+    expect(watcher.inbox.some((m) => m.t === 'chat' && m.sys && m.text === `${them} defeated Lonely in a ranked duel.`)).toBe(true);
+  });
+});

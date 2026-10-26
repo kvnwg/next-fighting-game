@@ -588,10 +588,10 @@ export class Game {
       });
       if (counted || earned[i] > 0) p.send({ t: 'profile', profile: profileView(p.profile) });
     }
-    const [pa, pb] = humans;
-    if (rated && pa && pb) {
-      const w = winner === 0 ? pa : pb;
-      const l = winner === 0 ? pb : pa;
+    // (a rated computer opponent's duels too: it passes as a player, so its results go out like anyone's)
+    if (rated) {
+      const w = arena.slots[winner];
+      const l = arena.slots[winner === 0 ? 1 : 0];
       this.broadcastAll({ t: 'chat', name: '', text: `${w.name} defeated ${l.name} in a ranked duel.`, sys: true });
     }
   }
