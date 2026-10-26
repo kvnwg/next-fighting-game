@@ -12,6 +12,8 @@
 
 export interface PlatformSettings {
   muteAudio: boolean;
+  /** the player (or a parent) has turned chat off on CrazyGames */
+  disableChat: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,7 +21,7 @@ type Sdk = any;
 
 class Platform {
   env: 'none' | 'local' | 'crazygames' | 'disabled' = 'none';
-  settings: PlatformSettings = { muteAudio: false };
+  settings: PlatformSettings = { muteAudio: false, disableChat: false };
   private sdk: Sdk = null;
   private playing = false;
   private loading = false;
@@ -34,9 +36,9 @@ class Platform {
       if (this.env === 'disabled') return;
       this.sdk = sdk;
       const s = sdk.game?.settings;
-      if (s) this.settings = { muteAudio: !!s.muteAudio };
+      if (s) this.settings = { muteAudio: !!s.muteAudio, disableChat: !!s.disableChat };
       sdk.game?.addSettingsChangeListener?.((next: PlatformSettings) => {
-        this.settings = { muteAudio: !!next.muteAudio };
+        this.settings = { muteAudio: !!next.muteAudio, disableChat: !!next.disableChat };
         for (const l of this.listeners) l(this.settings);
       });
     } catch (err) {
@@ -158,6 +160,35 @@ class Platform {
         done('skipped');
       }
     });
+  }
+
+  /**
+   * A link that brings a friend straight into a private lobby: CrazyGames' own invite link there,
+   * else this page with ?room=CODE.
+   */
+  inviteLink(code: string): string {
+    const link = this.call((s) => s.game.inviteLink({ room: code }) as string);
+    if (typeof link === 'string' && link) return link;
+    const url = new URL(location.href);
+    url.search = '';
+    url.searchParams.set('room', code);
+    return url.toString();
+  }
+
+  /** The private lobby the game was opened to join (an invite link), if any. */
+  inviteRoom(): string | null {
+    const fromSdk = this.call((s) => s.game.getInviteParam('room') as string | null);
+    if (fromSdk) return fromSdk;
+    return new URLSearchParams(location.search).get('room');
+  }
+
+  /** An invite link opened while the game is already running (CrazyGames). */
+  onInvite(listener: (room: string) => void): void {
+    this.call((s) =>
+      s.game.addJoinRoomListener?.((params: Record<string, string> | null) => {
+        if (params?.room) listener(params.room);
+      }),
+    );
   }
 
   /** The CrazyGames account name, when the player is signed in. */

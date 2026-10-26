@@ -34,13 +34,18 @@ Multiplayer and the shared ladder need the server.
 
 ### CrazyGames
 
-`npm run build:crazygames` builds the single-player game for [CrazyGames](https://developer.crazygames.com) into `dist/crazygames` (zipped to `dist/crazygames.zip`, ready to upload). It uses relative paths and loads the CrazyGames SDK v3 in the page head. `src/client/platform.ts` wraps the SDK, and every call does nothing off CrazyGames:
+The CrazyGames version plays online: everyone shares the grounds on one game server, deployed to [Fly.io](https://fly.io) (`Dockerfile`, `fly.toml`). Each public lobby has a few wandering fighters so it never feels empty, ranked finds you a computer opponent near your rating if no player turns up within 15 seconds, and friends play together in a **private lobby**: Play → Friends opens one with a 5-letter code (and an invite link) the others type in or open. Chat in a private lobby stays among the people in it.
+
+`npm run build:crazygames` builds it into `dist/crazygames` (zipped to `dist/crazygames.zip`, ready to upload), connecting to `wss://<app>.fly.dev/ws` with the app named in `fly.toml` (or `DEFLECT_SERVER=wss://…/ws`). `-- --offline` builds the old single-player version instead. It uses relative paths and loads the CrazyGames SDK v3 in the page head. `src/client/platform.ts` wraps the SDK, and every call does nothing off CrazyGames:
 - loading and gameplay start/stop (menus, the title screen and results are breaks);
 - a midgame ad after a match, never during one, with the game muted while it plays;
 - `happytime` on a ranked promotion;
-- the platform's mute setting;
+- the platform's mute and disable-chat settings;
+- invite links into a private lobby (`inviteLink`, `getInviteParam`, the join-room listener);
 - the signed-in player's name;
-- settings and progress saved with CrazyGames' data module.
+- settings saved with CrazyGames' data module (your identity on the server goes with them; progress is kept on the server).
+
+[docs/crazygames.md](docs/crazygames.md) walks through deploying the server and putting the game on CrazyGames.
 
 Touch controls switch on by themselves on phones and tablets.
 

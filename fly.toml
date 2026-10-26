@@ -1,0 +1,43 @@
+# The game server on Fly.io. `app` is its name and its address: https://<app>.fly.dev, and the
+# CrazyGames build connects to wss://<app>.fly.dev/ws (scripts/build-crazygames.mjs reads it from
+# here). Names are first come, first served: if this one is taken, pick another and change it here.
+app = 'deflect-duels'
+# where it runs: pick the region nearest most of your players (fly platform regions)
+primary_region = 'iad'
+
+[build]
+
+[env]
+  PORT = '8080'
+  DATA_DIR = '/data'
+  # wandering fighters in each public lobby
+  ROAMERS = '4'
+
+# the profiles (ratings, coins, unlocks) live on this volume, so they survive a redeploy
+[mounts]
+  source = 'deflect_data'
+  destination = '/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # a duel is a live connection: the server must never be put to sleep mid-match
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = 'connections'
+    soft_limit = 400
+    hard_limit = 500
+
+  [[http_service.checks]]
+    grace_period = '20s'
+    interval = '30s'
+    method = 'GET'
+    path = '/'
+    timeout = '5s'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'

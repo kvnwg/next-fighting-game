@@ -5,7 +5,7 @@ import { Fighter, FighterState, InputAction } from './fighter';
 import { round2 } from './math';
 import type { Progress } from './progress';
 
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export type QueueMode = 'ranked' | 'practice';
 export type MatchMode = 'ranked' | 'practice' | 'casual' | 'tutorial';
@@ -110,7 +110,10 @@ export type ClientMsg =
   /** an ad was watched to the end: the one after a match, or one from the shop */
   | { t: 'ad'; kind: 'match' | 'bonus' }
   /** start the tutorial, or skip (or leave) it */
-  | { t: 'tutorial'; a: 'start' | 'skip' };
+  | { t: 'tutorial'; a: 'start' | 'skip' }
+  /** a private lobby: open one (you get its code), join one by its code, or go back to the public grounds */
+  | { t: 'room'; a: 'create' | 'leave' }
+  | { t: 'room'; a: 'join'; code: string };
 
 /**
  * The tutorial's steps, in order: strike into the sensei's guard; block until your own guard
@@ -216,8 +219,8 @@ export type ServerMsg =
   | { t: 'chat'; name: string; text: string; sys?: boolean }
   | { t: 'feed'; killer: string; victim: string; how: string }
   | { t: 'online'; n: number }
-  /** which lobby you're in (numbered from 1) and how full it is */
-  | { t: 'lobby'; n: number; count: number; cap: number }
+  /** which lobby you're in (public ones numbered from 1; a private one has its code) and how full it is */
+  | { t: 'lobby'; n: number; count: number; cap: number; code?: string }
   | { t: 'rings'; r: RingView[] }
   | ({ t: 'select' } & SelectView)
   /** the select closed without a match (the other side left) */

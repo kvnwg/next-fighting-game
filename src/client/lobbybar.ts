@@ -1,7 +1,8 @@
 /**
  * The lobby's bottom bar, laid out like the reference: your fighter's portrait beside a big PLAY
  * button, and a row of pixel-art icons under it (Fighters, Shop, Ladder, Help, Settings). PLAY opens
- * the mode panel: a Casual practice duel at your chosen difficulty, or a Ranked duel; while
+ * the mode panel: a Casual practice duel at your chosen difficulty, a Ranked duel, or (online) a
+ * private lobby to bring friends into; while
  * the panel is open PLAY turns into CLOSE, and while you're queued it shows the search and cancels it.
  * The Fighters icon carries the free fighter's progress: a pip per match towards it, then FREE.
  */
@@ -10,10 +11,13 @@ import { CHARACTERS, type CharacterId } from '../shared/characters';
 import { icon } from './pixelicons';
 import bamboo from './assets/maps/bamboo.jpg';
 import forge from './assets/maps/forge.jpg';
+import sakura from './assets/maps/sakura.jpg';
 
 export interface LobbyBarHandlers {
   onPractice(diff: BotDifficulty): void;
   onRanked(): void;
+  /** the private lobby: open one, join one by code, or see your own's code */
+  onFriends(): void;
   onCancelQueue(): void;
   onFighters(): void;
   onShop(): void;
@@ -43,9 +47,11 @@ export class LobbyBar {
   private queued = false;
   private shownChar: CharacterId | null = null;
 
+  /** `friends`: the private lobby card (online only: there's nobody to bring offline) */
   constructor(
     parent: HTMLElement,
     private readonly h: LobbyBarHandlers,
+    friends = false,
   ) {
     const tile = (id: string, svg: string, label: string, key: string) =>
       `<button class="lb-icon" id="lb-${id}" title="${esc(label)}${key ? ` [${key}]` : ''}">${svg}<span>${esc(label)}</span><b class="lb-badge hidden"></b></button>`;
@@ -82,6 +88,17 @@ export class LobbyBar {
             <span class="mp-small">1v1</span><span class="mp-big">Duel</span><span class="mp-sub">Matched by rating</span>
           </button>
         </div>
+        ${
+          friends
+            ? `<div class="mp-col friends">
+          <div class="mp-head">${icon('fighters')}Friends</div>
+          <button class="mp-card friends" id="mp-friends">
+            <img src="${sakura}" alt="" draggable="false">
+            <span class="mp-small">Private</span><span class="mp-big">Lobby</span><span class="mp-sub">Play friends with a code</span>
+          </button>
+        </div>`
+            : ''
+        }
       </div>`;
     this.el = wrap.firstElementChild as HTMLElement;
     this.panel = wrap.lastElementChild as HTMLElement;
@@ -114,6 +131,10 @@ export class LobbyBar {
     this.panel.querySelector('#mp-ranked')!.addEventListener('click', () => {
       this.setPanel(false);
       this.h.onRanked();
+    });
+    this.panel.querySelector('#mp-friends')?.addEventListener('click', () => {
+      this.setPanel(false);
+      this.h.onFriends();
     });
     // a tap on the dim backdrop closes it
     this.panel.addEventListener('click', (e) => {

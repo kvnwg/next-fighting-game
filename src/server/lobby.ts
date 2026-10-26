@@ -3,7 +3,7 @@
  * anyone. There's a training yard with a passive dummy and a sparring dummy that swings back, and
  * dueling rings: challenge someone while you both stand in one and the ring seals around the two of
  * you, so nobody else can get in or land a blow until it's settled. The server runs as many lobbies
- * as it needs, LOBBY_CAP players each.
+ * as it needs, LOBBY_CAP players each, and private ones that friends join by a code.
  */
 import { CHARACTER_IDS, CharacterId } from '../shared/characters';
 import { COMBAT, INTEREST, LOBBY_CAP, PLAYER_RADIUS, RING_DUEL } from '../shared/config';
@@ -36,11 +36,12 @@ export class Lobby extends Instance {
   /** ring duel losers, waiting to get back up where they fell */
   private downedInRing = new Set<ServerFighter>();
 
-  /** `n`: this lobby's number, from 1 */
+  /** `n`: this lobby's number, from 1 (0 for a private one); `code`: a private lobby's, to join it by */
   constructor(
     game: Game,
     roamers = 0,
     readonly n = 1,
+    readonly code: string | null = null,
   ) {
     super(game, LOBBY_MAP);
     this.interest = INTEREST.near;
@@ -184,7 +185,7 @@ export class Lobby extends Instance {
   }
 
   private sendInfo(): void {
-    this.broadcast({ t: 'lobby', n: this.n, count: this.players.size, cap: LOBBY_CAP });
+    this.broadcast({ t: 'lobby', n: this.n, count: this.players.size, cap: LOBBY_CAP, ...(this.code ? { code: this.code } : {}) });
   }
 
   // ------------------------------------------------------------------ dueling rings

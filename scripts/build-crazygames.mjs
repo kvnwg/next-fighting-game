@@ -1,8 +1,11 @@
-// Builds the single-player game for CrazyGames (dist/crazygames, zipped to dist/crazygames.zip):
-// the game server runs in the page, everything is bundled with relative paths (CrazyGames serves
-// the game from its own CDN inside an iframe), and the CrazyGames SDK v3 is loaded in the head,
-// before the game code, as their docs ask. Off CrazyGames the SDK stays inert.
-// Usage: node scripts/build-crazygames.mjs
+// Builds the game for CrazyGames (dist/crazygames, zipped to dist/crazygames.zip). It plays online,
+// against the game server deployed to Fly.io (see fly.toml and docs/crazygames.md): the server's
+// address comes from DEFLECT_SERVER (wss://…/ws) or else the app named in fly.toml. Everything is
+// bundled with relative paths (CrazyGames serves the game from its own CDN inside an iframe), and
+// the CrazyGames SDK v3 is loaded in the head, before the game code, as their docs ask. Off
+// CrazyGames the SDK stays inert.
+// Usage: node scripts/build-crazygames.mjs            (online)
+//        node scripts/build-crazygames.mjs --offline  (single player: the server runs in the page)
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,7 +14,23 @@ import { build } from 'vite';
 const outDir = path.resolve('dist/crazygames');
 const SDK = '<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>';
 
-process.env.VITE_OFFLINE = '1';
+if (process.argv.includes('--offline')) {
+  process.env.VITE_OFFLINE = '1';
+  console.log('single player: the game server runs in the page');
+} else {
+  let server = process.env.DEFLECT_SERVER;
+  if (!server && fs.existsSync('fly.toml')) {
+    const app = /^app\s*=\s*['"]([^'"]+)['"]/m.exec(fs.readFileSync('fly.toml', 'utf8'))?.[1];
+    if (app) server = `wss://${app}.fly.dev/ws`;
+  }
+  // (ws:// only to try a local server: a page on https, as on CrazyGames, can't open one)
+  if (!server || !/^wss?:\/\//.test(server)) {
+    console.error('No game server: set DEFLECT_SERVER=wss://<your-app>.fly.dev/ws (or the app name in fly.toml), or build with --offline.');
+    process.exit(1);
+  }
+  process.env.VITE_SERVER_URL = server;
+  console.log(`online: the game connects to ${server}`);
+}
 await build({
   configFile: false,
   root: process.cwd(),

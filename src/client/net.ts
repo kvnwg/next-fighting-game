@@ -35,13 +35,21 @@ export class Net {
     return new Promise((resolve, reject) => {
       const ws: SocketLike = typeof target === 'string' ? (new WebSocket(target) as unknown as SocketLike) : target();
       this.ws = ws;
+      // a server that never answers (asleep, blocked) would otherwise hang here
+      const timeout = setTimeout(() => {
+        if (this.connected) return;
+        reject(new Error('Could not reach the game server.'));
+        ws.close();
+      }, 12_000);
       ws.onopen = () => {
+        clearTimeout(timeout);
         this.connected = true;
         this.ping();
         this.pingTimer = window.setInterval(() => this.ping(), 1000);
         resolve();
       };
       ws.onerror = () => {
+        clearTimeout(timeout);
         if (!this.connected) reject(new Error('Could not reach the game server.'));
       };
       ws.onclose = (e) => {

@@ -75,6 +75,9 @@ interface SpearFlight {
   lastTip: THREE.Vector3 | null;
 }
 
+/** where the game server is, when the page isn't served by it (the CrazyGames build) */
+const SERVER_URL: string = import.meta.env.VITE_SERVER_URL ?? '';
+
 export function startApp(root: HTMLElement, offline = false): void {
   new App(root, offline);
 }
@@ -136,9 +139,11 @@ class App {
   private titleScene: TitleScene | null = null;
   private titleScreen: TitleScreen | null = null;
   /** which lobby we're in and how full it is */
-  private lobbyInfo: { n: number; count: number; cap: number } | null = null;
+  private lobbyInfo: { n: number; count: number; cap: number; code?: string } | null = null;
   /** the tutorial is still to come for this player (it starts once the lobby is up) */
   private tutorialDue = false;
+  /** a friend's private lobby to join as soon as we're in (from an invite link) */
+  private inviteRoom: string | null = null;
   /** the tutorial's lessons drawn over the fight, while it runs */
   private tutorial: TutorialOverlay | null = null;
   private tutorialStep: string | null = null;
@@ -211,6 +216,8 @@ class App {
         return ok;
       },
       onTutorial: () => this.net.send({ t: 'tutorial', a: 'start' }),
+      onRoom: (a, code) => this.net.send(a === 'join' ? { t: 'room', a, code: code ?? '' } : { t: 'room', a }),
+      inviteLink: (code) => platform.inviteLink(code),
     }, offline, touch);
     // a soft tick as a real pointer finds a button
     root.addEventListener('pointerover', (e) => {
@@ -253,7 +260,17 @@ class App {
     requestAnimationFrame(() => platform.loadingStop());
     audio.setMuted('platform', platform.settings.muteAudio);
     audio.setListener(this.renderer.camera);
-    platform.onSettingsChange((p) => audio.setMuted('platform', p.muteAudio));
+    platform.onSettingsChange((p) => {
+      audio.setMuted('platform', p.muteAudio);
+      this.ui.setChatDisabled(p.disableChat);
+    });
+    this.ui.setChatDisabled(platform.settings.disableChat);
+    // opened from a friend's invite: straight into their private lobby once in (or now, if already in)
+    this.inviteRoom = platform.inviteRoom();
+    platform.onInvite((room) => {
+      if (this.myId) this.net.send({ t: 'room', a: 'join', code: room });
+      else this.inviteRoom = room;
+    });
     // a signed-in CrazyGames player gets their name filled in
     if (!settings.name) void platform.username().then((name) => name && this.titleScreen?.setName(name));
     // dev builds: reach the app from the console / screenshot scripts
@@ -320,10 +337,12 @@ class App {
         const { connectOffline } = await import('./offline');
         await this.net.connect(connectOffline);
       } else {
-        await this.net.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+        // the CrazyGames build talks to the game server (VITE_SERVER_URL); served by it, to its own host
+        await this.net.connect(SERVER_URL || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
       }
     } catch (e) {
-      screen.failed(`${(e as Error).message}${this.offline ? '' : ' Is the server running? (npm run dev)'}`);
+      const hint = this.offline ? '' : SERVER_URL ? ' Check your connection and try again.' : ' Is the server running? (npm run dev)';
+      screen.failed(`${(e as Error).message}${hint}`);
       return;
     }
     // hold the game back until the welcome has played out
@@ -375,7 +394,12 @@ class App {
       }
       saveSettings();
       // a first visit starts with the tutorial, once the lobby is up
-      this.tutorialDue = !m.profile.tutorial;
+      // (unless you came to play a friend: the tutorial waits for another visit, or the Help page)
+      this.tutorialDue = !m.profile.tutorial && !this.inviteRoom;
+      if (this.inviteRoom) {
+        this.net.send({ t: 'room', a: 'join', code: this.inviteRoom });
+        this.inviteRoom = null;
+      }
       this.profile = m.profile;
       this.online = m.online;
       this.ui.setProfile(m.profile);
@@ -460,7 +484,10 @@ class App {
       this.ui.showLeaderboard(m.entries, m.you, m.total, this.profile);
       this.mapView?.setLeaderboard(m.entries);
     });
-    n.on('lobby', (m) => (this.lobbyInfo = m));
+    n.on('lobby', (m) => {
+      this.lobbyInfo = m;
+      this.ui.setRoom(m.code ?? null);
+    });
     n.on('rings', (m) => this.onRings(m.r));
     n.on('challenge', (m) => {
       this.ui.showChallenge(m.from, m.name, m.char, m.ring !== undefined);

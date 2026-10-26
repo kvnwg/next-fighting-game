@@ -1149,6 +1149,9 @@ h4.ih .pi { width: 20px; height: 20px; }
 .mp-card:hover { transform: translateY(-4px); }
 .mp-card img { position: absolute; inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); object-fit: cover; filter: saturate(0.8) brightness(0.8); pointer-events: none; }
 .mp-card.ranked img { filter: sepia(0.5) hue-rotate(-30deg) saturate(1.6) brightness(0.65); }
+.mp-col.friends .mp-head { color: #ffb3c8; }
+.mp-card.friends { box-shadow: inset 0 0 0 3px #ff9fbd, 0 10px 30px rgba(0, 0, 0, 0.55); }
+.mp-card.friends .mp-small, .mp-card.friends .mp-big { color: #ffd0de; }
 .mp-card::before { content: ''; position: absolute; z-index: 1; inset: auto 3px 3px; height: 50%; background: rgba(0, 0, 0, 0.35); pointer-events: none; }
 .mp-card::after { content: ''; position: absolute; inset: auto 3px 3px; height: 36%; background: rgba(0, 0, 0, 0.5); pointer-events: none; }
 .mp-small, .mp-big, .mp-sub { position: absolute; left: 0; right: 0; z-index: 1; text-align: center; font-family: var(--display, var(--ui)); color: #f3e7b8; text-shadow: 0 2px 6px #000; }
@@ -1432,3 +1435,15 @@ html.sideways #app { inset: auto; top: 0; left: 0; width: var(--sh); height: var
 }
 /* touch: the bottom-right corner is the attack buttons; skip sits under the opponent's card */
 .touch .tut-skip { top: calc(118px + var(--hud-top)); bottom: auto; }
+
+/* play with friends: the private lobby's code, or opening and joining one */
+.fr { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 4px 4px 8px; text-align: center; }
+.fr .muted { max-width: 420px; margin: 0; }
+.fr-code { display: flex; gap: 8px; }
+.fr-code span { display: grid; place-items: center; width: 52px; height: 64px; background: rgba(0, 0, 0, 0.45); box-shadow: inset 0 0 0 2px #ff9fbd; font-family: var(--display, var(--ui)); font-size: 38px; font-weight: 700; color: #fff; -webkit-user-select: text; user-select: text; }
+.fr-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.fr-or { font-size: 13px; color: rgba(255, 255, 255, 0.6); text-transform: uppercase; letter-spacing: 0.12em; }
+.fr-join { display: flex; gap: 8px; }
+.fr-input { width: 150px; padding: 10px 12px; border: none; background: rgba(0, 0, 0, 0.45); box-shadow: inset 0 0 0 2px var(--line-hi, #666); color: #fff; font-family: var(--display, var(--ui)); font-size: 24px; letter-spacing: 0.25em; text-align: center; text-transform: uppercase; }
+.fr-input:focus { outline: none; box-shadow: inset 0 0 0 2px #ff9fbd; }
+#ui.chat-off .chat-row { display: none; }

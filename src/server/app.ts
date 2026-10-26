@@ -28,6 +28,8 @@ export interface ServerOptions {
   /** How long the map and fighter select stays open before a match (ms; tests shorten it). */
   selectTime?: number;
   introTime?: number;
+  /** wandering computer-run fighters in each public lobby (none by default: tests) */
+  roamers?: number;
 }
 
 export interface RunningServer {
@@ -84,7 +86,7 @@ function staticHandler(dir: string | undefined): http.RequestListener {
 
 export function startServer(opts: ServerOptions): Promise<RunningServer> {
   const store = new Store(opts.dataFile ? fileStore(opts.dataFile) : null);
-  const game = new Game(store, undefined, { selectTime: opts.selectTime, introTime: opts.introTime });
+  const game = new Game(store, undefined, { selectTime: opts.selectTime, introTime: opts.introTime, roamers: opts.roamers });
   const server = http.createServer(staticHandler(opts.staticDir));
   const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 });
 

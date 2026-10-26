@@ -5,6 +5,7 @@ import { ARENA_MAPS, MapDef } from '../shared/maps';
 import { AD_MIN_GAP_MS, AD_REWARD, FREE_PICK_GAMES, MATCH_AD_REWARD, MATCH_AD_WINDOW_MS, MATCH_REWARD, TUTORIAL_REWARD, UnlockRefusal, canUnlockChar, canUnlockMap, freePickReady, sharedMaps } from '../shared/progress';
 import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, SelectView, ServerMsg } from '../shared/protocol';
 import { eloDelta } from '../shared/ranks';
+import { normalizeRoomCode, randomRoomCode } from '../shared/rooms';
 import { Arena, botName } from './arena';
 import { Player, SocketLike } from './entities';
 import { Lobby } from './lobby';
@@ -48,8 +49,13 @@ interface PendingMatch {
 export interface GameOptions {
   /** Single-player mode (runs in the browser): ranked queues are matched against rated AI opponents. */
   offline?: boolean;
-  /** Wandering AI fighters in the lobby. */
+  /** Wandering computer-run fighters in each public lobby. */
   roamers?: number;
+  /**
+   * How long a ranked search waits for another player before it's matched against a rated
+   * computer opponent instead (ms). Offline that's all there is, so it's a moment; online, a while.
+   */
+  rankedFallback?: number;
   /** Always use this arena (dev/testing). */
   arena?: string;
   /** How long the map and fighter select stays open before a match (ms). */
@@ -62,10 +68,12 @@ export interface GameOptions {
 
 /** Coins a test build tops everyone up to. */
 const TEST_COINS = 99_999;
+/** how long an online ranked search waits for a player before a computer opponent (see rankedFallback) */
+const RANKED_FALLBACK_MS = 15_000;
 
 export class Game {
   readonly players = new Map<string, Player>();
-  /** The lobbies, LOBBY_CAP players each; the first one always stays open. */
+  /** The lobbies, LOBBY_CAP players each; the first one always stays open. Private ones have a code. */
   readonly lobbies: Lobby[] = [];
   /** the lobby each player was last in, to go back to after a match */
   private home = new WeakMap<Player, Lobby>();
@@ -100,23 +108,23 @@ export class Game {
   }
 
   /**
-   * Where a player goes: back to `prefer` if there's room, else the busiest lobby with room (so
-   * lobbies stay lively rather than spreading everyone thin), else a new one.
+   * Where a player goes: back to `prefer` if there's room, else the busiest public lobby with room
+   * (so lobbies stay lively rather than spreading everyone thin), else a new one.
    */
   private lobbyFor(prefer?: Lobby): Lobby {
     if (prefer && !prefer.full && this.lobbies.includes(prefer)) return prefer;
     let best: Lobby | null = null;
-    for (const l of this.lobbies) if (!l.full && (!best || l.players.size > best.players.size)) best = l;
+    for (const l of this.lobbies) if (!l.code && !l.full && (!best || l.players.size > best.players.size)) best = l;
     if (best) return best;
     // the lowest free number, so lobbies that emptied out get reused
     let n = 1;
-    while (this.lobbies.some((l) => l.n === n)) n++;
-    const l = new Lobby(this, 0, n);
+    while (this.lobbies.some((l) => !l.code && l.n === n)) n++;
+    const l = new Lobby(this, this.options.roamers ?? 0, n);
     this.lobbies.push(l);
     return l;
   }
 
-  /** Close lobbies that emptied out (players away in a match still count: they come back). */
+  /** Close lobbies that emptied out, private ones too (players away in a match still count: they come back). */
   private closeEmptyLobbies(): void {
     if (this.lobbies.length < 2) return;
     const homes = new Set<Lobby>();
@@ -328,7 +336,7 @@ export class Game {
         const text = sanitizeChat(msg.text);
         if (!text || now - p.lastChatAt < 600) return;
         p.lastChatAt = now;
-        this.broadcastAll({ t: 'chat', name: p.name, text });
+        this.chatFrom(p, { t: 'chat', name: p.name, text });
         break;
       }
       case 'forfeit':
@@ -342,6 +350,9 @@ export class Game {
         break;
       case 'ad':
         this.adReward(p, msg.kind);
+        break;
+      case 'room':
+        this.room(p, msg.a, msg.a === 'join' ? msg.code : undefined);
         break;
       case 'tutorial':
         if (msg.a === 'start') this.startTutorial(p);
@@ -395,18 +406,12 @@ export class Game {
     for (const q of this.queue) q.send({ t: 'queue', mode: 'ranked', since: q.queue!.since, searching: this.queue.length });
   }
 
-  /** Pair queued players with the closest rating; the acceptable gap widens the longer you wait. */
+  /**
+   * Pair queued players with the closest rating; the acceptable gap widens the longer you wait. Nobody
+   * found in time (offline there's nobody to find): a computer opponent rated close to you.
+   */
   matchmake(now: number): void {
-    if (this.options.offline) {
-      // nobody else is here: after a short "search", face an AI rated close to you
-      for (const p of [...this.queue]) {
-        if (now - p.queue!.since < 2500) continue;
-        const rating = Math.max(600, Math.round(p.profile.mmr + (Math.random() - 0.45) * 120));
-        this.beginSelect('ranked', p, null, undefined, rating);
-      }
-      return;
-    }
-    if (this.queue.length >= 2) {
+    if (!this.options.offline && this.queue.length >= 2) {
       const pool = [...this.queue].sort((a, b) => a.profile.mmr - b.profile.mmr);
       const used = new Set<Player>();
       for (let i = 0; i < pool.length; i++) {
@@ -431,6 +436,12 @@ export class Game {
         }
         if (best) this.beginSelect('ranked', a, best);
       }
+    }
+    const fallback = this.options.rankedFallback ?? (this.options.offline ? 2500 : RANKED_FALLBACK_MS);
+    for (const p of [...this.queue]) {
+      if (now - p.queue!.since < fallback) continue;
+      const rating = Math.max(600, Math.round(p.profile.mmr + (Math.random() - 0.45) * 120));
+      this.beginSelect('ranked', p, null, undefined, rating);
     }
     if (now - this.lastQueueBroadcast > 3000) {
       this.lastQueueBroadcast = now;
@@ -543,6 +554,63 @@ export class Game {
       const l = winner === 0 ? pb : pa;
       this.broadcastAll({ t: 'chat', name: '', text: `${w.name} defeated ${l.name} in a ranked duel.`, sys: true });
     }
+  }
+
+  // ------------------------------------------------------------------ private lobbies
+
+  /** Open a private lobby, join one by its code, or go back to the public grounds. */
+  private room(p: Player, a: unknown, code: unknown): void {
+    const here = p.instance;
+    if (!(here instanceof Lobby) || here.inDuel(p) || this.selecting.has(p)) {
+      p.send({ t: 'notice', text: 'Finish your match first.', kind: 'warn' });
+      return;
+    }
+    if (a === 'create') {
+      let c = randomRoomCode();
+      while (this.lobbies.some((l) => l.code === c)) c = randomRoomCode();
+      // no wanderers in there: it's for the friends you bring
+      const l = new Lobby(this, 0, 0, c);
+      this.lobbies.push(l);
+      this.moveTo(p, l);
+      p.send({ t: 'notice', text: `Private lobby ${c} is open. Send your friends the code.`, kind: 'good' });
+    } else if (a === 'join') {
+      const c = normalizeRoomCode(code);
+      const l = c ? this.lobbies.find((x) => x.code === c) : undefined;
+      if (!l) return p.send({ t: 'notice', text: c ? `No lobby with the code ${c}. Check it with your friend.` : 'That isn\'t a lobby code.', kind: 'warn' });
+      if (l === here) return;
+      if (l.full) return p.send({ t: 'notice', text: `Lobby ${l.code} is full.`, kind: 'warn' });
+      this.moveTo(p, l);
+      this.broadcastTo(l, { t: 'chat', name: '', text: `${p.name} joined the lobby.`, sys: true });
+    } else if (a === 'leave') {
+      if (!here.code) return;
+      this.home.delete(p);
+      this.moveTo(p, this.lobbyFor());
+    }
+  }
+
+  /** From one lobby to another (it becomes the one to come back to after a match). */
+  private moveTo(p: Player, l: Lobby): void {
+    this.unqueue(p);
+    this.challenges.delete(p.id);
+    p.instance?.removePlayer(p);
+    this.home.set(p, l);
+    l.addPlayer(p, l.spawnPoint());
+    this.closeEmptyLobbies();
+  }
+
+  /** Chat stays among the people of a private lobby (wherever they are, a match included); the public grounds share theirs. */
+  private chatFrom(p: Player, msg: ServerMsg): void {
+    const h = this.home.get(p);
+    const data = JSON.stringify(msg);
+    for (const q of this.players.values()) {
+      const qh = this.home.get(q);
+      if (h?.code ? qh === h : !qh?.code) q.sendRaw(data);
+    }
+  }
+
+  private broadcastTo(l: Lobby, msg: ServerMsg): void {
+    const data = JSON.stringify(msg);
+    for (const p of l.players) p.sendRaw(data);
   }
 
   // ------------------------------------------------------------------ coins, unlocks and the tutorial

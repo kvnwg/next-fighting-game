@@ -12,6 +12,7 @@ import { LORE, readingMinutes } from './lore';
 import { FREE_PICK_GAMES, MAP_PRICE, AD_REWARD, MATCH_AD_REWARD, charPrice, freePickReady, gamesToFreePick, isPremium, reachedGold } from '../shared/progress';
 import { THUMBS } from './select';
 import { matchAdExpected } from './adbreak';
+import { normalizeRoomCode } from '../shared/rooms';
 
 const h = (html: string): HTMLElement => {
   const t = document.createElement('template');
@@ -73,9 +74,13 @@ export interface UIHandlers {
   onWatchAd(kind: 'bonus'): Promise<boolean>;
   /** play the tutorial (again) */
   onTutorial(): void;
+  /** a private lobby: open one, join one by its code, or leave yours */
+  onRoom(a: 'create' | 'join' | 'leave', code?: string): void;
+  /** the link that brings a friend into a private lobby */
+  inviteLink(code: string): string;
 }
 
-export type ModalKind = 'chars' | 'ladder' | 'help' | 'shop';
+export type ModalKind = 'chars' | 'ladder' | 'help' | 'shop' | 'friends';
 
 /** Coins as written: 1,250. */
 const coinText = (n: number): string => Math.max(0, Math.floor(n)).toLocaleString('en-US');
@@ -262,8 +267,9 @@ export class UI {
         this.openModal('help');
         this.modal.querySelector('.settings')?.scrollIntoView({ block: 'center' });
       },
+      onFriends: () => this.toggleModal('friends'),
       portrait: (id) => this.handlers.portrait(id),
-    });
+    }, !offline);
     this.lobbyBar.setChar(settings.char);
     this.modal = h(`<div class="modal hidden"></div>`);
     this.root.appendChild(this.modal);
@@ -390,10 +396,11 @@ export class UI {
   }
 
   /** Small, dim connection line: players online, round-trip time, fps. */
-  setNetInfo(online: number, rtt: number | null, fps: number | null, lobby: { n: number; count: number; cap: number } | null = null): void {
+  setNetInfo(online: number, rtt: number | null, fps: number | null, lobby: { n: number; count: number; cap: number; code?: string } | null = null): void {
     const parts = [this.offline ? 'Single player' : `${online} online`];
-    // which lobby you're in, once there's more than one
-    if (lobby && !this.offline && online > lobby.count) parts.unshift(`Grounds ${lobby.n} · ${lobby.count}/${lobby.cap}`);
+    // which lobby you're in: a private one by its code, a public one once there's more than one
+    if (lobby?.code) parts.unshift(`Private lobby ${lobby.code} · ${lobby.count}/${lobby.cap}`);
+    else if (lobby && !this.offline && online > lobby.count) parts.unshift(`Grounds ${lobby.n} · ${lobby.count}/${lobby.cap}`);
     if (rtt !== null) parts.push(`${rtt}ms`);
     this.setText(this.els.online, parts.join(' · '));
     this.setText(this.els.fps, fps !== null ? ` · ${fps} fps` : '');
@@ -740,7 +747,17 @@ export class UI {
 
   // ------------------------------------------------------------------ chat
 
+  /** CrazyGames' setting: no chat from other players (the game's own notices still show). */
+  setChatDisabled(on: boolean): void {
+    this.chatOff = on;
+    this.root.classList.toggle('chat-off', on);
+    if (on && this.chatOpen) this.closeChat();
+  }
+
+  private chatOff = false;
+
   chat(name: string, text: string, sys = false): void {
+    if (this.chatOff && !sys) return;
     const el = h(`<div class="chat-line ${sys ? 'sys' : ''}">${sys ? '' : `<b>${esc(name)}:</b> `}${esc(text)}</div>`);
     this.chatLog.appendChild(el);
     while (this.chatLog.children.length > 40) this.chatLog.firstElementChild!.remove();
@@ -750,6 +767,7 @@ export class UI {
   }
 
   openChat(): void {
+    if (this.chatOff) return;
     this.chatOpen = true;
     this.chatInput.classList.remove('hidden');
     this.chatLog.classList.add('open');
@@ -916,10 +934,76 @@ export class UI {
     this.handlers.onModalChange(true);
     if (kind === 'chars') this.renderChars(currentChar);
     else if (kind === 'shop') this.renderShop();
+    else if (kind === 'friends') this.renderFriends();
     else if (kind === 'ladder') {
       this.frame('Ranked Ladder', `<div class="ladder">Loading…</div>`, false, '番付', 'ladder');
       this.handlers.onLeaderboard();
     } else this.renderHelp();
+  }
+
+  /** The private lobby you're in (its code), or null on the public grounds. */
+  setRoom(code: string | null): void {
+    if (code === this.room) return;
+    this.room = code;
+    if (this.modalOpen === 'friends') this.renderFriends();
+  }
+
+  private room: string | null = null;
+
+  /**
+   * Friends: open a private lobby and share its code or link, or join one with a friend's code. In
+   * one, the code to pass on, the link to copy, and the way back to the public grounds.
+   */
+  private renderFriends(): void {
+    const code = this.room;
+    const body = code
+      ? `<div class="fr">
+          <p class="muted">Friends who type this code, or open your invite link, join you here. Challenge each other with <span class="key">G</span>, or both stand in a ring and challenge for a duel there.</p>
+          <div class="fr-code" aria-label="Lobby code">${[...code].map((c) => `<span>${esc(c)}</span>`).join('')}</div>
+          <div class="fr-row">
+            <button class="btn" id="fr-link">${icon('chain')}Copy invite link</button>
+            <button class="btn" id="fr-copy">${icon('scroll')}Copy code</button>
+          </div>
+          <button class="btn small danger" id="fr-leave">${icon('back')}Back to the public grounds</button>
+        </div>`
+      : `<div class="fr">
+          <p class="muted">A lobby just for you and your friends: open one and send them the code, or join theirs.</p>
+          <button class="btn" id="fr-create">${icon('torii')}Open a private lobby</button>
+          <div class="fr-or">or join one</div>
+          <form class="fr-join" autocomplete="off">
+            <input class="fr-input" maxlength="7" placeholder="CODE" aria-label="Lobby code" spellcheck="false" autocapitalize="characters" />
+            <button class="btn" type="submit">${icon('check')}Join</button>
+          </form>
+        </div>`;
+    this.frame('Play with friends', body, false, '友', 'fighters', 'fr-box');
+    const box = this.modal.querySelector<HTMLElement>('.fr')!;
+    const copy = (text: string, done: string) => {
+      const ok = () => this.toast(done, 'good');
+      // the clipboard can be refused in a frame: show it to copy by hand then
+      const clip = navigator.clipboard;
+      if (!clip) return this.toast(text, 'info');
+      clip.writeText(text).then(ok, () => this.toast(text, 'info'));
+    };
+    if (code) {
+      box.querySelector('#fr-link')!.addEventListener('click', () => copy(this.handlers.inviteLink(code), 'Invite link copied. Send it to your friends.'));
+      box.querySelector('#fr-copy')!.addEventListener('click', () => copy(code, `Code ${code} copied.`));
+      box.querySelector('#fr-leave')!.addEventListener('click', () => {
+        this.handlers.onRoom('leave');
+        this.closeModal();
+      });
+      return;
+    }
+    box.querySelector('#fr-create')!.addEventListener('click', () => this.handlers.onRoom('create'));
+    const input = box.querySelector<HTMLInputElement>('.fr-input')!;
+    input.addEventListener('input', () => (input.value = input.value.toUpperCase()));
+    // typing a code shouldn't move your fighter or open menus
+    input.addEventListener('keydown', (e) => e.stopPropagation());
+    box.querySelector('form')!.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const c = normalizeRoomCode(input.value);
+      if (!c) return this.toast('A lobby code is 5 letters and numbers.', 'warn');
+      this.handlers.onRoom('join', c);
+    });
   }
 
   /**
