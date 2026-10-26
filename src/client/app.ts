@@ -206,6 +206,8 @@ class App {
         const ok = await watchAd();
         // the server pays out (it checks the offer is still good)
         if (ok) this.net.send({ t: 'ad', kind });
+        // never a button that does nothing (no ad served, closed early, an adblocker)
+        else this.ui.toast('No ad to show right now. Try again in a little while.', 'warn');
         return ok;
       },
       onTutorial: () => this.net.send({ t: 'tutorial', a: 'start' }),

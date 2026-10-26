@@ -1104,7 +1104,7 @@ export class UI {
       `<div class="shop">
         <div class="sh-top">
           <div class="sh-purse">${icon('coin')}<b>${coinText(coins)}</b><span>coins</span></div>
-          <button class="sh-ad">${icon('watch')}<span><b>Watch an ad</b><i>+${AD_REWARD} coins · as often as you like</i></span></button>
+          <button class="sh-ad">${icon('watch')}<span><b>Watch an ad</b><i>+${AD_REWARD} coins for a short video</i></span></button>
           <div class="sh-free${p && freePickReady(p) ? ' ready' : ''}"><span class="sh-pips">${pips}</span><span>${esc(freeLine)}</span></div>
         </div>
         ${iconHead('mountain', 'Arenas')}
