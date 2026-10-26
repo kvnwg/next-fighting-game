@@ -1,7 +1,7 @@
 /**
  * The lobby's bottom bar, laid out like the reference: your fighter's portrait beside a big PLAY
  * button, and a row of pixel-art icons under it (Fighters, Shop, Ladder, Help, Settings). PLAY opens
- * the mode panel: Casual practice against a bot of your chosen difficulty, or a Ranked duel; while
+ * the mode panel: a Casual practice duel at your chosen difficulty, or a Ranked duel; while
  * the panel is open PLAY turns into CLOSE, and while you're queued it shows the search and cancels it.
  * The Fighters icon carries the free fighter's progress: a pip per match towards it, then FREE.
  */
@@ -46,7 +46,6 @@ export class LobbyBar {
   constructor(
     parent: HTMLElement,
     private readonly h: LobbyBarHandlers,
-    offline: boolean,
   ) {
     const tile = (id: string, svg: string, label: string, key: string) =>
       `<button class="lb-icon" id="lb-${id}" title="${esc(label)}${key ? ` [${key}]` : ''}">${svg}<span>${esc(label)}</span><b class="lb-badge hidden"></b></button>`;
@@ -73,14 +72,14 @@ export class LobbyBar {
             <span class="mp-diff">
               <i data-diff="easy"><b>${icon('skull')}</b>Easy</i><i data-diff="normal" class="on"><b>${icon('skull')}${icon('skull')}</b>Normal</i><i data-diff="hard"><b>${icon('skull')}${icon('skull')}${icon('skull')}</b>Hard</i>
             </span>
-            <span class="mp-small">1v1</span><span class="mp-big">Practice</span><span class="mp-sub">Unranked, against a bot</span>
+            <span class="mp-small">1v1</span><span class="mp-big">Practice</span><span class="mp-sub">Unranked, pick how tough</span>
           </button>
         </div>
         <div class="mp-col ranked">
           <div class="mp-head">${icon('crown')}Ranked</div>
           <button class="mp-card ranked" id="mp-ranked">
             <img src="${forge}" alt="" draggable="false">
-            <span class="mp-small">1v1</span><span class="mp-big">Duel</span><span class="mp-sub">${offline ? 'Against an AI near your rating' : 'Matched by rating'}</span>
+            <span class="mp-small">1v1</span><span class="mp-big">Duel</span><span class="mp-sub">Matched by rating</span>
           </button>
         </div>
       </div>`;

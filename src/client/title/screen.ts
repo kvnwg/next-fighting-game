@@ -93,7 +93,7 @@ export class TitleScreen {
     this.input = this.el.querySelector<HTMLInputElement>('.ts-input')!;
     this.input.value = o.name.slice(0, 16);
     this.syncField();
-    if (o.offline) this.setStatus('Single player: roam the grounds, spar, practise, and climb ranked against AI. Progress saves in this browser.');
+    if (o.offline) this.setStatus('Roam the grounds, spar, practise, and climb the ranked ladder. Progress saves in this browser.');
 
     this.input.addEventListener('input', () => {
       this.syncField();

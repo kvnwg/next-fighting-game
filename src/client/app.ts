@@ -894,7 +894,7 @@ class App {
     // nobody in a ring duel can take another challenge
     const busy = new Set(this.rings.flatMap((r) => (r.state === 'countdown' || r.state === 'fight' ? [r.a, r.b] : [])));
     for (const f of this.fighters.values()) {
-      if (f === me || f.roster.bot || f.s === 'dead' || busy.has(f.id)) continue;
+      if (f === me || f.roster.dummy || f.s === 'dead' || busy.has(f.id)) continue;
       const d = dist2D(me.pos.x, me.pos.z, f.pos.x, f.pos.z);
       const ang = Math.abs(angleDiff(this.cam.yaw, yawTo(me.pos.x, me.pos.z, f.pos.x, f.pos.z)));
       if (d < bestD && ang < 0.7) {
@@ -1960,7 +1960,7 @@ class App {
     if (!target && this.lastHitTarget && performance.now() < this.lastHitTarget.until) target = this.fighters.get(this.lastHitTarget.id) ?? null;
     if (target) {
       const r = target.roster;
-      const title = r.dummy ? 'Training' : r.mmr !== undefined ? rankOf(r.mmr, r.placements ?? 0).label : r.bot ? 'AI' : '';
+      const title = r.dummy ? 'Training' : r.mmr !== undefined ? rankOf(r.mmr, r.placements ?? 0).label : '';
       const inMatch = !!m && m.players.some((p) => p.id === target!.id);
       this.ui.setCard('opp', {
         name: r.name,
@@ -2004,7 +2004,7 @@ class App {
         continue;
       }
       const r = f.roster;
-      const color = r.dummy ? '#c9b8a0' : r.bot ? '#a0c8ff' : r.mmr !== undefined ? rankOf(r.mmr, r.placements ?? 0).color : '#ffffff';
+      const color = r.dummy ? '#c9b8a0' : r.mmr !== undefined ? rankOf(r.mmr, r.placements ?? 0).color : '#ffffff';
       this.ui.plate(f.id, true, p.x, p.y, r.name, f.hp / f.char.stats.hp, color, f.char.name, f.po / f.char.stats.posture);
     }
 

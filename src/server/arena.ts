@@ -8,16 +8,13 @@ import { Player, ServerFighter } from './entities';
 import type { Game } from './game';
 import { Instance } from './instance';
 import { TutorialCoach } from './tutorial';
+import { playerName, playerRating } from '../shared/names';
 
 let botCounter = 0;
 
-/** Names for rated AI opponents (placeholders, like the rest of the cast). */
-const AI_NAMES = ['Kestrel', 'Marlo', 'Sable', 'Wren', 'Ivo', 'Tamsin', 'Kael', 'Juno', 'Orrin', 'Pell', 'Rook', 'Vesna'];
-
-/** What an AI opponent is called: a name for a rated one, its difficulty otherwise. */
-export function botName(diff: BotDifficulty, botRating?: number): string {
-  if (botRating !== undefined) return `${AI_NAMES[Math.floor(Math.random() * AI_NAMES.length)]} (AI)`;
-  return `${diff[0].toUpperCase() + diff.slice(1)} Bot`;
+/** What a computer-run opponent is called: like any other player (nothing says it isn't one). */
+export function botName(): string {
+  return playerName();
 }
 
 export class Arena extends Instance {
@@ -55,12 +52,13 @@ export class Arena extends Instance {
     if (!b) {
       // create the bot first so it is part of the human's initial roster
       const char = bot?.char ?? CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)];
-      const name = bot?.name ?? botName(diff, botRating);
+      const name = bot?.name ?? botName();
       fb = new ServerFighter(`bot-${++botCounter}`, name, char);
       fb.x = s1.x;
       fb.z = s1.z;
       fb.yaw = s1.yaw;
-      fb.rating = botRating;
+      // a rating on its card like anyone's (the real one when the match is rated)
+      fb.rating = botRating ?? playerRating();
       fb.brain = new BotBrain(fb, 'duel', botRating !== undefined ? botProfileForRating(botRating) : BOT_PROFILES[diff]);
       this.addFighter(fb);
     }

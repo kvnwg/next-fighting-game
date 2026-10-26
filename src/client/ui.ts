@@ -193,7 +193,7 @@ export class UI {
           <div class="net-info"><span id="online"></span><span id="fps"></span></div>
         </div>
         <div class="side-menu">
-          <button class="btn ranked" id="btn-ranked">${jpLabel('段位戦', offline ? 'Ranked vs AI' : 'Ranked')}<span class="key"> [K]</span></button>
+          <button class="btn ranked" id="btn-ranked">${jpLabel('段位戦', 'Ranked')}<span class="key"> [K]</span></button>
           <div class="practice-group">
             <button class="btn" id="btn-practice">${jpLabel('稽古', 'Practice')}<span class="key"> [P]</span></button>
             <select id="practice-diff" aria-label="Bot difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
@@ -262,7 +262,7 @@ export class UI {
         this.modal.querySelector('.settings')?.scrollIntoView({ block: 'center' });
       },
       portrait: (id) => this.handlers.portrait(id),
-    }, offline);
+    });
     this.lobbyBar.setChar(settings.char);
     this.modal = h(`<div class="modal hidden"></div>`);
     this.root.appendChild(this.modal);
@@ -1148,7 +1148,7 @@ export class UI {
       <div class="tiers">${tiers}</div>
       <p class="muted">${
         this.offline
-          ? 'Single player: you climb by beating AI opponents matched to your rating, and your record is saved in this browser. Run the game server to play ranked against other people.'
+          ? `Ranked is best of 3 rounds against an opponent near your rating. Ratings use Elo (K=32, 64 during your ${PLACEMENT_MATCHES} placement matches), and your record is saved in this browser.`
           : `Ranked is best of 3 rounds on a random map. Ratings use Elo (K=32, 64 during your ${PLACEMENT_MATCHES} placement matches). Leaving a ranked match counts as a loss.`
       }</p>`;
   }
@@ -1191,7 +1191,7 @@ export class UI {
               <tr><td>Tab / Q / MMB</td><td>Lock on</td></tr>
               <tr><td>G</td><td>Challenge the player you're looking at</td></tr>
               <tr><td>M</td><td>Play menu (frees the cursor to click it)</td></tr>
-              <tr><td>K · P</td><td>Queue ranked · Practice vs bot</td></tr>
+              <tr><td>K · P</td><td>Queue ranked · Practice duel</td></tr>
               <tr><td>C · L · H</td><td>Characters · Ladder · Help</td></tr>
               <tr><td>Esc</td><td>Free the cursor (to click menus)</td></tr>
               <tr><td>Enter</td><td>Chat</td></tr>
@@ -1265,7 +1265,7 @@ export class UI {
     const titleJp = mode === 'ranked' ? '段位戦' : mode === 'practice' ? '稽古' : '決闘';
     const card = (r: RosterEntry, mine: boolean) => {
       const c = CHARACTERS[r.char];
-      const rank = r.mmr !== undefined ? rankBadge(rankOf(r.mmr, r.placements ?? 0), true) : '<span class="muted">AI</span>';
+      const rank = r.mmr !== undefined ? rankBadge(rankOf(r.mmr, r.placements ?? 0), true) : '';
       return `<div class="vs-card ${mine ? 'mine' : ''}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}"><span class="vs-jp" aria-hidden="true">${c.jp}</span><span class="vs-port"><img src="${this.handlers.portrait(r.char)}" alt=""></span><div class="vs-char">${c.name}</div><div class="vs-weapon">${c.weapon}</div><div class="vs-name">${esc(r.name)}</div>${rank}</div>`;
     };
     const modeIcon: IconName = mode === 'ranked' ? 'crown' : mode === 'practice' ? 'dummy' : 'swords';

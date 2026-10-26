@@ -14,6 +14,7 @@ import { BOT_PROFILES, BotBrain } from './bot';
 import { Player, ServerFighter } from './entities';
 import type { Game } from './game';
 import { Instance } from './instance';
+import { playerName, playerRating } from '../shared/names';
 
 const RINGS = LOBBY_MAP.rings ?? [];
 
@@ -27,8 +28,6 @@ interface RingDuel {
   winner?: ServerFighter | null;
 }
 
-/** Placeholder names for wandering AI fighters. */
-const ROAMER_NAMES = ['Ash', 'Brannoc', 'Cinder', 'Dace', 'Elka', 'Fen', 'Garrow', 'Hollis'];
 
 export class Lobby extends Instance {
   readonly kind = 'lobby' as const;
@@ -47,7 +46,9 @@ export class Lobby extends Instance {
     this.interest = INTEREST.near;
     for (let i = 0; i < roamers; i++) {
       const char = CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)];
-      const f = new ServerFighter(`roamer-${i}`, `${ROAMER_NAMES[i % ROAMER_NAMES.length]} (AI)`, char);
+      // the wanderers pass as players: a name and a rating like anyone's
+      const f = new ServerFighter(`roamer-${i}`, playerName([...this.fighters.values()].map((o) => o.name)), char);
+      f.rating = playerRating();
       const s = this.roamerSpawn();
       f.x = s.x;
       f.z = s.z;

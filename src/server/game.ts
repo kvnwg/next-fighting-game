@@ -71,6 +71,8 @@ export class Game {
   private home = new WeakMap<Player, Lobby>();
   readonly arenas = new Set<Arena>();
   private queue: Player[] = [];
+  /** challenges to the lobby's wanderers, waiting on their answer */
+  private answers: { p: Player; name: string; char: CharacterId; at: number; accept: boolean }[] = [];
   /** pending challenges keyed by the challenged player's id (ring: fought in that lobby ring) */
   private challenges = new Map<string, { from: string; expires: number; ring: number }>();
   /** Matches waiting on the map and fighter select, by player. */
@@ -150,6 +152,7 @@ export class Game {
 
   tick(): void {
     const now = this.now();
+    if (this.answers.length) this.answerChallenges(now);
     // one broken instance must never take the whole server down
     for (const inst of [...this.lobbies, ...this.arenas]) {
       try {
@@ -609,7 +612,8 @@ export class Game {
   private challenge(p: Player, targetId: unknown): void {
     if (typeof targetId !== 'string') return;
     const target = this.players.get(targetId);
-    if (!target || target === p) return;
+    if (!target) return this.challengeWanderer(p, targetId);
+    if (target === p) return;
     const lobby = p.instance;
     if (!(lobby instanceof Lobby) || target.instance !== lobby || lobby.inDuel(p) || lobby.inDuel(target) || this.selecting.has(p) || this.selecting.has(target)) {
       p.send({ t: 'notice', text: `${target.name} is busy right now.`, kind: 'warn' });
@@ -623,6 +627,33 @@ export class Game {
     this.challenges.set(target.id, { from: p.id, expires, ring });
     target.send({ t: 'challenge', from: p.id, name: p.name, char: p.charId, expires, ...(ring >= 0 ? { ring } : {}) });
     p.send({ t: 'notice', text: ring >= 0 ? `Challenge sent to ${target.name}: a duel here in the ring.` : `Challenge sent to ${target.name}.`, kind: 'info' });
+  }
+
+  /**
+   * A challenge to one of the lobby's wanderers. It answers the way a player would: after a
+   * moment's thought, usually yes (a match against it, under its name and with its fighter).
+   */
+  private challengeWanderer(p: Player, id: string): void {
+    const lobby = p.instance;
+    if (!(lobby instanceof Lobby) || lobby.inDuel(p) || this.selecting.has(p)) return;
+    const f = lobby.fighters.get(id);
+    if (!f || f.owner || f.dummy || !f.isAlive() || this.answers.some((a) => a.p === p)) return;
+    this.answers.push({ p, name: f.name, char: f.char.id, at: this.now() + 1500 + Math.random() * 2500, accept: Math.random() < 0.8 });
+    p.send({ t: 'notice', text: `Challenge sent to ${f.name}.`, kind: 'info' });
+  }
+
+  /** The wanderers' answers, once they've thought it over. */
+  private answerChallenges(now: number): void {
+    for (const a of this.answers.filter((x) => now >= x.at)) {
+      this.answers.splice(this.answers.indexOf(a), 1);
+      const p = a.p;
+      if (p.closed || !(p.instance instanceof Lobby) || p.instance.inDuel(p) || this.selecting.has(p)) continue;
+      if (!a.accept) {
+        p.send({ t: 'notice', text: `${a.name} declined your challenge.`, kind: 'info' });
+        continue;
+      }
+      this.beginSelect('casual', p, null, 'normal', undefined, { name: a.name, char: a.char });
+    }
   }
 
   private challengeReply(p: Player, from: unknown, accept: boolean): void {
@@ -656,7 +687,8 @@ export class Game {
   // ------------------------------------------------------------------ map and fighter select
 
   /** Open the map and fighter select for a match; it starts when the vote closes. */
-  beginSelect(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, botRating?: number): void {
+  /** `as`: the computer-run opponent's name and fighter, when it's someone already met (a lobby wanderer). */
+  beginSelect(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, botRating?: number, as?: { name: string; char: CharacterId }): void {
     for (const p of [a, b]) {
       if (!p) continue;
       this.unqueue(p);
@@ -669,7 +701,7 @@ export class Game {
       players: [a, b],
       diff,
       botRating,
-      bot: b ? null : { char: CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)], name: botName(diff ?? 'normal', botRating), voteAt: now + 1200 + Math.random() * 2200 },
+      bot: b ? null : { char: as?.char ?? CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)], name: as?.name ?? botName(), voteAt: now + 1200 + Math.random() * 2200 },
       endsAt: now + (this.options.selectTime ?? MATCH.selectTime),
       // an arena either of you owns can be fought in
       maps: fixed ? [fixed.id] : sharedMaps(ARENA_MAPS.map((m) => m.id), a.profile, b?.profile),
