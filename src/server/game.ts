@@ -325,7 +325,8 @@ export class Game {
     p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.online, serverTime: this.now() });
     this.enterLobby(p);
     this.broadcastAll({ t: 'online', n: this.online });
-    this.broadcastAll({ t: 'chat', name: '', text: `${p.name} entered the grounds.`, sys: true });
+    // (to the public grounds' chat: a private lobby's stays among its own people)
+    this.chatFrom(p, { t: 'chat', name: '', text: `${p.name} entered the grounds.`, sys: true });
     return p;
   }
 

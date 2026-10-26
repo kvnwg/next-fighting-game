@@ -75,6 +75,10 @@ describe('private lobbies', () => {
     a.send({ t: 'chat', text: 'ready?' });
     expect(b.last('chat')!.text).toBe('ready?');
     expect(c.inbox.slice(before).some((m) => m.t === 'chat' && m.text === 'ready?')).toBe(false);
+    // nor does the public grounds' chatter come in
+    const d = join('Newcomer');
+    expect(c.last('chat')!.text).toBe(`${d.p.name} entered the grounds.`);
+    expect(b.last('chat')!.text).toBe('ready?');
 
     // a casual challenge between them, and after the match they're back in the private lobby
     a.send({ t: 'challenge', target: b.p.id });
