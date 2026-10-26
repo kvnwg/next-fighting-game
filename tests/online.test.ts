@@ -73,6 +73,23 @@ describe('dropped connections', () => {
   });
 });
 
+describe('challenges', () => {
+  it('a challenge from someone who left is off, even once they are back', () => {
+    const { game, join } = harness();
+    const a = join('Leaver');
+    const b = join('Stayer');
+    a.send({ t: 'challenge', target: b.p.id });
+    expect(b.last('challenge')!.from).toBe(a.p.id);
+    a.leave();
+    const back = join('Leaver', a.token);
+    b.send({ t: 'challengeReply', from: a.p.id, accept: true });
+    expect(back.last('select')).toBeUndefined();
+    expect(b.last('select')).toBeUndefined();
+    expect(b.last('notice')!.text).toMatch(/no longer available/);
+    expect((game as unknown as { challenges: Map<string, unknown> }).challenges.size).toBe(0);
+  });
+});
+
 describe('server robustness', () => {
   it('a match that fails to start calls the select off instead of throwing out of the tick', () => {
     const { game, step, join } = harness();

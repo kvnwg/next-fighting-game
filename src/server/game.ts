@@ -333,7 +333,8 @@ export class Game {
     p.closed = true;
     this.cancelSelect(p, `${p.name} left.`);
     this.unqueue(p);
-    this.challenges.delete(p.id);
+    // challenges to them, and the ones they sent (which would otherwise still stand if they came back)
+    for (const [target, c] of this.challenges) if (target === p.id || c.from === p.id) this.challenges.delete(target);
     const inst = p.instance;
     if (inst instanceof Arena) inst.forfeit(p);
     inst?.removePlayer(p);
@@ -777,10 +778,14 @@ export class Game {
 
   private challengeReply(p: Player, from: unknown, accept: boolean): void {
     const c = this.challenges.get(p.id);
-    if (!c || c.from !== from || this.now() > c.expires) return;
+    const gone = () => {
+      if (accept) p.send({ t: 'notice', text: 'That challenge is no longer available.', kind: 'warn' });
+    };
+    // (it ran out, or the challenger left)
+    if (!c || c.from !== from || this.now() > c.expires) return gone();
     this.challenges.delete(p.id);
     const challenger = this.players.get(c.from);
-    if (!challenger) return;
+    if (!challenger) return gone();
     if (!accept) {
       challenger.send({ t: 'notice', text: `${p.name} declined your challenge.`, kind: 'info' });
       return;
