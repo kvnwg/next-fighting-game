@@ -3,10 +3,14 @@
  * every match is their midgame ad (a rewarded ad must be the player's own choice there). Anywhere
  * without an ad network (this preview, local play) a stand-in ad break plays out instead, the same
  * length as a short ad, so the whole flow can be played. The game is muted while any of them runs.
+ *
+ * On Poki the after-match ad is a rewarded one the player picks on the result card instead, and
+ * Poki's commercial break (naturalBreak) comes as the player goes back to playing after a break.
+ * Poki decides when one of those really plays: no timers of our own there.
  */
 import { AD_MIN_GAP_MS } from '../shared/progress';
 import { audio } from './audio';
-import { platform } from './platform';
+import { POKI, platform } from './platform';
 
 /** how long the stand-in runs (no shorter than the server will pay for) */
 const STAND_IN_MS = AD_MIN_GAP_MS + 1000;
@@ -17,6 +21,11 @@ const MIDGAME_GAP_MS = 3 * 60_000;
 let running: Promise<boolean> | null = null;
 let lastPlayed = -Infinity;
 let lastFailed = false;
+
+/** An ad (or the stand-in) is on screen: the game takes no input meanwhile. */
+export function adRunning(): boolean {
+  return running !== null;
+}
 
 /**
  * Whether an ad will most likely play after this match, so the result card only promises one when
@@ -35,7 +44,8 @@ export function watchAd(): Promise<boolean> {
     audio.setMuted('ad', true);
     try {
       const r = await platform.requestRewardedAd(() => undefined);
-      if (r === 'unavailable') return await standIn();
+      // the Poki build without Poki's SDK (an adblocker stopped it): no ad, so no reward
+      if (r === 'unavailable') return POKI ? false : await standIn();
       return r === 'rewarded';
     } finally {
       audio.setMuted('ad', false);
@@ -65,6 +75,29 @@ export function matchAd(): Promise<boolean> {
     }
   })();
   return running;
+}
+
+/**
+ * Poki's commercial break, as the player goes back to playing after a natural break (the result
+ * card going, a menu closed somewhere safe). Poki decides whether an ad really plays; the game is
+ * muted only if one does. Nothing happens off Poki.
+ */
+export function naturalBreak(onStart?: () => void): Promise<void> {
+  if (!POKI || !platform.hasAds) return Promise.resolve();
+  if (running) return running.then(() => undefined);
+  running = (async () => {
+    try {
+      const r = await platform.requestMidgameAd(() => {
+        audio.setMuted('ad', true);
+        onStart?.();
+      });
+      return r === 'played';
+    } finally {
+      audio.setMuted('ad', false);
+      running = null;
+    }
+  })();
+  return running.then(() => undefined);
 }
 
 function standIn(): Promise<boolean> {

@@ -57,6 +57,15 @@ async function connect(name: string, char = 'ronin') {
 }
 
 describe('server', () => {
+  it('serves the privacy policy the game links to', async () => {
+    const res = await fetch(`http://localhost:${server.port}/privacy`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/html');
+    const html = await res.text();
+    expect(html).toContain('privacy policy');
+    expect(html).not.toContain('{{CONTACT}}');
+  });
+
   it('joins the lobby and sees dummies', async () => {
     const c = await connect('Alice');
     const enter = await c.waitFor('enter');

@@ -12,6 +12,7 @@ import { LORE, readingMinutes } from './lore';
 import { FREE_PICK_GAMES, MAP_PRICE, AD_REWARD, MATCH_AD_REWARD, charPrice, freePickReady, gamesToFreePick, isPremium, reachedGold } from '../shared/progress';
 import { THUMBS } from './select';
 import { matchAdExpected } from './adbreak';
+import { POKI, platform } from './platform';
 import { normalizeRoomCode } from '../shared/rooms';
 
 const h = (html: string): HTMLElement => {
@@ -118,11 +119,25 @@ interface Floater {
 }
 
 /** The cancel table (shared/cancels.ts) as the help screen shows it. */
-/** Every song's credit, as its licence asks. */
+/** Every song's credit, as its licence asks (only the songs this build plays). */
 function musicCredits(): string {
   return [...TRACKS.lobby, ...TRACKS.combat]
+    .filter((t) => t.commercial || !platform.commercial)
     .map((t) => `<li>"${t.title}" by ${t.artist} · <a href="${t.link}" target="_blank" rel="noopener">${t.licence}</a> · via BreakingCopyright</li>`)
     .join('');
+}
+
+/** the icon on a button that plays an ad: Poki asks for a clapperboard on every one */
+const AD_ICON: IconName = POKI ? 'clapper' : 'watch';
+
+/**
+ * The game server's privacy policy (it keeps your name, rating and progress), which Poki asks to be
+ * linked in the game: the server the build talks to, or the one serving the page.
+ */
+function privacyURL(): string {
+  const server: string = import.meta.env.VITE_SERVER_URL ?? '';
+  if (server) return server.replace(/^ws/, 'http').replace(/\/ws$/, '/privacy');
+  return new URL('/privacy', location.href).toString();
 }
 
 function cancelTable(): string {
@@ -1188,7 +1203,7 @@ export class UI {
       `<div class="shop">
         <div class="sh-top">
           <div class="sh-purse">${icon('coin')}<b>${coinText(coins)}</b><span>coins</span></div>
-          <button class="sh-ad">${icon('watch')}<span><b>Watch an ad</b><i>+${AD_REWARD} coins for a short video</i></span></button>
+          <button class="sh-ad">${icon(AD_ICON)}<span><b>Watch an ad</b><i>+${AD_REWARD} coins for a short video</i></span></button>
           <div class="sh-free${p && freePickReady(p) ? ' ready' : ''}"><span class="sh-pips">${pips}</span><span>${esc(freeLine)}</span></div>
         </div>
         ${iconHead('mountain', 'Arenas')}
@@ -1196,7 +1211,7 @@ export class UI {
         <div class="sh-maps">${ARENA_MAPS.map((m) => mapCard(m.id)).join('')}</div>
         ${iconHead('fighters', 'Fighters')}
         <button class="sh-fighters">${icon('fighters')}Unlock fighters<span>${coinText(charPrice('ronin'))} coins each · Lancer and Warden ${coinText(charPrice('lancer'))} at Gold</span></button>
-        <p class="muted">Every finished match pays coins, and every third match or so, a win ends with an ad that pays ${coinText(MATCH_AD_REWARD)} more.</p>
+        <p class="muted">Every finished match pays coins, and every third match or so, a win ends with ${POKI ? 'a video you can watch for' : 'an ad that pays'} ${coinText(MATCH_AD_REWARD)} more.</p>
       </div>`,
       true,
       '店',
@@ -1279,7 +1294,7 @@ export class UI {
               <tr><td>K · P</td><td>Queue ranked · Practice duel</td></tr>
               <tr><td>C · L · H</td><td>Characters · Ladder · Help</td></tr>
               <tr><td>Esc</td><td>Free the cursor (to click menus)</td></tr>
-              <tr><td>Enter</td><td>Chat</td></tr>
+              ${POKI ? '' : '<tr><td>Enter</td><td>Chat</td></tr>'}
             </table>
           </div>
           <div>
@@ -1311,6 +1326,7 @@ export class UI {
         </div>
         ${iconHead('speaker', 'Music')}
         <ul class="credits">${musicCredits()}</ul>
+        ${!POKI || this.offline ? '' : `<p class="muted">The game server keeps your fighter's name, rating and progress: see the <a href="${esc(privacyURL())}" target="_blank" rel="noopener">privacy policy</a>.</p>`}
       </div>`,
       true,
       '心得',
@@ -1392,8 +1408,11 @@ export class UI {
   /**
    * The result card: the coins earned, and that an ad plays next and what it pays when it's watched
    * through. `closed` runs as the card goes (the ad plays then).
+   *
+   * With `reward` (Poki), the ad is the player's choice instead: Continue beside a video button,
+   * Continue first and as big, as Poki asks. `closed` says whether the video was watched through.
    */
-  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null, closed?: () => void): void {
+  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null, closed?: (watched: boolean) => void, reward?: { coins: number; watch: () => Promise<boolean> }): void {
     let ratingHtml = '';
     if (r.before && r.after && r.delta !== undefined) {
       const before = rankOf(r.before.mmr, r.before.placements);
@@ -1412,7 +1431,11 @@ export class UI {
     const reason = r.reason === 'forfeit' ? (r.won ? 'Opponent forfeited' : 'You forfeited') : r.reason === 'timeout' ? 'Time' : '';
     const coinsHtml =
       (r.coins ? `<div class="res-coins">${icon('coin')}+${coinText(r.coins)} coins</div>` : '') +
-      (r.ad && matchAdExpected() ? `<div class="res-ad">${icon('watch')}An ad plays next. Watch it to the end for +${coinText(r.ad)} coins.</div>` : '');
+      (reward
+        ? `<div class="res-offer"><button class="btn res-go">${icon('check')}Continue</button><button class="btn res-watch">${icon(AD_ICON)}+${coinText(reward.coins)} coins</button></div>`
+        : r.ad && matchAdExpected()
+          ? `<div class="res-ad">${icon('watch')}An ad plays next. Watch it to the end for +${coinText(r.ad)} coins.</div>`
+          : '');
     const el = h(`<div class="result ${r.won ? 'win' : 'lose'}">
       <div class="res-jp">${r.won ? '勝利' : '敗北'}</div>
       <div class="res-icon">${icon(r.won ? 'crown' : 'skull')}</div>
@@ -1423,7 +1446,33 @@ export class UI {
       <div class="muted">Returning to the lobby…</div></div>`);
     void me;
     this.hud.appendChild(el);
-    window.setTimeout(() => el.classList.add('out'), 6300);
-    window.setTimeout(() => (el.remove(), closed?.()), 7000);
+    let done = false;
+    const close = (watched: boolean) => {
+      if (done) return;
+      done = true;
+      el.remove();
+      closed?.(watched);
+    };
+    const fade = (after: number) => {
+      window.setTimeout(() => el.classList.add('out'), after - 700);
+      window.setTimeout(() => close(false), after);
+    };
+    if (!reward) return fade(7000);
+    // a moment longer to choose; letting it go is Continue
+    let timer = window.setTimeout(() => close(false), 12_000);
+    const go = el.querySelector<HTMLButtonElement>('.res-go')!;
+    const watch = el.querySelector<HTMLButtonElement>('.res-watch')!;
+    go.addEventListener('click', () => close(false));
+    watch.addEventListener('click', () => {
+      clearTimeout(timer);
+      go.disabled = watch.disabled = true;
+      void reward.watch().then((ok) => {
+        if (ok) return close(true);
+        // no video came: the card carries on as before, the offer gone
+        watch.remove();
+        go.disabled = false;
+        timer = window.setTimeout(() => close(false), 4000);
+      });
+    });
   }
 }

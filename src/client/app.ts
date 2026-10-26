@@ -30,13 +30,14 @@ import { Telegraph } from './render/telegraph';
 import { TITLE_MAP } from './render/maps/title';
 import { TitleScene } from './title/scene';
 import { TitleScreen } from './title/screen';
-import { platform } from './platform';
+import { POKI, platform } from './platform';
 import { saveSettings, settings } from './settings';
 import { Sideways } from './rotate';
-import { matchAd, watchAd } from './adbreak';
+import { adRunning, matchAd, naturalBreak, watchAd } from './adbreak';
 import { TutorialOverlay } from './tutorial';
 import { TouchControls, isTouchDevice } from './touch';
 import { CardData, Preview, UI, esc } from './ui';
+import { playerName } from '../shared/names';
 
 type MatchMsg = Extract<ServerMsg, { t: 'match' }>;
 
@@ -160,6 +161,8 @@ class App {
   private ringCount = -1;
   /** someone wants a copy of the next rendered frame (the title's cut into the game) */
   private snapWant: ((frame: HTMLCanvasElement) => void) | null = null;
+  /** the result card is up (a break: the player isn't playing till it goes) */
+  private resultUp = false;
 
   constructor(
     root: HTMLElement,
@@ -207,7 +210,7 @@ class App {
           this.ui.setTouchMenu(false);
           // menus are breaks
           platform.gameplayStop();
-        } else if (this.myId) platform.gameplayStart();
+        } else this.resumePlay(true);
       },
       onPrompt: () => this.sendChallenge(),
       createPreview: (el) => createPreview(el),
@@ -218,8 +221,9 @@ class App {
         const ok = await watchAd();
         // the server pays out (it checks the offer is still good)
         if (ok) this.net.send({ t: 'ad', kind });
-        // never a button that does nothing (no ad served, closed early, an adblocker)
-        else this.ui.toast('No ad to show right now. Try again in a little while.', 'warn');
+        // never a button that does nothing (no ad served, closed early, an adblocker); Poki shows
+        // players its own word on that, and wants none of ours
+        else if (!POKI) this.ui.toast('No ad to show right now. Try again in a little while.', 'warn');
         return ok;
       },
       onTutorial: () => this.net.send({ t: 'tutorial', a: 'start' }),
@@ -285,8 +289,10 @@ class App {
     // title if the name is known) and into a new private lobby their friends can join
     this.instantRoom = !this.inviteRoom && platform.instantMultiplayer;
     if (this.instantRoom) void this.instantStart();
-    // a signed-in CrazyGames player gets their name filled in
+    // a signed-in CrazyGames player gets their name filled in; on Poki a first-timer finds one
+    // waiting, so it's a key or a tap and then straight in (they can type their own over it)
     if (!settings.name) void platform.username().then((name) => name && this.titleScreen?.setName(name));
+    if (POKI && !settings.name) this.titleScreen?.setName(playerName());
     // dev builds: reach the app from the console / screenshot scripts
     if (import.meta.env.DEV) (window as unknown as { __app: App }).__app = this;
   }
@@ -457,6 +463,8 @@ class App {
     });
     n.on('match', (m) => this.onMatch(m));
     n.on('select', (m) => {
+      // picking fighters is a break: the match is gameplay again
+      platform.gameplayStop();
       if (!this.select.open) {
         this.queue = null;
         this.input.exitLock();
@@ -473,16 +481,35 @@ class App {
       if (this.local && this.kind === 'lobby') this.local.frozen = false;
       this.ui.toast(m.reason, 'warn');
       this.joinInvite();
+      this.resumePlay();
     });
     n.on('result', (m) => {
+      this.resultUp = true;
+      // on Poki the after-match ad is the player's to choose: a video for the coins beside Continue
+      const offer = POKI && m.ad
+        ? {
+            coins: m.ad,
+            watch: async () => {
+              const ok = await watchAd();
+              if (ok) this.net.send({ t: 'ad', kind: 'match' });
+              return ok;
+            },
+          }
+        : undefined;
+      // the buttons need the cursor
+      if (offer) this.input.exitLock();
       // the card says an ad plays next and what it pays; it plays as the card goes, and pays if it runs to the end
-      this.ui.showResult(m, this.profile, () => {
-        if (!m.ad) return;
+      this.ui.showResult(m, this.profile, (watched) => {
+        this.resultUp = false;
+        // Poki: its commercial break as the player goes back to playing, unless they just watched one
+        if (POKI) return this.resumePlay(!watched);
+        if (!m.ad) return this.resumePlay();
         this.input.exitLock();
         void matchAd().then((ok) => {
           if (ok) this.net.send({ t: 'ad', kind: 'match' });
+          this.resumePlay();
         });
-      });
+      }, offer);
       audio.introStop();
       audio.play(m.won ? 'victory' : 'defeat');
       audio.music(null, 3);
@@ -611,6 +638,36 @@ class App {
       this.queue = null;
       if (this.local) this.local.frozen = true;
     }
+    // into a match, or back to the lobby: playing again (unless the result card is still up)
+    this.resumePlay();
+  }
+
+  // ------------------------------------------------------------------ breaks
+
+  /** The player can be in control: in, with no menu, fighter select or result card over the game. */
+  private get canPlay(): boolean {
+    return !!this.myId && !this.ui.modalOpen && !this.select.open && !this.resultUp;
+  }
+
+  /**
+   * Back to playing after a break. `breather`: a natural break (the result card gone, a menu
+   * closed), where Poki may slot in its commercial break first: only in the lobby's safe zone and
+   * not waiting on a ranked duel, so nobody is hit, or misses a match, while an ad plays.
+   */
+  private resumePlay(breather = false): void {
+    if (!this.canPlay) return;
+    const me = this.local?.cf;
+    const safe = this.kind === 'lobby' && !this.queue && !!me && inSafeZone(this.map, me.pos.x, me.pos.z);
+    if (!POKI || !breather || !safe) return platform.gameplayStart();
+    this.input.releaseAll();
+    void naturalBreak(() => {
+      // an ad is really playing: free the cursor for it, and let go of every key
+      this.input.exitLock();
+      this.input.releaseAll();
+      this.touch?.cancel();
+    }).then(() => {
+      if (this.canPlay) platform.gameplayStart();
+    });
   }
 
   private addFighter(r: RosterEntry): void {
@@ -1850,7 +1907,7 @@ class App {
     const mouse = this.input.consumeMouse();
     this.cam.addMouse(mouse.dx, mouse.dy, settings.sensitivity, settings.invertY, !!this.lock);
     // the title screen has its own keys (and a name being typed)
-    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active;
+    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active || adRunning();
     this.entranceCues(now);
     const left = this.select.tick(now);
     if (left !== null && left > 0) audio.selectBoom(left);

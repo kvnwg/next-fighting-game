@@ -188,8 +188,8 @@ export class Music {
   }
 
   private tracks(bed: Bed): Track[] {
-    // CrazyGames runs ads: a non-commercial licence doesn't cover it
-    return TRACKS[bed].filter((t) => t.commercial || platform.env !== 'crazygames');
+    // CrazyGames and Poki run ads: a non-commercial licence doesn't cover them
+    return TRACKS[bed].filter((t) => t.commercial || !platform.commercial);
   }
 
   /** The bed's next song: through all of them in a shuffled order, then a new order. */

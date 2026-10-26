@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:crazygames": "node scripts/build-crazygames.mjs",
+    "build:poki": "node scripts/build-poki.mjs",
     "render:voxel": "node tools/voxel/render-sheet.mjs",
     "export:voxel": "node tools/voxel/export-vox.mjs",
     "render:portraits": "node tools/voxel/render-portraits.mjs"

@@ -782,6 +782,19 @@ export const ICON = {
     'd..........d',
     'dddddddddddd',
   ],
+  /** a clapperboard: a rewarded video (Poki asks for one on every reward button) */
+  clapper: [
+    '.hhkkhhkkhh.',
+    'hhkkhhkkhh..',
+    '............',
+    'hhkkhhkkhhkk',
+    'dddddddddddd',
+    'dddddddddddd',
+    'ddhhhhhhhhdd',
+    'dddddddddddd',
+    'ddhhhhhhdddd',
+    'dddddddddddd',
+  ],
   /** a scroll on its rollers: a legend */
   scroll: [
     '.wwwwwwwwww.',

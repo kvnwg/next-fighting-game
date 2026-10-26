@@ -43,6 +43,17 @@ export function defaultCensor(): Censor {
   return createCensor(fs.readFileSync(new URL('./blocklist.txt', import.meta.url), 'utf8'));
 }
 
+/**
+ * The privacy policy page (/privacy), linked from the game's help page: Poki asks for one before it
+ * lets the game reach this server. The address to write to comes from PRIVACY_CONTACT (a Fly secret).
+ */
+function privacyPage(): string {
+  const contact = process.env.PRIVACY_CONTACT?.trim();
+  if (!contact) console.warn('[server] PRIVACY_CONTACT is not set: the privacy policy has no address to write to (fly secrets set PRIVACY_CONTACT=you@example.com)');
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  return fs.readFileSync(new URL('./privacy.html', import.meta.url), 'utf8').replaceAll('{{CONTACT}}', esc(contact || 'the developer (address to come)'));
+}
+
 export interface RunningServer {
   game: Game;
   port: number;
@@ -99,7 +110,16 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
   const store = new Store(opts.dataFile ? fileStore(opts.dataFile) : null);
   const censor = opts.censor === undefined ? defaultCensor() : opts.censor ?? undefined;
   const game = new Game(store, undefined, { selectTime: opts.selectTime, introTime: opts.introTime, roamers: opts.roamers, silentTimeout: SILENT_TIMEOUT_MS, censor });
-  const server = http.createServer(staticHandler(opts.staticDir));
+  const files = staticHandler(opts.staticDir);
+  const privacy = privacyPage();
+  const server = http.createServer((req, res) => {
+    if (new URL(req.url ?? '/', 'http://x').pathname.replace(/\/$/, '') === '/privacy') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=3600' });
+      res.end(privacy);
+      return;
+    }
+    files(req, res);
+  });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 });
 
   server.on('upgrade', (req, socket, head) => {

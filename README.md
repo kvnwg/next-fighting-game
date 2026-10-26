@@ -47,6 +47,10 @@ The CrazyGames version plays online: everyone shares the grounds on one game ser
 
 [docs/crazygames.md](docs/crazygames.md) walks through deploying the server and putting the game on CrazyGames.
 
+### Poki
+
+`npm run build:poki` builds the Poki version into `dist/poki` (zipped to `dist/poki.zip`), online against the same server. It loads Poki's SDK instead (wrapped by the same `src/client/platform.ts`, `VITE_PLATFORM=poki`) and follows Poki's rules where they differ: the fonts ship in the build (no outside requests), no chat, pale sparks instead of blood, Poki's commercial break on the way back into play, the after-win ad as a 🎬 choice beside Continue, links out through the SDK. The server serves the privacy policy Poki asks for at `/privacy`. [docs/poki.md](docs/poki.md) has the steps, the paste-ready store text and the thumbnail (`docs/poki/`).
+
 Touch controls switch on by themselves on phones and tablets.
 
 Other scripts: `npm test` (combat rules, server integration and bot-vs-bot match simulations), `npm run typecheck`.

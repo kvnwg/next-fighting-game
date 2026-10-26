@@ -362,6 +362,15 @@ function showMap(r: GameRenderer, mapId: string, params: URLSearchParams): void 
     const foe = models[1].root.position;
     rig.snapBehind(0);
     for (let i = 0; i < 120; i++) rig.update(1 / 60, me, foe);
+    // `cam=x,y,z&look=x,y,z&fov=30`: a fixed camera instead (the store thumbnail: the opponent's
+    // attack, framed close)
+    const fixed = params.get('cam')?.split(',').map(Number);
+    if (fixed?.length === 3) {
+      r.camera.position.set(fixed[0], fixed[1], fixed[2]);
+      r.camera.lookAt(...((params.get('look')?.split(',').map(Number) ?? [0, 1, 0]) as [number, number, number]));
+      if (params.get('fov')) r.camera.fov = Number(params.get('fov'));
+      r.camera.updateProjectionMatrix();
+    }
     const loopLock = () => {
       view.update(0.016, r.camera.position);
       r.render();

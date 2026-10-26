@@ -56,6 +56,9 @@ const DEBRIS = ['#6b5a48', '#4a3d31', '#8a7660'];
 const MAX_PARTICLES = 2400;
 const MAX_SPLATS = 72;
 const BLOOD = ['#a80c1a', '#7a0812', '#c41824', '#560610'];
+/** The Poki build: Poki takes no visible blood, so a cut throws pale sparks and leaves no splats. */
+const NO_BLOOD = import.meta.env.VITE_PLATFORM === 'poki';
+const SPARKS = ['#fff4dc', '#ffd9a8', '#f4f0ff', '#ffc890'];
 
 let starGeo: THREE.BufferGeometry | null = null;
 /** Four-pointed sparkle used for deflect/impact flashes. */
@@ -146,6 +149,7 @@ export class Effects {
     if (_a.lengthSq() < 1e-4) _a.set(1, 0, 0);
     _a.normalize();
     const side = _b.set(-_a.z, 0, _a.x);
+    if (NO_BLOOD) return this.cutSparks(pos, side, scale);
     const n = Math.round(16 * scale);
     for (let i = 0; i < n; i++) {
       const sp = (3 + Math.random() * 6) * Math.sqrt(scale);
@@ -170,6 +174,16 @@ export class Effects {
       sp.delay = 0.18 + d * 0.12;
       sp.max = sp.life = 5 + Math.random() * 2;
       sp.color.set(BLOOD[(i + 1) % BLOOD.length]);
+    }
+  }
+
+  /** In place of blood (NO_BLOOD): a fan of hot sparks flung the way the blade went, fading in the air. */
+  private cutSparks(pos: THREE.Vector3, side: THREE.Vector3, scale: number): void {
+    const n = Math.round(14 * scale);
+    for (let i = 0; i < n; i++) {
+      const sp = (4 + Math.random() * 6) * Math.sqrt(scale);
+      const s = (Math.random() - 0.5) * 1.1;
+      this.emit(pos.x, pos.y, pos.z, (_a.x + side.x * s) * sp, 1 + Math.random() * 3, (_a.z + side.z * s) * sp, SPARKS[i % SPARKS.length], { life: 0.35, size: 0.03 + Math.random() * 0.03, gravity: 6, drag: 2.5, stretch: 0.08 });
     }
   }
 
