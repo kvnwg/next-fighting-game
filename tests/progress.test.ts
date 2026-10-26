@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Arena } from '../src/server/arena';
+import { MATCH } from '../src/shared/config';
 import { Game } from '../src/server/game';
 import { Store } from '../src/server/store';
 import { TUTORIAL_NEED } from '../src/server/tutorial';
@@ -181,7 +182,7 @@ describe('coins and unlocks', () => {
 describe('tutorial', () => {
   const ev = (k: CombatEvent['k'], a: string, d: string, key?: string): CombatEvent => ({ k, a, d, x: 0, y: 0, z: 0, ...(key ? { key: key as never } : {}) });
 
-  it('runs every lesson in order, pays once, and goes back to the lobby', () => {
+  it('runs every lesson in order, pays once, ends in a real duel and goes back to the lobby', () => {
     const { join, step, game, now } = world();
     const c = join('Student');
     c.send({ t: 'tutorial', a: 'start' });
@@ -232,10 +233,20 @@ describe('tutorial', () => {
     while (now() < sensei.stateStart + sensei.atkWindup - 120) step(20);
     expect(arena.applyInput(me, 'dodge', now(), { dx: 1, dz: 0 })).toBe(true);
     step(3000);
-    expect(coach.step).toBe('done');
+    // the lessons are learned and paid for: now he fights for real
+    expect(coach.step).toBe('duel');
     expect(c.prof.tutorial).toBe(true);
     expect(c.prof.coins).toBe(TUTORIAL_REWARD);
-    step(5000);
+    expect(arena.coach).toBeNull();
+    expect(arena.phase).toBe('fight');
+    expect(sensei.brain).not.toBe(coach);
+    // he goes down (and stays down): one round takes the match, with its result screen
+    arena.killByEnvironment(sensei, 'fall', now());
+    const result = c.inbox.find((m): m is Extract<ServerMsg, { t: 'result' }> => m.t === 'result');
+    expect(result).toMatchObject({ mode: 'tutorial', won: true });
+    expect(c.prof.coins).toBe(TUTORIAL_REWARD);
+    expect(arena.phase).toBe('matchEnd');
+    step(MATCH.matchEndTime + 500);
     expect(game.arenas.size).toBe(0);
     expect(c.player.instance?.kind).toBe('lobby');
   });

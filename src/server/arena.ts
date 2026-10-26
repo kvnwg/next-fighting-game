@@ -34,7 +34,8 @@ export class Arena extends Instance {
   readonly humans: [Player | null, Player | null];
   private readonly rosters: [RosterEntry, RosterEntry];
   /** the tutorial's sensei, when this match is the tutorial */
-  readonly coach: TutorialCoach | null = null;
+  /** the tutorial's sensei while he's teaching (gone once the closing duel starts) */
+  coach: TutorialCoach | null = null;
 
   constructor(
     game: Game,
@@ -72,7 +73,7 @@ export class Arena extends Instance {
     if (mode === 'tutorial') {
       // straight into the lesson: no entrances, no countdown, no clock
       const now = game.now();
-      this.coach = new TutorialCoach(fb, fa, a, (t) => this.tutorialDone(t));
+      this.coach = new TutorialCoach(fb, fa, a, (t) => this.tutorialDuel(t));
       fb.brain = this.coach;
       // face to face in the middle of the arena, a few steps apart
       const mx = (s0.x + s1.x) / 2;
@@ -89,13 +90,26 @@ export class Arena extends Instance {
     this.setPhase('intro', game.now() + (game.options.introTime ?? MATCH.introTime));
   }
 
-  /** The last lesson is learned: a moment to take it in, then back to the lobby. */
-  private tutorialDone(now: number): void {
+  /**
+   * The last lesson is learned (and paid for). Now the sensei fights for real: one round, to a
+   * KO, ending like any match, with its result screen and then the lobby.
+   */
+  private tutorialDuel(now: number): void {
     if (this.finished) return;
-    this.finished = true;
     const p = this.humans[0];
     if (p) this.game.endTutorial(p, true);
-    this.setPhase('matchEnd', now + 4500);
+    const sensei = this.slots[1];
+    sensei.windupScale = 1;
+    sensei.brain = new BotBrain(sensei, 'duel', BOT_PROFILES.easy);
+    this.coach = null;
+    for (const f of this.slots) f.specialReadyAt = now + f.char.special.cooldown;
+    // no clock on it: it ends when one of you goes down
+    this.setPhase('fight', now + 3_600_000);
+  }
+
+  /** Rounds to win the match: the tutorial's closing duel is a single round. */
+  private get roundsToWin(): number {
+    return this.mode === 'tutorial' ? 1 : MATCH.roundsToWin;
   }
 
   isFrozen(): boolean {
@@ -162,7 +176,7 @@ export class Arena extends Instance {
   private endRound(winner: 0 | 1 | -1, now: number): void {
     if (winner === 0 || winner === 1) this.scores[winner]++;
     this.roundWinner = winner;
-    if (this.scores[0] >= MATCH.roundsToWin || this.scores[1] >= MATCH.roundsToWin) {
+    if (this.scores[0] >= this.roundsToWin || this.scores[1] >= this.roundsToWin) {
       this.finish(this.scores[0] > this.scores[1] ? 0 : 1, 'ko', now);
     } else if (this.round >= MATCH.maxRounds) {
       // too many draws: the leader wins, otherwise whoever ended the last round healthier

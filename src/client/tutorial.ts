@@ -5,13 +5,14 @@
  * sensei's posture as you strike and deflect, yours as you block and it fills to breaking, the
  * execution mark when his guard is broken. For deflects and dodges a ring closes on the sensei and
  * meets its target exactly when his blow lands: press then. Too early, too late and good flash up
- * as you try. Skip is always there.
+ * as you try. Skip is there through the lessons. The last step is a real duel with him: the
+ * lesson overlay steps aside for it, and the match ends with its result like any other.
  */
 import type { TutorialNote, TutorialStep } from '../shared/protocol';
 import { TUTORIAL_STEPS } from '../shared/protocol';
 import { icon } from './pixelicons';
 
-type Lessoned = Exclude<TutorialStep, 'done'>;
+type Lessoned = Exclude<TutorialStep, 'duel'>;
 
 interface Lesson {
   word: string;
@@ -64,7 +65,7 @@ export class TutorialOverlay {
     private readonly touch: boolean,
     onSkip: () => void,
   ) {
-    const pips = TUTORIAL_STEPS.filter((s) => s !== 'done')
+    const pips = TUTORIAL_STEPS.filter((s) => s !== 'duel')
       .map((s) => `<i data-step="${s}"></i>`)
       .join('');
     this.el = document.createElement('div');
@@ -95,10 +96,11 @@ export class TutorialOverlay {
     const head = this.el.querySelector<HTMLElement>('.tut-head')!;
     if (step !== this.step) {
       this.step = step;
-      if (step === 'done') {
+      if (step === 'duel') {
+        // the lessons are over: now beat him
         head.classList.add('hidden');
         this.el.querySelector('.tut-skip')!.classList.add('hidden');
-        this.stamp('Lesson learned', '了');
+        this.stamp('Now beat him', '決闘');
         this.setArrow(null, '');
         this.ring.classList.add('hidden');
         return;
@@ -120,7 +122,7 @@ export class TutorialOverlay {
       head.classList.add('in');
       this.stamp(l.word, l.jp);
     }
-    if (step === 'done') return;
+    if (step === 'duel') return;
     // a pip for each one done
     this.el.querySelector('.tut-count')!.innerHTML = Array.from({ length: need }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
     if (note) this.flash(note);
@@ -129,7 +131,7 @@ export class TutorialOverlay {
   /** Each frame: the arrow onto its bar, and the ring closing on his blow. */
   update(f: TutorialFrame): void {
     const step = this.step;
-    if (!step || step === 'done') return;
+    if (!step || step === 'duel') return;
     const l = LESSONS[step];
     const target =
       l.target === 'me'

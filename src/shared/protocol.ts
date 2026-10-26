@@ -117,8 +117,9 @@ export type ClientMsg =
  * breaks (and pay for it); deflect his blows until his guard breaks; finish him with a deathblow;
  * dodge his perilous attack; done.
  */
-export type TutorialStep = 'strike' | 'block' | 'deflect' | 'execute' | 'perilous' | 'done';
-export const TUTORIAL_STEPS: readonly TutorialStep[] = ['strike', 'block', 'deflect', 'execute', 'perilous', 'done'];
+/** The lessons, then a real duel with the sensei (a result, then back to the lobby). */
+export type TutorialStep = 'strike' | 'block' | 'deflect' | 'execute' | 'perilous' | 'duel';
+export const TUTORIAL_STEPS: readonly TutorialStep[] = ['strike', 'block', 'deflect', 'execute', 'perilous', 'duel'];
 /** feedback on the last try: a deflect pressed too early (held into a block) or too late (hit) */
 export type TutorialNote = 'early' | 'late' | 'good' | 'broken' | 'again';
 

@@ -432,7 +432,9 @@ class App {
       const was = this.tutorialStep;
       this.tutorialStep = m.step;
       this.tutorial.show(m.step, m.n, m.need, m.note);
-      if (m.step !== was) audio.cardSlam();
+      // the lessons over, the closing duel starts like any fight
+      if (m.step === 'duel' && was !== 'duel') audio.play('fight');
+      else if (m.step !== was) audio.cardSlam();
       else if (m.note === 'good') audio.ready('special');
     });
     n.on('coins', (m) => {

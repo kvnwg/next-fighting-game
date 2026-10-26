@@ -3,8 +3,9 @@
  * stands in guard while you strike into it and you watch his posture fill. He hammers your guard
  * until yours breaks, and executes you for it. He swings slowly enough to read so you can deflect
  * him, and each deflect fills his posture until it breaks. He waits, broken, for your deathblow.
- * Last, he throws his perilous grab for you to dodge. The client draws each lesson over the fight
- * (client/tutorial.ts); nothing here waits on anyone reading.
+ * Then he throws his perilous grab for you to dodge. Last, he fights you for real, one round, and
+ * the match ends like any other (see Arena.tutorialDuel). The client draws each lesson over the
+ * fight (client/tutorial.ts); nothing here waits on anyone reading.
  */
 import { COMBAT } from '../shared/config';
 import { dist2D, yawTo } from '../shared/math';
@@ -14,7 +15,7 @@ import type { Player, ServerFighter } from './entities';
 import type { Instance } from './instance';
 
 /** how many of each lesson's move it takes to pass it */
-export const TUTORIAL_NEED: Record<TutorialStep, number> = { strike: 4, block: 3, deflect: 3, execute: 1, perilous: 1, done: 0 };
+export const TUTORIAL_NEED: Record<TutorialStep, number> = { strike: 4, block: 3, deflect: 3, execute: 1, perilous: 1, duel: 1 };
 
 /** how slowly the sensei winds up in each lesson (1 = a normal fight) */
 const SLOW: Partial<Record<TutorialStep, number>> = { block: 1.5, deflect: 2.1, perilous: 1.6 };
@@ -61,7 +62,7 @@ export class TutorialCoach implements Brain {
       f.hp = f.maxHp;
     }
     this.send();
-    if (next === 'done') this.finished(now);
+    if (next === 'duel') this.finished(now);
   }
 
   /** Break a fighter's guard outright (the lesson needs it now, whatever the numbers say). */
@@ -131,7 +132,7 @@ export class TutorialCoach implements Brain {
           else {
             this.n = 1;
             this.send('good');
-            this.advance('done', now);
+            this.advance('duel', now);
             return;
           }
         }
@@ -140,7 +141,7 @@ export class TutorialCoach implements Brain {
           if (this.swing(inst, 'special', d, now)) this.watching = { serial: s.attackSerial, caught: false };
         }
         break;
-      case 'done':
+      case 'duel':
         if (s.blockHeld) inst.applyInput(s, 'blockUp', now);
         break;
     }
