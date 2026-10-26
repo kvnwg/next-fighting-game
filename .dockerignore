@@ -4,5 +4,4 @@ dist
 data
 tests
 docs
-tools
 *.log
