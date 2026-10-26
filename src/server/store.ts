@@ -51,6 +51,8 @@ export class Store {
   private byId = new Map<string, Profile>();
   private byToken = new Map<string, Profile>();
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** the ladder, sorted, until something changes (sorting every profile on each ask is slow) */
+  private ladder: Profile[] | null = null;
 
   /** `persist` null = in-memory only (tests). */
   constructor(private readonly persist: StorePersistence | null) {
@@ -65,6 +67,7 @@ export class Store {
   }
 
   private index(p: Profile): void {
+    this.ladder = null;
     this.byId.set(p.id, p);
     this.byToken.set(p.token, p);
   }
@@ -121,12 +124,14 @@ export class Store {
   }
 
   private placed(): Profile[] {
-    return [...this.byId.values()]
+    return (this.ladder ??= [...this.byId.values()]
       .filter((p) => p.placements >= PLACEMENT_MATCHES)
-      .sort((a, b) => b.mmr - a.mmr || b.wins - a.wins);
+      .sort((a, b) => b.mmr - a.mmr || b.wins - a.wins));
   }
 
+  /** Something in a profile changed: the ladder is sorted again when next asked for, and it's saved soon. */
   markDirty(): void {
+    this.ladder = null;
     if (!this.persist || this.saveTimer) return;
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;

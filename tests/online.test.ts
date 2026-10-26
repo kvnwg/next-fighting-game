@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Game } from '../src/server/game';
 import { Store } from '../src/server/store';
 import { LOBBY_CAP } from '../src/shared/config';
+import { PLACEMENT_MATCHES } from '../src/shared/ranks';
 import { PROTOCOL_VERSION, ServerMsg } from '../src/shared/protocol';
 
 type Msg<T extends ServerMsg['t']> = Extract<ServerMsg, { t: T }>;
@@ -103,6 +104,24 @@ describe('identity', () => {
     game.handleConnection(ws as never);
     onMessage(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION - 1, name: 'Stale', char: 'ronin' }));
     expect(closedWith).toMatch(/updated.*reload/);
+  });
+});
+
+describe('ranked ladder', () => {
+  it('asking for the ladder over and over is cheap, and it follows every result', () => {
+    const store = new Store(null);
+    for (let i = 0; i < 20_000; i++) Object.assign(store.create(`P${i}`), { placements: PLACEMENT_MATCHES, mmr: 600 + ((i * 7919) % 1500) });
+    const t0 = performance.now();
+    for (let i = 0; i < 200; i++) store.leaderboard(25);
+    // a client may send 160 messages a second: the ladder can't cost a sort of everyone each time
+    expect((performance.now() - t0) / 200).toBeLessThan(1);
+    // a result (or a newcomer) changes it
+    const climber = store.create('Climber');
+    expect(store.position(climber)).toBeNull();
+    Object.assign(climber, { placements: PLACEMENT_MATCHES, mmr: 5000 });
+    store.markDirty();
+    expect(store.leaderboard(1)[0].name).toBe('Climber');
+    expect(store.position(climber)).toBe(1);
   });
 });
 
