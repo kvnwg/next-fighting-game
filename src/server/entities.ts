@@ -102,6 +102,8 @@ export class Player {
   lastPingS = 0;
   queue: { mode: QueueMode; since: number; diff?: BotDifficulty } | null = null;
   lastChatAt = 0;
+  /** when anything last came in from them (server ms) */
+  lastHeardAt = 0;
   msgWindowStart = 0;
   msgCount = 0;
   closed = false;

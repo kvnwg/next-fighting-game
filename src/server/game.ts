@@ -64,6 +64,11 @@ export interface GameOptions {
   introTime?: number;
   /** A test build: everyone owns every fighter and arena, with coins to spare. */
   unlockAll?: boolean;
+  /**
+   * Drop a connection that has sent nothing for this long (ms; clients ping every second). A phone
+   * that lost its network can leave its socket open for minutes, its fighter standing there.
+   */
+  silentTimeout?: number;
 }
 
 /** Coins a test build tops everyone up to. */
@@ -175,7 +180,13 @@ export class Game {
     if (now - this.lastServerPing > 2000) {
       // latency is measured by the server, so a client can't claim extra lag compensation
       this.lastServerPing = now;
-      for (const p of this.players.values()) {
+      const silent = this.options.silentTimeout;
+      for (const p of [...this.players.values()]) {
+        if (silent && now - p.lastHeardAt > silent) {
+          p.ws.close(4003, 'connection timed out');
+          this.leave(p);
+          continue;
+        }
         p.lastPingS = Math.round(now);
         p.send({ t: 'sping', s: p.lastPingS });
       }
@@ -220,6 +231,7 @@ export class Game {
         if (msg.t === 'hello') player = this.join(ws, msg);
         return;
       }
+      player.lastHeardAt = this.now();
       if (!this.rateLimit(player)) {
         ws.close(4008, 'too many messages');
         return;
@@ -274,6 +286,7 @@ export class Game {
     // you play a fighter you own (a locked one falls back to the Ronin)
     const char: CharacterId = isCharacterId(msg.char) && profile.chars.includes(msg.char) ? msg.char : 'ronin';
     const p = new Player(ws, profile, char);
+    p.lastHeardAt = this.now();
     this.players.set(p.id, p);
     p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.players.size, serverTime: this.now() });
     this.enterLobby(p);
