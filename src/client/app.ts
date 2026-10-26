@@ -149,6 +149,8 @@ class App {
   private demoSubject: ClientFighter | null = null;
   /** a friend's private lobby to join as soon as we're in (from an invite link) */
   private inviteRoom: string | null = null;
+  /** started from CrazyGames' "play with friends": open a private lobby as soon as we're in */
+  private instantRoom = false;
   /** the tutorial's lessons drawn over the fight, while it runs */
   private tutorial: TutorialOverlay | null = null;
   private tutorialStep: string | null = null;
@@ -279,6 +281,10 @@ class App {
       // in a match (or its select) the server can't move you: it waits till you're back in the lobby
       if (this.myId && this.kind === 'lobby' && !this.select.open) this.joinInvite();
     });
+    // started from CrazyGames' "play with friends": the party leader goes straight in (no stop at the
+    // title if the name is known) and into a new private lobby their friends can join
+    this.instantRoom = !this.inviteRoom && platform.instantMultiplayer;
+    if (this.instantRoom) void this.instantStart();
     // a signed-in CrazyGames player gets their name filled in
     if (!settings.name) void platform.username().then((name) => name && this.titleScreen?.setName(name));
     // dev builds: reach the app from the console / screenshot scripts
@@ -361,6 +367,17 @@ class App {
     this.net.send({ t: 'hello', v: PROTOCOL_VERSION, token: settings.token || undefined, name, char: settings.char });
   }
 
+  /** Instant multiplayer: connect without waiting at the title, unless there's a name to pick first. */
+  private async instantStart(): Promise<void> {
+    const name = settings.name || (await platform.username());
+    if (!name || !this.titleScreen?.waiting) return;
+    // nobody has touched the page yet: the sound comes on with the first click or key
+    const unlock = (): void => audio.unlock();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    await this.connect(name);
+  }
+
   /** Into the private lobby a friend's invite is for, if one is waiting. */
   private joinInvite(): void {
     if (!this.inviteRoom) return;
@@ -372,6 +389,7 @@ class App {
     const n = this.net;
     n.onClose = (reason) => {
       platform.gameplayStop();
+      platform.setRoom(null);
       this.myId = '';
       this.lobbyInfo = null;
       this.ui.showTitle();
@@ -410,8 +428,12 @@ class App {
       saveSettings();
       // a first visit starts with the tutorial, once the lobby is up
       // (unless you came to play a friend: the tutorial waits for another visit, or the Help page)
-      this.tutorialDue = !m.profile.tutorial && !this.inviteRoom;
+      this.tutorialDue = !m.profile.tutorial && !this.inviteRoom && !this.instantRoom;
       this.joinInvite();
+      if (this.instantRoom) {
+        this.instantRoom = false;
+        this.net.send({ t: 'room', a: 'create' });
+      }
       this.profile = m.profile;
       this.online = m.online;
       this.ui.setProfile(m.profile);
@@ -500,6 +522,7 @@ class App {
     n.on('lobby', (m) => {
       this.lobbyInfo = m;
       this.ui.setRoom(m.code ?? null);
+      platform.setRoom(m.code ?? null, m.count < m.cap);
     });
     n.on('rings', (m) => this.onRings(m.r));
     n.on('challenge', (m) => {

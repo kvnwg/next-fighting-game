@@ -191,6 +191,31 @@ class Platform {
     );
   }
 
+  /** Started from CrazyGames' "play with friends": the game opens a private lobby straight away. */
+  get instantMultiplayer(): boolean {
+    return !!this.call((s) => s.game.isInstantMultiplayer);
+  }
+
+  /** the private lobby CrazyGames was last told the player is in */
+  private room: { code: string; joinable: boolean } | null = null;
+
+  /**
+   * Tells CrazyGames which private lobby the player is in (its Room Data), so friends can join it
+   * from CrazyGames' side too: the invite button, notifications. null: not in one any more (back on
+   * the public grounds, or disconnected).
+   */
+  setRoom(code: string | null, joinable = true): void {
+    if (!code) {
+      if (!this.room) return;
+      this.room = null;
+      this.call((s) => s.game.leftRoom());
+      return;
+    }
+    if (this.room?.code === code && this.room.joinable === joinable) return;
+    this.room = { code, joinable };
+    this.call((s) => s.game.updateRoom({ roomId: code, isJoinable: joinable, inviteParams: { room: code } }));
+  }
+
   /** The CrazyGames account name, when the player is signed in. */
   async username(): Promise<string | null> {
     if (!this.sdk?.user?.isUserAccountAvailable) return null;

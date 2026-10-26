@@ -440,11 +440,19 @@ export class TitleScreen {
     clearTimeout(this.windTimer);
     window.removeEventListener('keydown', this.onKey);
     this.el.classList.add('out');
+    // the opening's big pixels and dark may not have resolved yet (connected straight from the boot)
+    this.o.renderer.pixelate = 1;
+    this.o.renderer.fade = 0;
     setTimeout(() => this.el.remove(), 700);
   }
 
   get active(): boolean {
     return this.state !== 'gone';
+  }
+
+  /** still before the name is given: App may connect on the player's behalf */
+  get waiting(): boolean {
+    return this.state === 'boot' || this.state === 'press' || this.state === 'name';
   }
 
   // ------------------------------------------------------------------ per frame
