@@ -109,6 +109,13 @@ export class Game {
     this.lobbies.push(new Lobby(this, options.roamers ?? 0, 1));
   }
 
+  /** Who's online, as players see it: everyone connected, and the wanderers that pass as players. */
+  get online(): number {
+    let n = this.players.size;
+    for (const l of this.lobbies) n += l.wanderers;
+    return n;
+  }
+
   /** The first lobby (the only one until it fills up). */
   get lobby(): Lobby {
     return this.lobbies[0];
@@ -128,6 +135,7 @@ export class Game {
     while (this.lobbies.some((l) => !l.code && l.n === n)) n++;
     const l = new Lobby(this, this.options.roamers ?? 0, n);
     this.lobbies.push(l);
+    if (l.wanderers) this.broadcastAll({ t: 'online', n: this.online });
     return l;
   }
 
@@ -144,6 +152,7 @@ export class Game {
       if (l.players.size > 0 || homes.has(l)) continue;
       l.destroy();
       this.lobbies.splice(i, 1);
+      if (l.wanderers) this.broadcastAll({ t: 'online', n: this.online });
     }
   }
 
@@ -312,9 +321,9 @@ export class Game {
     const p = new Player(ws, profile, char);
     p.lastHeardAt = this.now();
     this.players.set(p.id, p);
-    p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.players.size, serverTime: this.now() });
+    p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.online, serverTime: this.now() });
     this.enterLobby(p);
-    this.broadcastAll({ t: 'online', n: this.players.size });
+    this.broadcastAll({ t: 'online', n: this.online });
     this.broadcastAll({ t: 'chat', name: '', text: `${p.name} entered the grounds.`, sys: true });
     return p;
   }
@@ -329,7 +338,7 @@ export class Game {
     if (inst instanceof Arena) inst.forfeit(p);
     inst?.removePlayer(p);
     this.players.delete(p.id);
-    this.broadcastAll({ t: 'online', n: this.players.size });
+    this.broadcastAll({ t: 'online', n: this.online });
   }
 
   // ------------------------------------------------------------------ messages

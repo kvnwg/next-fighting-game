@@ -66,4 +66,5 @@ If the server changed too (anything under `src/server` or `src/shared`), `fly de
   struggles (`fly logs`, the Fly dashboard's metrics), `fly scale vm shared-cpu-2x` or more memory
   with `fly scale memory 1024`.
 - **Fake players.** Each public lobby has 4 wandering fighters (`ROAMERS` in `fly.toml`). Private
-  lobbies have none.
+  lobbies have none. They pass as players, so they count in the players online and take a place
+  in their lobby (20 people and 4 wanderers fill one).

@@ -35,6 +35,8 @@ export class Lobby extends Instance {
   private duels: (RingDuel | null)[] = RINGS.map(() => null);
   /** ring duel losers, waiting to get back up where they fell */
   private downedInRing = new Set<ServerFighter>();
+  /** how many wanderers walk it: they pass as players, so they count (and take a place) like players */
+  readonly wanderers: number;
 
   /** `n`: this lobby's number, from 1 (0 for a private one); `code`: a private lobby's, to join it by */
   constructor(
@@ -57,6 +59,7 @@ export class Lobby extends Instance {
       f.brain = new BotBrain(f, 'roam', BOT_PROFILES.normal);
       this.fighters.set(f.id, f);
     }
+    this.wanderers = this.fighters.size;
     for (const [i, d] of (LOBBY_MAP.dummies ?? []).entries()) {
       const f = new ServerFighter(`dummy-${i}`, d.kind === 'sparring' ? 'Sparring Dummy' : 'Training Dummy', 'ronin');
       f.dummy = d.kind;
@@ -161,7 +164,7 @@ export class Lobby extends Instance {
   // ------------------------------------------------------------------ membership
 
   get full(): boolean {
-    return this.players.size >= LOBBY_CAP;
+    return this.players.size + this.wanderers >= LOBBY_CAP;
   }
 
   addPlayer(p: Player, spawn: { x: number; z: number; yaw: number }): ServerFighter {
@@ -185,7 +188,7 @@ export class Lobby extends Instance {
   }
 
   private sendInfo(): void {
-    this.broadcast({ t: 'lobby', n: this.n, count: this.players.size, cap: LOBBY_CAP, ...(this.code ? { code: this.code } : {}) });
+    this.broadcast({ t: 'lobby', n: this.n, count: this.players.size + this.wanderers, cap: LOBBY_CAP, ...(this.code ? { code: this.code } : {}) });
   }
 
   // ------------------------------------------------------------------ dueling rings

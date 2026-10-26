@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Game } from '../src/server/game';
 import { Store } from '../src/server/store';
+import { LOBBY_CAP } from '../src/shared/config';
 import { PROTOCOL_VERSION, ServerMsg } from '../src/shared/protocol';
 
 type Msg<T extends ServerMsg['t']> = Extract<ServerMsg, { t: T }>;
@@ -135,6 +136,22 @@ describe('server robustness', () => {
 });
 
 describe('computer opponents pass as players', () => {
+  it('the wanderers count among the players online and in their lobby', () => {
+    const { game, join } = harness({ roamers: 4 });
+    const a = join('Early');
+    // one person and four wanderers walking about: five on the grounds, not "1 online"
+    expect(a.inbox.find((m) => m.t === 'welcome')).toMatchObject({ online: 5 });
+    expect(a.last('lobby')).toMatchObject({ n: 1, count: 5, cap: LOBBY_CAP });
+    // they take their places: the lobby is full at LOBBY_CAP with them in it
+    const others = Array.from({ length: LOBBY_CAP - 5 }, (_, i) => join(`Guest${i}`));
+    expect(others.at(-1)!.last('lobby')).toMatchObject({ n: 1, count: LOBBY_CAP });
+    const late = join('Late');
+    expect(late.last('lobby')).toMatchObject({ n: 2, count: 5 });
+    expect(late.last('online')!.n).toBe(LOBBY_CAP + 5);
+    expect(a.last('online')!.n).toBe(LOBBY_CAP + 5);
+    expect(game.lobbies).toHaveLength(2);
+  });
+
   it('a ranked duel against the rated fallback opponent is announced like one between two players', () => {
     const { step, join } = harness({ rankedFallback: 1000 });
     const lone = join('Lonely');
