@@ -1,0 +1,424 @@
+/**
+ * Hit resolution. Given an attack that connected at time `t`, work out what the defender was doing
+ * at that moment (from their lag-compensated defense timeline) and apply the result.
+ */
+import { AttackDef, AttackKey, isHeavyKey } from './characters';
+import { COMBAT } from './config';
+import { DefenseEvent, Fighter } from './fighter';
+import { DEG, Vec2, angleDiff, forward, yawTo } from './math';
+
+export type Outcome =
+  | 'miss'
+  | 'evade'
+  | 'mikiri'
+  | 'deflect'
+  | 'block'
+  | 'guardBreak'
+  | 'hit'
+  | 'armor'
+  | 'deathblow'
+  | 'counter';
+
+export interface DefenseInfo {
+  guarding: boolean;
+  parrying: boolean;
+  iframes: boolean;
+  dodgeDir: Vec2 | null;
+  airborne: boolean;
+}
+
+export const NO_DEFENSE: DefenseInfo = { guarding: false, parrying: false, iframes: false, dodgeDir: null, airborne: false };
+
+/** Reconstruct a fighter's defensive state at time t from their defense timeline (sorted by t). */
+export function defenseAt(log: readonly DefenseEvent[], t: number): DefenseInfo {
+  const tol = COMBAT.parryLateTolerance;
+  const info: DefenseInfo = { guarding: false, parrying: false, iframes: false, dodgeDir: null, airborne: false };
+  let lastGuard: DefenseEvent | null = null;
+  for (const e of log) {
+    if (e.type === 'guardOn' || e.type === 'guardOff') {
+      if (e.t <= t) lastGuard = e;
+      else if (e.type === 'guardOn' && e.t <= t + tol && e.parryUntil > e.t) {
+        // pressed a hair late: still counts as a deflect (only a real press, not an automatic re-guard)
+        info.guarding = true;
+        info.parrying = true;
+      }
+    } else if (e.type === 'dodge') {
+      if (e.t <= t + tol && t <= e.t + e.iframes) {
+        info.iframes = true;
+        info.dodgeDir = { x: e.dx, z: e.dz };
+      }
+    } else if (e.type === 'jump') {
+      if (t >= e.t + COMBAT.jumpEvadeStart && t <= e.t + COMBAT.jumpEvadeEnd) info.airborne = true;
+      // untouchable on the way up only
+      if (t >= e.t + COMBAT.jumpIframesStart && t <= e.t + COMBAT.jumpIframesEnd) info.iframes = true;
+    }
+  }
+  if (lastGuard && lastGuard.type === 'guardOn') {
+    info.guarding = true;
+    if (t <= lastGuard.parryUntil) info.parrying = true;
+  }
+  return info;
+}
+
+export function pruneDefenseLog(log: DefenseEvent[], before: number): void {
+  // keep the guard entry that was in effect at the cutoff: it defines the guard state from then on
+  let lastGuardIdx = -1;
+  for (let i = 0; i < log.length && log[i].t < before; i++) {
+    if (log[i].type === 'guardOn' || log[i].type === 'guardOff') lastGuardIdx = i;
+  }
+  let w = 0;
+  for (let i = 0; i < log.length; i++) {
+    if (log[i].t >= before || i === lastGuardIdx) log[w++] = log[i];
+  }
+  log.length = w;
+}
+
+/** Insert keeping the log sorted by time. */
+export function pushDefense(log: DefenseEvent[], e: DefenseEvent): void {
+  let i = log.length;
+  while (i > 0 && log[i - 1].t > e.t) i--;
+  log.splice(i, 0, e);
+}
+
+/**
+ * Is `target` inside the attack's reach: the cone in front of `attacker`, or its shape (a line
+ * straight ahead, a ring round it, or a zone round where it aimed)? Returns the distance between
+ * them if so.
+ */
+export function inAttackCone(attacker: Fighter, target: Fighter, atk: AttackDef, radius: number, span?: [number, number]): number | null {
+  const dx = target.x - attacker.x;
+  const dz = target.z - attacker.z;
+  const d = Math.hypot(dx, dz);
+  const shape = atk.shape;
+  if (shape?.kind === 'zone') {
+    const aim = attacker.aim;
+    if (!aim) return null;
+    return Math.hypot(target.x - aim.x, target.z - aim.z) - radius <= shape.radius ? d : null;
+  }
+  if (Math.abs(target.y - attacker.y) > 2.2) return null;
+  if (shape?.kind === 'ring') return d + radius >= shape.inner && d - radius <= atk.range ? d : null;
+  if (shape?.kind === 'line') {
+    const f = forward(attacker.yaw);
+    const along = dx * f.x + dz * f.z;
+    const across = Math.abs(dx * f.z - dz * f.x);
+    const [near, far] = span ?? [0, atk.range];
+    return along + radius >= near && along - radius <= far && across <= shape.width + radius ? Math.max(0, along) : null;
+  }
+  if (d - radius > atk.range) return null;
+  if (d < 0.3) return d;
+  const ang = Math.abs(angleDiff(attacker.yaw, Math.atan2(dx, dz)));
+  // a wider effective arc up close so point-blank hits don't whiff
+  const slack = Math.atan2(radius, d);
+  if (ang > atk.arc * DEG + slack) return null;
+  return d;
+}
+
+/**
+ * How far out along its line a thrown weapon is, as a fraction of the range, `u` (0..1) of the way
+ * through the active frames: out fast and slowing to the end of the line by halfway, then pulled
+ * back to the hand faster and faster.
+ */
+export function thrownOut(u: number): number {
+  if (u <= 0.5) {
+    const k = Math.max(0, u) / 0.5;
+    return 1 - (1 - k) * (1 - k);
+  }
+  const k = Math.min(1, (u - 0.5) / 0.5);
+  return 1 - k * k;
+}
+
+/**
+ * The stretch of its line a thrown weapon has swept so far in this hit (see AttackDef.thrown): on
+ * the way out, from the hand to where it has got; on the way back, from where it has got to the
+ * end of the line.
+ */
+export function thrownSpan(atk: AttackDef, u: number): [number, number] {
+  const d = atk.range * thrownOut(u);
+  return u <= 0.5 ? [0, d] : [d, atk.range];
+}
+
+/**
+ * Where a zone attack marks the ground: on the foe it's most plausibly meant for (near, and in
+ * front), or half its range straight ahead if nobody is in reach.
+ */
+export function zoneAim(from: { x: number; z: number; yaw: number }, foes: Iterable<{ x: number; z: number }>, range: number): Vec2 {
+  let best: { x: number; z: number } | null = null;
+  let bestScore = Infinity;
+  for (const o of foes) {
+    const d = Math.hypot(o.x - from.x, o.z - from.z);
+    if (d > range) continue;
+    const score = d + Math.abs(angleDiff(from.yaw, yawTo(from.x, from.z, o.x, o.z))) * 3;
+    if (score < bestScore) {
+      bestScore = score;
+      best = o;
+    }
+  }
+  if (best) return { x: best.x, z: best.z };
+  const fw = forward(from.yaw);
+  return { x: from.x + fw.x * range * 0.5, z: from.z + fw.z * range * 0.5 };
+}
+
+export function decideOutcome(attacker: Fighter, defender: Fighter, atk: AttackDef, t: number, def: DefenseInfo): Outcome {
+  if (!defender.isAlive() || defender.state === 'knockdown' || defender.invulnUntil > t) return 'miss';
+  if (defender.state === 'broken') return 'deathblow';
+
+  const toAttacker = yawTo(defender.x, defender.z, attacker.x, attacker.z);
+
+  if (def.iframes) {
+    if (atk.perilous === 'thrust' && def.dodgeDir) {
+      const f = forward(toAttacker);
+      if (def.dodgeDir.x * f.x + def.dodgeDir.z * f.z > 0.5) return 'mikiri';
+    }
+    return 'evade';
+  }
+  if ((atk.perilous === 'sweep' || atk.perilous === 'grab') && def.airborne) return 'evade';
+
+  if (
+    defender.state === 'stance' &&
+    defender.stateStart <= t &&
+    defender.char.ability.kind === 'counter' &&
+    atk.perilous !== 'grab' &&
+    atk.perilous !== 'sweep' &&
+    atk.perilous !== 'area'
+  ) {
+    return 'counter';
+  }
+
+  const guardArc = (COMBAT.guardArc + (defender.mods.guardArcBonus ?? 0)) * DEG;
+  const facing = Math.abs(angleDiff(defender.yaw, toAttacker)) <= guardArc;
+  const canDeflect = !atk.unparryable && atk.perilous !== 'sweep' && atk.perilous !== 'grab' && atk.perilous !== 'area';
+  const canBlock = !atk.perilous;
+
+  if (facing && def.parrying && canDeflect) return 'deflect';
+  if (facing && def.guarding && canBlock) {
+    const incoming = blockPostureDamage(attacker, defender, atk);
+    return defender.posture + incoming >= defender.maxPosture ? 'guardBreak' : 'block';
+  }
+  return defender.hasHyperArmor(t) ? 'armor' : 'hit';
+}
+
+function postureMult(f: Fighter): number {
+  return f.mods.postureDamageMult ?? 1;
+}
+
+function blockPostureDamage(attacker: Fighter, defender: Fighter, atk: AttackDef): number {
+  return atk.blockPosture * postureMult(attacker) * (defender.mods.blockPostureMult ?? 1) * COMBAT.hitPostureMult;
+}
+
+export interface HitResult {
+  outcome: Outcome;
+  attackerId: string;
+  defenderId: string;
+  key: AttackKey;
+  damage: number;
+  /** Health restored to the attacker (lifesteal). */
+  healed: number;
+  defenderBroken: boolean;
+  attackerBroken: boolean;
+  killed: Fighter | null;
+  /** Knockback distances (meters) along the attacker -> defender line. */
+  pushDefender: number;
+  pushAttacker: number;
+  /** If set, the defender is dragged to this distance in front of the attacker. */
+  pull: number | null;
+  backstab: boolean;
+  tipper: boolean;
+  /** an execution started (the deathblow lands later, see executeBlow) */
+  execute: boolean;
+}
+
+export interface HitGeometry {
+  distance: number;
+}
+
+/** Apply a resolved hit, mutating both fighters. `now` is when the result takes effect. */
+export function applyHit(
+  attacker: Fighter,
+  defender: Fighter,
+  atk: AttackDef,
+  key: AttackKey,
+  outcome: Outcome,
+  now: number,
+  geo: HitGeometry,
+): HitResult {
+  // contact (it landed, was armoured through, blocked or broke the guard) opens the attack's
+  // on-contact cancels, the special above all (see shared/cancels.ts)
+  if (outcome === 'hit' || outcome === 'armor' || outcome === 'block' || outcome === 'guardBreak') attacker.contactSerial = attacker.attackSerial;
+  const r: HitResult = {
+    outcome,
+    attackerId: attacker.id,
+    defenderId: defender.id,
+    key,
+    damage: 0,
+    healed: 0,
+    defenderBroken: false,
+    attackerBroken: false,
+    killed: null,
+    pushDefender: 0,
+    pushAttacker: 0,
+    pull: null,
+    backstab: false,
+    tipper: false,
+    execute: false,
+  };
+
+  const tipper = !!attacker.mods.tipperBonus && geo.distance >= atk.range * 0.7;
+  r.tipper = tipper && (outcome === 'hit' || outcome === 'armor');
+  const tipMult = tipper ? 1 + (attacker.mods.tipperBonus ?? 0) : 1;
+  const aPost = postureMult(attacker) * tipMult;
+  let dmgMult = attacker.damageMult(now) * tipMult;
+
+  const dealDamage = (amount: number) => {
+    const dealt = Math.min(defender.hp, Math.round(amount));
+    defender.hp -= dealt;
+    defender.lastDamageAt = now;
+    r.damage = dealt;
+    const ls = attacker.mods.lifesteal ?? 0;
+    if (ls > 0 && dealt > 0) {
+      const before = attacker.hp;
+      attacker.heal(dealt * ls);
+      r.healed = attacker.hp - before;
+    }
+    if (defender.hp <= 0) {
+      defender.hp = 0;
+      defender.force('dead', now);
+      r.killed = defender;
+      return true;
+    }
+    return false;
+  };
+
+  switch (outcome) {
+    case 'miss':
+    case 'evade':
+      break;
+
+    case 'mikiri': {
+      const broke = attacker.addPosture(COMBAT.mikiriPosture * postureMult(defender), now);
+      r.attackerBroken = broke;
+      attacker.force(broke ? 'broken' : 'deflected', now, broke ? COMBAT.brokenTime : COMBAT.mikiriStunTime);
+      break;
+    }
+
+    case 'deflect': {
+      const mult = atk.perilous ? COMBAT.perilousDeflectMult : 1;
+      const broke = attacker.addPosture(atk.posture * COMBAT.deflectAttackerPosture * mult * postureMult(defender), now);
+      r.attackerBroken = broke;
+      const recoil = Math.min(
+        COMBAT.deflectRecoilMax,
+        Math.max(COMBAT.deflectRecoilMin, COMBAT.deflectRecoilBase + atk.posture * mult * COMBAT.deflectRecoilPerPosture),
+      );
+      attacker.force(broke ? 'broken' : 'deflected', now, broke ? COMBAT.brokenTime : Math.round(recoil));
+      // deflecting costs a sliver of your own posture, but can never break you
+      const self = atk.blockPosture * COMBAT.deflectSelfPosture * (defender.mods.blockPostureMult ?? 1);
+      defender.posture = Math.min(defender.maxPosture - 1, defender.posture + self);
+      defender.lastPostureDamageAt = now;
+      defender.lastPressDeflected = true;
+      if (defender.mods.riposteWindupMult) defender.riposteUntil = now + 1200;
+      r.pushAttacker = COMBAT.deflectKnockback;
+      break;
+    }
+
+    case 'block': {
+      defender.addPosture(blockPostureDamage(attacker, defender, atk), now);
+      defender.force('blockstun', now, COMBAT.blockstunTime);
+      r.pushDefender = COMBAT.blockKnockback + (atk.knockback ?? 0) * 0.5;
+      break;
+    }
+
+    case 'guardBreak': {
+      defender.posture = defender.maxPosture;
+      defender.lastPostureDamageAt = now;
+      defender.force('broken', now, COMBAT.brokenTime);
+      r.defenderBroken = true;
+      r.pushDefender = COMBAT.blockKnockback + (atk.knockback ?? 0) * 0.5;
+      break;
+    }
+
+    case 'hit':
+    case 'armor': {
+      const toAttacker = yawTo(defender.x, defender.z, attacker.x, attacker.z);
+      const back = Math.abs(angleDiff(defender.yaw, toAttacker)) > 115 * DEG;
+      if (back && attacker.mods.backstabBonus) {
+        dmgMult *= 1 + attacker.mods.backstabBonus;
+        r.backstab = true;
+      }
+      if (dealDamage(atk.damage * dmgMult * COMBAT.hitDamageMult)) break;
+      const postureAmt = atk.posture * aPost * COMBAT.hitPostureMult * (outcome === 'armor' ? 0.5 : 1);
+      const broke = defender.addPosture(postureAmt, now);
+      if (broke) {
+        defender.force('broken', now, COMBAT.brokenTime);
+        r.defenderBroken = true;
+      } else if (outcome === 'hit') {
+        // a heavy blow staggers longer (and locks the guard out longer, see Fighter.guardLockEnd)
+        const heavyHit = isHeavyKey(key) || key === 'sp';
+        defender.force('stagger', now, heavyHit ? COMBAT.staggerHeavyTime : COMBAT.staggerTime);
+      }
+      if (outcome === 'hit') {
+        r.pushDefender = COMBAT.hitKnockback + (atk.knockback ?? 0);
+        if (atk.pull != null) r.pull = atk.pull;
+      }
+      break;
+    }
+
+    case 'deathblow': {
+      // the execution: both locked into the paired animation; the blow lands later (executeBlow)
+      attacker.force('execute', now, COMBAT.executeTime);
+      defender.force('executed', now, COMBAT.executeTime);
+      attacker.invulnUntil = now + COMBAT.executeTime;
+      defender.invulnUntil = now + COMBAT.executeTime;
+      r.execute = true;
+      break;
+    }
+
+    case 'counter': {
+      const ab = defender.char.ability;
+      if (ab.kind !== 'counter') break;
+      const ct = ab.attack;
+      defender.startAttack('ct', now);
+      const dealt = Math.min(attacker.hp, Math.round(ct.damage * COMBAT.hitDamageMult));
+      attacker.hp -= dealt;
+      attacker.lastDamageAt = now;
+      r.damage = dealt;
+      if (attacker.hp <= 0) {
+        attacker.hp = 0;
+        attacker.force('dead', now);
+        r.killed = attacker;
+        break;
+      }
+      const broke = attacker.addPosture(ct.posture * postureMult(defender) * COMBAT.hitPostureMult, now);
+      r.attackerBroken = broke;
+      attacker.force(broke ? 'broken' : 'stagger', now, broke ? COMBAT.brokenTime : COMBAT.staggerTime + 200);
+      r.pushAttacker = 1.0;
+      break;
+    }
+  }
+  return r;
+}
+
+/**
+ * The execution's finishing blow: most of a fight's damage. Returns the damage dealt and whether
+ * it killed. The victim's posture comes back whole either way.
+ */
+export function executeBlow(attacker: Fighter, defender: Fighter, now: number): { damage: number; killed: boolean; healed: number } {
+  const amount = defender.maxHp * COMBAT.executeDamage * attacker.damageMult(now);
+  const dealt = Math.min(defender.hp, Math.round(amount));
+  defender.hp -= dealt;
+  defender.lastDamageAt = now;
+  // both walk away from an execution with their guard whole again
+  defender.posture = 0;
+  attacker.posture = 0;
+  let healed = 0;
+  const ls = attacker.mods.lifesteal ?? 0;
+  if (ls > 0 && dealt > 0) {
+    const before = attacker.hp;
+    attacker.heal(dealt * ls);
+    healed = attacker.hp - before;
+  }
+  if (defender.hp <= 0) {
+    defender.hp = 0;
+    defender.force('dead', now);
+    return { damage: dealt, killed: true, healed };
+  }
+  return { damage: dealt, killed: false, healed };
+}

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Ronin Voxel Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;800&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet" />
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+<style>
+  :root { --paper: #f3f0e9; --ink: #141416; --muted: #6d6a64; --rule: #d4cfc4; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--paper); color: var(--ink); font-family: 'Cormorant Garamond', Georgia, serif; }
+  #sheet { width: 2560px; padding: 56px 72px 48px; background: var(--paper); }
+  header { display: flex; align-items: baseline; gap: 28px; border-bottom: 2px solid var(--ink); padding-bottom: 18px; }
+  h1 { font-family: 'Shippori Mincho', serif; font-weight: 800; font-size: 92px; letter-spacing: 0.12em; line-height: 1; }
+  .kanji { font-family: 'Shippori Mincho', serif; font-size: 64px; font-weight: 800; }
+  .meta { margin-left: auto; text-align: right; font-size: 26px; color: var(--muted); line-height: 1.35; }
+  .panels { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 30px; }
+  figure { display: flex; flex-direction: column; align-items: center; }
+  figcaption { margin-top: 10px; font-size: 30px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 600; }
+  figcaption small { display: block; text-align: center; font-size: 20px; letter-spacing: 0.1em; color: var(--muted); text-transform: none; font-weight: 500; }
+  footer { display: flex; align-items: center; gap: 36px; margin-top: 26px; border-top: 1px solid var(--rule); padding-top: 18px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+  .swatch { width: 34px; height: 34px; border: 1px solid rgba(0,0,0,0.25); }
+  footer p { font-size: 22px; color: var(--muted); max-width: 900px; line-height: 1.35; }
+  footer .label { font-size: 22px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 600; color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="sheet">
+  <header>
+    <h1>RONIN</h1><span class="kanji">浪人</span>
+    <div class="meta" id="meta"></div>
+  </header>
+  <div id="rows"></div>
+  <footer>
+    <span class="label">Palette</span>
+    <div class="swatches" id="swatches"></div>
+    <p>Straw kasa, long robe over hakama, katana &amp; wakizashi through the obi, sheathed polearm across the back. Kept to the ink-wash greys of the reference.</p>
+  </footer>
+</div>
+<script type="module">
+  import { buildRonin, poses, palette } from './model.js';
+  import { renderSheet, swatches } from '../../tools/voxel/sheet.js';
+
+  const model = buildRonin();
+  const view = (id, title, sub, pose, dir, x) => ({ id, title, sub, model, poses, pose, dir, x });
+  renderSheet(document.getElementById('rows'), {
+    px: 9,
+    y: [-3, 91],
+    rows: [[
+      view('tpose', 'T-Pose', 'front', 'tpose', [0, 0, 1], [-40, 40]),
+      view('apose', 'A-Pose', 'front', 'apose', [0, 0, 1], [-33, 33]),
+      view('side', 'Side', 'left profile · A-pose', 'apose', [1, 0, 0], [-20, 26]),
+      view('back', 'Back', 'A-pose', 'apose', [0, 0, -1], [-33, 33]),
+    ]],
+  });
+
+  const height = model.bounds.max[1] - model.bounds.min[1] + 1;
+  const dims = model.bounds.max.map((m, i) => m - model.bounds.min[i] + 1);
+  document.getElementById('meta').innerHTML =
+    `Voxel character sheet<br>${model.voxels.length.toLocaleString()} voxels · ${model.bones.length} bones · ${height} vx tall incl. polearm<br>1 voxel ≈ 2.25 cm · T-pose bounds ${dims.join(' × ')}`;
+  swatches(document.getElementById('swatches'), palette);
+
+  await document.fonts.ready;
+  window.__ready = true;
+</script>
+</body>
+</html>
