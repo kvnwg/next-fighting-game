@@ -5,6 +5,8 @@ import { PLACEMENT_MATCHES, START_MMR } from '../shared/ranks';
 
 export interface Profile extends ProfileView {
   token: string;
+  /** matches finished since the last after-match ad (see MATCH_AD_EVERY) */
+  sinceAd?: number;
   createdAt: number;
   lastSeen: number;
 }

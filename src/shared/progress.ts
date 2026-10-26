@@ -35,8 +35,10 @@ export const AD_REWARD = 30;
 export const TUTORIAL_REWARD = 100;
 /** The server won't pay for ads closer together than this (no ad is shorter). */
 export const AD_MIN_GAP_MS = 5000;
-/** Coins for the ad that plays after every match, watched to the end. */
+/** Coins for the ad that plays after a won match, watched to the end. */
 export const MATCH_AD_REWARD = 50;
+/** An ad plays after a win once this many matches have been finished since the last one (never after a loss). */
+export const MATCH_AD_EVERY = 3;
 /** How long after a match its ad can still pay (it plays as the result card goes). */
 export const MATCH_AD_WINDOW_MS = 3 * 60_000;
 

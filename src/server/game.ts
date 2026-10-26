@@ -2,7 +2,7 @@
 import { CHARACTER_IDS, CharacterId, isCharacterId } from '../shared/characters';
 import { MATCH, SERVER_TICK_HZ } from '../shared/config';
 import { ARENA_MAPS, MapDef } from '../shared/maps';
-import { AD_MIN_GAP_MS, AD_REWARD, FREE_PICK_GAMES, MATCH_AD_REWARD, MATCH_AD_WINDOW_MS, MATCH_REWARD, TUTORIAL_REWARD, UnlockRefusal, canUnlockChar, canUnlockMap, freePickReady, sharedMaps } from '../shared/progress';
+import { AD_MIN_GAP_MS, AD_REWARD, FREE_PICK_GAMES, MATCH_AD_EVERY, MATCH_AD_REWARD, MATCH_AD_WINDOW_MS, MATCH_REWARD, TUTORIAL_REWARD, UnlockRefusal, canUnlockChar, canUnlockMap, freePickReady, sharedMaps } from '../shared/progress';
 import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, SelectView, ServerMsg } from '../shared/protocol';
 import { eloDelta } from '../shared/ranks';
 import { normalizeRoomCode, randomRoomCode } from '../shared/rooms';
@@ -590,6 +590,7 @@ export class Game {
       earned[i] = winner === i ? table.win : table.loss;
       prof.coins += earned[i];
       prof.games++;
+      prof.sinceAd = (prof.sinceAd ?? 0) + 1;
       if (prof.games === FREE_PICK_GAMES && freePickReady(prof)) p.send({ t: 'notice', text: 'Your free fighter is ready! Open Fighters to pick one.', kind: 'good' });
       this.store.markDirty();
     }
@@ -597,9 +598,13 @@ export class Game {
       const p = humans[i];
       if (!p) continue;
       const counted = rated && opponentRating(i) !== null;
-      // an ad plays once the result card goes (not after the tutorial), paying when it's watched through
-      const ad = arena.mode !== 'tutorial';
-      if (ad) p.matchAdUntil = this.now() + MATCH_AD_WINDOW_MS;
+      // an ad plays once the result card goes, paying when it's watched through: after a win, once a
+      // few matches have been finished since the last one (never after a loss, nor the tutorial)
+      const ad = earned[i] > 0 && winner === i && (p.profile.sinceAd ?? 0) >= MATCH_AD_EVERY;
+      if (ad) {
+        p.matchAdUntil = this.now() + MATCH_AD_WINDOW_MS;
+        p.profile.sinceAd = 0;
+      }
       p.send({
         t: 'result',
         mode: arena.mode,

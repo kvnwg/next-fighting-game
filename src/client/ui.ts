@@ -1196,7 +1196,7 @@ export class UI {
         <div class="sh-maps">${ARENA_MAPS.map((m) => mapCard(m.id)).join('')}</div>
         ${iconHead('fighters', 'Fighters')}
         <button class="sh-fighters">${icon('fighters')}Unlock fighters<span>${coinText(charPrice('ronin'))} coins each · Lancer and Warden ${coinText(charPrice('lancer'))} at Gold</span></button>
-        <p class="muted">Every finished match pays coins, and the ad that plays after it pays ${coinText(MATCH_AD_REWARD)} more.</p>
+        <p class="muted">Every finished match pays coins, and every third match or so, a win ends with an ad that pays ${coinText(MATCH_AD_REWARD)} more.</p>
       </div>`,
       true,
       '店',

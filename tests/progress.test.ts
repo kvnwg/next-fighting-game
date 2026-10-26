@@ -70,29 +70,44 @@ describe('coins and unlocks', () => {
     expect(old.coins).toBe(0);
   });
 
-  it('a finished match pays, its ad pays once on top, and giving up pays nothing', () => {
+  it('a finished match pays, giving up pays nothing, and every third match a win ends with an ad', () => {
     const { join, playMatch, step } = world();
     const c = join('Earner');
+    const { win, loss } = MATCH_REWARD.practice;
+    // the first two matches: coins, and no ad
     playMatch(c, true);
-    const win = MATCH_REWARD.practice.win;
     expect(c.prof.coins).toBe(win);
     expect(c.prof.games).toBe(1);
-    // the card says an ad plays next and what it pays; nothing doubles any more
-    expect(c.last('result')).toMatchObject({ coins: win, ad: MATCH_AD_REWARD });
+    expect(c.last('result')).toMatchObject({ coins: win });
+    expect(c.last('result')).not.toHaveProperty('ad');
     expect(c.last('result')).not.toHaveProperty('double');
+    playMatch(c, true);
+    expect(c.last('result')).not.toHaveProperty('ad');
+    // an ad claimed without one being due pays nothing
     c.send({ t: 'ad', kind: 'match' });
-    expect(c.prof.coins).toBe(win + MATCH_AD_REWARD);
-    expect(c.last('coins')).toMatchObject({ gained: MATCH_AD_REWARD, why: 'matchAd' });
-    // once per match
+    expect(c.prof.coins).toBe(2 * win);
+    // the third is a loss: never an ad after a loss, so it waits for the next win
+    playMatch(c, false);
+    expect(c.prof.coins).toBe(2 * win + loss);
+    expect(c.last('result')).not.toHaveProperty('ad');
+    // giving up pays nothing and doesn't count
+    playMatch(c, false, true);
+    expect(c.prof.coins).toBe(2 * win + loss);
+    expect(c.prof.games).toBe(3);
+    // the next win: the card says an ad plays next and what it pays
+    playMatch(c, true);
+    expect(c.last('result')).toMatchObject({ coins: win, ad: MATCH_AD_REWARD });
     step(AD_MIN_GAP_MS + 100);
     c.send({ t: 'ad', kind: 'match' });
-    expect(c.prof.coins).toBe(win + MATCH_AD_REWARD);
-    // a loss still pays something; giving up pays nothing and doesn't count
-    playMatch(c, false);
-    expect(c.prof.coins).toBe(win + MATCH_AD_REWARD + MATCH_REWARD.practice.loss);
-    playMatch(c, false, true);
-    expect(c.prof.coins).toBe(win + MATCH_AD_REWARD + MATCH_REWARD.practice.loss);
-    expect(c.prof.games).toBe(2);
+    expect(c.prof.coins).toBe(3 * win + loss + MATCH_AD_REWARD);
+    expect(c.last('coins')).toMatchObject({ gained: MATCH_AD_REWARD, why: 'matchAd' });
+    // once per ad
+    step(AD_MIN_GAP_MS + 100);
+    c.send({ t: 'ad', kind: 'match' });
+    expect(c.prof.coins).toBe(3 * win + loss + MATCH_AD_REWARD);
+    // and the count starts again: the next win has none
+    playMatch(c, true);
+    expect(c.last('result')).not.toHaveProperty('ad');
   });
 
   it('ads from the shop pay every time, but no faster than an ad can play', () => {
