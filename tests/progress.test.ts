@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Arena } from '../src/server/arena';
 import { MATCH } from '../src/shared/config';
 import { Game } from '../src/server/game';
@@ -278,5 +278,9 @@ describe('tutorial', () => {
     expect(game.arenas.size).toBe(0);
     expect(c.prof.tutorial).toBe(true);
     expect(c.prof.coins).toBe(0);
+    // skipping it again changes nothing (and so has nothing to save, or to sort the ladder over)
+    const dirty = vi.spyOn(game.store, 'markDirty');
+    for (let i = 0; i < 10; i++) c.send({ t: 'tutorial', a: 'skip' });
+    expect(dirty).not.toHaveBeenCalled();
   });
 });

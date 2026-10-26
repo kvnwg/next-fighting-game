@@ -720,6 +720,8 @@ export class Game {
   /** The tutorial is over: learned (the first time pays), or skipped. Either way it won't come up again. */
   endTutorial(p: Player, learned: boolean): void {
     const prof = p.profile;
+    // already done (a replay from Help, or a skip sent again): nothing changes, nothing to save
+    if (prof.tutorial) return;
     if (learned && !prof.tutorial) {
       prof.coins += TUTORIAL_REWARD;
       p.send({ t: 'coins', gained: TUTORIAL_REWARD, why: 'tutorial' });
