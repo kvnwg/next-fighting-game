@@ -99,6 +99,17 @@ describe('private lobbies', () => {
     expect(game.lobbies.includes(room)).toBe(false);
   });
 
+  it('a wanderer left behind in the public grounds no longer answers your challenge', () => {
+    const { game, join, step } = harness({ roamers: 2 });
+    const a = join('Host');
+    const wanderer = [...game.lobby.fighters.values()].find((f) => f.id.startsWith('roamer-'))!;
+    a.send({ t: 'challenge', target: wanderer.id });
+    a.send({ t: 'room', a: 'create' });
+    step(5000);
+    expect(a.last('select')).toBeUndefined();
+    expect((a.p.instance as Lobby).code).toBeTruthy();
+  });
+
   it('closes when its people disconnect', () => {
     const { game, join, step } = harness();
     const a = join('Host');

@@ -644,6 +644,8 @@ export class Game {
   private moveTo(p: Player, l: Lobby): void {
     this.unqueue(p);
     this.challenges.delete(p.id);
+    // a wanderer back there can't answer a challenge any more
+    this.answers = this.answers.filter((a) => a.p !== p);
     p.instance?.removePlayer(p);
     this.home.set(p, l);
     l.addPlayer(p, l.spawnPoint());
