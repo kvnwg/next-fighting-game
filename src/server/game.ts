@@ -156,7 +156,14 @@ export class Game {
 
   start(): void {
     if (this.timer) return;
-    this.timer = setInterval(() => this.tick(), 1000 / SERVER_TICK_HZ);
+    this.timer = setInterval(() => {
+      // a throw out of a timer would take the whole server (everyone's match) down with it
+      try {
+        this.tick();
+      } catch (err) {
+        console.error('[game] tick failed', err);
+      }
+    }, 1000 / SERVER_TICK_HZ);
   }
 
   stop(): void {
@@ -198,7 +205,19 @@ export class Game {
         pm.votes.map[1] = Math.random() < 0.5 && pm.votes.map[0] ? pm.votes.map[0] : pm.maps[Math.floor(Math.random() * pm.maps.length)];
         this.sendSelect(pm);
       }
-      if (now >= pm.endsAt) this.finishSelect(pm);
+      if (now >= pm.endsAt) {
+        try {
+          this.finishSelect(pm);
+        } catch (err) {
+          // the match couldn't start: nobody is left on the select, or out of every lobby
+          console.error('[game] match start failed', err);
+          for (const p of pm.players) {
+            if (!p || p.closed) continue;
+            if (!p.instance) this.enterLobby(p);
+            p.send({ t: 'selectCancel', reason: 'The match could not start.' });
+          }
+        }
+      }
     }
 
     if (now - this.lastMatchmake > 1000) {
@@ -227,23 +246,28 @@ export class Game {
         return;
       }
       if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return;
-      if (!player) {
-        if (msg.t === 'hello') player = this.join(ws, msg);
-        return;
-      }
-      player.lastHeardAt = this.now();
-      if (!this.rateLimit(player)) {
-        ws.close(4008, 'too many messages');
-        return;
-      }
+      // (a throw out of a socket's handler would take the whole server down)
       try {
+        if (!player) {
+          if (msg.t === 'hello') player = this.join(ws, msg);
+          return;
+        }
+        player.lastHeardAt = this.now();
+        if (!this.rateLimit(player)) {
+          ws.close(4008, 'too many messages');
+          return;
+        }
         this.handle(player, msg);
       } catch (err) {
         console.error('[game] message error', err);
       }
     });
     ws.on('close', () => {
-      if (player) this.leave(player);
+      try {
+        if (player) this.leave(player);
+      } catch (err) {
+        console.error('[game] leave failed', err);
+      }
     });
     ws.on('error', () => ws.close());
   }
