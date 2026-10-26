@@ -115,7 +115,7 @@ interface Floater {
 /** The cancel table (shared/cancels.ts) as the help screen shows it. */
 /** Every song's credit, as its licence asks. */
 function musicCredits(): string {
-  return [...TRACKS.lobby, ...TRACKS.select, ...TRACKS.combat]
+  return [...TRACKS.lobby, ...TRACKS.combat]
     .map((t) => `<li>"${t.title}" by ${t.artist} · <a href="${t.link}" target="_blank" rel="noopener">${t.licence}</a> · via BreakingCopyright</li>`)
     .join('');
 }

@@ -54,6 +54,8 @@ const RECORDED: Partial<Record<Sfx, { layers: string[]; offset?: number }>> = {
   matchFound: { layers: ['match_found'] },
   // one cycle of the ticking loop per number (see countdown()), from where its zap has built
   countdown: { layers: ['countdown'], offset: 0.2 },
+  // the fighter select's count: a drum hit lifted from one of the fight's songs (Good Day To Die)
+  boom: { layers: ['select_boom'] },
   fight: { layers: ['start_screech', 'start_confirm'] },
   victory: { layers: ['victory_fanfare', 'victory_piano'] },
   defeat: { layers: ['defeat'] },
@@ -148,14 +150,18 @@ class AudioEngine {
   private tunes: Music | null = null;
   private bed: Bed | null = null;
 
-  /** Start a music bed (the fighter select, the fight), or fade the music out with null. */
-  music(bed: Bed | null, fade = 2): void {
+  /**
+   * Start a music bed (the lobby, the fight), or fade the music out with null. The fighter select
+   * keeps the lobby's song going (or starts it), its clock booming over it.
+   */
+  music(to: Bed | 'select' | null, fade = 2): void {
+    const bed = to === 'select' ? 'lobby' : to;
     this.bed = bed;
     if (!this.tunes) return;
     if (bed) this.tunes.play(bed);
     else this.tunes.stop(fade);
     // the fight's first song loads while the fighters are picked
-    if (bed === 'select') this.tunes.cue('combat');
+    if (to === 'select') this.tunes.cue('combat');
   }
 
   /**
@@ -282,7 +288,7 @@ class AudioEngine {
 
   /** A named sound (menus, the countdown, entrances, the title screen); `take` picks which of its recordings. */
   play(name: Sfx, volume = 1, pos?: V3, take?: number): void {
-    const ui = name === 'click' || name === 'type' || name === 'countdown' || name === 'matchFound' || name === 'fight' || name === 'victory' || name === 'defeat';
+    const ui = name === 'click' || name === 'type' || name === 'countdown' || name === 'boom' || name === 'matchFound' || name === 'fight' || name === 'victory' || name === 'defeat';
     const rec = RECORDED[name];
     this.emit((o) => void ((rec && R.playLayers(o, rec.layers, 1, take, rec.offset)) || legacy(o, name)), {
       level: (ui ? LEVEL.ui : LEVEL.legacy) * (LEGACY_LEVEL[name] ?? 1),
@@ -294,6 +300,11 @@ class AudioEngine {
       gap: name === 'matchFound' ? 2 : 0.02,
       priority: ui ? 2 : 1,
     });
+  }
+
+  /** The fighter select's clock at `secs` left: a boom each second, the last three harder. */
+  selectBoom(secs: number): void {
+    this.play('boom', secs <= 3 ? 1 : 0.6);
   }
 
   /** The countdown at `n` (3, 2, 1): each number plays its own cycle of the recorded loop, in order. */

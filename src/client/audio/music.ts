@@ -1,6 +1,6 @@
 /**
- * The music: a bed for the fighter select and one for the fight, from the starting walk into the
- * ring to the result. The songs are files in public/music (next to the page), streamed through an
+ * The music: a bed for the lobby (it carries on through the fighter select) and one for the fight,
+ * from the starting walk into the ring to the result. The songs are files in public/music (next to the page), streamed through an
  * <audio> element routed into the mix: a five-minute song decoded whole would be over 100 MB.
  * Every song here needs its credit shown (the help page lists them, see CREDITS.md); `commercial`
  * is false for the ones whose licence rules out a build that earns money (ads, a store).
@@ -17,13 +17,11 @@ export interface Track {
   commercial: boolean;
 }
 
-export type Bed = 'lobby' | 'select' | 'combat';
+export type Bed = 'lobby' | 'combat';
 
 export const TRACKS: Record<Bed, Track[]> = {
   // the shrine plaza and the open ground around it, where anyone can be fought
   lobby: [{ file: 'reborn.mp3', title: 'Reborn', artist: 'Alex Productions', licence: 'CC BY 3.0', link: 'https://creativecommons.org/licenses/by/3.0/', commercial: true }],
-  // a 24-second cut of it: the select screen only lasts ten
-  select: [{ file: 'dragon-castle.mp3', title: 'Dragon Castle', artist: 'Makai Symphony', licence: 'CC BY-NC 3.0', link: 'https://creativecommons.org/licenses/by-nc/3.0/', commercial: false }],
   combat: [
     { file: 'thunder-unison.mp3', title: 'Thunder Unison', artist: 'Keys Of Moon', licence: 'CC BY 3.0', link: 'https://creativecommons.org/licenses/by/3.0/', commercial: true },
     { file: 'good-day-to-die.mp3', title: 'Good Day To Die', artist: 'Miguel Johnson', licence: 'CC BY 3.0', link: 'https://creativecommons.org/licenses/by/3.0/', commercial: true },
@@ -56,7 +54,7 @@ const SILENCE = (() => {
 /** The songs are mastered loud (about -15.5 LUFS): this sits them under the fight. */
 const LEVEL = 0.5;
 /** each bed's level against the fight's */
-const BED_LEVEL: Record<Bed, number> = { lobby: 0.8, select: 1, combat: 1 };
+const BED_LEVEL: Record<Bed, number> = { lobby: 0.8, combat: 1 };
 /** under an execution, so the finisher carries */
 const DUCK = 0.45;
 

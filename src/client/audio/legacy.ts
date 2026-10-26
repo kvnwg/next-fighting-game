@@ -28,6 +28,7 @@ export type Sfx =
   | 'type'
   | 'matchFound'
   | 'countdown'
+  | 'boom'
   | 'fight'
   | 'victory'
   | 'defeat'
@@ -160,6 +161,7 @@ export function legacy(o: Out, name: Sfx): void {
       burst(o, 2.2, 0.12, 'bandpass', 500, 900, 2.5);
       burst(o, 1.6, 0.08, 'bandpass', 1400, 700, 4, 0.5);
       return;
+    case 'boom':
     case 'taiko':
       osc(o, { f: 110, f1: 45, dur: 0.7, gain: 0.8, a: 0.002 });
       noise(o, { color: 'pink', type: 'lowpass', f: 900, f1: 120, dur: 0.15, gain: 0.4 });

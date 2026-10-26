@@ -1786,7 +1786,7 @@ class App {
     this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active;
     this.entranceCues(now);
     const left = this.select.tick(now);
-    if (left !== null && left > 0 && left <= 3) audio.countdown(left, 0.5);
+    if (left !== null && left > 0) audio.selectBoom(left);
 
     if (this.lock && (this.lock.s === 'dead' || !this.fighters.has(this.lock.id) || (this.local && dist2D(this.local.cf.pos.x, this.local.cf.pos.z, this.lock.pos.x, this.lock.pos.z) > 30))) {
       if (this.kind !== 'arena' || !this.fighters.has(this.lock.id)) this.lock = null;

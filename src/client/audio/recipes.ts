@@ -634,7 +634,7 @@ const SAMPLE_GAIN: Record<string, number> = {
   // Ronin's wind sits 6 dB under his unsheathe, the Monk's breath matches his thump, the title
   // screen's whoosh sits 4 dB under its shing and the Wraith's scrape is level with the unsheathe;
   // the entrance stomp keeps the level of the Knight's deflect it replaces
-  ui_click: 0.1, match_found: 0.16, countdown: 0.18, start_screech: 0.91, start_confirm: 0.91, victory_fanfare: 0.15, victory_piano: 0.15, defeat: 0.15, blade_draw: 0.39, blade_shing: 0.44, heavy_whoosh: 0.44, glass_tink: 0.72, riser_chime: 1.57, juggernaut_slam: 1.32, juggernaut_thud: 1.32, juggernaut_boom: 0.5, juggernaut_rubble: 0.5, ronin_taiko: 0.75, ronin_flute: 0.75, wind_howl: 0.2, ronin_wind_sweep: 0.2, monk_breath: 0.52, reaper_scrape: 0.18, reaper_groan: 0.18, entrance_stomp: 0.32,
+  ui_click: 0.1, match_found: 0.16, countdown: 0.18, select_boom: 0.14, start_screech: 0.91, start_confirm: 0.91, victory_fanfare: 0.15, victory_piano: 0.15, defeat: 0.15, blade_draw: 0.39, blade_shing: 0.44, heavy_whoosh: 0.44, glass_tink: 0.72, riser_chime: 1.57, juggernaut_slam: 1.32, juggernaut_thud: 1.32, juggernaut_boom: 0.5, juggernaut_rubble: 0.5, ronin_taiko: 0.75, ronin_flute: 0.75, wind_howl: 0.2, ronin_wind_sweep: 0.2, monk_breath: 0.52, reaper_scrape: 0.18, reaper_groan: 0.18, entrance_stomp: 0.32,
   // the Knight's deflect (the sword hit and the shield ring together), at the level of the shield thud
   // it replaced; his shield bash; the Warden's step (at the level of the gravel step he had); the vanish
   // and the jump (at the roll dodge's level: the synthesised ones are near silent), the blink, the body
