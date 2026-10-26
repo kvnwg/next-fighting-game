@@ -293,7 +293,8 @@ export class Game {
   private join(ws: SocketLike, msg: Extract<ClientMsg, { t: 'hello' }>): Player | null {
     if (msg.v !== PROTOCOL_VERSION) {
       ws.send(JSON.stringify({ t: 'notice', text: 'Your client is out of date. Refresh the page.', kind: 'warn' }));
-      ws.close(4001, 'version');
+      // (the reason is what the player reads: the notice above is held back behind the title screen)
+      ws.close(4001, 'the game has been updated, reload the page');
       return null;
     }
     const name = sanitizeName(msg.name);
@@ -302,7 +303,7 @@ export class Game {
       const existing = this.players.get(profile.id);
       if (existing) {
         existing.send({ t: 'notice', text: 'You logged in from somewhere else.', kind: 'warn' });
-        existing.ws.close(4002, 'replaced');
+        existing.ws.close(4002, 'you logged in from somewhere else');
         this.leave(existing);
       }
       profile.name = name;

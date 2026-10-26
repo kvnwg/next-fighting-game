@@ -90,6 +90,22 @@ describe('challenges', () => {
   });
 });
 
+describe('identity', () => {
+  it('says why a connection was closed in words the player can read', () => {
+    const { join, game } = harness();
+    const first = join('Twotabs');
+    const second = join('Twotabs', first.token);
+    expect(first.ws.closedWith).toBe('you logged in from somewhere else');
+    expect(game.players.get(second.p.id)).toBe(second.p);
+    let closedWith = '';
+    let onMessage: (d: unknown) => void = () => {};
+    const ws = { readyState: 1, send() {}, close: (_c: number, r: string) => (closedWith = r), on: (ev: string, cb: (d: unknown) => void) => ev === 'message' && (onMessage = cb) };
+    game.handleConnection(ws as never);
+    onMessage(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION - 1, name: 'Stale', char: 'ronin' }));
+    expect(closedWith).toMatch(/updated.*reload/);
+  });
+});
+
 describe('server robustness', () => {
   it('a match that fails to start calls the select off instead of throwing out of the tick', () => {
     const { game, step, join } = harness();
