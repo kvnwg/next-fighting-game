@@ -39,8 +39,8 @@ interface PendingMatch {
   players: [Player, Player | null];
   diff?: BotDifficulty;
   botRating?: number;
-  /** the AI opponent's own picks, made at voteAt */
-  bot: { char: CharacterId; name: string; voteAt: number } | null;
+  /** the AI opponent's own picks, made at voteAt (and the rating it showed, if it was met in the lobby) */
+  bot: { char: CharacterId; name: string; voteAt: number; rating?: number } | null;
   endsAt: number;
   maps: string[];
   votes: SelectView['votes'];
@@ -85,7 +85,7 @@ export class Game {
   readonly arenas = new Set<Arena>();
   private queue: Player[] = [];
   /** challenges to the lobby's wanderers, waiting on their answer */
-  private answers: { p: Player; name: string; char: CharacterId; at: number; accept: boolean }[] = [];
+  private answers: { p: Player; name: string; char: CharacterId; rating?: number; at: number; accept: boolean }[] = [];
   /** pending challenges keyed by the challenged player's id (ring: fought in that lobby ring) */
   private challenges = new Map<string, { from: string; expires: number; ring: number }>();
   /** Matches waiting on the map and fighter select, by player. */
@@ -495,7 +495,7 @@ export class Game {
     return ARENA_MAPS[Math.floor(Math.random() * ARENA_MAPS.length)];
   }
 
-  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap(), botRating?: number, bot?: { char: CharacterId; name: string }): Arena {
+  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap(), botRating?: number, bot?: { char: CharacterId; name: string; rating?: number }): Arena {
     for (const p of [a, b]) {
       if (!p) continue;
       this.unqueue(p);
@@ -748,7 +748,7 @@ export class Game {
     if (!(lobby instanceof Lobby) || lobby.inDuel(p) || this.selecting.has(p)) return;
     const f = lobby.fighters.get(id);
     if (!f || f.owner || f.dummy || !f.isAlive() || this.answers.some((a) => a.p === p)) return;
-    this.answers.push({ p, name: f.name, char: f.char.id, at: this.now() + 1500 + Math.random() * 2500, accept: Math.random() < 0.8 });
+    this.answers.push({ p, name: f.name, char: f.char.id, rating: f.rating, at: this.now() + 1500 + Math.random() * 2500, accept: Math.random() < 0.8 });
     p.send({ t: 'notice', text: `Challenge sent to ${f.name}.`, kind: 'info' });
   }
 
@@ -762,7 +762,7 @@ export class Game {
         p.send({ t: 'notice', text: `${a.name} declined your challenge.`, kind: 'info' });
         continue;
       }
-      this.beginSelect('casual', p, null, 'normal', undefined, { name: a.name, char: a.char });
+      this.beginSelect('casual', p, null, 'normal', undefined, { name: a.name, char: a.char, rating: a.rating });
     }
   }
 
@@ -798,7 +798,7 @@ export class Game {
 
   /** Open the map and fighter select for a match; it starts when the vote closes. */
   /** `as`: the computer-run opponent's name and fighter, when it's someone already met (a lobby wanderer). */
-  beginSelect(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, botRating?: number, as?: { name: string; char: CharacterId }): void {
+  beginSelect(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, botRating?: number, as?: { name: string; char: CharacterId; rating?: number }): void {
     for (const p of [a, b]) {
       if (!p) continue;
       this.unqueue(p);
@@ -811,7 +811,7 @@ export class Game {
       players: [a, b],
       diff,
       botRating,
-      bot: b ? null : { char: as?.char ?? CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)], name: as?.name ?? botName(), voteAt: now + 1200 + Math.random() * 2200 },
+      bot: b ? null : { char: as?.char ?? CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)], name: as?.name ?? botName(), rating: as?.rating, voteAt: now + 1200 + Math.random() * 2200 },
       endsAt: now + (this.options.selectTime ?? MATCH.selectTime),
       // an arena either of you owns can be fought in
       maps: fixed ? [fixed.id] : sharedMaps(ARENA_MAPS.map((m) => m.id), a.profile, b?.profile),
@@ -851,7 +851,7 @@ export class Game {
       const c = pm.votes.char[i];
       if (p && c) p.charId = c;
     }
-    const bot = pm.bot ? { char: pm.votes.char[1] ?? pm.bot.char, name: pm.bot.name } : undefined;
+    const bot = pm.bot ? { char: pm.votes.char[1] ?? pm.bot.char, name: pm.bot.name, rating: pm.bot.rating } : undefined;
     this.startMatch(pm.mode, a, b, pm.diff, map, pm.botRating, bot);
   }
 
