@@ -9,7 +9,8 @@ export const LEVEL = {
   guardBreak: 1.25,
   posture: 0.9,
   windup: 0.5,
-  finish: 1.0,
+  // an execution's lead-in and finishing blow: as loud as the deflect's clang, or louder
+  finish: 1.6,
   step: 0.5,
   dodge: 0.55,
   cue: 0.75,
@@ -20,3 +21,9 @@ export const LEVEL = {
 
 /** Reverb send per family: parries hang in the air, footsteps barely touch the room. */
 export const WET = { swing: 0.12, hit: 0.18, block: 0.18, deflect: 0.55, big: 0.4, step: 0.05, finish: 0.55 };
+
+/**
+ * An execution's flourish strikes, on top of a hit's level: each fighter's brought up to the
+ * deflect's clang (measured offline; the Warden's and the Monk's already land that hard).
+ */
+export const EXEC_BLOW: Record<string, number> = { ronin: 1.3, juggernaut: 1, duelist: 1.75, lancer: 1.3, shade: 1.75, reaper: 1.75, monk: 1, paladin: 1.15 };

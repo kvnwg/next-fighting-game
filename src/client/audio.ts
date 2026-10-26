@@ -8,7 +8,7 @@ import { CHARACTERS, CharacterId, getAttack } from '../shared/characters';
 import type { CombatEvent } from '../shared/protocol';
 import { LEGACY_LEVEL, Sfx, legacy } from './audio/legacy';
 import { loadSamples, primeSample } from './audio/samples';
-import { LEVEL, WET } from './audio/levels';
+import { EXEC_BLOW, LEVEL, WET } from './audio/levels';
 import { Mixer, Voice } from './audio/mixer';
 import { Bed, Music } from './audio/music';
 import { Profile, profile } from './audio/profiles';
@@ -599,7 +599,7 @@ class AudioEngine {
 
   /** One of an execution's flourish strikes landing on the victim. */
   executionBlow(a: CharacterId, d: CharacterId, o: Placed): void {
-    this.emit((out) => R.execBlow(out, profile(a), profile(d)), { level: LEVEL.hit, vol: o.vol, pos: o.pos, wet: WET.hit, hero: true, priority: 2 });
+    this.emit((out) => R.execBlow(out, profile(a), profile(d)), { level: LEVEL.hit * (EXEC_BLOW[a] ?? 1), vol: o.vol, pos: o.pos, wet: WET.hit, hero: true, priority: 2 });
   }
 
   dodge(char: CharacterId, kind: 'roll' | 'vanish' | 'leap', o: Placed): void {
