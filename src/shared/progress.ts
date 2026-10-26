@@ -23,14 +23,14 @@ export const MAP_PRICE = 300;
 /** Matches to finish before the free fighter is yours to pick. */
 export const FREE_PICK_GAMES = 3;
 
-/** Coins for a finished match (giving up earns nothing). */
+/** Coins for a finished match (giving up earns nothing): a little; the ad after it pays the most. */
 export const MATCH_REWARD: Record<'ranked' | 'casual' | 'practice', { win: number; loss: number }> = {
-  ranked: { win: 60, loss: 30 },
-  casual: { win: 60, loss: 30 },
-  practice: { win: 40, loss: 20 },
+  ranked: { win: 10, loss: 5 },
+  casual: { win: 10, loss: 5 },
+  practice: { win: 10, loss: 5 },
 };
-/** Coins for watching an ad from the shop, as often as you like. */
-export const AD_REWARD = 50;
+/** Coins for watching an ad from the shop, between matches (less than the one after a match). */
+export const AD_REWARD = 30;
 /** Coins for finishing the tutorial the first time. */
 export const TUTORIAL_REWARD = 100;
 /** The server won't pay for ads closer together than this (no ad is shorter). */
