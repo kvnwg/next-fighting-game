@@ -7,6 +7,7 @@ import { Profile, Store, StorePersistence } from '../server/store';
 import type { SocketLike } from '../server/entities';
 import type { SocketLike as ClientSocketLike } from './net';
 import { platform } from './platform';
+import { demoDirector, parseScenes } from './demo';
 
 const PROFILES_KEY = 'deflect.offline.profiles.v1';
 
@@ -99,7 +100,11 @@ export function connectOffline(): ClientSocketLike {
     const arena = params.get('arena') ?? undefined;
     // the build published on Claude is for testing: everything unlocked (?unlockall does it in dev)
     const unlockAll = import.meta.env.VITE_UNLOCK_ALL === '1' || (import.meta.env.DEV && params.has('unlockall'));
-    game = new Game(new Store(localPersistence), undefined, { offline: true, roamers: 4, arena, unlockAll });
+    // recording the trailer (dev only): the director's matches, nothing saved
+    const demo = import.meta.env.DEV && params.has('demo');
+    game = demo
+      ? new Game(new Store(null), undefined, { offline: true, unlockAll: true, introTime: 1500, director: demoDirector(() => game!, parseScenes(params.get('demo')), Number(params.get('fight') || Infinity)) })
+      : new Game(new Store(localPersistence), undefined, { offline: true, roamers: 4, arena, unlockAll });
     game.start();
     addEventListener('pagehide', () => game?.store.flush());
   }

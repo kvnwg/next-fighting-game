@@ -75,6 +75,9 @@ interface SpearFlight {
   lastTip: THREE.Vector3 | null;
 }
 
+/** recording the trailer (dev only, see demo.ts): your fighter plays itself and the camera follows it */
+const DEMO = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
+
 /** where the game server is, when the page isn't served by it (the CrazyGames build) */
 const SERVER_URL: string = import.meta.env.VITE_SERVER_URL ?? '';
 
@@ -142,6 +145,8 @@ class App {
   private lobbyInfo: { n: number; count: number; cap: number; code?: string } | null = null;
   /** the tutorial is still to come for this player (it starts once the lobby is up) */
   private tutorialDue = false;
+  /** the fighter the camera follows while the game plays itself (DEMO) */
+  private demoSubject: ClientFighter | null = null;
   /** a friend's private lobby to join as soon as we're in (from an invite link) */
   private inviteRoom: string | null = null;
   /** the tutorial's lessons drawn over the fight, while it runs */
@@ -255,6 +260,8 @@ class App {
     this.openTitle();
     this.titleScreen!.boot();
     this.bindNet();
+    // the trailer starts straight away (DEMO)
+    if (DEMO) void this.connect('Kensei');
     requestAnimationFrame((t) => this.frame(t));
     // the title screen is up: loading is over
     requestAnimationFrame(() => platform.loadingStop());
@@ -542,7 +549,9 @@ class App {
     this.local = null;
     for (const r of m.roster) this.addFighter(r);
     this.applySnaps(m.snap, this.net.serverNow(), true);
-    const me = this.fighters.get(this.myId);
+    const me = DEMO ? undefined : this.fighters.get(this.myId);
+    this.demoSubject = DEMO ? (this.fighters.get(this.myId) ?? null) : null;
+    if (this.demoSubject) this.cam.snapBehind(m.yaw);
     if (me) {
       this.local = new LocalController(me, this.net, map);
       this.local.onAction = (a, ok) => {
@@ -585,7 +594,7 @@ class App {
       }
       return;
     }
-    const f = new ClientFighter(r, r.id === this.myId, this.scene);
+    const f = new ClientFighter(r, r.id === this.myId && !DEMO, this.scene);
     f.lavaAt = (x, z) => !!hazardAt(this.map, x, z);
     this.fighters.set(r.id, f);
   }
@@ -1866,6 +1875,14 @@ class App {
       this.cam.subjectBulk = CAMERA_BULK[this.local.cf.roster.char] ?? 1;
       this.cam.update(dt, p, this.lock ? this.lock.pos : null, { dodging: this.local.sim.state === 'dodge' });
       this.mapView?.update(dt, p);
+    } else if (this.demoSubject) {
+      const f = this.demoSubject;
+      this.cam.shakeScale = 1;
+      this.cam.subjectScale = f.model.scale;
+      this.cam.targetScale = this.lock?.model.scale ?? 1;
+      this.cam.subjectBulk = CAMERA_BULK[f.roster.char] ?? 1;
+      this.cam.update(dt, f.pos, this.lock ? this.lock.pos : null, { dodging: f.s === 'dodge' });
+      this.mapView?.update(dt, f.pos);
     } else if (this.titleScene) {
       this.titleScene.update(dt);
     } else {
@@ -1876,7 +1893,8 @@ class App {
     this.effects.update(dt, this.renderer.camera);
     this.updateMarks(dt);
     this.updateHud(dt, now);
-    this.renderer.render();
+    // recording the trailer draws only the frames it keeps (see scripts in demo.ts)
+    if (!DEMO || (globalThis as { __demoRender?: boolean }).__demoRender !== false) this.renderer.render();
     if (this.snapWant) {
       // copy the frame now, while the canvas still holds it
       const src = this.renderer.renderer.domElement;
@@ -1895,6 +1913,41 @@ class App {
       this.fps.frames = 0;
       this.fps.t = 0;
     }
+  }
+
+  /** The fight's HUD while the game plays itself (DEMO): both cards and the foe's posture, from what the server says. */
+  private demoHud(now: number): void {
+    const me = this.demoSubject;
+    const m = this.match;
+    if (!me || !m) return;
+    this.ui.setMatch(m, now);
+    if (m.phase === 'countdown') {
+      const secs = Math.ceil((m.endsAt - now) / 1000);
+      if (secs !== this.lastCountdown && secs > 0 && secs <= 3) {
+        this.lastCountdown = secs;
+        this.ui.banner(String(secs), `第${KANJI_NUM[m.round] ?? m.round}戦 · Round ${m.round}`, 950, 'count', KANJI_NUM[secs]);
+      }
+    }
+    const foe = this.fighters.get(m.players[m.you === 0 ? 1 : 0].id) ?? null;
+    const card = (f: ClientFighter, score: number): CardData => ({
+      name: f.roster.name,
+      title: f.roster.mmr !== undefined ? rankOf(f.roster.mmr, f.roster.placements ?? 0).label : '',
+      char: f.char,
+      hp: f.hp,
+      special: f.specialCharge(now),
+      posture: f.po / f.char.stats.posture,
+      broken: f.s === 'broken',
+      pips: score,
+      pipMax: MATCH.roundsToWin,
+      meta: '',
+    });
+    this.ui.setCard('self', card(me, m.scores[m.you]));
+    this.ui.setPostureMain(me.po / me.char.stats.posture, me.s === 'broken');
+    if (!foe) return;
+    this.ui.setCard('opp', card(foe, m.scores[m.you === 0 ? 1 : 0]));
+    const head = foe.s !== 'dead' ? this.project(foe.pos.x, foe.pos.y + 2.25 * foe.model.scale, foe.pos.z) : null;
+    this.ui.setFoePosture(head, foe.po / foe.char.stats.posture, foe.s === 'broken');
+    this.ui.setBrokenMark(foe.s === 'broken' ? this.project(foe.pos.x, foe.pos.y + 1.25 * foe.model.scale, foe.pos.z) : null);
   }
 
   private project(x: number, y: number, z: number): { x: number; y: number } | null {
@@ -1926,7 +1979,7 @@ class App {
   private updateHud(dt: number, now: number): void {
     this.ui.updateFloaters(dt, (x, y, z) => this.project(x, y, z));
     const local = this.local;
-    if (!local) return;
+    if (!local) return this.demoHud(now);
     const me = local.cf;
     const sim = local.sim;
     this.ui.setNetInfo(this.online, this.offline ? null : Math.round(this.net.rtt), settings.showFps ? this.fps.value : null, this.kind === 'lobby' ? this.lobbyInfo : null);

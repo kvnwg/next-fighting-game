@@ -64,6 +64,17 @@ export interface GameOptions {
   introTime?: number;
   /** A test build: everyone owns every fighter and arena, with coins to spare. */
   unlockAll?: boolean;
+  /** Runs the matches instead of the lobby (recording the trailer: see src/client/demo.ts). */
+  director?: Director;
+}
+
+/** Puts players in matches of its choosing, instead of the lobby. */
+export interface Director {
+  /** a player is in: true if the director has placed them */
+  join(p: Player): boolean;
+  /** their match is over: true if the director has placed them again */
+  matchOver(p: Player): boolean;
+  tick(now: number): void;
 }
 
 /** Coins a test build tops everyone up to. */
@@ -161,6 +172,7 @@ export class Game {
   tick(): void {
     const now = this.now();
     if (this.answers.length) this.answerChallenges(now);
+    this.options.director?.tick(now);
     // one broken instance must never take the whole server down
     for (const inst of [...this.lobbies, ...this.arenas]) {
       try {
@@ -273,7 +285,7 @@ export class Game {
     const p = new Player(ws, profile, char);
     this.players.set(p.id, p);
     p.send({ t: 'welcome', id: p.id, token: profile.token, profile: profileView(profile), online: this.players.size, serverTime: this.now() });
-    this.enterLobby(p);
+    if (!this.options.director?.join(p)) this.enterLobby(p);
     this.broadcastAll({ t: 'online', n: this.players.size });
     this.broadcastAll({ t: 'chat', name: '', text: `${p.name} entered the grounds.`, sys: true });
     return p;
@@ -473,7 +485,7 @@ export class Game {
     const humans = [...arena.players];
     arena.destroy();
     for (const p of humans) {
-      if (p.closed) continue;
+      if (p.closed || this.options.director?.matchOver(p)) continue;
       this.enterLobby(p);
       p.send({ t: 'profile', profile: profileView(p.profile) });
     }
