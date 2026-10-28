@@ -115,6 +115,8 @@ interface Floater {
   z: number;
   life: number;
   max: number;
+  /** a callout that counts up (DEFLECT ×2, ×3): the next one with the same key takes its place */
+  key?: string;
 }
 
 /** The cancel table (shared/cancels.ts) as the help screen shows it. */
@@ -716,10 +718,16 @@ export class UI {
     this.plates.clear();
   }
 
-  floatText(text: string, x: number, y: number, z: number, cls: string, kanji = ''): void {
+  floatText(text: string, x: number, y: number, z: number, cls: string, kanji = '', key?: string): void {
+    if (key) {
+      for (const f of this.floaters.filter((o) => o.key === key)) {
+        f.el.remove();
+        this.floaters.splice(this.floaters.indexOf(f), 1);
+      }
+    }
     const el = h(`<div class="floater ${cls}">${kanji ? `<span class="f-jp">${kanji}</span>` : ''}${esc(text)}</div>`);
     this.floatLayer.appendChild(el);
-    this.floaters.push({ el, x, y, z, life: 1.0, max: 1.0 });
+    this.floaters.push({ el, x, y, z, life: 1.0, max: 1.0, key });
     if (this.floaters.length > 30) {
       const f = this.floaters.shift()!;
       f.el.remove();

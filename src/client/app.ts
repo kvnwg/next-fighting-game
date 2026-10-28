@@ -122,6 +122,9 @@ class App {
   /** back-to-back deflects build up the spectacle */
   private deflectStreak = 0;
   private lastDeflectAt = -Infinity;
+  /** your own run of deflects, counted out over the clash (DEFLECT ×2, ×3...); a hit taken ends it */
+  private myDeflects = 0;
+  private myLastDeflectAt = -Infinity;
   /** when the last impact frame began (performance.now) */
   private impactStart = -Infinity;
   /** the ring entrances playing in the match intro: whose, when, and which cues have fired */
@@ -992,8 +995,9 @@ class App {
     const meA = e.a === this.myId;
     const mine = meD || meA;
     const vol = this.volumeAt(e.x, e.z);
-    // no words or numbers over a fight: Dueling Grounds shows none
+    // no words or numbers over a fight, as in Dueling Grounds (the one exception: deflects)
     const say = (..._: unknown[]): void => undefined;
+    if (meD && (e.k === 'hit' || e.k === 'guardBreak' || e.k === 'deathblow')) this.myDeflects = 0;
     const head = (f: ClientFighter | undefined) => (f ? new THREE.Vector3(f.pos.x, f.pos.y + 2.1 * f.model.scale, f.pos.z) : pos);
     // impact freeze on both fighters; the one struck shudders through it
     const stop = (ms: number, shudder = 0) => {
@@ -1039,7 +1043,14 @@ class App {
           this.renderer.flashColor.set('#ffd88a');
           this.cam.shake(0.12 * big, 0.14);
         }
-        if (meD) this.local?.onDeflected();
+        if (meD) {
+          // your timing, called out over the clash, and counted up while the run lasts
+          this.myDeflects = nowMs - this.myLastDeflectAt < 2500 ? this.myDeflects + 1 : 1;
+          this.myLastDeflectAt = nowMs;
+          const n = this.myDeflects;
+          this.ui.floatText(n > 1 ? `DEFLECT ×${n}` : 'DEFLECT', pos.x, pos.y + 0.4, pos.z, n > 2 ? 'good huge' : 'good big', '弾', 'deflect');
+          this.local?.onDeflected();
+        } else if (meA) this.ui.floatText('DEFLECTED', pos.x, pos.y + 0.4, pos.z, 'bad big', '弾');
         break;
       }
       case 'block':
