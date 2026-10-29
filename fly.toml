@@ -3,7 +3,7 @@
 # here). Names are first come, first served: if this one is taken, pick another and change it here.
 app = 'deflect-duels'
 # where it runs: pick the region nearest most of your players (fly platform regions)
-primary_region = 'iad'
+primary_region = 'yyz'
 
 [build]
 
