@@ -491,9 +491,10 @@ class App {
     n.on('result', (m) => {
       // the first fight or a trial: the card waits for a choice, so the cursor is freed for it
       if (m.trial) this.input.exitLock();
-      if (m.unlock) this.startCeremony(m.coins);
+      // beating the sensei: the ceremony takes the place of the card (when there's a fighter left to take)
+      const ceremony = !!m.unlock && this.startCeremony(m.coins);
       // the card says an ad plays next and what it pays; it plays as the card goes, and pays if it runs to the end
-      else
+      if (!ceremony)
         this.ui.showResult(m, this.profile, (choice) => {
           // Next: straight into the next trial (or the same one again), once any ad is over
           const go = () => choice === 'next' && this.net.send({ t: 'trial' });
@@ -505,7 +506,8 @@ class App {
           });
         });
       audio.introStop();
-      audio.play(m.won ? 'victory' : 'defeat');
+      // (the ceremony has its own fanfare)
+      if (!ceremony) audio.play(m.won ? 'victory' : 'defeat');
       audio.music(null, 3);
       platform.gameplayStop();
       // a ranked promotion is the rare moment CrazyGames' celebration is for
@@ -592,10 +594,11 @@ class App {
    * Beating the sensei: the fighter it earns, picked from the ones you could take and revealed as a
    * spectacle (unlock.ts). Then into the next trial with them, or back to the grounds.
    */
-  private startCeremony(coins?: number): void {
+  private startCeremony(coins?: number): boolean {
     const owned = this.profile?.chars ?? [];
     const choices = CHARACTER_IDS.filter((id) => !owned.includes(id) && !isPremium(id));
-    if (!choices.length) return;
+    // (nothing left to take: the ordinary result card instead)
+    if (!choices.length) return false;
     this.input.exitLock();
     this.touch?.cancel();
     this.ceremony = new UnlockCeremony(this.ui.root, {
@@ -613,6 +616,7 @@ class App {
         this.net.send({ t: 'trial', char: id });
       },
     });
+    return true;
   }
 
   private enterInstance(m: Extract<ServerMsg, { t: 'enter' }>): void {

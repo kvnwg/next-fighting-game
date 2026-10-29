@@ -298,6 +298,20 @@ describe('the first fight', () => {
     expect(c.player.instance).toBe(t2);
   });
 
+  it('beaten with every fighter you could take already yours: no unlock to offer, the trial goes on', () => {
+    const { join, game, now } = world();
+    const c = join('Collector');
+    c.prof.chars = ['ronin', 'duelist', 'shade', 'reaper', 'monk', 'paladin'];
+    c.send({ t: 'tutorial', a: 'start' });
+    const arena = [...game.arenas][0] as Arena;
+    // past the lessons, straight to the duel
+    (arena as unknown as { tutorialDuel(t: number): void }).tutorialDuel(now());
+    arena.killByEnvironment(arena.slots[1], 'fall', now());
+    const result = c.last('result')!;
+    expect(result).toMatchObject({ won: true, trial: { n: 1, next: 2 } });
+    expect(result).not.toHaveProperty('unlock');
+  });
+
   it('can be skipped, and pays nothing then (the free fighter waits for a few matches)', () => {
     const { join, game } = world();
     const c = join('Busy');

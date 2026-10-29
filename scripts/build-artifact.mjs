@@ -1,7 +1,7 @@
 import zlib from 'node:zlib';
 // Builds the single-player game into one self-contained HTML page (dist/artifact/deflect.html):
 // the game server runs in the page, three.js loads from jsDelivr, everything else is inlined.
-// Usage: node scripts/build-artifact.mjs
+// Usage: node scripts/build-artifact.mjs [--locked]
 import fs from 'node:fs';
 import path from 'node:path';
 import { build } from 'vite';
@@ -10,8 +10,9 @@ const THREE_VERSION = JSON.parse(fs.readFileSync('node_modules/three/package.jso
 const outDir = path.resolve('dist/artifact');
 
 process.env.VITE_OFFLINE = '1';
-// the Claude build is for testing: every fighter and arena unlocked, coins to spare (not the CrazyGames build)
-process.env.VITE_UNLOCK_ALL = '1';
+// the Claude build is for testing: every fighter and arena unlocked, coins to spare (not the CrazyGames
+// build). `--locked` builds it as a new player meets it instead: the first fight, the unlock, the trials
+if (!process.argv.includes('--locked')) process.env.VITE_UNLOCK_ALL = '1';
 await build({
   configFile: false,
   root: process.cwd(),

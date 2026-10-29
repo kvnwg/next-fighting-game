@@ -629,8 +629,8 @@ export class Game {
       if (arena.mode === 'tutorial' && winner === 0) {
         prof.tutorial = true;
         this.reachedFirst(solo, 'won');
-        // and the fighter that beating him earns: picked on the spot
-        unlock = freePickReady(prof);
+        // and the fighter that beating him earns: picked on the spot (if there's one left to take)
+        unlock = freePickReady(prof) && CHARACTER_IDS.some((id) => canUnlockChar(prof, id, true).ok);
       }
       trial = { n, next: winner === 0 ? nextTrial(prof.trial) : n };
     }
