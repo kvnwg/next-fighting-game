@@ -1099,6 +1099,8 @@ h4.ih .pi { width: 20px; height: 20px; }
 }
 @media (max-width: 600px) and (orientation: portrait) {
   .ts-panel { top: auto; bottom: calc(5vh + 16px); transform: none; }
+  /* "Enter the grounds" on one line beside the count */
+  .ts-go { gap: 8px; padding: 10px 14px; font-size: 14px; letter-spacing: 0.08em; white-space: nowrap; }
   .ts-welcome, .ts-forge { top: auto; bottom: calc(12vh + 20px); transform: none; }
   @keyframes ts-shake { 20% { transform: translateX(-8px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(2px); } }
 }
