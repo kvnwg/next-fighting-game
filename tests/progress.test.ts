@@ -4,7 +4,8 @@ import { MATCH } from '../src/shared/config';
 import { Game } from '../src/server/game';
 import { Store } from '../src/server/store';
 import { TUTORIAL_NEED } from '../src/server/tutorial';
-import { AD_MIN_GAP_MS, AD_REWARD, CHAR_PRICE, MATCH_AD_REWARD, FREE_PICK_GAMES, MAP_PRICE, MATCH_REWARD, TUTORIAL_REWARD, canUnlockChar, withProgress } from '../src/shared/progress';
+import { AD_MIN_GAP_MS, AD_REWARD, CHAR_PRICE, MATCH_AD_REWARD, FREE_PICK_GAMES, MAP_PRICE, MATCH_REWARD, TRIAL_REWARD, TUTORIAL_REWARD, canUnlockChar, gamesToFreePick, withProgress } from '../src/shared/progress';
+import { TRIALS, trialOpponent } from '../src/shared/trials';
 import { CombatEvent, PROTOCOL_VERSION, ServerMsg } from '../src/shared/protocol';
 
 function world() {
@@ -212,10 +213,10 @@ describe('coins and unlocks', () => {
   });
 });
 
-describe('tutorial', () => {
+describe('the first fight', () => {
   const ev = (k: CombatEvent['k'], a: string, d: string, key?: string): CombatEvent => ({ k, a, d, x: 0, y: 0, z: 0, ...(key ? { key: key as never } : {}) });
 
-  it('runs every lesson in order, pays once, ends in a real duel and goes back to the lobby', () => {
+  it('strike, deflect, a deathblow, then a duel you can\'t lose; beating him pays, earns a fighter and goes on to trial 2', () => {
     const { join, step, game, now } = world();
     const c = join('Student');
     c.send({ t: 'tutorial', a: 'start' });
@@ -227,17 +228,12 @@ describe('tutorial', () => {
     expect(sensei.char.id).toBe('monk');
     const steps = () => c.inbox.filter((m): m is Extract<ServerMsg, { t: 'tutorial' }> => m.t === 'tutorial');
     expect(steps()[0]).toMatchObject({ step: 'strike', n: 0, need: TUTORIAL_NEED.strike });
+    expect(c.prof.first).toBe('strike');
 
-    // strike into his guard: his posture climbs with each blow
-    for (let i = 0; i < TUTORIAL_NEED.strike; i++) coach.observe([ev('block', me.id, sensei.id)], now());
-    expect(coach.step).toBe('block');
-
-    // block his blows; then your guard breaks and he executes you (for real: the sim runs it)
-    for (let i = 0; i < TUTORIAL_NEED.block; i++) coach.observe([ev('block', sensei.id, me.id)], now());
-    coach.observe([ev('block', sensei.id, me.id)], now());
-    expect(steps().some((m) => m.note === 'broken')).toBe(true);
-    step(9000);
+    // strike him
+    for (let i = 0; i < TUTORIAL_NEED.strike; i++) coach.observe([ev('hit', me.id, sensei.id)], now());
     expect(coach.step).toBe('deflect');
+    expect(c.prof.first).toBe('deflect');
 
     // a block is too early, a hit too late; deflects fill his posture and the last breaks it
     coach.observe([ev('block', sensei.id, me.id)], now());
@@ -248,54 +244,143 @@ describe('tutorial', () => {
     expect(coach.step).toBe('execute');
     expect(sensei.state).toBe('broken');
 
-    // the deathblow, played out, then his perilous attack to dodge
+    // the deathblow, played out (for real: the sim runs it), then the duel
+    const before = sensei.hp;
     arena.applyInput(me, 'light', now());
-    for (let i = 0; i < 20 && coach.step === 'execute'; i++) {
+    for (let i = 0; i < 20 && arena.coach; i++) {
       step(500);
       if (me.state === 'idle' && sensei.state === 'broken') arena.applyInput(me, 'light', now());
       // walk into reach of him
       me.x = sensei.x;
       me.z = sensei.z - 1.6;
     }
-    expect(coach.step).toBe('perilous');
-    // he throws his perilous grab: dodge through it as it comes
-    me.x = sensei.x;
-    me.z = sensei.z - 1.8;
-    for (let i = 0; i < 400 && !(sensei.state === 'attack' && sensei.attackKey === 'sp'); i++) step(20);
-    expect(sensei.attackKey).toBe('sp');
-    while (now() < sensei.stateStart + sensei.atkWindup - 120) step(20);
-    expect(arena.applyInput(me, 'dodge', now(), { dx: 1, dz: 0 })).toBe(true);
-    step(3000);
-    // the lessons are learned and paid for: now he fights for real
-    expect(coach.step).toBe('duel');
-    expect(c.prof.tutorial).toBe(true);
-    expect(c.prof.coins).toBe(TUTORIAL_REWARD);
     expect(arena.coach).toBeNull();
+    expect(c.prof.first).toBe('duel');
+    expect(steps().at(-1)!.step).toBe('duel');
+    // his wounds stay on him; you go into it whole
+    expect(sensei.hp).toBeLessThan(before);
+    expect(me.hp).toBe(me.maxHp);
     expect(arena.phase).toBe('fight');
     expect(sensei.brain).not.toBe(coach);
-    // he goes down (and stays down): one round takes the match, with its result screen
+    // nothing's paid or marked done until he's beaten
+    expect(c.prof.tutorial).toBe(false);
+    expect(c.prof.coins).toBe(0);
+
+    // you can't go down in it
+    arena.killByEnvironment(me, 'fall', now());
+    expect(me.isAlive()).toBe(true);
+    expect(arena.phase).toBe('fight');
+    expect(c.inbox.some((m) => m.t === 'result')).toBe(false);
+
+    // he goes down: one round takes the match, and the fighter it earns is offered on the spot
     arena.killByEnvironment(sensei, 'fall', now());
-    const result = c.inbox.find((m): m is Extract<ServerMsg, { t: 'result' }> => m.t === 'result');
-    expect(result).toMatchObject({ mode: 'tutorial', won: true });
+    expect(c.last('result')).toMatchObject({ mode: 'tutorial', won: true, coins: TUTORIAL_REWARD, unlock: true, trial: { n: 1, next: 2 } });
+    expect(c.prof).toMatchObject({ tutorial: true, trial: 1, coins: TUTORIAL_REWARD, first: 'won' });
+    expect(gamesToFreePick(c.prof)).toBe(0);
+    c.send({ t: 'unlock', kind: 'char', id: 'reaper', free: true });
+    expect(c.prof.chars).toContain('reaper');
+    expect(c.prof.freePicked).toBe(true);
     expect(c.prof.coins).toBe(TUTORIAL_REWARD);
-    expect(arena.phase).toBe('matchEnd');
+
+    // Next, straight from the result: trial 2, with the new fighter
+    c.send({ t: 'trial', char: 'reaper' });
+    const t2 = [...game.arenas].find((a) => a !== arena)!;
+    expect(t2.trial).toBe(2);
+    expect(t2.slots[0].char.id).toBe('reaper');
+    expect(t2.slots[1].name).toBe(trialOpponent(2).name);
+    expect(t2.slots[1].char.id).toBe(trialOpponent(2).char);
+    expect(t2.map.id).toBe(trialOpponent(2).map);
+    expect(c.last('match')).toMatchObject({ trial: 2 });
+    expect(c.prof.started).toBe(2);
+    // the sensei's arena closes without pulling them back to the lobby
     step(MATCH.matchEndTime + 500);
-    expect(game.arenas.size).toBe(0);
-    expect(c.player.instance?.kind).toBe('lobby');
+    expect(game.arenas.has(arena)).toBe(false);
+    expect(c.player.instance).toBe(t2);
   });
 
-  it('can be skipped, and pays nothing then', () => {
+  it('can be skipped, and pays nothing then (the free fighter waits for a few matches)', () => {
     const { join, game } = world();
     const c = join('Busy');
     c.send({ t: 'tutorial', a: 'start' });
     expect(game.arenas.size).toBe(1);
     c.send({ t: 'tutorial', a: 'skip' });
     expect(game.arenas.size).toBe(0);
-    expect(c.prof.tutorial).toBe(true);
-    expect(c.prof.coins).toBe(0);
+    expect(c.prof).toMatchObject({ tutorial: true, skipped: true, trial: 0, coins: 0, first: 'strike' });
+    expect(gamesToFreePick(c.prof)).toBe(FREE_PICK_GAMES);
     // skipping it again changes nothing (and so has nothing to save, or to sort the ladder over)
     const dirty = vi.spyOn(game.store, 'markDirty');
     for (let i = 0; i < 10; i++) c.send({ t: 'tutorial', a: 'skip' });
     expect(dirty).not.toHaveBeenCalled();
+  });
+});
+
+describe('trials', () => {
+  /** the latest match a player is in */
+  const latest = (game: { arenas: Set<Arena> }, p: unknown) => [...game.arenas].reverse().find((a) => a.humans[0] === p)!;
+
+  it('one round each against the next opponent up: the next after a win, the same again after a loss', () => {
+    const { join, game, step, now } = world();
+    const c = join('Climber');
+    // the sensei unbeaten (skipped or not), a trial is the first fight
+    c.send({ t: 'trial' });
+    expect(latest(game, c.player).mode).toBe('tutorial');
+    c.send({ t: 'tutorial', a: 'skip' });
+    c.send({ t: 'trial' });
+    expect(latest(game, c.player).mode).toBe('tutorial');
+    c.send({ t: 'tutorial', a: 'skip' });
+
+    // beaten: trial 2, from the lobby (a fighter you don't own stays home)
+    c.prof.trial = 1;
+    c.send({ t: 'trial', char: 'shade' });
+    let arena = latest(game, c.player);
+    expect(arena.trial).toBe(2);
+    expect(arena.slots[0].char.id).toBe('ronin');
+    step(MATCH.countdownTime + 500);
+    expect(arena.phase).toBe('fight');
+    arena.killByEnvironment(arena.slots[1], 'fall', now());
+    expect(arena.finished).toBe(true);
+    expect(c.last('result')).toMatchObject({ won: true, trial: { n: 2, next: 3 }, coins: MATCH_REWARD.practice.win + TRIAL_REWARD });
+    expect(c.prof.trial).toBe(2);
+
+    // from its result straight into trial 3; lost, Next is trial 3 again, and nothing extra
+    c.send({ t: 'trial' });
+    arena = latest(game, c.player);
+    expect(arena.trial).toBe(3);
+    step(MATCH.countdownTime + 500);
+    arena.killByEnvironment(arena.slots[0], 'fall', now());
+    expect(c.last('result')).toMatchObject({ won: false, trial: { n: 3, next: 3 }, coins: MATCH_REWARD.practice.loss });
+    expect(c.prof.trial).toBe(2);
+
+    // all of them won: Next says so, and the Trials card replays the last
+    step(MATCH.matchEndTime + 500);
+    expect(c.player.instance?.kind).toBe('lobby');
+    c.prof.trial = TRIALS;
+    c.send({ t: 'trial' });
+    arena = latest(game, c.player);
+    expect(arena.trial).toBe(TRIALS);
+    step(MATCH.countdownTime + 500);
+    arena.killByEnvironment(arena.slots[1], 'fall', now());
+    expect(c.last('result')).toMatchObject({ won: true, trial: { n: TRIALS, next: null } });
+  });
+
+  it('start only from the lobby or the result of a first fight or trial', () => {
+    const { join, game, step, playMatch } = world();
+    const c = join('Eager');
+    c.prof.trial = 1;
+    // picking a practice match: no
+    c.send({ t: 'queue', mode: 'practice', diff: 'easy' });
+    c.send({ t: 'trial' });
+    expect(game.arenas.size).toBe(0);
+    step(400);
+    // in it: no
+    const practice = latest(game, c.player);
+    c.send({ t: 'trial' });
+    expect(latest(game, c.player)).toBe(practice);
+    // on its result: still no (only a trial's own result leads on)
+    game.reportResult(practice, 0, 'ko');
+    c.send({ t: 'trial' });
+    expect(latest(game, c.player)).toBe(practice);
+    game.closeArena(practice);
+    void playMatch;
   });
 });

@@ -13,6 +13,7 @@ import { FREE_PICK_GAMES, MAP_PRICE, AD_REWARD, MATCH_AD_REWARD, charPrice, free
 import { THUMBS } from './select';
 import { matchAdExpected } from './adbreak';
 import { normalizeRoomCode } from '../shared/rooms';
+import { TRIALS, nextTrial } from '../shared/trials';
 
 const h = (html: string): HTMLElement => {
   const t = document.createElement('template');
@@ -74,6 +75,8 @@ export interface UIHandlers {
   onWatchAd(kind: 'bonus'): Promise<boolean>;
   /** play the tutorial (again) */
   onTutorial(): void;
+  /** the next trial (the first fight while the sensei is unbeaten) */
+  onTrial(): void;
   /** a private lobby: open one, join one by its code, or leave yours */
   onRoom(a: 'create' | 'join' | 'leave', code?: string): void;
   /** the link that brings a friend into a private lobby */
@@ -259,6 +262,7 @@ export class UI {
     this.root.appendChild(this.hud);
     this.lobbyBar = new LobbyBar(this.hud, {
       onPractice: (d) => this.handlers.onPractice(d),
+      onTrial: () => this.handlers.onTrial(),
       onRanked: () => this.handlers.onRanked(),
       onCancelQueue: () => this.handlers.onCancelQueue(),
       onFighters: () => this.toggleModal('chars'),
@@ -381,6 +385,7 @@ export class UI {
     this.profile = p;
     this.setText(this.els.purseN, coinText(p.coins));
     this.lobbyBar.setFreePick(Math.min(p.games, FREE_PICK_GAMES), FREE_PICK_GAMES, freePickReady(p), p.freePicked);
+    this.lobbyBar.setTrial(nextTrial(p.trial), TRIALS);
     // what's owned or affordable may have changed under an open menu
     if (this.modalOpen === 'chars') this.charsRefresh?.();
     else if (this.modalOpen === 'shop') this.renderShop();
@@ -594,7 +599,7 @@ export class UI {
     if (!m || !shown) return;
     let secs = 0;
     if (m.phase === 'fight') secs = Math.max(0, Math.ceil((m.endsAt - serverNow) / 1000));
-    this.setText(this.els.round, `Round ${m.round}`);
+    this.setText(this.els.round, m.trial ? `Trial ${m.trial} of ${TRIALS}` : `Round ${m.round}`);
     this.setText(this.els.timerText, m.phase === 'fight' ? (secs >= 100 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : String(secs)) : '—');
     this.els.timer.classList.toggle('urgent', m.phase === 'fight' && secs <= 10);
   }
@@ -1352,16 +1357,16 @@ export class UI {
 
   // ------------------------------------------------------------------ match screens
 
-  matchIntro(mode: MatchMode, mapId: string, players: [RosterEntry, RosterEntry], you: 0 | 1): void {
+  matchIntro(mode: MatchMode, mapId: string, players: [RosterEntry, RosterEntry], you: 0 | 1, trial?: number): void {
     const map = MAPS[mapId];
-    const title = mode === 'ranked' ? 'Ranked duel' : mode === 'practice' ? 'Practice duel' : 'Duel';
-    const titleJp = mode === 'ranked' ? '段位戦' : mode === 'practice' ? '稽古' : '決闘';
+    const title = trial ? `Trial ${trial} of ${TRIALS}` : mode === 'ranked' ? 'Ranked duel' : mode === 'practice' ? 'Practice duel' : 'Duel';
+    const titleJp = trial ? '試練' : mode === 'ranked' ? '段位戦' : mode === 'practice' ? '稽古' : '決闘';
     const card = (r: RosterEntry, mine: boolean) => {
       const c = CHARACTERS[r.char];
       const rank = r.mmr !== undefined ? rankBadge(rankOf(r.mmr, r.placements ?? 0), true) : '';
       return `<div class="vs-card ${mine ? 'mine' : ''}" style="--c1:${c.palette.primary};--c2:${c.palette.accent}"><span class="vs-jp" aria-hidden="true">${c.jp}</span><span class="vs-port"><img src="${this.handlers.portrait(r.char)}" alt=""></span><div class="vs-char">${c.name}</div><div class="vs-weapon">${c.weapon}</div><div class="vs-name">${esc(r.name)}</div>${rank}</div>`;
     };
-    const modeIcon: IconName = mode === 'ranked' ? 'crown' : mode === 'practice' ? 'dummy' : 'swords';
+    const modeIcon: IconName = trial ? 'swords' : mode === 'ranked' ? 'crown' : mode === 'practice' ? 'dummy' : 'swords';
     const el = h(`<div class="match-intro"><div class="mi-mode">${icon(modeIcon)}<span class="jp">${titleJp}</span>${title}</div><div class="mi-jp">${map?.jp ?? ''}</div><div class="mi-map">${map?.name ?? ''}</div>
       <div class="mi-vs">${card(players[you], true)}<div class="vs">対</div>${card(players[you === 0 ? 1 : 0], false)}</div>
       <div class="mi-desc">${esc(map?.description ?? '')}</div></div>`);
@@ -1399,9 +1404,11 @@ export class UI {
 
   /**
    * The result card: the coins earned, and that an ad plays next and what it pays when it's watched
-   * through. `closed` runs as the card goes (the ad plays then).
+   * through. `closed` runs as the card goes (the ad plays then). After the first fight or a trial
+   * the card stays for a choice: the next trial (or the same one again after a loss), which comes
+   * by itself after a win once its count runs out, or the lobby.
    */
-  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null, closed?: () => void): void {
+  showResult(r: Extract<ServerMsg, { t: 'result' }>, me: ProfileView | null, closed?: (choice?: 'next' | 'lobby') => void): void {
     let ratingHtml = '';
     if (r.before && r.after && r.delta !== undefined) {
       const before = rankOf(r.before.mmr, r.before.placements);
@@ -1421,6 +1428,26 @@ export class UI {
     const coinsHtml =
       (r.coins ? `<div class="res-coins">${icon('coin')}+${coinText(r.coins)} coins</div>` : '') +
       (r.ad && matchAdExpected() ? `<div class="res-ad">${icon('watch')}An ad plays next. Watch it to the end for +${coinText(r.ad)} coins.</div>` : '');
+    const trial = r.trial;
+    let trialHtml = '<div class="muted">Returning to the lobby…</div>';
+    if (trial) {
+      const which = trial.n === 1 ? 'The sensei' : `Trial ${trial.n} of ${TRIALS}`;
+      const cleared = r.won ? trial.n : trial.n - 1;
+      const pips = Array.from({ length: TRIALS }, (_, i) => `<i class="${i < cleared ? 'done' : ''}${i === trial.n - 1 ? ' now' : ''}"></i>`).join('');
+      const next = trial.next;
+      const go =
+        next === null
+          ? ''
+          : r.won
+            ? `<button class="res-next">${icon('swords')}<span>${next === 1 ? 'The sensei' : `Trial ${next}`}</span><span class="res-count"></span><span class="res-key">Enter</span></button>`
+            : `<button class="res-next retry">${icon('swords')}<span>Try again</span><span class="res-key">Enter</span></button>`;
+      trialHtml = `<div class="res-trial">
+        <div class="res-trial-label">${esc(which)}${r.won ? ' <b>cleared</b>' : ''}</div>
+        <div class="res-trial-pips">${pips}</div>
+        ${next === null ? '<div class="res-trial-label">All the trials won. Try Ranked next!</div>' : ''}
+      </div>
+      <div class="res-actions">${go}<button class="res-lobby">Lobby</button></div>`;
+    }
     const el = h(`<div class="result ${r.won ? 'win' : 'lose'}">
       <div class="res-jp">${r.won ? '勝利' : '敗北'}</div>
       <div class="res-icon">${icon(r.won ? 'crown' : 'skull')}</div>
@@ -1428,10 +1455,56 @@ export class UI {
       <div class="res-score">${r.scores.join(' - ')}${reason ? ` · ${reason}` : ''}</div>
       ${ratingHtml}
       ${coinsHtml}
-      <div class="muted">Returning to the lobby…</div></div>`);
+      ${trialHtml}</div>`);
     void me;
     this.hud.appendChild(el);
-    window.setTimeout(() => el.classList.add('out'), 6300);
-    window.setTimeout(() => (el.remove(), closed?.()), 7000);
+    if (!trial) {
+      window.setTimeout(() => el.classList.add('out'), 6300);
+      window.setTimeout(() => (el.remove(), closed?.()), 7000);
+      return;
+    }
+    // the trial's card waits for a choice; after a win, Next counts down and goes by itself
+    let left = r.won && trial.next !== null ? 10 : 0;
+    const count = el.querySelector<HTMLElement>('.res-count');
+    const stop = () => {
+      clearInterval(timer);
+      window.removeEventListener('keydown', onKey);
+      if (this.resultCard?.el === el) this.resultCard = null;
+    };
+    const done = (choice: 'next' | 'lobby') => {
+      if (el.classList.contains('out')) return;
+      stop();
+      el.classList.add('out');
+      window.setTimeout(() => (el.remove(), closed?.(choice)), 400);
+    };
+    const tick = () => {
+      if (count) count.textContent = left > 0 ? String(left) : '';
+      if (left > 0 && --left === 0) done('next');
+    };
+    const timer = left > 0 ? window.setInterval(tick, 1000) : 0;
+    tick();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || this.chatOpen || this.modalOpen) return;
+      e.preventDefault();
+      done(trial.next === null ? 'lobby' : 'next');
+    };
+    window.addEventListener('keydown', onKey);
+    el.querySelector('.res-next')?.addEventListener('click', () => done('next'));
+    el.querySelector('.res-lobby')!.addEventListener('click', () => done('lobby'));
+    this.resultCard = { el, stop };
+  }
+
+  /** the trial result card waiting for a choice, if one is up */
+  private resultCard: { el: HTMLElement; stop: () => void } | null = null;
+
+  /**
+   * Something else was chosen (a match found, a queue joined): a trial card still up goes, its
+   * count stopped, without choosing anything itself.
+   */
+  dropResult(): void {
+    const c = this.resultCard;
+    if (!c) return;
+    c.stop();
+    c.el.remove();
   }
 }

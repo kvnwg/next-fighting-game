@@ -2,7 +2,8 @@
  * What you own and how you earn it. Everyone starts with the Ronin and the Sakura arena; coins come
  * from finishing matches, from the ad that plays after each one, and from watching ads any time, and
  * buy the other fighters and arenas. The Lancer and the Warden cost twice as much and only open up
- * once you've reached Gold. After your first few matches you get one fighter free.
+ * once you've reached Gold. Beating the sensei in the first fight gets you one fighter free (skip
+ * it, and your first few matches do).
  *
  * The server holds the truth (shared so the client can show prices and locks the same way).
  */
@@ -31,8 +32,10 @@ export const MATCH_REWARD: Record<'ranked' | 'casual' | 'practice', { win: numbe
 };
 /** Coins for watching an ad from the shop, between matches (less than the one after a match). */
 export const AD_REWARD = 30;
-/** Coins for finishing the tutorial the first time. */
+/** Coins for beating the sensei in the first fight, the first time. */
 export const TUTORIAL_REWARD = 100;
+/** Coins for clearing a trial the first time (on top of the match's own; see shared/trials.ts). */
+export const TRIAL_REWARD = 25;
 /** The server won't pay for ads closer together than this (no ad is shorter). */
 export const AD_MIN_GAP_MS = 5000;
 /** Coins for the ad that plays after a won match, watched to the end. */
@@ -52,6 +55,8 @@ export interface Progress {
   freePicked: boolean;
   /** the tutorial has been finished or skipped */
   tutorial: boolean;
+  /** the furthest trial won: 1 once the sensei is beaten, up to TRIALS (shared/trials.ts) */
+  trial: number;
 }
 
 /** Defaults for a new player, or the missing parts of one saved before progress existed. */
@@ -66,6 +71,7 @@ export function withProgress<T extends object>(o: T): T & Progress {
     games: Number.isFinite(p.games) ? Math.max(0, Math.floor(p.games!)) : 0,
     freePicked: !!p.freePicked,
     tutorial: !!p.tutorial,
+    trial: Number.isFinite(p.trial) ? Math.max(0, Math.floor(p.trial!)) : 0,
   });
 }
 
@@ -81,14 +87,14 @@ export function reachedGold(p: { peak: number; placements: number }): boolean {
   return p.placements >= PLACEMENT_MATCHES && p.peak >= gold.min;
 }
 
-/** The free fighter is waiting to be picked. */
+/** The free fighter is waiting to be picked: the sensei is beaten, or the first few matches are done. */
 export function freePickReady(p: Progress): boolean {
-  return !p.freePicked && p.games >= FREE_PICK_GAMES;
+  return !p.freePicked && (p.trial >= 1 || p.games >= FREE_PICK_GAMES);
 }
 
 /** Matches left before the free pick (0 once it's ready or used). */
 export function gamesToFreePick(p: Progress): number {
-  return p.freePicked ? 0 : Math.max(0, FREE_PICK_GAMES - p.games);
+  return p.freePicked || p.trial >= 1 ? 0 : Math.max(0, FREE_PICK_GAMES - p.games);
 }
 
 export type UnlockRefusal = 'owned' | 'gold' | 'coins' | 'free' | 'unknown';

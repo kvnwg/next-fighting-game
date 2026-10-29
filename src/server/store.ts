@@ -9,6 +9,11 @@ export interface Profile extends ProfileView {
   sinceAd?: number;
   createdAt: number;
   lastSeen: number;
+  /** the furthest step reached in the first fight ('won' once the sensei is beaten), and whether it was skipped */
+  first?: string;
+  skipped?: boolean;
+  /** matches started (games counts those finished) */
+  started?: number;
 }
 
 export function profileView(p: Profile): ProfileView {
@@ -28,6 +33,7 @@ export function profileView(p: Profile): ProfileView {
     games: p.games,
     freePicked: p.freePicked,
     tutorial: p.tutorial,
+    trial: p.trial,
   };
 }
 

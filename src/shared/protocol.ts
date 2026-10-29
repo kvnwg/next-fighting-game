@@ -111,18 +111,23 @@ export type ClientMsg =
   | { t: 'ad'; kind: 'match' | 'bonus' }
   /** start the tutorial, or skip (or leave) it */
   | { t: 'tutorial'; a: 'start' | 'skip' }
+  /**
+   * your next trial: the first fight while the sensei is unbeaten, then trials 2 to 10 (see
+   * shared/trials.ts). From the lobby, or straight from a trial's result. `char`: the fighter to
+   * bring (one you own; your current one otherwise)
+   */
+  | { t: 'trial'; char?: CharacterId }
   /** a private lobby: open one (you get its code), join one by its code, or go back to the public grounds */
   | { t: 'room'; a: 'create' | 'leave' }
   | { t: 'room'; a: 'join'; code: string };
 
 /**
- * The tutorial's steps, in order: strike into the sensei's guard; block until your own guard
- * breaks (and pay for it); deflect his blows until his guard breaks; finish him with a deathblow;
- * dodge his perilous attack; done.
+ * The first fight, against the sensei: strike him; deflect his slow blows until his guard breaks;
+ * finish it with a deathblow; then beat him for real (blocking and perilous attacks are taught
+ * the first time they come up in a fight, see client/tutorial.ts).
  */
-/** The lessons, then a real duel with the sensei (a result, then back to the lobby). */
-export type TutorialStep = 'strike' | 'block' | 'deflect' | 'execute' | 'perilous' | 'duel';
-export const TUTORIAL_STEPS: readonly TutorialStep[] = ['strike', 'block', 'deflect', 'execute', 'perilous', 'duel'];
+export type TutorialStep = 'strike' | 'deflect' | 'execute' | 'duel';
+export const TUTORIAL_STEPS: readonly TutorialStep[] = ['strike', 'deflect', 'execute', 'duel'];
 /** feedback on the last try: a deflect pressed too early (held into a block) or too late (hit) */
 export type TutorialNote = 'early' | 'late' | 'good' | 'broken' | 'again';
 
@@ -197,6 +202,8 @@ export type ServerMsg =
       you: 0 | 1;
       players: [RosterEntry, RosterEntry];
       roundWinner?: 0 | 1 | -1;
+      /** this match is a trial: which one (2 to TRIALS) */
+      trial?: number;
     }
   | {
       t: 'result';
@@ -210,6 +217,10 @@ export type ServerMsg =
       /** coins earned, and what the ad that plays next pays when it's watched to the end */
       coins?: number;
       ad?: number;
+      /** the first fight or a trial: which one (1 is the sensei), and the one Next starts (null: all cleared) */
+      trial?: { n: number; next: number | null };
+      /** the sensei is beaten: a fighter of your choice is yours to take, now */
+      unlock?: true;
     }
   | { t: 'profile'; profile: ProfileView }
   | { t: 'leaderboard'; entries: LeaderboardEntry[]; you: number | null; total: number }
@@ -226,7 +237,7 @@ export type ServerMsg =
   /** the select closed without a match (the other side left) */
   | { t: 'selectCancel'; reason: string }
   /** coins just came in */
-  | { t: 'coins'; gained: number; why: 'match' | 'matchAd' | 'ad' | 'tutorial' }
+  | { t: 'coins'; gained: number; why: 'match' | 'matchAd' | 'ad' | 'tutorial' | 'trial' }
   /** a fighter or arena is yours now */
   | { t: 'unlocked'; kind: 'char' | 'map'; id: string; free: boolean }
   /** where the tutorial is: the step, how far through it (n of need), and a note on the last try */

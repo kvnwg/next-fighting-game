@@ -1,11 +1,12 @@
 /** Top-level server state: connections, the lobbies, running arenas, matchmaking and challenges. */
 import { CHARACTER_IDS, CharacterId, isCharacterId } from '../shared/characters';
 import { MATCH, SERVER_TICK_HZ } from '../shared/config';
-import { ARENA_MAPS, MapDef } from '../shared/maps';
-import { AD_MIN_GAP_MS, AD_REWARD, FREE_PICK_GAMES, MATCH_AD_EVERY, MATCH_AD_REWARD, MATCH_AD_WINDOW_MS, MATCH_REWARD, TUTORIAL_REWARD, UnlockRefusal, canUnlockChar, canUnlockMap, freePickReady, sharedMaps } from '../shared/progress';
-import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, SelectView, ServerMsg } from '../shared/protocol';
+import { ARENA_MAPS, MAPS, MapDef } from '../shared/maps';
+import { AD_MIN_GAP_MS, AD_REWARD, FREE_PICK_GAMES, MATCH_AD_EVERY, MATCH_AD_REWARD, MATCH_AD_WINDOW_MS, MATCH_REWARD, TRIAL_REWARD, TUTORIAL_REWARD, UnlockRefusal, canUnlockChar, canUnlockMap, freePickReady, sharedMaps } from '../shared/progress';
+import { BotDifficulty, ClientMsg, MatchMode, PROTOCOL_VERSION, SelectView, ServerMsg, TUTORIAL_STEPS, TutorialStep } from '../shared/protocol';
 import { eloDelta } from '../shared/ranks';
 import { normalizeRoomCode, randomRoomCode } from '../shared/rooms';
+import { TRIALS, nextTrial, trialOpponent } from '../shared/trials';
 import { Arena, botName } from './arena';
 import type { Censor } from './censor';
 import { Player, SocketLike } from './entities';
@@ -433,8 +434,11 @@ export class Game {
         if (msg.a === 'start') this.startTutorial(p);
         else if (msg.a === 'skip') {
           if (p.instance instanceof Arena && p.instance.coach) p.instance.forfeit(p, true);
-          else this.endTutorial(p, false);
+          else this.endTutorial(p);
         }
+        break;
+      case 'trial':
+        this.startTrial(p, msg.char);
         break;
       case 'fell': {
         const f = p.fighter;
@@ -530,14 +534,17 @@ export class Game {
     return ARENA_MAPS[Math.floor(Math.random() * ARENA_MAPS.length)];
   }
 
-  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap(), botRating?: number, bot?: { char: CharacterId; name: string; rating?: number }): Arena {
+  startMatch(mode: MatchMode, a: Player, b: Player | null, diff?: BotDifficulty, map: MapDef = this.pickMap(), botRating?: number, bot?: { char: CharacterId; name: string; rating?: number }, trial?: number): Arena {
     for (const p of [a, b]) {
       if (!p) continue;
       this.unqueue(p);
       this.challenges.delete(p.id);
       p.instance?.removePlayer(p);
+      // matches started (against those finished, it shows how many are walked out of)
+      p.profile.started = (p.profile.started ?? 0) + 1;
+      this.store.markDirty();
     }
-    const arena = new Arena(this, map, mode, a, b, diff, botRating, bot);
+    const arena = new Arena(this, map, mode, a, b, diff, botRating, bot, trial);
     this.arenas.add(arena);
     return arena;
   }
@@ -605,6 +612,28 @@ export class Game {
       if (prof.games === FREE_PICK_GAMES && freePickReady(prof)) p.send({ t: 'notice', text: 'Your free fighter is ready! Open Fighters to pick one.', kind: 'good' });
       this.store.markDirty();
     }
+    // the first fight and the trials: the furthest one won moves on, and the first win of each pays
+    let trial: { n: number; next: number | null } | undefined;
+    let unlock = false;
+    const solo = humans[0];
+    if (solo && (arena.mode === 'tutorial' || arena.trial !== undefined)) {
+      const prof = solo.profile;
+      const n = arena.trial ?? 1;
+      if (winner === 0 && n > prof.trial) {
+        prof.trial = n;
+        const bonus = n === 1 ? TUTORIAL_REWARD : TRIAL_REWARD;
+        prof.coins += bonus;
+        earned[0] += bonus;
+        this.store.markDirty();
+      }
+      if (arena.mode === 'tutorial' && winner === 0) {
+        prof.tutorial = true;
+        this.reachedFirst(solo, 'won');
+        // and the fighter that beating him earns: picked on the spot
+        unlock = freePickReady(prof);
+      }
+      trial = { n, next: winner === 0 ? nextTrial(prof.trial) : n };
+    }
     for (const i of [0, 1] as const) {
       const p = humans[i];
       if (!p) continue;
@@ -625,6 +654,8 @@ export class Game {
         ...(counted ? { before: before[i]!, after: { mmr: p.profile.mmr, placements: p.profile.placements }, delta: deltas[i] } : {}),
         ...(earned[i] > 0 ? { coins: earned[i] } : {}),
         ...(ad ? { ad: MATCH_AD_REWARD } : {}),
+        ...(trial && i === 0 ? { trial } : {}),
+        ...(unlock && i === 0 ? { unlock: true as const } : {}),
       });
       if (counted || earned[i] > 0) p.send({ t: 'profile', profile: profileView(p.profile) });
     }
@@ -740,25 +771,54 @@ export class Game {
     p.send({ t: 'profile', profile: profileView(p.profile) });
   }
 
-  /** The tutorial: a lesson against the sensei on Sakura (see tutorial.ts). */
+  /**
+   * Free to start a first fight or a trial: in the lobby (not mid-duel or picking a match), or on
+   * the result of a first fight or trial just finished (its Next button: straight into the next).
+   */
+  private canStartTrial(p: Player): boolean {
+    const here = p.instance;
+    if (here instanceof Arena) return here.finished && (here.mode === 'tutorial' || here.trial !== undefined);
+    return here instanceof Lobby && !here.inDuel(p) && !this.selecting.has(p);
+  }
+
+  /** The first fight: against the sensei on Sakura (see tutorial.ts). */
   startTutorial(p: Player): void {
-    if (!(p.instance instanceof Lobby) || p.instance.inDuel(p) || this.selecting.has(p)) return;
+    if (!this.canStartTrial(p)) return;
     const map = ARENA_MAPS.find((m) => m.id === 'sakura') ?? ARENA_MAPS[0];
     this.startMatch('tutorial', p, null, 'easy', map, undefined, { char: 'monk', name: 'Sensei' });
   }
 
-  /** The tutorial is over: learned (the first time pays), or skipped. Either way it won't come up again. */
-  endTutorial(p: Player, learned: boolean): void {
+  /**
+   * The next trial (shared/trials.ts): the first fight while the sensei is unbeaten, then the next
+   * one up, the last again once they're all won. `char`: the fighter to bring, if it's yours.
+   */
+  startTrial(p: Player, char: unknown): void {
+    if (!this.canStartTrial(p)) return;
+    if (isCharacterId(char) && p.profile.chars.includes(char)) p.charId = char;
+    const n = nextTrial(p.profile.trial) ?? TRIALS;
+    if (n <= 1) return this.startTutorial(p);
+    const o = trialOpponent(n);
+    this.startMatch('practice', p, null, undefined, MAPS[o.map] ?? this.pickMap(), o.rating, { char: o.char, name: o.name, rating: o.rating }, n);
+  }
+
+  /** The first fight is skipped: it won't come up again (the free fighter waits for a few matches instead). */
+  endTutorial(p: Player): void {
     const prof = p.profile;
     // already done (a replay from Help, or a skip sent again): nothing changes, nothing to save
     if (prof.tutorial) return;
-    if (learned && !prof.tutorial) {
-      prof.coins += TUTORIAL_REWARD;
-      p.send({ t: 'coins', gained: TUTORIAL_REWARD, why: 'tutorial' });
-    }
     prof.tutorial = true;
+    prof.skipped = true;
     this.store.markDirty();
     p.send({ t: 'profile', profile: profileView(prof) });
+  }
+
+  /** How far into the first fight a player got (the furthest step, kept on their profile). */
+  reachedFirst(p: Player, step: TutorialStep | 'won'): void {
+    const order: readonly string[] = [...TUTORIAL_STEPS, 'won'];
+    const prof = p.profile;
+    if (prof.first && order.indexOf(step) <= order.indexOf(prof.first)) return;
+    prof.first = step;
+    this.store.markDirty();
   }
 
   // ------------------------------------------------------------------ challenges

@@ -1,8 +1,8 @@
 /**
  * The lobby's bottom bar, laid out like the reference: your fighter's portrait beside a big PLAY
  * button, and a row of pixel-art icons under it (Fighters, Shop, Ladder, Help, Settings). PLAY opens
- * the mode panel: a Casual practice duel at your chosen difficulty, a Ranked duel, or (online) a
- * private lobby to bring friends into; while
+ * the mode panel: the next of the Trials (ten duels, each harder), a Casual practice duel at your
+ * chosen difficulty, a Ranked duel, or (online) a private lobby to bring friends into; while
  * the panel is open PLAY turns into CLOSE, and while you're queued it shows the search and cancels it.
  * The Fighters icon carries the free fighter's progress: a pip per match towards it, then FREE.
  */
@@ -12,8 +12,11 @@ import { icon } from './pixelicons';
 import bamboo from './assets/maps/bamboo.jpg';
 import forge from './assets/maps/forge.jpg';
 import sakura from './assets/maps/sakura.jpg';
+import summit from './assets/maps/summit.jpg';
 
 export interface LobbyBarHandlers {
+  /** the next trial */
+  onTrial(): void;
   onPractice(diff: BotDifficulty): void;
   onRanked(): void;
   /** the private lobby: open one, join one by code, or see your own's code */
@@ -71,6 +74,13 @@ export class LobbyBar {
         </div>
       </div>
       <div class="mode-panel hidden">
+        <div class="mp-col trials">
+          <div class="mp-head">${icon('swords')}Trials</div>
+          <button class="mp-card trials" id="mp-trials">
+            <img src="${summit}" alt="" draggable="false">
+            <span class="mp-small">Ten duels</span><span class="mp-big">Trial 2</span><span class="mp-sub">Each one harder</span>
+          </button>
+        </div>
         <div class="mp-col casual">
           <div class="mp-head">${icon('dummy')}Casual</div>
           <button class="mp-card" id="mp-practice">
@@ -124,6 +134,10 @@ export class LobbyBar {
         for (const c of this.panel.querySelectorAll('[data-diff]')) c.classList.toggle('on', c === chip);
       });
     }
+    this.panel.querySelector('#mp-trials')!.addEventListener('click', () => {
+      this.setPanel(false);
+      this.h.onTrial();
+    });
     this.panel.querySelector('#mp-practice')!.addEventListener('click', () => {
       this.setPanel(false);
       this.h.onPractice(this.diff);
@@ -172,6 +186,15 @@ export class LobbyBar {
     const html = ready ? 'FREE' : Array.from({ length: need }, (_, i) => `<i class="${i < done ? 'on' : ''}"></i>`).join('');
     if (badge.innerHTML !== html) badge.innerHTML = html;
     badge.title = ready ? 'A free fighter is waiting: pick one' : `${need - done} more match${need - done === 1 ? '' : 'es'} to a free fighter`;
+  }
+
+  /** The Trials card: the one to fight next (`next` of `total`; null once they're all won). */
+  setTrial(next: number | null, total: number): void {
+    const card = this.panel.querySelector<HTMLElement>('#mp-trials')!;
+    const big = next === null ? 'All won' : next === 1 ? 'Sensei' : `Trial ${next}`;
+    const sub = next === null ? `Fight trial ${total} again` : `${next} of ${total}, each one harder`;
+    card.querySelector('.mp-big')!.textContent = big;
+    card.querySelector('.mp-sub')!.textContent = sub;
   }
 
   setChar(id: CharacterId): void {

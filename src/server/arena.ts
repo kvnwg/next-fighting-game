@@ -7,7 +7,7 @@ import { BOT_PROFILES, BotBrain, botProfileForRating } from './bot';
 import { Player, ServerFighter } from './entities';
 import type { Game } from './game';
 import { Instance } from './instance';
-import { TutorialCoach } from './tutorial';
+import { SENSEI_DUEL, TutorialCoach } from './tutorial';
 import { playerName, playerRating } from '../shared/names';
 
 let botCounter = 0;
@@ -45,6 +45,8 @@ export class Arena extends Instance {
     readonly botRating?: number,
     /** The bot's fighter and name, when the map and fighter select already settled them (and the rating a lobby wanderer showed). */
     bot?: { char: CharacterId; name: string; rating?: number },
+    /** this match is a trial: which one (2 to TRIALS, shared/trials.ts); one round */
+    readonly trial?: number,
   ) {
     super(game, map);
     const [s0, s1] = map.spawns;
@@ -71,7 +73,7 @@ export class Arena extends Instance {
     if (mode === 'tutorial') {
       // straight into the lesson: no entrances, no countdown, no clock
       const now = game.now();
-      this.coach = new TutorialCoach(fb, fa, a, (t) => this.tutorialDuel(t));
+      this.coach = new TutorialCoach(fb, fa, a, (t) => this.tutorialDuel(t), (step) => game.reachedFirst(a, step));
       fb.brain = this.coach;
       // face to face in the middle of the arena, a few steps apart
       const mx = (s0.x + s1.x) / 2;
@@ -89,25 +91,23 @@ export class Arena extends Instance {
   }
 
   /**
-   * The last lesson is learned (and paid for). Now the sensei fights for real: one round, to a
-   * KO, ending like any match, with its result screen and then the lobby.
+   * The lessons are over. Now the sensei fights for real (slower and holding back, and you can't
+   * go down: see onKill): one round, to a KO, ending like any match, with its result screen.
+   * Beating him is what pays (Game.reportResult).
    */
   private tutorialDuel(now: number): void {
     if (this.finished) return;
-    const p = this.humans[0];
-    if (p) this.game.endTutorial(p, true);
     const sensei = this.slots[1];
-    sensei.windupScale = 1;
-    sensei.brain = new BotBrain(sensei, 'duel', BOT_PROFILES.easy);
+    sensei.brain = new BotBrain(sensei, 'duel', SENSEI_DUEL);
     this.coach = null;
     for (const f of this.slots) f.specialReadyAt = now + f.char.special.cooldown;
     // no clock on it: it ends when one of you goes down
     this.setPhase('fight', now + 3_600_000);
   }
 
-  /** Rounds to win the match: the tutorial's closing duel is a single round. */
+  /** Rounds to win the match: the first fight's duel and the trials are a single round. */
   private get roundsToWin(): number {
-    return this.mode === 'tutorial' ? 1 : MATCH.roundsToWin;
+    return this.mode === 'tutorial' || this.trial !== undefined ? 1 : MATCH.roundsToWin;
   }
 
   isFrozen(): boolean {
@@ -145,6 +145,7 @@ export class Arena extends Instance {
         you: i as 0 | 1,
         players: this.rosters,
         roundWinner: this.roundWinner,
+        ...(this.trial !== undefined ? { trial: this.trial } : {}),
       });
     }
   }
@@ -163,6 +164,12 @@ export class Arena extends Instance {
     if (this.coach) {
       // nobody dies in a lesson: up again where they fell
       this.revive(victim, victim.x, victim.z, victim.yaw, now, 0);
+      return;
+    }
+    if (this.mode === 'tutorial' && victim === this.slots[0] && this.phase === 'fight') {
+      // the sensei won't let you lose your first fight: back on your feet, and at him again
+      this.revive(victim, victim.x, victim.z, victim.yaw, now, 1200);
+      victim.hp = victim.maxHp * 0.5;
       return;
     }
     if (this.phase !== 'fight') return;
@@ -232,7 +239,7 @@ export class Arena extends Instance {
       if (this.finished) return;
       this.finished = true;
       if (chose) {
-        this.game.endTutorial(p, false);
+        this.game.endTutorial(p);
         this.game.closeArena(this);
       } else this.setPhase('matchEnd', this.game.now());
       return;

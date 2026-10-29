@@ -19,6 +19,8 @@ export interface Settings {
   /** calmer camera: smaller shakes, no punch-ins */
   reduceShake: boolean;
   showFps: boolean;
+  /** the tips already shown (client/tutorial.ts Tips): each comes up once */
+  tips: string[];
 }
 
 const KEY = 'deflect.settings.v1';
@@ -35,6 +37,7 @@ const DEFAULTS: Settings = {
   parryCue: true,
   reduceShake: false,
   showFps: false,
+  tips: [],
 };
 
 function load(): Settings {
@@ -44,6 +47,7 @@ function load(): Settings {
     const s = { ...DEFAULTS, ...JSON.parse(raw) } as Settings;
     if (!isCharacterId(s.char)) s.char = 'ronin';
     if (!['auto', 'low', 'medium', 'high', 'ultra'].includes(s.graphics)) s.graphics = 'auto';
+    if (!Array.isArray(s.tips)) s.tips = [];
     return s;
   } catch {
     return { ...DEFAULTS };

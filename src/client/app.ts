@@ -1,6 +1,6 @@
 /** The client application: wires networking, input, simulation, rendering and UI together. */
 import * as THREE from 'three';
-import { AttackDef, AttackKey, AttackShape, CHARACTERS, CharacterId, executeSpacing, getAttack, isHeavyKey } from '../shared/characters';
+import { AttackDef, AttackKey, AttackShape, CHARACTERS, CHARACTER_IDS, CharacterId, executeSpacing, getAttack, isHeavyKey } from '../shared/characters';
 import { COMBAT, MATCH, PLAYER_RADIUS } from '../shared/config';
 import { MAPS, LOBBY_MAP, MapDef, hazardAt, inSafeZone } from '../shared/maps';
 import { angleDiff, dist2D, forward, yawTo } from '../shared/math';
@@ -34,7 +34,9 @@ import { platform } from './platform';
 import { saveSettings, settings } from './settings';
 import { watchOrientation } from './orientation';
 import { matchAd, watchAd } from './adbreak';
-import { TutorialOverlay } from './tutorial';
+import { Tips, TutorialOverlay } from './tutorial';
+import { UnlockCeremony } from './unlock';
+import { isPremium } from '../shared/progress';
 import { TouchControls, isTouchDevice } from './touch';
 import { CardData, Preview, UI, esc } from './ui';
 
@@ -96,6 +98,10 @@ class App {
   private ui: UI;
   private select: SelectScreen;
   private touch: TouchControls | null = null;
+  /** what the first fight leaves out, taught the first time it comes up (tutorial.ts) */
+  private tips: Tips;
+  /** beating the sensei: the fighter it earns, picked and revealed (unlock.ts) */
+  private ceremony: UnlockCeremony | null = null;
   private mapView: MapView | null = null;
   private map: MapDef = LOBBY_MAP;
   private fighters = new Map<string, ClientFighter>();
@@ -181,6 +187,7 @@ class App {
       onEnter: (name) => void this.connect(name),
       onRanked: () => this.net.send({ t: 'queue', mode: 'ranked' }),
       onPractice: (diff) => this.net.send({ t: 'queue', mode: 'practice', diff }),
+      onTrial: () => this.net.send({ t: 'trial' }),
       onCancelQueue: () => this.net.send({ t: 'unqueue' }),
       onSelectChar: (id) => {
         this.selectChar(id);
@@ -256,6 +263,7 @@ class App {
         },
       });
     }
+    this.tips = new Tips(this.ui.hud, this.ui.touch);
     // turning the phone rearranges the controls under the player's thumbs: let go of everything held
     watchOrientation(() => {
       this.input.releaseAll();
@@ -457,9 +465,12 @@ class App {
     n.on('reject', (m) => this.local?.onReject(m.a, m.q));
     n.on('queue', (m) => {
       this.queue = m.mode ? { since: m.since, count: m.searching } : null;
+      // queued for something else: a trial card still counting down goes
+      if (m.mode) this.ui.dropResult();
     });
     n.on('match', (m) => this.onMatch(m));
     n.on('select', (m) => {
+      this.ui.dropResult();
       if (!this.select.open) {
         this.queue = null;
         this.input.exitLock();
@@ -478,14 +489,21 @@ class App {
       this.joinInvite();
     });
     n.on('result', (m) => {
+      // the first fight or a trial: the card waits for a choice, so the cursor is freed for it
+      if (m.trial) this.input.exitLock();
+      if (m.unlock) this.startCeremony(m.coins);
       // the card says an ad plays next and what it pays; it plays as the card goes, and pays if it runs to the end
-      this.ui.showResult(m, this.profile, () => {
-        if (!m.ad) return;
-        this.input.exitLock();
-        void matchAd().then((ok) => {
-          if (ok) this.net.send({ t: 'ad', kind: 'match' });
+      else
+        this.ui.showResult(m, this.profile, (choice) => {
+          // Next: straight into the next trial (or the same one again), once any ad is over
+          const go = () => choice === 'next' && this.net.send({ t: 'trial' });
+          if (!m.ad) return void go();
+          this.input.exitLock();
+          void matchAd().then((ok) => {
+            if (ok) this.net.send({ t: 'ad', kind: 'match' });
+            go();
+          });
         });
-      });
       audio.introStop();
       audio.play(m.won ? 'victory' : 'defeat');
       audio.music(null, 3);
@@ -510,6 +528,8 @@ class App {
       if (m.why === 'matchAd') this.ui.toast(`Thanks for watching: +${m.gained} coins`, 'good');
     });
     n.on('unlocked', (m) => {
+      // (the ceremony makes its own fuss)
+      if (this.ceremony) return;
       audio.unlocked();
       const name = m.kind === 'char' ? (CHARACTERS[m.id as CharacterId]?.name ?? m.id) : (MAPS[m.id]?.name ?? m.id);
       this.ui.toast(m.kind === 'char' ? `${name} unlocked${m.free ? ' (your free pick)' : ''}!` : `${name} unlocked: pick it before a match`, 'good');
@@ -568,12 +588,43 @@ class App {
     this.lock = null;
   }
 
+  /**
+   * Beating the sensei: the fighter it earns, picked from the ones you could take and revealed as a
+   * spectacle (unlock.ts). Then into the next trial with them, or back to the grounds.
+   */
+  private startCeremony(coins?: number): void {
+    const owned = this.profile?.chars ?? [];
+    const choices = CHARACTER_IDS.filter((id) => !owned.includes(id) && !isPremium(id));
+    if (!choices.length) return;
+    this.input.exitLock();
+    this.touch?.cancel();
+    this.ceremony = new UnlockCeremony(this.ui.root, {
+      choices,
+      coins,
+      portrait: (id) => portraitURL(this.renderer.renderer, id),
+      createPreview: (el) => createPreview(el, true),
+      onPick: (id) => this.net.send({ t: 'unlock', kind: 'char', id, free: true }),
+      onDone: (id) => {
+        this.ceremony = null;
+        if (!id) return platform.gameplayStart();
+        settings.char = id;
+        saveSettings();
+        this.ui.setLobbyChar(id);
+        this.net.send({ t: 'trial', char: id });
+      },
+    });
+  }
+
   private enterInstance(m: Extract<ServerMsg, { t: 'enter' }>): void {
     audio.introStop();
     this.cam.stopShots();
     this.endEntrances();
     this.select.hide();
     this.clearFighters();
+    // a new match: a trial's result card whose choice was made elsewhere (the Trials card, a friend's invite) goes
+    if (m.kind !== 'lobby') this.ui.dropResult();
+    // back in control, in a lobby or a match (a result card stopped it)
+    if (!this.ui.modalOpen && !this.ceremony) platform.gameplayStart();
     const map = Object.prototype.hasOwnProperty.call(MAPS, m.map) ? MAPS[m.map] : LOBBY_MAP;
     this.loadMap(map);
     this.kind = m.kind;
@@ -769,7 +820,7 @@ class App {
     const oppId = m.players[m.you === 0 ? 1 : 0].id;
     switch (m.phase) {
       case 'intro': {
-        this.ui.matchIntro(m.mode, m.map, m.players, m.you);
+        this.ui.matchIntro(m.mode, m.map, m.players, m.you, m.trial);
         audio.play('matchFound');
         // a close-up on them, one on you, and back behind your shoulder for the countdown
         const me = this.fighters.get(this.myId);
@@ -1059,6 +1110,8 @@ class App {
         if (d) d.model.react('guard', { side: Math.max(-1, Math.min(1, swing.x * Math.cos(d.yaw) - swing.z * Math.sin(d.yaw))), heavy });
         break;
       case 'guardBreak':
+        // your guard broken in a match for the first time: blocking isn't the answer, deflecting is
+        if (meD && this.kind === 'arena' && this.match?.mode !== 'tutorial') this.tips.show('guardBroken');
         this.effects.burst(pos, { count: 24, color: ['#ff9a2a', '#ffd24a', '#ff5a2a'], speed: 7, life: 0.45, size: 0.07 });
         // the guard shatters like glass
         this.effects.shards(pos, swing, 24);
@@ -1738,6 +1791,8 @@ class App {
       const vol = this.volumeAt(f.pos.x, f.pos.z);
       if (v.state === 'attack' && v.attack?.perilous && f.lastPerilousSerial !== v.serial) {
         f.lastPerilousSerial = v.serial;
+        // the first of each kind coming at you in a match: what to do about it
+        if (this.kind === 'arena' && f.id !== this.myId && this.match?.mode !== 'tutorial') this.tips.show(`perilous-${v.attack.perilous}`);
         audio.perilous(f.roster.char, { vol, pos: f.pos }, Math.max(0, v.attack.windup - v.elapsed) / 1000);
         this.effects.flash(this.tmp.set(f.pos.x, f.pos.y + 2.4 * f.model.scale, f.pos.z), '#ff2a2a', 1.4, 0.3);
       }
@@ -1861,7 +1916,7 @@ class App {
     const mouse = this.input.consumeMouse();
     this.cam.addMouse(mouse.dx, mouse.dy, settings.sensitivity, settings.invertY, !!this.lock);
     // the title screen has its own keys (and a name being typed)
-    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active;
+    this.input.suspended = this.ui.chatOpen || !!this.ui.modalOpen || this.select.open || !!this.titleScreen?.active || !!this.ceremony;
     this.entranceCues(now);
     const left = this.select.tick(now);
     if (left !== null && left > 0) audio.selectBoom(left);
@@ -1935,8 +1990,9 @@ class App {
     this.effects.update(dt, this.renderer.camera);
     this.updateMarks(dt);
     this.updateHud(dt, now);
-    // recording the trailer draws only the frames it keeps (see scripts in demo.ts)
-    if (!DEMO || (globalThis as { __demoRender?: boolean }).__demoRender !== false) this.renderer.render();
+    // recording the trailer draws only the frames it keeps (see scripts in demo.ts); the unlock
+    // ceremony covers the whole screen, so the world under it isn't drawn (its fighter is)
+    if ((!DEMO || (globalThis as { __demoRender?: boolean }).__demoRender !== false) && !this.ceremony) this.renderer.render();
     if (this.snapWant) {
       // copy the frame now, while the canvas still holds it
       const src = this.renderer.renderer.domElement;
@@ -2155,7 +2211,8 @@ class App {
 }
 
 /** Small spinning character preview for the select screen. */
-function createPreview(container: HTMLElement): Preview {
+/** A fighter on a turntable going through their moves; `close`: framed tighter, for a square frame. */
+function createPreview(container: HTMLElement, close = false): Preview {
   const holder = document.createElement('div');
   holder.className = 'preview-holder';
   container.appendChild(holder);
@@ -2217,10 +2274,10 @@ function createPreview(container: HTMLElement): Preview {
       }
       model = new CharacterModel(id);
       scene.add(model.root);
-      // framed close on the fighter, whatever their size, so they fill the tall frame
+      // framed close on the fighter, whatever their size, so they fill the tall frame (or the square one)
       const k = model.scale;
-      r.camera.position.set(0, 1.25 * k, 3.1 * k);
-      r.camera.lookAt(0, 0.95 * k, 0);
+      r.camera.position.set(0, (close ? 1.15 : 1.25) * k, (close ? 2.35 : 3.1) * k);
+      r.camera.lookAt(0, (close ? 1.0 : 0.95) * k, 0);
       idx = 0;
       stateT = 0;
     },

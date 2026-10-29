@@ -107,6 +107,8 @@ export function connectOffline(): ClientSocketLike {
       : new Game(new Store(localPersistence), undefined, { offline: true, roamers: 4, arena, unlockAll });
     game.start();
     addEventListener('pagehide', () => game?.store.flush());
+    // dev builds: reach the in-page server from the console / screenshot scripts
+    if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = game;
   }
   const client = new ClientEnd();
   const server = new ServerEnd(client);

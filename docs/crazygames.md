@@ -56,6 +56,22 @@ the volume. `fly logs` shows what the server is doing.
 Every time the game changes: `npm run build:crazygames` and upload the new zip as a new version.
 If the server changed too (anything under `src/server` or `src/shared`), `fly deploy --ha=false` first.
 
+## How far players get
+
+The server keeps everyone's progress in `/data/profiles.json` on its volume. This prints a summary
+of it, without touching it (from a computer with the Fly tool, signed in with `fly auth login`):
+
+```
+fly ssh console -a deflect-duels -C 'node -e "const p=require(process.argv[1]).profiles;const n=f=>p.filter(f).length;const by=g=>p.reduce((o,x)=>{const v=g(x);o[v]=(o[v]||0)+1;return o},{});console.log({players:p.length,firstFight:by(x=>x.first),skippedIt:n(x=>x.skipped),bestTrial:by(x=>x.trial||0),matchesStarted:p.reduce((s,x)=>s+(x.started||0),0),matchesFinished:p.reduce((s,x)=>s+(x.games||0),0),cameBackLater:n(x=>x.lastSeen-x.createdAt>6*36e5)})" /data/profiles.json'
+```
+
+- `firstFight`: the furthest each player got in the first fight: `strike`, `deflect`, `execute`
+  (the deathblow), `duel`, or `won`. `undefined` is players from before the first fight existed.
+- `skippedIt`: players who pressed Skip on it.
+- `bestTrial`: how many players have each trial as their best won (1 is the sensei, 10 the last; 0 none).
+- `matchesStarted` against `matchesFinished`: how many matches are walked out of.
+- `cameBackLater`: players who connected again at least 6 hours after their first visit.
+
 ## Good to know
 
 - **If the server is down, the game can't be played** on CrazyGames (players see "Could not reach the
