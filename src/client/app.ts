@@ -32,7 +32,7 @@ import { TitleScene } from './title/scene';
 import { TitleScreen } from './title/screen';
 import { platform } from './platform';
 import { saveSettings, settings } from './settings';
-import { Sideways } from './rotate';
+import { watchOrientation } from './orientation';
 import { matchAd, watchAd } from './adbreak';
 import { TutorialOverlay } from './tutorial';
 import { TouchControls, isTouchDevice } from './touch';
@@ -256,8 +256,8 @@ class App {
         },
       });
     }
-    // any touchscreen counts here: held upright, it's a phone or a tablet, and the game turns itself
-    new Sideways(touch || navigator.maxTouchPoints > 0, () => {
+    // turning the phone rearranges the controls under the player's thumbs: let go of everything held
+    watchOrientation(() => {
       this.input.releaseAll();
       this.touch?.cancel();
       this.renderer.resize();

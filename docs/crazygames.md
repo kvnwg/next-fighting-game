@@ -50,7 +50,8 @@ the volume. `fly logs` shows what the server is doing.
      its code;
    - the after-match ad and the shop's ad button (ads only run once CrazyGames turns them on).
 3. Fill in the listing and submit (see the step-by-step guide this came with: covers, video, controls,
-   tags, landscape only, mobile on, the music credits).
+   tags, both orientations (portrait and landscape: phones play held either way up), mobile on, the
+   music credits). If the listing still says landscape only, change it to both.
 
 Every time the game changes: `npm run build:crazygames` and upload the new zip as a new version.
 If the server changed too (anything under `src/server` or `src/shared`), `fly deploy --ha=false` first.

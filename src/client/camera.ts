@@ -11,6 +11,8 @@ import type { CharacterId } from '../shared/characters';
 
 /** Wide, like Dueling Grounds (Roblox's 70): the camera sits close behind you, so it needs the width. */
 export const CAMERA_FOV = 70;
+/** How much the view widens (degrees, vertical) on a phone held upright (see CameraRig.narrow). */
+const NARROW_FOV = 14;
 /** Sideways offset of the camera (and its aim) to the player's right, in metres. */
 const SHOULDER = 1.4;
 /** The fixed framing while locked on: pitch and boom length (scaled with your fighter's size). */
@@ -125,6 +127,20 @@ export class CameraRig {
     this.punchTarget.set(at.x, at.y + 1.2, at.z);
   }
 
+  /**
+   * How tall and narrow the view is: 0 on a landscape screen, 1 on a phone held upright. A narrow
+   * view sits further back and higher, closer in behind you and a little wider, so you and your
+   * opponent stack up the frame instead of running off its sides.
+   */
+  private narrow(): number {
+    return 1 - THREE.MathUtils.smoothstep(this.camera.aspect, 0.55, 1.25);
+  }
+
+  /** The follow camera's field of view for this screen. */
+  private followFov(): number {
+    return CAMERA_FOV + NARROW_FOV * this.narrow();
+  }
+
   /** Knock the camera along a hit's direction on a spring. */
   kick(dirX: number, dirZ: number, amount = 0.2): void {
     this.kickVel.x += dirX * amount * 14 * this.shakeScale;
@@ -173,7 +189,7 @@ export class CameraRig {
   restPose(player: THREE.Vector3, target: THREE.Vector3): CamPose {
     this.yaw = yawTo(player.x, player.z, target.x, target.z);
     const { pos, look, subject } = this.aim(player, target);
-    return { pos, look, fov: CAMERA_FOV, subject };
+    return { pos, look, fov: this.followFov(), subject };
   }
 
   /** Where the follow camera wants to be and to look, at the current yaw. */
@@ -181,12 +197,14 @@ export class CameraRig {
     if (target) return this.duelAim(player, target);
     const f = forward(this.yaw);
     const pitch = this.pitch;
-    const distance = this.distance;
-    const shoulder = SHOULDER;
+    const n = this.narrow();
+    const distance = this.distance * (1 + 0.2 * n);
+    // (upright, you stand in the middle: there's no width to spare off to one side)
+    const shoulder = SHOULDER * (1 - 0.75 * n);
     const cosP = Math.cos(pitch);
     const pos = new THREE.Vector3(
       player.x - f.x * distance * cosP,
-      player.y + 2.0 + Math.sin(pitch) * distance,
+      player.y + 2.0 + 0.4 * n + Math.sin(pitch) * distance,
       player.z - f.z * distance * cosP,
     );
     // over the right shoulder so the player doesn't block the opponent
@@ -212,6 +230,8 @@ export class CameraRig {
   private duelAim(player: THREE.Vector3, target: THREE.Vector3) {
     // framed for the bigger of the two
     const k = Math.max(1, this.subjectScale, this.targetScale);
+    // upright: further back, higher and nearer your back, so they show over your head
+    const n = this.narrow();
     const d = Math.max(0.5, Math.hypot(target.x - player.x, target.z - player.z));
     // the axis follows the smoothed yaw, so the camera doesn't jitter with every step
     const u = forward(this.yaw);
@@ -220,11 +240,11 @@ export class CameraRig {
     // just off the line between you: ~24° up close (so your own back doesn't hide them), ~11° apart
     const close = THREE.MathUtils.smoothstep(d, 1.5, 7);
     // (further round a bulky fighter, so they don't hide them)
-    const phi = THREE.MathUtils.lerp(0.42, 0.2, close) * this.subjectBulk;
+    const phi = THREE.MathUtils.lerp(0.42, 0.2, close) * this.subjectBulk * (1 - 0.4 * n);
     // and the whole view nudged over your right shoulder, so you stand a little left of centre
-    const sh = THREE.MathUtils.lerp(0.55, 0.3, close) * k * this.subjectBulk;
+    const sh = THREE.MathUtils.lerp(0.55, 0.3, close) * k * this.subjectBulk * (1 - 0.7 * n);
     // about two body heights behind you, a little further when they're far off
-    const boom = THREE.MathUtils.clamp(3.3 + d * 0.08, 3.4, 4.2) * k;
+    const boom = THREE.MathUtils.clamp(3.3 + d * 0.08, 3.4, 4.2) * k * (1 + 0.3 * n);
     const bx = -u.x * Math.cos(phi) + rx * Math.sin(phi);
     const bz = -u.z * Math.cos(phi) + rz * Math.sin(phi);
     // eye a little over head height, looking nearly level; it stands on the slow ground height,
@@ -234,7 +254,7 @@ export class CameraRig {
     // and when they're in the air it sinks a little to look up at them
     const above = Math.max(0, target.y - ground);
     // (a bulky fighter's camera rides a little higher, to look over their shoulder at them)
-    const eye = (2.3 + 0.6 * (this.subjectBulk - 1)) * k;
+    const eye = (2.3 + 0.6 * (this.subjectBulk - 1) + 1.2 * n) * k;
     const pos = new THREE.Vector3(player.x + bx * boom + rx * sh, ground + eye + lift * 0.3 - above * 0.2, player.z + bz * boom + rz * sh);
     const subject = new THREE.Vector3(target.x, target.y + 1.2 * k, target.z);
     // only what's behind you pulls it in (it mustn't end up inside a tree or a wall). Something
@@ -256,7 +276,10 @@ export class CameraRig {
     }
     {
       const k = Math.max(1, this.subjectScale, this.targetScale);
-      G.uSee.value[0].set(player.x, player.y + 1.2 * k, player.z, 0.95 * k);
+      // (upright the camera looks down on you more steeply: the hole aims lower and opens wider,
+      // so a lantern in front of your legs goes too)
+      const n = this.narrow();
+      G.uSee.value[0].set(player.x, player.y + (1.2 - 0.45 * n) * k, player.z, (0.95 + 0.3 * n) * k);
       if (target) G.uSee.value[1].set(target.x, target.y + 1.2 * k, target.z, 1.05 * k);
       else G.uSee.value[1].w = 0;
     }
@@ -281,7 +304,7 @@ export class CameraRig {
     }
     const cam = this.camera.position.copy(this.pos);
     const look = _look.copy(this.look);
-    let fovTarget = CAMERA_FOV + (opts.dodging ? 5 : 0);
+    let fovTarget = this.followFov() + (opts.dodging ? 5 : 0);
     let roll = 0;
 
     if (this.punchT >= 0) {

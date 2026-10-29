@@ -1,11 +1,12 @@
 /**
  * On-screen controls for phones and tablets: a floating thumbstick on the left, drag anywhere else
- * to look around, and the fight buttons in a cluster on the right. The special attack button only
- * appears once its meter has filled.
+ * to look around, and the fight buttons in a cluster on the right. Held upright the stick takes the
+ * lower left only, under the left thumb, and the screen above is all for looking. The special attack
+ * button only appears once its meter has filled.
  */
 import { Bind, Input } from './input';
 import { icon } from './pixelicons';
-import { frameWidth, toFrame } from './rotate';
+import { isPortrait } from './orientation';
 
 /** Touch-first device (or forced with ?touch / ?touch=0). */
 export function isTouchDevice(): boolean {
@@ -98,9 +99,8 @@ export class TouchControls {
       // a new touch on the left always takes the stick: if the last thumb's lift got lost (the
       // controls hidden under a cinematic, a system gesture), the stick would otherwise stay
       // pushed with no way to grab it back
-      // (positions in the game's frame: the screen, or the screen turned, see rotate.ts)
-      const p = toFrame(e.clientX, e.clientY);
-      if (p.x < frameWidth() * 0.45) {
+      const p = { x: e.clientX, y: e.clientY };
+      if (p.x < window.innerWidth * 0.45 && (!isPortrait() || p.y > window.innerHeight * 0.45)) {
         if (this.stickId !== null) this.resetStick();
         this.stickId = e.pointerId;
         this.stickOrigin = { x: p.x, y: p.y };
@@ -113,7 +113,7 @@ export class TouchControls {
     // moves and lifts are watched on the window, not the pad: a pointer whose capture was lost
     // (the controls hidden mid-touch) still reports there
     window.addEventListener('pointermove', (e) => {
-      const p = toFrame(e.clientX, e.clientY);
+      const p = { x: e.clientX, y: e.clientY };
       if (e.pointerId === this.stickId) {
         this.moveStick(p.x, p.y);
         return;

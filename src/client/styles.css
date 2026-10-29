@@ -385,6 +385,7 @@ select { font-family: var(--ui); font-weight: 600; font-size: 14px; letter-spaci
   position: relative;
   width: min(780px, 94vw);
   max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   display: flex;
   flex-direction: column;
   color: var(--text);
@@ -737,8 +738,8 @@ h4.ih .pi { width: 20px; height: 20px; }
 .touch .toasts { top: 100px; }
 .touch .modal-body { touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 
-/* short screens (phones on their side): a more compact HUD */
-@media (max-height: 520px) {
+/* short screens (phones on their side) and narrow ones (phones held upright): a more compact HUD */
+@media (max-height: 520px), (max-width: 600px) and (orientation: portrait) {
   .fcard { --a: 10px; width: min(460px, 38vw); gap: 7px; }
   .fc-port { width: 46px; height: 46px; }
   .fc-heart { width: 17px; height: 16px; }
@@ -782,7 +783,7 @@ h4.ih .pi { width: 20px; height: 20px; }
   .mi-desc { font-size: 14px; margin-top: 10px; }
   .challenge-popup { top: 16%; font-size: 16px; }
   .btn.big { padding: 9px 24px; font-size: 16px; }
-  .modal-box { max-height: calc(100vh - 32px); }
+  .modal-box { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
   .modal-head { padding: 12px 18px 8px; }
   .modal-head h2 { font-size: 22px; }
 }
@@ -1255,17 +1256,6 @@ body.chars-locked #btn-chars, body.chars-locked #lb-fighters { display: none !im
 #btn-forfeit.gone { display: none !important; }
 .lb-play-key { font-family: var(--ui); font-size: 12px; font-weight: 700; line-height: 1; padding: 3px 5px; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 3px; color: rgba(255, 255, 255, 0.75); text-shadow: none; letter-spacing: 0; }
 
-/* ---------------------------------------------------------------- portrait: the game turns itself (rotate.ts) */
-/* the page laid out landscape (the screen's height wide) and turned a quarter turn onto the screen */
-html.sideways #app { inset: auto; top: 0; left: 0; width: var(--sh); height: var(--sw); transform-origin: 0 0; transform: translate(var(--sw), 0) rotate(90deg); }
-/* and a moment's prompt to turn the phone, over the game and letting every touch through */
-.rotate-hint { position: fixed; left: 50%; top: 50%; z-index: 2147483000; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 26px 28px; background: rgba(7, 6, 10, 0.86); color: #fff; text-align: center; pointer-events: none; transition: opacity 0.4s; -webkit-user-select: none; user-select: none; }
-.rotate-hint.hidden { opacity: 0; }
-.rg-text { font-family: var(--display, var(--ui)); font-weight: 700; font-size: 22px; letter-spacing: 0.1em; text-transform: uppercase; max-width: 16em; line-height: 1.4; }
-.rg-phone { width: 54px; height: 92px; border: 4px solid #fff; border-radius: 10px; position: relative; animation: rg-turn 2.4s ease-in-out infinite; }
-.rg-phone span { position: absolute; left: 50%; bottom: 6px; width: 10px; height: 4px; margin-left: -5px; border-radius: 2px; background: #fff; }
-@keyframes rg-turn { 0%, 25% { transform: rotate(0deg); } 55%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
-
 /* ---- coins: the purse in the lobby's top-right corner (it opens the shop), and the jump and
    the floating "+60" as coins come in */
 .purse { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); top: calc(16px + var(--hud-top)); z-index: 6; display: none; align-items: center; gap: 8px; padding: 6px 12px 5px 8px; font: 700 20px var(--display); letter-spacing: 0.04em; color: var(--gold-hi); background: #16131e; border: none; cursor: pointer; text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
@@ -1447,3 +1437,133 @@ html.sideways #app { inset: auto; top: 0; left: 0; width: var(--sh); height: var
 .fr-input { width: 150px; padding: 10px 12px; border: none; background: rgba(0, 0, 0, 0.45); box-shadow: inset 0 0 0 2px var(--line-hi, #666); color: #fff; font-family: var(--display, var(--ui)); font-size: 24px; letter-spacing: 0.25em; text-align: center; text-transform: uppercase; }
 .fr-input:focus { outline: none; box-shadow: inset 0 0 0 2px #ff9fbd; }
 #ui.chat-off .chat-row { display: none; }
+
+/* ---------------------------------------------------------------- phones held upright */
+/* A tall, narrow screen. The two health cards share the top with the clock (or the safe-zone sign)
+   and the lessons under them; the lower part of the screen belongs to the thumbs: the stick on the
+   left, the fight buttons on the right, and the lobby bar just above them. --pu is the fight
+   buttons' unit (see .touch-ui), for whatever has to clear them, measured on the height the page
+   really gets: a phone's address bar (top or bottom) or the site's own header take some. */
+@media (max-width: 600px) and (orientation: portrait) {
+  #ui { --pu: min(1vw, 0.5vh); }
+  @supports (height: 1dvh) {
+    #ui { --pu: min(1vw, 0.5dvh); }
+  }
+  /* the fight buttons keep their shape from the phone on its side; the ability and lock-on move up
+     the right edge, out of the way of the stick */
+  .touch-ui { --u: var(--pu); }
+  .tc-ability { --x: 8.5; --y: 45; }
+  .tc-lock { --x: 10; --y: 58; }
+
+  .fcard, .touch .fcard { --a: 8px; top: calc(8px + var(--hud-top)); width: calc(50% - 16px); gap: 6px; }
+  .fcard.self, .touch .fcard.self { left: max(10px, env(safe-area-inset-left, 0px)); }
+  .fcard.opp, .touch .fcard.opp { right: max(10px, env(safe-area-inset-right, 0px)); }
+  .fc-port { width: 38px; height: 38px; }
+  .fc-main { gap: 3px; }
+  .fc-top, .fc-bot { gap: 6px; min-height: 12px; }
+  .fc-title, .fc-ping { display: none; }
+  .fc-n { max-width: 100%; font-size: 11px; letter-spacing: 0.08em; }
+  .fc-handle { font-size: 14px; }
+  .fc-hp { height: 12px; }
+  .fc-po { height: 6px; }
+  .fc-heart { width: 14px; height: 13px; }
+  .fc-sp { width: 36px; }
+  .fc-pips { gap: 5px; }
+  .fc-pips i { width: 7px; height: 7px; }
+  /* the clock under the cards, between the menu and the opponent's side */
+  .top-center { top: calc(64px + var(--hud-top)); gap: 2px; }
+  .match-timer { font-size: 24px; min-width: 52px; padding: 3px 10px 2px; }
+  .match-round { font-size: 9px; letter-spacing: 0.2em; }
+  .hud.lobby .top-center { top: calc(112px + var(--hud-top)); }
+  .zone-indicator, .touch .zone-indicator { font-size: 10px; padding: 2px 10px; }
+  .net-info { display: none; }
+  .purse { top: calc(10px + var(--hud-top)); right: max(10px, env(safe-area-inset-right, 0px)); }
+
+  .touch .tc-top { top: calc(62px + var(--hud-top)); left: max(10px, env(safe-area-inset-left, 0px)); }
+  .touch .side-menu { top: calc(112px + var(--hud-top)); left: max(10px, env(safe-area-inset-left, 0px)); }
+  .touch .side-menu.open { max-height: calc(100% - 122px - var(--hud-top)); }
+  .touch .side-menu .btn { min-width: 200px; }
+  .chat, .touch .chat { top: calc(150px + var(--hud-top)); bottom: auto; left: max(10px, env(safe-area-inset-left, 0px)); width: calc(100% - 20px); }
+  .touch .chat-log { max-height: 96px; }
+  .chat-line { font-size: 13px; }
+  .feed, .touch .feed { top: calc(240px + var(--hud-top)); right: max(10px, env(safe-area-inset-right, 0px)); }
+  .feed-row { font-size: 12px; padding: 3px 8px; }
+  .toasts, .touch .toasts { top: 34%; width: calc(100% - 24px); }
+  .queue-panel, .touch .queue-panel { top: calc(112px + var(--hud-top)); min-width: 0; }
+  .challenge-popup, .touch .challenge-popup { top: calc(150px + var(--hud-top)); width: calc(100% - 24px); padding: 12px 14px 14px; }
+  .center { top: 40%; width: 100%; }
+  .banner { padding: 4px 28px 8px; }
+  .b-en { font-size: 40px; }
+  .banner.fight .b-en { font-size: 60px; }
+  .banner.count .b-en { font-size: 76px; }
+  .banner.en-only .b-en { font-size: 34px; }
+  .result { min-width: 0; width: calc(100% - 24px); padding: 12px 16px 14px; }
+
+  /* your own posture, the prompts and the lobby bar sit above the fight buttons */
+  .touch .posture-main:not(.foe) { bottom: calc(var(--pu) * 57 + env(safe-area-inset-bottom, 0px)); width: 60vw; }
+  .touch .prompt, .touch .hud.lobby .prompt { bottom: calc(var(--pu) * 66 + 30px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 24px); font-size: 15px; }
+  .touch .lobby-bar { left: 50%; bottom: calc(var(--pu) * 64 + env(safe-area-inset-bottom, 0px)); gap: 4px; }
+  .touch .hud.lobby .posture-main:not(.foe) { bottom: calc(var(--pu) * 64 + 118px + env(safe-area-inset-bottom, 0px)); }
+  .touch .hud.lobby .prompt { bottom: calc(var(--pu) * 64 + 132px + env(safe-area-inset-bottom, 0px)); }
+  .lb-portrait, .touch .lb-portrait { width: 38px; height: 38px; }
+  .lb-play, .touch .lb-play { min-width: 170px; height: 40px; font-size: 19px; padding: 0 34px 0 24px; }
+  .lb-icons, .touch .lb-icons { gap: 4px; }
+  .lb-icon, .touch .lb-icon { width: 62px; }
+  .lb-icon .pi, .touch .lb-icon .pi { width: 40px; height: 40px; }
+  .lb-icon span, .touch .lb-icon span { font-size: 11px; margin-top: -2px; }
+  /* Play's choices stacked, each a wide card, above the lobby bar */
+  .mode-panel, .touch .mode-panel { flex-direction: column; gap: 8px; padding: calc(60px + var(--hud-top)) 16px calc(118px + env(safe-area-inset-bottom, 0px)); }
+  /* while they're open the fight buttons step aside and the lobby bar drops to the bottom, so all
+     three fit on a short screen (a phone's address bar and the site's header take their share) */
+  .touch .hud:has(> .mode-panel:not(.hidden)) .touch-ui { visibility: hidden; }
+  .touch .mode-panel:not(.hidden) ~ .lobby-bar { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .mp-col { width: min(360px, 100%); gap: 4px; }
+  .mp-head { font-size: 16px; }
+  .mp-head .pi { width: 22px; height: 22px; }
+  .mp-card, .touch .mp-card { width: 100%; height: 90px; }
+  .mp-small { display: none; }
+  .mp-card .mp-big, .mp-big { bottom: 22px; font-size: 22px; }
+  .mp-sub { bottom: 6px; font-size: 10px; }
+  .mp-diff { top: 6px; }
+  .mp-diff i { font-size: 11px; padding: 3px 6px; }
+
+  /* the pre-match pick: the arenas two by two, the fighters four by four under them */
+  .select-screen { --px: 3px; padding: calc(10px + var(--hud-top)) 10px calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .sel-band { width: 100%; padding: 8px 10px 12px; }
+  .select-screen .sel-title { gap: 8px; font-size: 15px; }
+  .select-screen .sel-title .jp { font-size: 11px; }
+  .sel-title .pi { width: 20px; height: 20px; }
+  .sel-count { font-size: 22px; }
+  .sel-maps, .select-screen .sel-maps { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 8px; }
+  .sel-tile { aspect-ratio: 2 / 1; }
+  .sel-chars, .select-screen .sel-chars { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; }
+  .sel-label, .sel-card .sel-label { left: 5px; bottom: 3px; font-size: 11px; }
+  .sel-jp { font-size: 11px; }
+  .sel-badge { width: 26px; height: 26px; }
+
+  /* the lessons under the cards and the clock; skip under the opponent's card */
+  .tut-head { top: calc(104px + var(--hud-top)); max-width: calc(100% - 24px); padding: 6px 14px 8px; gap: 4px; }
+  .tut-word b { font-size: 24px; }
+  .tut-jp { font-size: 20px; }
+  .tut-key { gap: 8px; font-size: 12px; text-align: center; }
+  .tut-key kbd { font-size: 13px; white-space: nowrap; }
+  .tut-stamp b { font-size: 44px; }
+  .tut-stamp .tut-jp { font-size: 40px; }
+  .tut-note { width: calc(100% - 24px); font-size: 22px; text-align: center; }
+  .tut-note[data-tone='bad'] { font-size: 28px; }
+  .touch .tut-skip { top: calc(64px + var(--hud-top)); right: max(10px, env(safe-area-inset-right, 0px)); }
+}
+/* upright but short (an address bar or a header takes a good share): the lessons tighter, so the
+   arrows pointing into the fight show under them */
+@media (max-width: 600px) and (orientation: portrait) and (max-height: 620px) {
+  .tut-head { top: calc(100px + var(--hud-top)); padding: 4px 10px 6px; gap: 2px; }
+  .tut-pips i { height: 4px; }
+  .tut-word b { font-size: 19px; }
+  .tut-jp { font-size: 16px; }
+  .tut-count i { width: 10px; height: 10px; }
+}
+/* a tablet held upright keeps the wide layout, but the cards leave too little room between them
+   for the lessons: those go under them */
+@media (min-width: 601px) and (orientation: portrait) {
+  .touch .tut-head { top: calc(100px + var(--hud-top)); }
+}

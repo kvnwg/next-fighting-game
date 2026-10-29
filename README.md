@@ -47,7 +47,7 @@ The CrazyGames version plays online: everyone shares the grounds on one game ser
 
 [docs/crazygames.md](docs/crazygames.md) walks through deploying the server and putting the game on CrazyGames.
 
-Touch controls switch on by themselves on phones and tablets.
+Touch controls switch on by themselves on phones and tablets, which play held either way up.
 
 Other scripts: `npm test` (combat rules, server integration and bot-vs-bot match simulations), `npm run typecheck`.
 
@@ -73,7 +73,7 @@ Ranked profiles are stored in `data/profiles.json` (`DATA_DIR` overrides the fol
 | C / L / H | Characters / Ranked ladder / Help and settings |
 | Enter | Chat |
 
-**Phones and tablets** get on-screen controls automatically (or add `?touch` to the URL to force them on, `?touch=0` to force them off). Play in landscape.
+**Phones and tablets** get on-screen controls automatically (or add `?touch` to the URL to force them on, `?touch=0` to force them off). They play held either way up: upright, the health cards share the top, the stick takes the lower left, and the camera sits further back and higher so you and your opponent stack up the screen (`src/client/orientation.ts`, the portrait block at the end of `styles.css`, and `narrow()` in `camera.ts`).
 - **Move:** put your left thumb anywhere on the left side; the stick appears under it.
 - **Look:** drag anywhere else.
 - **Buttons** (right side, from `src/client/touch.ts`): **Parry** (tap to deflect, hold to block), **Heavy**, **Dodge** (hold to sprint), **Light** and **Jump**.

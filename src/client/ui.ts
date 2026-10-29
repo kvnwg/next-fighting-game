@@ -1257,7 +1257,7 @@ export class UI {
             ${
               this.touch
                 ? `<table class="keys">
-              <tr><td>Left thumb</td><td>Move (anywhere on the left side)</td></tr>
+              <tr><td>Left thumb</td><td>Move (anywhere on the left side; its lower half with the phone upright)</td></tr>
               <tr><td>Drag right</td><td>Look around (out of a duel; locked on, the camera holds still)</td></tr>
               <tr><td>Light</td><td>Light attack, three in a row (after a forward dodge: dash attack; walking away: backstep attack; in the air: air attack)</td></tr>
               <tr><td>Heavy</td><td>Heavy attack, three in a row, with the same dash, backstep and air versions (tap Parry during the windup to feint)</td></tr>
